@@ -1,0 +1,52 @@
+{
+  "name": "invoice-bonus-system",
+  "version": "1.0.0",
+  "description": "專案開立發票業績認列獎金計算總表系統",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "migrate": "node migrations/migrate.js",
+    "migrate:users": "node migrations/migrate_users.js",
+    "migrate:project-code": "node migrations/migrate_project_code_unique.js",
+    "migrate:project-customer": "node migrations/migrate_project_customer_unique.js",
+    "migrate:project-name": "node migrations/migrate_project_name_unique.js",
+    "migrate:user-roles": "node migrations/migrate_user_roles.js",
+    "migrate:remove-user-role-check": "node migrations/migrate_remove_user_role_check.js",
+    "migrate:roles": "node migrations/migrate_roles.js",
+    "migrate:system-settings": "node migrations/migrate_system_settings.js",
+    "migrate:project-types": "node migrations/migrate_project_types.js",
+    "migrate:remove-project-type-check": "node migrations/migrate_remove_project_type_check.js",
+    "migrate:sales-discount": "node migrations/migrate_sales_discount.js",
+    "migrate:costs": "node migrations/migrate_costs.js",
+    "migrate:update-total-received": "node migrations/migrate_update_total_received_with_fee.js",
+    "seed": "node migrations/seed.js",
+    "test:expected-invoice": "node test_expected_invoice_update.js",
+    "check:expected-invoice": "node check_expected_invoice_field.js",
+    "check:password-hash": "node scripts/check_password_hash.js",
+    "upgrade:passwords": "node scripts/upgrade_passwords.js",
+    "test": "jest"
+  },
+  "keywords": [
+    "invoice",
+    "bonus",
+    "project-management",
+    "taiwan"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "argon2": "^0.40.1",
+    "bcrypt": "^5.1.1",
+    "better-sqlite3": "^11.8.1",
+    "dayjs": "^1.11.13",
+    "ejs": "^3.1.10",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.0",
+    "express-session": "^1.18.2",
+    "multer": "^1.4.5-lts.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  }
+}

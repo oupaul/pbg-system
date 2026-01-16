@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %> - 業績獎金系統</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/css/style.css" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="/">
+        <i class="bi bi-calculator"></i> 業績獎金系統
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="/"><i class="bi bi-house"></i> 首頁</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/projects"><i class="bi bi-folder"></i> 專案管理</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/bonuses"><i class="bi bi-currency-dollar"></i> 獎金管理</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/salespeople"><i class="bi bi-people"></i> 業務管理</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/customers"><i class="bi bi-building"></i> 客戶管理</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/import-export"><i class="bi bi-arrow-left-right"></i> 匯入/匯出</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/audit-logs"><i class="bi bi-clock-history"></i> 修改記錄</a>
+          </li>
+          <% if (typeof user !== 'undefined' && user && user.role === 'admin') { %>
+          <li class="nav-item">
+            <a class="nav-link" href="/backup-restore"><i class="bi bi-archive"></i> 備份還原</a>
+          </li>
+          <% } %>
+        </ul>
+        <% if (typeof user !== 'undefined' && user) { %>
+          <ul class="navbar-nav">
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                <i class="bi bi-person-circle"></i> <%= user.name || user.username %>
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li><h6 class="dropdown-header"><%= user.name || user.username %></h6></li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <a class="dropdown-item" href="/change-password">
+                    <i class="bi bi-key"></i> 修改密碼
+                  </a>
+                </li>
+                <% if (user.role === 'admin') { %>
+                <li>
+                  <a class="dropdown-item" href="/users">
+                    <i class="bi bi-people"></i> 使用者管理
+                  </a>
+                </li>
+                <% } %>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <form method="POST" action="/logout" class="m-0">
+                    <button type="submit" class="dropdown-item">
+                      <i class="bi bi-box-arrow-right"></i> 登出
+                    </button>
+                  </form>
+                </li>
+              </ul>
+            </li>
+          </ul>
+        <% } %>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container-fluid py-4">
+    <div class="row mb-4">
+      <div class="col">
+        <h1 class="h3"><i class="bi bi-archive"></i> 備份與還原</h1>
+      </div>
+    </div>
+
+    <% if (typeof success !== 'undefined' && success) { %>
+      <div class="alert alert-success alert-dismissible fade show">
+        <i class="bi bi-check-circle"></i> <%= success %>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    <% } %>
+
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="alert alert-danger alert-dismissible fade show">
+        <i class="bi bi-exclamation-triangle"></i> <%= error %>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    <% } %>
+
+    <!-- 進度條容器 -->
+    <div id="progressContainer" style="display: none;" class="mb-4">
+      <div class="card">
+        <div class="card-header bg-info text-white">
+          <i class="bi bi-hourglass-split"></i> <span id="progressTitle">執行中...</span>
+        </div>
+        <div class="card-body">
+          <div class="mb-2">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span id="progressMessage">準備中...</span>
+              <span id="progressPercent" class="badge bg-primary">0%</span>
+            </div>
+            <div class="progress" style="height: 25px;">
+              <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                   role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <!-- 備份功能 -->
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-header bg-primary text-white">
+            <i class="bi bi-cloud-upload"></i> 建立備份
+          </div>
+          <div class="card-body">
+            <p class="card-text">建立系統完整備份，包含資料庫和上傳檔案。</p>
+            <form id="backupForm" method="POST" action="/backup-restore/backup">
+              <button type="submit" class="btn btn-primary" id="backupBtn">
+                <i class="bi bi-cloud-upload"></i> 立即備份
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- NAS 設定 -->
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-header bg-info text-white">
+            <i class="bi bi-server"></i> NAS 異地備份設定
+          </div>
+          <div class="card-body">
+            <p class="card-text">設定 Synology NAS 異地備份，備份完成後自動同步到 NAS。</p>
+            <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#nasConfigModal">
+              <i class="bi bi-gear"></i> 設定 NAS
+            </button>
+            <div id="nasStatus" class="mt-2"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 備份列表 -->
+      <div class="col-md-12">
+        <div class="card">
+          <div class="card-header bg-info text-white">
+            <i class="bi bi-list-ul"></i> 備份列表
+          </div>
+          <div class="card-body">
+            <% if (typeof backups !== 'undefined' && backups && backups.length > 0) { %>
+              <div class="mb-3">
+                <button type="button" class="btn btn-sm btn-secondary" id="selectAllBtn" onclick="toggleSelectAll()">
+                  <i class="bi bi-check-square"></i> 全選
+                </button>
+                <button type="button" class="btn btn-sm btn-danger" id="batchDeleteBtn" onclick="batchDelete()" disabled>
+                  <i class="bi bi-trash"></i> 批次刪除
+                </button>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-hover">
+                  <thead>
+                    <tr>
+                      <th width="50">
+                        <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                      </th>
+                      <th>備份檔案名稱</th>
+                      <th>檔案大小</th>
+                      <th>建立時間</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% backups.forEach(function(backup) { %>
+                      <tr>
+                        <td>
+                          <input type="checkbox" class="backup-checkbox" value="<%= backup.filename %>" onchange="updateBatchDeleteBtn()">
+                        </td>
+                        <td>
+                          <i class="bi bi-file-earmark-zip"></i> 
+                          <%= backup.filename %>
+                        </td>
+                        <td><%= backup.sizeFormatted %></td>
+                        <td><%= new Date(backup.created).toLocaleString('zh-TW') %></td>
+                        <td>
+                          <a href="/backup-restore/download/<%= encodeURIComponent(backup.filename) %>" class="btn btn-sm btn-primary me-2">
+                            <i class="bi bi-download"></i> 下載
+                          </a>
+                          <form method="POST" action="/backup-restore/delete" style="display: inline;" onsubmit="return confirm('確定要刪除此備份檔案嗎？此操作無法復原！');">
+                            <input type="hidden" name="backupFile" value="<%= backup.filename %>">
+                            <button type="submit" class="btn btn-sm btn-danger">
+                              <i class="bi bi-trash"></i> 刪除
+                            </button>
+                          </form>
+                        </td>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+            <% } else { %>
+              <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> 目前沒有備份檔案
+              </div>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NAS 設定 Modal -->
+    <div class="modal fade" id="nasConfigModal" tabindex="-1" aria-labelledby="nasConfigModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="nasConfigModalLabel"><i class="bi bi-server"></i> NAS 異地備份設定</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <form id="nasConfigForm">
+              <div class="mb-3">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="nasEnabled" name="enabled">
+                  <label class="form-check-label" for="nasEnabled">
+                    <strong>啟用 NAS 異地備份</strong>
+                  </label>
+                </div>
+                <small class="form-text text-muted">啟用後，每次備份完成會自動同步到 NAS</small>
+              </div>
+
+              <div class="mb-3">
+                <label for="nasProtocol" class="form-label">傳輸協定</label>
+                <select class="form-select" id="nasProtocol" name="protocol" required>
+                  <option value="rsync">rsync（推薦）</option>
+                  <option value="scp">SCP/SSH</option>
+                </select>
+                <small class="form-text text-muted">建議使用 rsync，效率更高</small>
+              </div>
+
+              <div class="mb-3">
+                <label for="nasHost" class="form-label">NAS 主機地址 <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="nasHost" name="host" placeholder="例如: 192.168.1.100 或 nas.example.com" required>
+                <small class="form-text text-muted">NAS 的 IP 地址或主機名稱</small>
+              </div>
+
+              <div class="mb-3">
+                <label for="nasPort" class="form-label">連接埠</label>
+                <input type="number" class="form-control" id="nasPort" name="port" value="22" min="1" max="65535">
+                <small class="form-text text-muted">SSH 連接埠（預設: 22）</small>
+              </div>
+
+              <div class="mb-3">
+                <label for="nasUsername" class="form-label">用戶名稱 <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="nasUsername" name="username" placeholder="例如: admin" required>
+                <small class="form-text text-muted">NAS 的登入用戶名稱</small>
+              </div>
+
+              <div class="mb-3">
+                <label for="nasPath" class="form-label">備份路徑 <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="nasPath" name="path" placeholder="例如: /volume1/backups/invoice-bonus" required>
+                <small class="form-text text-muted">NAS 上的備份目錄路徑（絕對路徑）</small>
+              </div>
+
+              <div class="alert alert-info">
+                <h6><i class="bi bi-info-circle"></i> 認證方式說明</h6>
+                <ul class="mb-0 small">
+                  <li><strong>rsync:</strong> 需要配置 SSH key 免密碼登入，或使用 rsync daemon</li>
+                  <li><strong>SCP/SSH:</strong> 需要配置 SSH key 免密碼登入</li>
+                  <li>建議使用 SSH key 認證，更安全且無需輸入密碼</li>
+                  <li>配置 SSH key: <code>ssh-keygen -t rsa</code> 然後 <code>ssh-copy-id username@nas-host</code></li>
+                </ul>
+              </div>
+
+              <div id="nasConfigError" class="alert alert-danger" style="display: none;"></div>
+              <div id="nasConfigSuccess" class="alert alert-success" style="display: none;"></div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="button" class="btn btn-info" id="testNasConnection">
+              <i class="bi bi-wifi"></i> 測試連接
+            </button>
+            <button type="button" class="btn btn-primary" id="saveNasConfig">
+              <i class="bi bi-save"></i> 儲存設定
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row mt-4">
+      <div class="col">
+        <div class="alert alert-warning">
+          <h5><i class="bi bi-exclamation-triangle"></i> 注意事項</h5>
+          <ul class="mb-0">
+            <li>備份包含資料庫和所有上傳檔案</li>
+            <li>備份檔案存放在 <code><%= typeof backupDir !== 'undefined' && backupDir ? backupDir : '/opt/invoice-bonus-backups' %></code></li>
+            <li>系統會自動保留最近 10 個備份檔案</li>
+            <li>啟用 NAS 異地備份後，每次備份完成會自動同步到 NAS</li>
+            <li>NAS 備份需要配置 SSH key 免密碼登入</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    let currentOperationId = null;
+    let progressInterval = null;
+
+    // 備份表單提交
+    document.getElementById('backupForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      if (!confirm('確定要建立備份嗎？')) {
+        return;
+      }
+      
+      const btn = document.getElementById('backupBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>執行中...';
+      
+      try {
+        const response = await fetch('/backup-restore/backup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('HTTP ' + response.status);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && data.operationId) {
+          currentOperationId = data.operationId;
+          showProgress('備份', data.operationId);
+          startProgressPolling(data.operationId, () => {
+            // 進度完成或失敗時恢復按鈕
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-cloud-upload"></i> 立即備份';
+          });
+        } else {
+          alert('備份啟動失敗: ' + (data.error || '未知錯誤'));
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-cloud-upload"></i> 立即備份';
+        }
+      } catch (error) {
+        console.error('備份錯誤:', error);
+        alert('備份啟動失敗: ' + error.message);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-cloud-upload"></i> 立即備份';
+      }
+    });
+
+    // 載入 NAS 設定狀態
+    async function loadNasStatus() {
+      try {
+        const response = await fetch('/backup-restore/nas/config');
+        if (response.ok) {
+          const data = await response.json();
+          const statusDiv = document.getElementById('nasStatus');
+          if (data.config && data.config.enabled) {
+            statusDiv.innerHTML = '<span class="badge bg-success"><i class="bi bi-check-circle"></i> 已啟用</span>';
+          } else {
+            statusDiv.innerHTML = '<span class="badge bg-secondary"><i class="bi bi-x-circle"></i> 未啟用</span>';
+          }
+        }
+      } catch (error) {
+        console.error('載入 NAS 狀態失敗:', error);
+      }
+    }
+
+    // 頁面載入時檢查 NAS 狀態
+    loadNasStatus();
+
+    // NAS 設定 Modal 載入時填充現有設定
+    document.getElementById('nasConfigModal').addEventListener('show.bs.modal', async function() {
+      try {
+        const response = await fetch('/backup-restore/nas/config');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.config) {
+            document.getElementById('nasEnabled').checked = data.config.enabled || false;
+            document.getElementById('nasProtocol').value = data.config.protocol || 'rsync';
+            document.getElementById('nasHost').value = data.config.host || '';
+            document.getElementById('nasPort').value = data.config.port || 22;
+            document.getElementById('nasUsername').value = data.config.username || '';
+            document.getElementById('nasPath').value = data.config.path || '';
+          }
+        }
+      } catch (error) {
+        console.error('載入 NAS 設定失敗:', error);
+      }
+    });
+
+    // 儲存 NAS 設定
+    document.getElementById('saveNasConfig').addEventListener('click', async function() {
+      const form = document.getElementById('nasConfigForm');
+      const formData = new FormData(form);
+      const config = {
+        enabled: document.getElementById('nasEnabled').checked,
+        protocol: formData.get('protocol'),
+        host: formData.get('host'),
+        port: parseInt(formData.get('port')) || 22,
+        username: formData.get('username'),
+        path: formData.get('path')
+      };
+
+      const errorDiv = document.getElementById('nasConfigError');
+      const successDiv = document.getElementById('nasConfigSuccess');
+      errorDiv.style.display = 'none';
+      successDiv.style.display = 'none';
+
+      try {
+        const response = await fetch('/backup-restore/nas/config', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(config)
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          successDiv.textContent = '設定已儲存';
+          successDiv.style.display = 'block';
+          loadNasStatus();
+          setTimeout(() => {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('nasConfigModal'));
+            modal.hide();
+          }, 1500);
+        } else {
+          errorDiv.textContent = data.error || '儲存失敗';
+          errorDiv.style.display = 'block';
+        }
+      } catch (error) {
+        errorDiv.textContent = '儲存失敗: ' + error.message;
+        errorDiv.style.display = 'block';
+      }
+    });
+
+    // 測試 NAS 連接
+    document.getElementById('testNasConnection').addEventListener('click', async function() {
+      const form = document.getElementById('nasConfigForm');
+      const formData = new FormData(form);
+      const config = {
+        enabled: document.getElementById('nasEnabled').checked,
+        protocol: formData.get('protocol'),
+        host: formData.get('host'),
+        port: parseInt(formData.get('port')) || 22,
+        username: formData.get('username'),
+        path: formData.get('path')
+      };
+
+      const errorDiv = document.getElementById('nasConfigError');
+      const successDiv = document.getElementById('nasConfigSuccess');
+      errorDiv.style.display = 'none';
+      successDiv.style.display = 'none';
+
+      const btn = this;
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>測試中...';
+
+      try {
+        const response = await fetch('/backup-restore/nas/test', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(config)
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          successDiv.textContent = data.message || '連接測試成功';
+          successDiv.style.display = 'block';
+        } else {
+          errorDiv.textContent = data.message || '連接測試失敗';
+          errorDiv.style.display = 'block';
+        }
+      } catch (error) {
+        errorDiv.textContent = '測試失敗: ' + error.message;
+        errorDiv.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    });
+
+    // 顯示進度條
+    function showProgress(operation, operationId) {
+      document.getElementById('progressContainer').style.display = 'block';
+      document.getElementById('progressTitle').textContent = operation + '執行中...';
+      document.getElementById('progressMessage').textContent = '準備中...';
+      document.getElementById('progressPercent').textContent = '0%';
+      document.getElementById('progressBar').style.width = '0%';
+      document.getElementById('progressBar').setAttribute('aria-valuenow', '0');
+      
+      // 滾動到進度條
+      document.getElementById('progressContainer').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // 開始輪詢進度
+    function startProgressPolling(operationId, onComplete = null) {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
+      
+      let errorCount = 0;
+      const maxErrors = 5;
+      
+      progressInterval = setInterval(async () => {
+        try {
+          const response = await fetch('/backup-restore/progress/' + operationId);
+          
+          if (!response.ok) {
+            errorCount++;
+            if (errorCount >= maxErrors) {
+              clearInterval(progressInterval);
+              progressInterval = null;
+              document.getElementById('progressContainer').style.display = 'none';
+              if (onComplete) onComplete();
+              alert('無法獲取進度資訊，請重新整理頁面查看結果');
+            }
+            return;
+          }
+          
+          const progress = await response.json();
+          errorCount = 0; // 重置錯誤計數
+          
+          if (progress.status === 'not_found') {
+            clearInterval(progressInterval);
+            progressInterval = null;
+            if (onComplete) onComplete();
+            return;
+          }
+          
+          updateProgress(progress);
+          
+          if (progress.status === 'completed' || progress.status === 'error') {
+            clearInterval(progressInterval);
+            progressInterval = null;
+            
+            // 恢復按鈕狀態
+            if (onComplete) onComplete();
+            
+            // 3秒後隱藏進度條並重新載入頁面（成功時）或顯示錯誤（失敗時）
+            setTimeout(() => {
+              if (progress.status === 'completed') {
+                window.location.reload();
+              } else {
+                document.getElementById('progressContainer').style.display = 'none';
+                alert(progress.message || '操作失敗');
+              }
+            }, 3000);
+          }
+        } catch (error) {
+          console.error('獲取進度錯誤:', error);
+          errorCount++;
+          if (errorCount >= maxErrors) {
+            clearInterval(progressInterval);
+            progressInterval = null;
+            document.getElementById('progressContainer').style.display = 'none';
+            if (onComplete) onComplete();
+            alert('無法獲取進度資訊，請重新整理頁面查看結果');
+          }
+        }
+      }, 1000); // 每秒輪詢一次
+    }
+
+    // 全選/取消全選
+    function toggleSelectAll() {
+      const selectAllCheckbox = document.getElementById('selectAll');
+      const checkboxes = document.querySelectorAll('.backup-checkbox');
+      const isChecked = selectAllCheckbox.checked;
+      
+      checkboxes.forEach(checkbox => {
+        checkbox.checked = isChecked;
+      });
+      
+      updateBatchDeleteBtn();
+      
+      // 更新全選按鈕文字
+      const selectAllBtn = document.getElementById('selectAllBtn');
+      if (selectAllBtn) {
+        selectAllBtn.innerHTML = isChecked 
+          ? '<i class="bi bi-x-square"></i> 取消全選'
+          : '<i class="bi bi-check-square"></i> 全選';
+      }
+    }
+
+    // 更新批次刪除按鈕狀態
+    function updateBatchDeleteBtn() {
+      const checkboxes = document.querySelectorAll('.backup-checkbox:checked');
+      const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+      const selectAllCheckbox = document.getElementById('selectAll');
+      
+      if (batchDeleteBtn) {
+        batchDeleteBtn.disabled = checkboxes.length === 0;
+      }
+      
+      // 更新全選 checkbox 狀態
+      const allCheckboxes = document.querySelectorAll('.backup-checkbox');
+      if (selectAllCheckbox && allCheckboxes.length > 0) {
+        const checkedCount = checkboxes.length;
+        selectAllCheckbox.checked = checkedCount === allCheckboxes.length;
+        selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < allCheckboxes.length;
+        
+        // 更新全選按鈕文字
+        const selectAllBtn = document.getElementById('selectAllBtn');
+        if (selectAllBtn) {
+          if (checkedCount === allCheckboxes.length) {
+            selectAllBtn.innerHTML = '<i class="bi bi-x-square"></i> 取消全選';
+          } else if (checkedCount > 0) {
+            selectAllBtn.innerHTML = '<i class="bi bi-check-square"></i> 全選 (' + checkedCount + ')';
+          } else {
+            selectAllBtn.innerHTML = '<i class="bi bi-check-square"></i> 全選';
+          }
+        }
+      }
+    }
+
+    // 批次刪除
+    async function batchDelete() {
+      const checkboxes = document.querySelectorAll('.backup-checkbox:checked');
+      const selectedFiles = Array.from(checkboxes).map(cb => cb.value);
+      
+      if (selectedFiles.length === 0) {
+        alert('請至少選擇一個備份檔案');
+        return;
+      }
+      
+      const count = selectedFiles.length;
+      if (!confirm(`確定要刪除 ${count} 個備份檔案嗎？此操作無法復原！`)) {
+        return;
+      }
+      
+      const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+      if (batchDeleteBtn) {
+        batchDeleteBtn.disabled = true;
+        batchDeleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>刪除中...';
+      }
+      
+      try {
+        const response = await fetch('/backup-restore/delete-batch', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ backupFiles: selectedFiles })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          alert(`已成功刪除 ${data.deletedCount || count} 個備份檔案`);
+          window.location.reload();
+        } else {
+          alert('刪除失敗: ' + (data.error || '未知錯誤'));
+          if (batchDeleteBtn) {
+            batchDeleteBtn.disabled = false;
+            batchDeleteBtn.innerHTML = '<i class="bi bi-trash"></i> 批次刪除';
+          }
+        }
+      } catch (error) {
+        console.error('批次刪除錯誤:', error);
+        alert('刪除失敗: ' + error.message);
+        if (batchDeleteBtn) {
+          batchDeleteBtn.disabled = false;
+          batchDeleteBtn.innerHTML = '<i class="bi bi-trash"></i> 批次刪除';
+        }
+      }
+    }
+
+    // 更新進度條
+    function updateProgress(progress) {
+      const progressBar = document.getElementById('progressBar');
+      const progressPercent = document.getElementById('progressPercent');
+      const progressMessage = document.getElementById('progressMessage');
+      const progressTitle = document.getElementById('progressTitle');
+      
+      const percent = progress.progress || 0;
+      progressBar.style.width = percent + '%';
+      progressBar.setAttribute('aria-valuenow', percent);
+      progressPercent.textContent = percent + '%';
+      progressMessage.textContent = progress.message || '執行中...';
+      
+      // 根據狀態更新樣式
+      if (progress.status === 'completed') {
+        progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+        progressBar.classList.add('bg-success');
+        progressTitle.textContent = progress.operation === 'backup' ? '備份完成' : '還原完成';
+      } else if (progress.status === 'error') {
+        progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+        progressBar.classList.add('bg-danger');
+        progressTitle.textContent = '操作失敗';
+      } else {
+        progressBar.classList.add('progress-bar-striped', 'progress-bar-animated');
+        progressBar.classList.remove('bg-success', 'bg-danger');
+        progressTitle.textContent = (progress.operation === 'backup' ? '備份' : '還原') + '執行中...';
+      }
+    }
+    </script>
+  </main>
+
+  <footer class="footer mt-auto py-3 bg-light">
+    <div class="container text-center">
+      <span class="text-muted">專案開立發票業績認列獎金計算總表系統 © <%= new Date().getFullYear() %></span>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>

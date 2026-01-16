@@ -1,0 +1,261 @@
+<%- include('../layout', { body: `
+<div class="row mb-4">
+  <div class="col">
+    <h1 class="h3">
+      <i class="bi bi-folder"></i> 專案管理
+      ${filters.uninvoiced ? '<span class="badge bg-warning text-dark ms-2">未開立發票</span>' : ''}
+      ${filters.unpaid ? '<span class="badge bg-danger ms-2">未收款</span>' : ''}
+    </h1>
+  </div>
+  <div class="col-auto d-flex gap-2">
+    <a href="/projects${filters.uninvoiced ? '' : '?uninvoiced=true'}" class="btn ${filters.uninvoiced ? 'btn-warning' : 'btn-outline-warning'}">
+      <i class="bi bi-file-earmark-x"></i> ${filters.uninvoiced ? '顯示全部' : '未開立發票'}
+    </a>
+    <a href="/projects${filters.unpaid ? '' : '?unpaid=true'}" class="btn ${filters.unpaid ? 'btn-danger' : 'btn-outline-danger'}">
+      <i class="bi bi-cash-coin"></i> ${filters.unpaid ? '顯示全部' : '未收款'}
+    </a>
+    ${locals.canEdit ? '<a href="/projects/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 新增專案</a>' : ''}
+  </div>
+</div>
+
+${locals.isReadOnly ? '<div class="alert alert-info mb-4"><i class="bi bi-info-circle"></i> 您目前為唯讀模式，無法進行編輯操作</div>' : ''}
+
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="get" class="row g-3">
+      <div class="col-md-2">
+        <label class="form-label">年度</label>
+        <select name="year" class="form-select">
+          <option value="all" ${!filters.year || filters.year === 'all' || filters.year === null ? 'selected' : ''}>全部年度</option>
+          ${years.map(y => '<option value="' + y + '" ' + (filters.year == y && filters.year !== 'all' ? 'selected' : '') + '>' + y + '</option>').join('')}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">狀態</label>
+        <select name="status" class="form-select">
+          <option value="">全部</option>
+          <option value="未結案" ${filters.status === '未結案' ? 'selected' : ''}>未結案</option>
+          <option value="已結案" ${filters.status === '已結案' ? 'selected' : ''}>已結案</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">類型</label>
+        <select name="type" class="form-select">
+          <option value="">全部</option>
+          ${typeof projectTypes !== 'undefined' && projectTypes ? projectTypes.map(type => {
+            const selected = filters.type === type.type_name ? 'selected' : '';
+            return '<option value="' + type.type_name + '" ' + selected + '>' + type.type_name + '</option>';
+          }).join('') : '<option value="食驗室" ${filters.type === \'食驗室\' ? \'selected\' : \'\'}>食驗室</option><option value="純廣" ${filters.type === \'純廣\' ? \'selected\' : \'\'}>純廣</option><option value="專案" ${filters.type === \'專案\' ? \'selected\' : \'\'}>專案</option>'}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">業務</label>
+        <select name="salesperson" class="form-select">
+          <option value="">全部</option>
+          ${salespeople.map(s => `<option value="${s.name}" ${filters.salesperson === s.name ? 'selected' : ''}>${s.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">預計開票</label>
+        <select name="expected_invoice_year_month" class="form-select">
+          <option value="">全部</option>
+          ${expectedInvoiceYearMonths.map(ym => '<option value="' + ym + '" ' + (filters.expected_invoice_year_month === ym ? 'selected' : '') + '>' + ym + '</option>').join('')}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">關鍵字</label>
+        <input type="text" name="keyword" class="form-control" value="${filters.keyword || ''}" placeholder="專案編號/名稱/公司">
+      </div>
+      ${filters.uninvoiced ? `
+        <input type="hidden" name="uninvoiced" value="true">
+      ` : ''}
+      ${filters.unpaid ? `
+        <input type="hidden" name="unpaid" value="true">
+      ` : ''}
+      <div class="col-md-2 d-flex align-items-end">
+        <button type="submit" class="btn btn-secondary w-100"><i class="bi bi-search"></i> 搜尋</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+${salespersonStats ? `
+<!-- 專案統計資訊 -->
+<div class="card mb-4 border-primary">
+  <div class="card-header bg-primary text-white">
+    <h5 class="mb-0"><i class="bi bi-calculator"></i> ${userRole === 'salesperson' ? '我的專案統計資訊' : '專案統計資訊'}</h5>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-2">
+        <div class="text-center p-3 bg-light rounded">
+          <div class="text-muted small mb-1">專案價格金額</div>
+          <div class="h5 mb-0 text-primary">
+            $${salespersonStats.totalPrice.toLocaleString()}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="text-center p-3 bg-light rounded">
+          <div class="text-muted small mb-1">已開立發票金額</div>
+          <div class="h5 mb-0 text-success">
+            $${salespersonStats.totalInvoiced.toLocaleString()}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="text-center p-3 bg-light rounded">
+          <div class="text-muted small mb-1">未開發票金額</div>
+          <div class="h5 mb-0 text-warning">
+            $${salespersonStats.totalUninvoiced.toLocaleString()}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="text-center p-3 bg-light rounded">
+          <div class="text-muted small mb-1">已收款金額</div>
+          <div class="h5 mb-0 text-info">
+            $${salespersonStats.totalReceived.toLocaleString()}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="text-center p-3 bg-light rounded">
+          <div class="text-muted small mb-1">未收款金額</div>
+          <div class="h5 mb-0 ${salespersonStats.totalUnpaid > 0 ? 'text-danger' : 'text-success'}">
+            $${salespersonStats.totalUnpaid.toLocaleString()}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="text-center p-3 bg-light rounded">
+          <div class="text-muted small mb-1">專案數量</div>
+          <div class="h5 mb-0 text-secondary">
+            ${projects.length} 筆
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+` : ''}
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-striped mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th>
+              <a href="?${sortLinks.project_code}" class="text-white text-decoration-none">
+                專案編號${sortIcons.project_code}
+              </a>
+            </th>
+            <th>
+              <a href="?${sortLinks.contract_month}" class="text-white text-decoration-none">
+                月份${sortIcons.contract_month}
+              </a>
+            </th>
+            <th>
+              <a href="?${sortLinks.expected_invoice_year_month}" class="text-white text-decoration-none">
+                預計開票${sortIcons.expected_invoice_year_month}
+              </a>
+            </th>
+            <th>
+              <a href="?${sortLinks.project_type}" class="text-white text-decoration-none">
+                類型${sortIcons.project_type}
+              </a>
+            </th>
+            <th>
+              <a href="?${sortLinks.salesperson_name}" class="text-white text-decoration-none">
+                業務${sortIcons.salesperson_name}
+              </a>
+            </th>
+            <th>
+              <a href="?${sortLinks.company_name}" class="text-white text-decoration-none">
+                客戶${sortIcons.company_name}
+              </a>
+            </th>
+            <th>
+              <a href="?${sortLinks.project_name}" class="text-white text-decoration-none">
+                專案名稱${sortIcons.project_name}
+              </a>
+            </th>
+            <th class="text-end">
+              <a href="?${sortLinks.price_with_tax}" class="text-white text-decoration-none">
+                價格(含稅)${sortIcons.price_with_tax}
+              </a>
+            </th>
+            <th class="text-end">
+              <a href="?${sortLinks.total_invoiced}" class="text-white text-decoration-none">
+                已開發票${sortIcons.total_invoiced}
+              </a>
+            </th>
+            <th class="text-end">
+              <a href="?${sortLinks.uninvoiced_amount}" class="text-white text-decoration-none">
+                未開發票${sortIcons.uninvoiced_amount}
+              </a>
+            </th>
+            <th class="text-end">
+              <a href="?${sortLinks.total_received}" class="text-white text-decoration-none">
+                已收款${sortIcons.total_received}
+              </a>
+            </th>
+            <th class="text-end">
+              <a href="?${sortLinks.unpaid_amount}" class="text-white text-decoration-none">
+                未收款${sortIcons.unpaid_amount}
+              </a>
+            </th>
+            <th>
+              <a href="?${sortLinks.status}" class="text-white text-decoration-none">
+                狀態${sortIcons.status}
+              </a>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          ${projects.length ? projects.map(p => {
+            const unpaidAmount = (p.total_invoiced || 0) - (p.total_received || 0) - (p.sales_discount || 0);
+            return `
+            <tr onclick="location.href='/projects/${p.id}'" style="cursor:pointer">
+              <td><code>${p.project_code}</code></td>
+              <td>${p.contract_month || '-'}月</td>
+              <td>${p.expected_invoice_year_month ? '<small class="text-primary">' + p.expected_invoice_year_month + '</small>' : '<span class="text-muted">-</span>'}</td>
+              <td><span class="badge bg-${typeof typeColorMap !== 'undefined' && typeColorMap[p.project_type] ? typeColorMap[p.project_type] : (p.project_type === '食驗室' ? 'primary' : p.project_type === '純廣' ? 'success' : 'info')}">${p.project_type}</span></td>
+              <td>${p.salesperson_name || '-'}</td>
+              <td>${p.company_name || '-'}</td>
+              <td>${p.project_name}</td>
+              <td class="text-end">$${(p.price_with_tax || 0).toLocaleString()}</td>
+              <td class="text-end">$${(p.total_invoiced || 0).toLocaleString()}</td>
+              <td class="text-end"><span class="text-info">$${((p.price_with_tax || 0) - (p.total_invoiced || 0)).toLocaleString()}</span></td>
+              <td class="text-end">$${(p.total_received || 0).toLocaleString()}</td>
+              <td class="text-end"><span class="${unpaidAmount > 0 ? 'text-danger fw-bold' : 'text-muted'}">$${unpaidAmount.toLocaleString()}</span></td>
+              <td>
+                <span class="badge bg-${p.status === '已結案' ? 'secondary' : p.status === '取消' ? 'danger' : 'warning'}">${p.status}</span>
+                ${p.is_new_customer ? '<span class="badge bg-success ms-1">新</span>' : ''}
+              </td>
+            </tr>
+          `;
+          }).join('') : '<tr><td colspan="13" class="text-center text-muted py-4">無符合條件的專案</td></tr>'}
+          
+          ${salespersonStats && projects.length > 0 ? `
+          <!-- 統計總計行 -->
+          <tr class="table-info fw-bold">
+            <td colspan="7" class="text-end"><strong>統計總計：</strong></td>
+            <td class="text-end">$${salespersonStats.totalPrice.toLocaleString()}</td>
+            <td class="text-end">$${salespersonStats.totalInvoiced.toLocaleString()}</td>
+            <td class="text-end">$${salespersonStats.totalUninvoiced.toLocaleString()}</td>
+            <td class="text-end">$${salespersonStats.totalReceived.toLocaleString()}</td>
+            <td class="text-end ${salespersonStats.totalUnpaid > 0 ? 'text-danger' : ''}">$${salespersonStats.totalUnpaid.toLocaleString()}</td>
+            <td></td>
+          </tr>
+          ` : ''}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer text-muted">
+    共 ${projects.length} 筆專案
+  </div>
+</div>
+`}) %>

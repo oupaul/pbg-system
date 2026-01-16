@@ -1,0 +1,345 @@
+<% 
+  // 構建 body HTML
+  let bodyHtml = '';
+  
+  bodyHtml += '<div class="row mb-4">';
+  bodyHtml += '  <div class="col">';
+  bodyHtml += '    <h1 class="h3"><i class="bi bi-heart-pulse"></i> 系統健康狀態</h1>';
+  bodyHtml += '    <p class="text-muted">查看系統運行狀態和資料庫資訊</p>';
+  bodyHtml += '  </div>';
+  bodyHtml += '</div>';
+  
+  bodyHtml += '<div class="row g-4">';
+  
+  // 資料庫狀態卡片
+  bodyHtml += '  <div class="col-md-6">';
+  bodyHtml += '    <div class="card h-100">';
+  bodyHtml += '      <div class="card-header bg-primary text-white">';
+  bodyHtml += '        <i class="bi bi-database"></i> 資料庫狀態';
+  bodyHtml += '      </div>';
+  bodyHtml += '      <div class="card-body">';
+  
+  if (typeof healthInfo.database !== 'undefined' && healthInfo.database.exists) {
+    bodyHtml += '        <div class="mb-3">';
+    bodyHtml += '          <strong>狀態：</strong>';
+    bodyHtml += '          <span class="badge bg-success">正常</span>';
+    bodyHtml += '        </div>';
+    bodyHtml += '        <div class="mb-3">';
+    bodyHtml += '          <strong>檔案大小：</strong>';
+    bodyHtml += (healthInfo.database.sizeFormatted || '未知');
+    bodyHtml += '        </div>';
+    bodyHtml += '        <div class="mb-3">';
+    bodyHtml += '          <strong>最後修改時間：</strong>';
+    bodyHtml += new Date(healthInfo.database.modifiedTime).toLocaleString('zh-TW');
+    bodyHtml += '        </div>';
+    bodyHtml += '        <div class="mb-3">';
+    bodyHtml += '          <strong>資料表數量：</strong>';
+    bodyHtml += (healthInfo.database.tableCount || 0);
+    bodyHtml += '        </div>';
+    bodyHtml += '        <hr>';
+    bodyHtml += '        <h6>資料表統計：</h6>';
+    bodyHtml += '        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">';
+    bodyHtml += '          <table class="table table-sm table-hover">';
+    bodyHtml += '            <thead>';
+    bodyHtml += '              <tr>';
+    bodyHtml += '                <th>資料表</th>';
+    bodyHtml += '                <th class="text-end">記錄數</th>';
+    bodyHtml += '              </tr>';
+    bodyHtml += '            </thead>';
+    bodyHtml += '            <tbody>';
+    
+    if (healthInfo.database.tables && healthInfo.database.tables.length > 0) {
+      healthInfo.database.tables.forEach(function(table) {
+        bodyHtml += '              <tr>';
+        bodyHtml += '                <td>' + (table.displayName || table.name) + '</td>';
+        bodyHtml += '                <td class="text-end">' + ((table.count || 0).toLocaleString()) + '</td>';
+        bodyHtml += '              </tr>';
+      });
+    } else {
+      bodyHtml += '              <tr><td colspan="2" class="text-center text-muted">無資料</td></tr>';
+    }
+    
+    bodyHtml += '            </tbody>';
+    bodyHtml += '          </table>';
+    bodyHtml += '        </div>';
+  } else {
+    bodyHtml += '        <div class="alert alert-danger">';
+    bodyHtml += '          <i class="bi bi-exclamation-triangle"></i> 資料庫檔案不存在或無法讀取';
+    if (healthInfo.database && healthInfo.database.error) {
+      bodyHtml += '          <br><small>錯誤：' + healthInfo.database.error + '</small>';
+    }
+    bodyHtml += '        </div>';
+  }
+  
+  bodyHtml += '      </div>';
+  bodyHtml += '    </div>';
+  bodyHtml += '  </div>';
+  
+  // 系統資訊卡片
+  bodyHtml += '  <div class="col-md-6">';
+  bodyHtml += '    <div class="card h-100">';
+  bodyHtml += '      <div class="card-header bg-info text-white">';
+  bodyHtml += '        <i class="bi bi-server"></i> 系統資訊';
+  bodyHtml += '      </div>';
+  bodyHtml += '      <div class="card-body">';
+  bodyHtml += '        <div class="mb-3">';
+  bodyHtml += '          <strong>Node.js 版本：</strong>';
+  bodyHtml += (healthInfo.system.nodeVersion || '未知');
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="mb-3">';
+  bodyHtml += '          <strong>作業系統：</strong>';
+  bodyHtml += (healthInfo.system.platform || '未知') + ' (' + (healthInfo.system.arch || '未知') + ')';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="mb-3">';
+  bodyHtml += '          <strong>運行環境：</strong>';
+  bodyHtml += '          <span class="badge bg-' + (healthInfo.system.env === 'production' ? 'success' : 'warning') + '">' + (healthInfo.system.env || 'development') + '</span>';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="mb-3">';
+  bodyHtml += '          <strong>運行時間：</strong>';
+  bodyHtml += (healthInfo.system.uptimeFormatted || '未知');
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="mb-3">';
+  bodyHtml += '          <strong>程序 ID：</strong>';
+  bodyHtml += (healthInfo.system.pid || '未知');
+  bodyHtml += '        </div>';
+  bodyHtml += '        <hr>';
+  bodyHtml += '        <h6>記憶體使用：</h6>';
+  bodyHtml += '        <div class="mb-2">';
+  bodyHtml += '          <small>總堆積記憶體：</small>';
+  bodyHtml += '          <div class="text-end"><strong>' + (healthInfo.system.memory.total || '未知') + '</strong></div>';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="mb-2">';
+  bodyHtml += '          <small>已使用堆積記憶體：</small>';
+  bodyHtml += '          <div class="text-end"><strong>' + (healthInfo.system.memory.used || '未知') + '</strong></div>';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="mb-2">';
+  bodyHtml += '          <small>外部記憶體：</small>';
+  bodyHtml += '          <div class="text-end"><strong>' + (healthInfo.system.memory.external || '未知') + '</strong></div>';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="mb-2">';
+  bodyHtml += '          <small>常駐集區大小 (RSS)：</small>';
+  bodyHtml += '          <div class="text-end"><strong>' + (healthInfo.system.memory.rss || '未知') + '</strong></div>';
+  bodyHtml += '        </div>';
+  bodyHtml += '      </div>';
+  bodyHtml += '    </div>';
+  bodyHtml += '  </div>';
+  
+  // 統計資訊卡片
+  bodyHtml += '  <div class="col-md-6">';
+  bodyHtml += '    <div class="card h-100">';
+  bodyHtml += '      <div class="card-header bg-success text-white">';
+  bodyHtml += '        <i class="bi bi-bar-chart"></i> 資料統計';
+  bodyHtml += '      </div>';
+  bodyHtml += '      <div class="card-body">';
+  
+  if (typeof healthInfo.statistics !== 'undefined' && !healthInfo.statistics.error) {
+    bodyHtml += '        <div class="row g-3">';
+    bodyHtml += '          <div class="col-6">';
+    bodyHtml += '            <div class="text-center p-3 bg-light rounded">';
+    bodyHtml += '              <div class="text-muted small mb-1">專案</div>';
+    bodyHtml += '              <div class="h4 mb-0">' + ((healthInfo.statistics.projects || 0).toLocaleString()) + '</div>';
+    bodyHtml += '            </div>';
+    bodyHtml += '          </div>';
+    bodyHtml += '          <div class="col-6">';
+    bodyHtml += '            <div class="text-center p-3 bg-light rounded">';
+    bodyHtml += '              <div class="text-muted small mb-1">客戶</div>';
+    bodyHtml += '              <div class="h4 mb-0">' + ((healthInfo.statistics.customers || 0).toLocaleString()) + '</div>';
+    bodyHtml += '            </div>';
+    bodyHtml += '          </div>';
+    bodyHtml += '          <div class="col-6">';
+    bodyHtml += '            <div class="text-center p-3 bg-light rounded">';
+    bodyHtml += '              <div class="text-muted small mb-1">發票</div>';
+    bodyHtml += '              <div class="h4 mb-0">' + ((healthInfo.statistics.invoices || 0).toLocaleString()) + '</div>';
+    bodyHtml += '            </div>';
+    bodyHtml += '          </div>';
+    bodyHtml += '          <div class="col-6">';
+    bodyHtml += '            <div class="text-center p-3 bg-light rounded">';
+    bodyHtml += '              <div class="text-muted small mb-1">收款</div>';
+    bodyHtml += '              <div class="h4 mb-0">' + ((healthInfo.statistics.payments || 0).toLocaleString()) + '</div>';
+    bodyHtml += '            </div>';
+    bodyHtml += '          </div>';
+    bodyHtml += '          <div class="col-6">';
+    bodyHtml += '            <div class="text-center p-3 bg-light rounded">';
+    bodyHtml += '              <div class="text-muted small mb-1">使用者</div>';
+    bodyHtml += '              <div class="h4 mb-0">' + ((healthInfo.statistics.users || 0).toLocaleString()) + '</div>';
+    bodyHtml += '            </div>';
+    bodyHtml += '          </div>';
+    bodyHtml += '          <div class="col-6">';
+    bodyHtml += '            <div class="text-center p-3 bg-light rounded">';
+    bodyHtml += '              <div class="text-muted small mb-1">業務</div>';
+    bodyHtml += '              <div class="h4 mb-0">' + ((healthInfo.statistics.salespeople || 0).toLocaleString()) + '</div>';
+    bodyHtml += '            </div>';
+    bodyHtml += '          </div>';
+    bodyHtml += '        </div>';
+    bodyHtml += '        <hr>';
+    bodyHtml += '        <div class="mb-2">';
+    bodyHtml += '          <strong>專案總金額：</strong>';
+    bodyHtml += '          <div class="text-end">$' + ((healthInfo.statistics.totalProjectAmount || 0).toLocaleString()) + '</div>';
+    bodyHtml += '        </div>';
+    bodyHtml += '        <div class="mb-2">';
+    bodyHtml += '          <strong>已開立發票總額：</strong>';
+    bodyHtml += '          <div class="text-end text-success">$' + ((healthInfo.statistics.totalInvoiced || 0).toLocaleString()) + '</div>';
+    bodyHtml += '        </div>';
+    bodyHtml += '        <div class="mb-2">';
+    bodyHtml += '          <strong>已收款總額：</strong>';
+    bodyHtml += '          <div class="text-end text-success">$' + ((healthInfo.statistics.totalReceived || 0).toLocaleString()) + '</div>';
+    bodyHtml += '        </div>';
+  } else {
+    bodyHtml += '        <div class="alert alert-warning">';
+    bodyHtml += '          <i class="bi bi-exclamation-triangle"></i> 無法載入統計資訊';
+    if (healthInfo.statistics && healthInfo.statistics.error) {
+      bodyHtml += '          <br><small>錯誤：' + healthInfo.statistics.error + '</small>';
+    }
+    bodyHtml += '        </div>';
+  }
+  
+  bodyHtml += '      </div>';
+  bodyHtml += '    </div>';
+  bodyHtml += '  </div>';
+  
+  // 備份狀態卡片
+  bodyHtml += '  <div class="col-md-6">';
+  bodyHtml += '    <div class="card h-100">';
+  bodyHtml += '      <div class="card-header bg-warning text-dark">';
+  bodyHtml += '        <i class="bi bi-archive"></i> 備份狀態';
+  bodyHtml += '      </div>';
+  bodyHtml += '      <div class="card-body">';
+  
+  if (typeof healthInfo.backup !== 'undefined' && !healthInfo.backup.error) {
+    bodyHtml += '        <div class="mb-3">';
+    bodyHtml += '          <strong>備份檔案數量：</strong>';
+    bodyHtml += (healthInfo.backup.count || 0);
+    bodyHtml += '        </div>';
+    
+    if (healthInfo.backup.latestBackup) {
+      bodyHtml += '        <hr>';
+      bodyHtml += '        <h6>最近備份：</h6>';
+      bodyHtml += '        <div class="mb-2">';
+      bodyHtml += '          <strong>檔案名稱：</strong>';
+      bodyHtml += '          <div class="text-break">' + healthInfo.backup.latestBackup.filename + '</div>';
+      bodyHtml += '        </div>';
+      bodyHtml += '        <div class="mb-2">';
+      bodyHtml += '          <strong>檔案大小：</strong>';
+      bodyHtml += (healthInfo.backup.latestBackup.size || '未知');
+      bodyHtml += '        </div>';
+      bodyHtml += '        <div class="mb-2">';
+      bodyHtml += '          <strong>建立時間：</strong>';
+      bodyHtml += new Date(healthInfo.backup.latestBackup.created).toLocaleString('zh-TW');
+      bodyHtml += '        </div>';
+      bodyHtml += '        <div class="mt-3">';
+      bodyHtml += '          <a href="/backup-restore" class="btn btn-sm btn-outline-primary">';
+      bodyHtml += '            <i class="bi bi-archive"></i> 查看備份管理';
+      bodyHtml += '          </a>';
+      bodyHtml += '        </div>';
+    } else {
+      bodyHtml += '        <div class="alert alert-info">';
+      bodyHtml += '          <i class="bi bi-info-circle"></i> 目前沒有備份檔案';
+      bodyHtml += '        </div>';
+    }
+  } else {
+    bodyHtml += '        <div class="alert alert-warning">';
+    bodyHtml += '          <i class="bi bi-exclamation-triangle"></i> 無法載入備份資訊';
+    if (healthInfo.backup && healthInfo.backup.error) {
+      bodyHtml += '          <br><small>錯誤：' + healthInfo.backup.error + '</small>';
+    }
+    bodyHtml += '        </div>';
+  }
+  
+  bodyHtml += '      </div>';
+  bodyHtml += '    </div>';
+  bodyHtml += '  </div>';
+  
+  // 最近活動卡片
+  bodyHtml += '  <div class="col-md-12">';
+  bodyHtml += '    <div class="card">';
+  bodyHtml += '      <div class="card-header bg-secondary text-white">';
+  bodyHtml += '        <i class="bi bi-clock-history"></i> 最近活動';
+  bodyHtml += '      </div>';
+  bodyHtml += '      <div class="card-body">';
+  
+  if (typeof healthInfo.recentActivity !== 'undefined' && !healthInfo.recentActivity.error && healthInfo.recentActivity.length > 0) {
+    bodyHtml += '        <div class="table-responsive">';
+    bodyHtml += '          <table class="table table-hover">';
+    bodyHtml += '            <thead>';
+    bodyHtml += '              <tr>';
+    bodyHtml += '                <th>時間</th>';
+    bodyHtml += '                <th>操作</th>';
+    bodyHtml += '                <th>資料表</th>';
+    bodyHtml += '                <th>使用者</th>';
+    bodyHtml += '                <th>詳情</th>';
+    bodyHtml += '              </tr>';
+    bodyHtml += '            </thead>';
+    bodyHtml += '            <tbody>';
+    
+    healthInfo.recentActivity.forEach(function(activity) {
+      const actionLabels = {
+        'create': '新增',
+        'update': '更新',
+        'delete': '刪除'
+      };
+      const actionLabel = actionLabels[activity.action] || activity.action;
+      const actionClass = activity.action === 'create' ? 'success' : activity.action === 'update' ? 'info' : 'danger';
+      const changesKeys = activity.changes ? Object.keys(activity.changes) : [];
+      
+      bodyHtml += '              <tr>';
+      bodyHtml += '                <td>' + new Date(activity.created_at).toLocaleString('zh-TW') + '</td>';
+      bodyHtml += '                <td><span class="badge bg-' + actionClass + '">' + actionLabel + '</span></td>';
+      bodyHtml += '                <td>' + (activity.table_name || '-') + '</td>';
+      bodyHtml += '                <td>' + (activity.user || '系統') + '</td>';
+      bodyHtml += '                <td>';
+      
+      if (changesKeys.length > 0) {
+        changesKeys.slice(0, 3).forEach(function(key, index) {
+          if (index > 0) {
+            bodyHtml += ', ';
+          }
+          bodyHtml += '<small>' + key + '</small>';
+        });
+        if (changesKeys.length > 3) {
+          bodyHtml += '...';
+        }
+      } else {
+        bodyHtml += '-';
+      }
+      
+      bodyHtml += '                </td>';
+      bodyHtml += '              </tr>';
+    });
+    
+    bodyHtml += '            </tbody>';
+    bodyHtml += '          </table>';
+    bodyHtml += '        </div>';
+    bodyHtml += '        <div class="mt-3 text-end">';
+    bodyHtml += '          <a href="/audit-logs" class="btn btn-sm btn-outline-secondary">';
+    bodyHtml += '            <i class="bi bi-list"></i> 查看完整記錄';
+    bodyHtml += '          </a>';
+    bodyHtml += '        </div>';
+  } else {
+    bodyHtml += '        <div class="alert alert-info">';
+    bodyHtml += '          <i class="bi bi-info-circle"></i> ';
+    if (healthInfo.recentActivity && healthInfo.recentActivity.error) {
+      bodyHtml += '無法載入活動記錄：' + healthInfo.recentActivity.error;
+    } else {
+      bodyHtml += '目前沒有活動記錄';
+    }
+    bodyHtml += '        </div>';
+  }
+  
+  bodyHtml += '      </div>';
+  bodyHtml += '    </div>';
+  bodyHtml += '  </div>';
+  
+  bodyHtml += '</div>';
+  
+  bodyHtml += '<div class="row mt-4">';
+  bodyHtml += '  <div class="col">';
+  bodyHtml += '    <div class="text-end">';
+  bodyHtml += '      <button type="button" class="btn btn-primary" onclick="location.reload()">';
+  bodyHtml += '        <i class="bi bi-arrow-clockwise"></i> 重新整理';
+  bodyHtml += '      </button>';
+  bodyHtml += '    </div>';
+  bodyHtml += '  </div>';
+  bodyHtml += '</div>';
+%>
+
+<%- include('../layout', { title: title, body: bodyHtml }) %>

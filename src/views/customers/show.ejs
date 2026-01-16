@@ -1,0 +1,97 @@
+<%- include('../layout', { body: `
+<div class="row mb-4">
+  <div class="col">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/customers">客戶管理</a></li>
+        <li class="breadcrumb-item active">${customer.company_name}</li>
+      </ol>
+    </nav>
+    <h1 class="h3 mt-2">${customer.company_name}</h1>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="text-muted">客戶編號</h6>
+        <p class="fs-5 mb-0"><code>${customer.customer_code}</code></p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="text-muted">統一編號</h6>
+        <p class="fs-5 mb-0">${customer.tax_id || '-'}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card bg-primary text-white">
+      <div class="card-body text-center">
+        <h6>專案數 / 總金額</h6>
+        <h4>${stats?.project_count || 0} 件 / $${(stats?.total_amount || 0).toLocaleString()}</h4>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-folder"></i> 專案列表</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>專案編號</th>
+            <th>專案名稱</th>
+            <th>類型</th>
+            <th>業務</th>
+            <th class="text-end">金額</th>
+            <th>狀態</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${projects.map(p => `
+            <tr onclick="location.href='/projects/${p.id}'" style="cursor:pointer">
+              <td><code>${p.project_code}</code></td>
+              <td>${p.project_name}</td>
+              <td><span class="badge bg-${p.project_type === '食驗室' ? 'primary' : p.project_type === '純廣' ? 'success' : 'info'}">${p.project_type}</span></td>
+              <td>${p.salesperson_name || '-'}</td>
+              <td class="text-end">$${(p.price_with_tax || 0).toLocaleString()}</td>
+              <td><span class="badge bg-${p.status === '已結案' ? 'secondary' : 'warning'}">${p.status}</span></td>
+            </tr>
+          `).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">尚無專案</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><i class="bi bi-gear"></i> 編輯客戶資料</div>
+  <div class="card-body">
+    <form action="/customers/${customer.id}" method="POST">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">客戶編號</label>
+          <input type="text" name="customer_code" class="form-control" value="${customer.customer_code}" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">統一編號</label>
+          <input type="text" name="tax_id" class="form-control" value="${customer.tax_id || ''}" maxlength="8">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">公司名稱</label>
+          <input type="text" name="company_name" class="form-control" value="${customer.company_name}" required>
+        </div>
+        <div class="col-12">
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> 更新</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+`}) %>

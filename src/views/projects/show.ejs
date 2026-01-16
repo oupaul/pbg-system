@@ -1,0 +1,813 @@
+<%- include('../layout', { body: `
+<div class="row mb-4">
+  <div class="col">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/projects">專案管理</a></li>
+        <li class="breadcrumb-item active">${project.project_code}</li>
+      </ol>
+    </nav>
+    <h1 class="h3 mt-2">${project.project_name}</h1>
+  </div>
+  ${locals.canEdit ? '<div class="col-auto"><a href="/projects/' + project.id + '/edit" class="btn btn-outline-primary"><i class="bi bi-pencil"></i> 編輯</a></div>' : ''}
+</div>
+
+${locals.isReadOnly ? '<div class="alert alert-info mb-4"><i class="bi bi-info-circle"></i> 您目前為唯讀模式，無法進行編輯操作</div>' : ''}
+
+<div class="row g-4 mb-4">
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-info-circle"></i> 專案資訊
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="text-muted small">專案編號</label>
+            <div><code class="fs-5">${project.project_code}</code></div>
+          </div>
+          <div class="col-md-4">
+            <label class="text-muted small">專案類型</label>
+            <div><span class="badge bg-${typeof typeColorMap !== 'undefined' && typeColorMap[project.project_type] ? typeColorMap[project.project_type] : (project.project_type === '食驗室' ? 'primary' : project.project_type === '純廣' ? 'success' : 'info')} fs-6">${project.project_type}</span></div>
+          </div>
+          <div class="col-md-4">
+            <label class="text-muted small">狀態</label>
+            <div><span class="badge bg-${project.status === '已結案' ? 'secondary' : project.status === '取消' ? 'danger' : 'warning'} fs-6">${project.status}</span></div>
+          </div>
+          <div class="col-md-4">
+            <label class="text-muted small">簽約年度/月份</label>
+            <div class="fw-bold">${project.contract_year} / ${project.contract_month || '-'}月</div>
+          </div>
+          <div class="col-md-4">
+            <label class="text-muted small">業務人員</label>
+            <div class="fw-bold">${project.salesperson_name || '-'}</div>
+          </div>
+          <div class="col-md-4">
+            <label class="text-muted small">新/舊客戶</label>
+            <div>${project.is_new_customer ? '<span class="badge bg-success">新客戶</span>' : '<span class="badge bg-secondary">舊客戶</span>'}</div>
+          </div>
+          <div class="col-12">
+            <label class="text-muted small">客戶</label>
+            <div class="fw-bold">${project.company_name || '-'} <small class="text-muted">(${project.customer_code || '-'} / ${project.tax_id || '-'})</small></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-4">
+    <div class="card bg-light">
+      <div class="card-header">
+        <i class="bi bi-calculator"></i> 金額彙總
+      </div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between mb-2">
+          <span>價格(含稅)</span>
+          <strong>$${(project.price_with_tax || 0).toLocaleString()}</strong>
+        </div>
+        <div class="d-flex justify-content-between mb-2">
+          <span>價格(未稅)</span>
+          <span>$${(project.price_without_tax || 0).toLocaleString()}</span>
+        </div>
+        ${typeof project.sales_discount !== 'undefined' && project.sales_discount ? `
+        <div class="d-flex justify-content-between mb-2">
+          <span>銷貨折讓</span>
+          <span class="text-warning">-$${(project.sales_discount || 0).toLocaleString()}</span>
+        </div>
+        ` : ''}
+        ${typeof summary.totalCost !== 'undefined' ? `
+        <div class="d-flex justify-content-between mb-2">
+          <span>總成本</span>
+          <span class="text-danger">-$${(summary.totalCost || 0).toLocaleString()}</span>
+        </div>
+        ` : ''}
+        ${typeof summary.grossProfit !== 'undefined' ? `
+        <div class="d-flex justify-content-between mb-2">
+          <span>未稅毛利</span>
+          <strong class="${summary.grossProfit >= 0 ? 'text-success' : 'text-danger'}">$${(summary.grossProfit || 0).toLocaleString()}</strong>
+        </div>
+        ` : ''}
+        <hr>
+        <div class="d-flex justify-content-between mb-2">
+          <span>已開發票</span>
+          <span class="text-success">$${(summary.totalInvoiced || 0).toLocaleString()}</span>
+        </div>
+        <div class="d-flex justify-content-between mb-2">
+          <span>未開發票</span>
+          <span class="text-warning">$${(summary.uninvoiced || 0).toLocaleString()}</span>
+        </div>
+        <hr>
+        <div class="d-flex justify-content-between mb-2">
+          <span>已收款</span>
+          <span class="text-success">$${(summary.totalReceived || 0).toLocaleString()}</span>
+        </div>
+        <div class="d-flex justify-content-between mb-2">
+          <span>應收帳款</span>
+          <span class="text-danger">$${(summary.outstanding || 0).toLocaleString()}</span>
+        </div>
+        ${locals.user && (locals.user.role === 'admin' || locals.user.role === 'user') ? `
+        <hr>
+        <div class="d-flex justify-content-between">
+          <span>獎金合計</span>
+          <strong class="text-primary">$${(summary.totalBonus || 0).toLocaleString()}</strong>
+        </div>
+        ` : ''}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 業務預計開立發票年月 -->
+${locals.canEdit ? `
+<div class="card mb-3 border-primary">
+  <div class="card-body py-2">
+    <form id="expectedInvoiceForm" action="/projects/${project.id}/update-expected-invoice" method="POST" class="row g-2 align-items-center" onsubmit="return validateExpectedInvoiceForm()">
+      <div class="col-auto">
+        <label class="col-form-label"><i class="bi bi-calendar-event text-primary"></i> <strong>業務預計開立發票年月：</strong></label>
+      </div>
+      <div class="col-auto">
+        <select class="form-select form-select-sm" id="expectedYear" style="width: 100px;" onchange="updateExpectedInvoiceField()">
+          <option value="">--年--</option>
+          ${(() => {
+            const currentYear = new Date().getFullYear();
+            const selectedYearMonth = project.expected_invoice_year_month || '';
+            const selectedYear = selectedYearMonth ? selectedYearMonth.split('-')[0] : '';
+            let options = '';
+            for (let y = currentYear - 1; y <= currentYear + 3; y++) {
+              options += '<option value="' + y + '"' + (selectedYear == y ? ' selected' : '') + '>' + y + '年</option>';
+            }
+            return options;
+          })()}
+        </select>
+      </div>
+      <div class="col-auto">
+        <select class="form-select form-select-sm" id="expectedMonth" style="width: 90px;" onchange="updateExpectedInvoiceField()">
+          <option value="">--月--</option>
+          ${(() => {
+            const selectedYearMonth = project.expected_invoice_year_month || '';
+            const selectedMonth = selectedYearMonth ? selectedYearMonth.split('-')[1] : '';
+            let options = '';
+            for (let m = 1; m <= 12; m++) {
+              const monthStr = m.toString().padStart(2, '0');
+              options += '<option value="' + monthStr + '"' + (selectedMonth == monthStr ? ' selected' : '') + '>' + m + '月</option>';
+            }
+            return options;
+          })()}
+        </select>
+      </div>
+      <input type="hidden" name="expected_invoice_year_month" id="expectedInvoiceYearMonth" value="${project.expected_invoice_year_month || ''}">
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check-lg"></i> 更新</button>
+      </div>
+      <div class="col-auto">
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="resetExpectedInvoice()" ${!project.expected_invoice_year_month ? 'disabled' : ''}>
+          <i class="bi bi-x-circle"></i> 重設
+        </button>
+      </div>
+      <div class="col-auto">
+        <span class="text-muted small">
+          ${project.expected_invoice_year_month ? '已設定: <strong class="text-primary">' + project.expected_invoice_year_month + '</strong>' : '尚未設定'}
+        </span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// 更新隱藏欄位的值
+function updateExpectedInvoiceField() {
+  const yearSelect = document.getElementById('expectedYear');
+  const monthSelect = document.getElementById('expectedMonth');
+  const hiddenField = document.getElementById('expectedInvoiceYearMonth');
+  
+  if (!yearSelect || !monthSelect || !hiddenField) {
+    console.error('找不到表單元素');
+    return;
+  }
+  
+  const year = yearSelect.value;
+  const month = monthSelect.value;
+  
+  console.log('updateExpectedInvoiceField - Year:', year, 'Month:', month);
+  
+  if (year && month) {
+    const value = year + '-' + month;
+    hiddenField.value = value;
+    console.log('設定 expected_invoice_year_month:', value);
+  } else {
+    console.log('年月未完整選擇，保持原值:', hiddenField.value);
+  }
+}
+
+// 表單提交前驗證並更新隱藏欄位
+function validateExpectedInvoiceForm() {
+  const yearSelect = document.getElementById('expectedYear');
+  const monthSelect = document.getElementById('expectedMonth');
+  const hiddenField = document.getElementById('expectedInvoiceYearMonth');
+  
+  if (!yearSelect || !monthSelect || !hiddenField) {
+    console.error('找不到表單元素');
+    return false;
+  }
+  
+  const year = yearSelect.value;
+  const month = monthSelect.value;
+  
+  console.log('表單提交 - Year:', year, 'Month:', month);
+  
+  // 確保隱藏欄位有最新的值
+  if (year && month) {
+    const value = year + '-' + month;
+    hiddenField.value = value;
+    console.log('提交前設定 expected_invoice_year_month:', value);
+    return true;
+  } else if (!year && !month) {
+    // 兩者都為空，清空隱藏欄位（允許清除設定）
+    hiddenField.value = '';
+    console.log('提交前清空 expected_invoice_year_month');
+    return true;
+  } else {
+    // 只選了年或月，不允許提交
+    alert('請同時選擇年份和月份，或兩者都不選');
+    return false;
+  }
+}
+
+// 重設預計開票年月
+function resetExpectedInvoice() {
+  if (!confirm('確定要重設預計開票年月為「尚未設定」嗎？')) {
+    return;
+  }
+  
+  const yearSelect = document.getElementById('expectedYear');
+  const monthSelect = document.getElementById('expectedMonth');
+  const hiddenField = document.getElementById('expectedInvoiceYearMonth');
+  
+  if (!yearSelect || !monthSelect || !hiddenField) {
+    console.error('找不到表單元素');
+    return;
+  }
+  
+  // 清空選擇
+  yearSelect.value = '';
+  monthSelect.value = '';
+  hiddenField.value = '';
+  
+  // 提交表單
+  const form = document.getElementById('expectedInvoiceForm');
+  if (form) {
+    form.submit();
+  }
+}
+</script>
+` : (project.expected_invoice_year_month ? `
+<!-- 唯讀顯示 -->
+<div class="card mb-3 border-info">
+  <div class="card-body py-2">
+    <div class="row g-2 align-items-center">
+      <div class="col-auto">
+        <label class="col-form-label"><i class="bi bi-calendar-event text-info"></i> <strong>業務預計開立發票年月：</strong></label>
+      </div>
+      <div class="col-auto">
+        <strong class="text-primary">${project.expected_invoice_year_month}</strong>
+      </div>
+    </div>
+  </div>
+</div>
+` : '')}
+
+<!-- 發票明細 -->
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-receipt"></i> 發票明細</span>
+    ${locals.canEdit ? '<button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#invoiceModal"><i class="bi bi-plus-lg"></i> 新增發票</button>' : ''}
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>發票日期</th>
+            <th>發票號碼</th>
+            <th class="text-end">金額(含稅)</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${invoices.length ? invoices.map(inv => `
+            <tr>
+              <td>${inv.invoice_date || '-'}</td>
+              <td><code>${inv.invoice_number || '-'}</code></td>
+              <td class="text-end">$${(inv.amount_with_tax || 0).toLocaleString()}</td>
+              <td class="text-end">
+                ${locals.canEdit ? '<button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editInvoiceModal' + inv.id + '"><i class="bi bi-pencil"></i></button>' : ''}
+                ${locals.canEdit ? '<form action="/invoices/' + inv.id + '/delete" method="POST" style="display:inline" onsubmit="return confirm(\'確定刪除？\')"><button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>' : ''}
+              </td>
+            </tr>
+          `).join('') : '<tr><td colspan="4" class="text-center text-muted py-3">尚無發票</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 收款明細 -->
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-cash"></i> 收款明細</span>
+    ${locals.canEdit ? '<button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#paymentModal"><i class="bi bi-plus-lg"></i> 新增收款</button>' : ''}
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>收款日期</th>
+            <th>對應發票</th>
+            <th class="text-end">匯入金額</th>
+            <th class="text-end">差異(匯費等)</th>
+            <th>備註</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${payments.length ? payments.map(pay => `
+            <tr>
+              <td>${pay.payment_date || '-'}</td>
+              <td><code>${pay.invoice_number || '-'}</code></td>
+              <td class="text-end">$${(pay.bank_deposit_amount || 0).toLocaleString()}</td>
+              <td class="text-end text-danger">$${(pay.payment_difference || 0).toLocaleString()}</td>
+              <td><small>${pay.notes || ''}</small></td>
+              <td class="text-end">
+                ${locals.canEdit ? '<button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editPaymentModal' + pay.id + '"><i class="bi bi-pencil"></i></button>' : ''}
+                ${locals.canEdit ? '<form action="/payments/' + pay.id + '/delete" method="POST" style="display:inline" onsubmit="return confirm(\'確定刪除？\')"><button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>' : ''}
+              </td>
+            </tr>
+          `).join('') : '<tr><td colspan="6" class="text-center text-muted py-3">尚無收款記錄</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 成本明細 -->
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-cash-stack"></i> 成本明細</span>
+    ${locals.canEdit ? '<button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#costModal"><i class="bi bi-plus-lg"></i> 新增成本</button>' : ''}
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>成本日期</th>
+            <th>成本類型</th>
+            <th class="text-end">金額</th>
+            <th>備註</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${typeof costs !== 'undefined' && costs.length ? costs.map(cost => `
+            <tr>
+              <td>${cost.cost_date || '-'}</td>
+              <td>${cost.cost_type || '-'}</td>
+              <td class="text-end text-danger">$${(cost.amount || 0).toLocaleString()}</td>
+              <td><small>${cost.notes || ''}</small></td>
+              <td class="text-end">
+                ${locals.canEdit ? '<button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editCostModal' + cost.id + '"><i class="bi bi-pencil"></i></button>' : ''}
+                ${locals.canEdit ? '<form action="/costs/' + cost.id + '/delete" method="POST" style="display:inline" onsubmit="return confirm(\'確定刪除？\')"><button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>' : ''}
+              </td>
+            </tr>
+          `).join('') : '<tr><td colspan="5" class="text-center text-muted py-3">尚無成本記錄</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+${locals.user && (locals.user.role === 'admin' || locals.user.role === 'user') ? `
+<!-- 獎金明細 -->
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-award"></i> 獎金明細</span>
+    ${locals.canEdit ? '<button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#bonusModal"><i class="bi bi-plus-lg"></i> 新增獎金</button>' : ''}
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>獎金類型</th>
+            <th class="text-end">計算基礎</th>
+            <th class="text-end">比例</th>
+            <th class="text-end">獎金金額</th>
+            <th>發放日期</th>
+            <th>狀態</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${bonuses.length ? bonuses.map(b => `
+            <tr>
+              <td>${b.bonus_type}</td>
+              <td class="text-end">$${(b.base_amount || 0).toLocaleString()}</td>
+              <td class="text-end">${b.bonus_percentage ? b.bonus_percentage + '%' : '-'}</td>
+              <td class="text-end fw-bold">$${(b.bonus_amount || 0).toLocaleString()}</td>
+              <td>${b.payment_date || '-'}</td>
+              <td>
+                <span class="badge bg-${b.status === '已發放' ? 'success' : b.status === '充公' ? 'danger' : 'warning'}">${b.status}</span>
+                ${b.forfeiture_reason ? '<br><small class="text-muted">' + b.forfeiture_reason + '</small>' : ''}
+              </td>
+              <td class="text-end">
+                ${locals.canEdit ? '<button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editBonusModal' + b.id + '"><i class="bi bi-pencil"></i></button>' : ''}
+                ${locals.canEdit ? '<form action="/bonuses/' + b.id + '/delete" method="POST" style="display:inline" onsubmit="return confirm(\'確定刪除？\')"><button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>' : ''}
+              </td>
+            </tr>
+          `).join('') : '<tr><td colspan="7" class="text-center text-muted py-3">尚無獎金記錄</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+` : ''}
+
+<!-- 新增發票 Modal -->
+<div class="modal fade" id="invoiceModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="/invoices" method="POST">
+        <input type="hidden" name="project_id" value="${project.id}">
+        <div class="modal-header">
+          <h5 class="modal-title">新增發票</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">發票日期</label>
+            <input type="date" name="invoice_date" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">發票號碼</label>
+            <input type="text" name="invoice_number" class="form-control" placeholder="XX12345678">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">金額(含稅)</label>
+            <input type="number" name="amount_with_tax" class="form-control" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 新增收款 Modal -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="/payments" method="POST">
+        <input type="hidden" name="project_id" value="${project.id}">
+        <div class="modal-header">
+          <h5 class="modal-title">新增收款</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">收款日期</label>
+            <input type="date" name="payment_date" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">對應發票</label>
+            <select name="invoice_id" class="form-select">
+              <option value="">-- 選擇發票 --</option>
+              ${invoices.map(i => {
+                const isUsed = typeof usedInvoiceIds !== 'undefined' && usedInvoiceIds.includes(i.id);
+                return isUsed ? '' : `<option value="${i.id}">${i.invoice_number} ($${i.amount_with_tax?.toLocaleString()})</option>`;
+              }).filter(opt => opt !== '').join('')}
+            </select>
+            ${typeof usedInvoiceIds !== 'undefined' && usedInvoiceIds.length > 0 && invoices.filter(i => !usedInvoiceIds.includes(i.id)).length === 0 ? '<small class="text-muted d-block mt-1">所有發票已被選取</small>' : ''}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">銀行匯入金額</label>
+            <input type="number" name="bank_deposit_amount" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">差異金額(匯費/違約金)</label>
+            <input type="number" name="payment_difference" class="form-control" value="0">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">差異類型</label>
+            <select name="difference_type" class="form-select">
+              <option value="">-- 無 --</option>
+              <option value="匯費">匯費</option>
+              <option value="違約金">違約金</option>
+              <option value="其他">其他</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">備註</label>
+            <textarea name="notes" class="form-control" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-success">新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 新增成本 Modal -->
+<div class="modal fade" id="costModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="/costs" method="POST">
+        <input type="hidden" name="project_id" value="${project.id}">
+        <div class="modal-header">
+          <h5 class="modal-title">新增成本</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">成本日期</label>
+            <input type="date" name="cost_date" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">成本類型</label>
+            <input type="text" name="cost_type" class="form-control" placeholder="例如：材料費、人工費等">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">金額</label>
+            <input type="number" name="amount" class="form-control" step="1" min="0" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">備註</label>
+            <textarea name="notes" class="form-control" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-warning">新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 編輯成本 Modals -->
+${typeof costs !== 'undefined' && costs.length ? costs.map(cost => `
+<div class="modal fade" id="editCostModal${cost.id}" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="/costs/${cost.id}" method="POST">
+        <div class="modal-header">
+          <h5 class="modal-title">編輯成本</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">成本日期</label>
+            <input type="date" name="cost_date" class="form-control" value="${cost.cost_date || ''}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">成本類型</label>
+            <input type="text" name="cost_type" class="form-control" value="${cost.cost_type || ''}" placeholder="例如：材料費、人工費等">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">金額</label>
+            <input type="number" name="amount" class="form-control" value="${cost.amount || 0}" step="1" min="0" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">備註</label>
+            <textarea name="notes" class="form-control" rows="2">${cost.notes || ''}</textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-warning">更新</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+`).join('') : ''}
+
+${locals.canEdit ? `
+<!-- 新增獎金 Modal -->
+<div class="modal fade" id="bonusModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="/bonuses" method="POST">
+        <input type="hidden" name="project_id" value="${project.id}">
+        <input type="hidden" name="salesperson_id" value="${project.salesperson_id || ''}">
+        <div class="modal-header">
+          <h5 class="modal-title">新增獎金</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">獎金類型</label>
+            <select name="bonus_type" class="form-select" required>
+              <option value="食驗室獎金">食驗室獎金</option>
+              <option value="純廣獎金">純廣獎金</option>
+              <option value="專案簽約獎金">專案簽約獎金</option>
+              <option value="專案結案獎金">專案結案獎金</option>
+              <option value="開發獎金">開發獎金</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">計算基礎(未稅)</label>
+            <input type="number" name="base_amount" class="form-control" value="${project.price_without_tax || 0}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">獎金比例(%)</label>
+            <input type="number" name="bonus_percentage" class="form-control" step="0.1">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">獎金金額</label>
+            <input type="number" name="bonus_amount" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">發放日期</label>
+            <input type="date" name="payment_date" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">狀態</label>
+            <select name="status" class="form-select">
+              <option value="待發放">待發放</option>
+              <option value="已發放">已發放</option>
+              <option value="充公">充公</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-info">新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+` : ''}
+
+<!-- 編輯發票 Modals -->
+${invoices.map(inv => `
+<div class="modal fade" id="editInvoiceModal${inv.id}" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="/invoices/${inv.id}" method="POST">
+        <div class="modal-header">
+          <h5 class="modal-title">編輯發票</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">發票日期</label>
+            <input type="date" name="invoice_date" class="form-control" value="${inv.invoice_date || ''}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">發票號碼</label>
+            <input type="text" name="invoice_number" class="form-control" value="${inv.invoice_number || ''}" placeholder="XX12345678">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">金額(含稅)</label>
+            <input type="number" name="amount_with_tax" class="form-control" value="${inv.amount_with_tax || 0}" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">更新</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+`).join('')}
+
+<!-- 編輯收款 Modals -->
+${payments.map(pay => `
+<div class="modal fade" id="editPaymentModal${pay.id}" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="/payments/${pay.id}" method="POST">
+        <div class="modal-header">
+          <h5 class="modal-title">編輯收款</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">收款日期</label>
+            <input type="date" name="payment_date" class="form-control" value="${pay.payment_date || ''}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">對應發票</label>
+            <select name="invoice_id" class="form-select">
+              <option value="">-- 選擇發票 --</option>
+              ${invoices.map(i => {
+                const isCurrentPayment = i.id == pay.invoice_id;
+                const isUsedByOther = typeof usedInvoiceIds !== 'undefined' && usedInvoiceIds.includes(i.id) && !isCurrentPayment;
+                // 如果是當前收款選取的發票，或未被其他收款選取，則顯示
+                if (isCurrentPayment || !isUsedByOther) {
+                  return `<option value="${i.id}" ${isCurrentPayment ? 'selected' : ''}>${i.invoice_number} ($${i.amount_with_tax?.toLocaleString()})</option>`;
+                }
+                return '';
+              }).filter(opt => opt !== '').join('')}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">銀行匯入金額</label>
+            <input type="number" name="bank_deposit_amount" class="form-control" value="${pay.bank_deposit_amount || 0}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">差異金額(匯費/違約金)</label>
+            <input type="number" name="payment_difference" class="form-control" value="${pay.payment_difference || 0}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">差異類型</label>
+            <select name="difference_type" class="form-select">
+              <option value="">-- 無 --</option>
+              <option value="匯費" ${pay.difference_type === '匯費' ? 'selected' : ''}>匯費</option>
+              <option value="違約金" ${pay.difference_type === '違約金' ? 'selected' : ''}>違約金</option>
+              <option value="其他" ${pay.difference_type === '其他' ? 'selected' : ''}>其他</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">備註</label>
+            <textarea name="notes" class="form-control" rows="2">${pay.notes || ''}</textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-success">更新</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+`).join('')}
+
+${locals.canEdit ? `
+<!-- 編輯獎金 Modals -->
+${bonuses.map(b => `
+<div class="modal fade" id="editBonusModal${b.id}" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="/bonuses/${b.id}" method="POST">
+        <input type="hidden" name="redirect" value="/projects/${project.id}">
+        <div class="modal-header">
+          <h5 class="modal-title">編輯獎金</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">獎金類型</label>
+            <input type="text" class="form-control" value="${b.bonus_type}" disabled>
+            <small class="text-muted">獎金類型無法修改</small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">計算基礎(未稅)</label>
+            <input type="number" name="base_amount" class="form-control" value="${b.base_amount || 0}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">獎金比例(%)</label>
+            <input type="number" name="bonus_percentage" class="form-control" value="${b.bonus_percentage || 0}" step="0.1">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">獎金金額</label>
+            <input type="number" name="bonus_amount" class="form-control" value="${b.bonus_amount || 0}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">發放日期</label>
+            <input type="date" name="payment_date" class="form-control" value="${b.payment_date || ''}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">狀態</label>
+            <select name="status" class="form-select">
+              <option value="待發放" ${b.status === '待發放' ? 'selected' : ''}>待發放</option>
+              <option value="已發放" ${b.status === '已發放' ? 'selected' : ''}>已發放</option>
+              <option value="充公" ${b.status === '充公' ? 'selected' : ''}>充公</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">充公原因</label>
+            <textarea name="forfeiture_reason" class="form-control" rows="2">${b.forfeiture_reason || ''}</textarea>
+            <small class="text-muted">僅在狀態為「充公」時填寫</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-info">更新</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+`).join('')}
+` : ''}
+`}) %>

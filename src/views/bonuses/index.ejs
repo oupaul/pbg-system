@@ -1,0 +1,195 @@
+<%- include('../layout', { body: `
+<div class="row mb-4">
+  <div class="col">
+    <h1 class="h3"><i class="bi bi-currency-dollar"></i> 獎金管理</h1>
+  </div>
+  <div class="col-auto">
+    <form class="d-flex" method="get">
+      <select name="year" class="form-select" onchange="this.form.submit()">
+        ${years.map(y => `<option value="${y}" ${y == selectedYear ? 'selected' : ''}>${y}</option>`).join('')}
+      </select>
+    </form>
+  </div>
+</div>
+
+${error ? '<div class="alert alert-danger alert-dismissible fade show" role="alert"><i class="bi bi-exclamation-triangle"></i> ' + error + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>' : ''}
+${success ? '<div class="alert alert-success alert-dismissible fade show" role="alert"><i class="bi bi-check-circle"></i> ' + success + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>' : ''}
+
+<!-- 獎金統計卡片 -->
+<div class="row g-4 mb-4">
+  ${(stats || []).map(s => `
+    <div class="col-md-4 col-lg-2">
+      <div class="card h-100">
+        <div class="card-body text-center">
+          <h6 class="text-muted">${s.bonus_type}</h6>
+          <h4 class="mb-0">$${(s.total_amount || 0).toLocaleString()}</h4>
+          <small class="text-success">已發放: $${(s.paid_amount || 0).toLocaleString()}</small>
+        </div>
+      </div>
+    </div>
+  `).join('') || '<div class="col-12"><div class="alert alert-info">尚無獎金資料</div></div>'}
+</div>
+
+<!-- 業務獎金彙總 -->
+<div class="card mb-4">
+  <div class="card-header">
+    <i class="bi bi-people"></i> 業務獎金彙總
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>業務</th>
+            <th class="text-center">專案數</th>
+            <th class="text-end">總獎金</th>
+            <th class="text-end">已發放</th>
+            <th class="text-end">待發放</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${(salespersonSummary || []).map(s => `
+            <tr onclick="location.href='/salespeople/${s.id}?year=${selectedYear}'" style="cursor:pointer">
+              <td><strong>${s.name}</strong></td>
+              <td class="text-center">${s.project_count || 0}</td>
+              <td class="text-end">$${(s.total_bonus || 0).toLocaleString()}</td>
+              <td class="text-end text-success">$${(s.paid_bonus || 0).toLocaleString()}</td>
+              <td class="text-end text-warning">$${(s.pending_bonus || 0).toLocaleString()}</td>
+            </tr>
+          `).join('') || '<tr><td colspan="5" class="text-center text-muted py-3">尚無資料</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 獎金明細 -->
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-list-ul"></i> 獎金明細</span>
+    <div class="btn-group">
+      ${locals.canEdit ? '<button id="batchDeleteBtn" class="btn btn-sm btn-outline-danger" onclick="batchDeleteBonuses()" style="display:none;"><i class="bi bi-trash"></i> 刪除選取 (<span id="selectedCount">0</span>)</button>' : ''}
+      <a href="/import-export/export/bonuses/${selectedYear}" class="btn btn-sm btn-outline-success">
+        <i class="bi bi-download"></i> 匯出
+      </a>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <form id="batchDeleteForm" method="POST" action="/bonuses/batch-delete">
+        <table class="table table-hover table-sm mb-0">
+          <thead class="table-dark">
+            <tr>
+              ${locals.canEdit ? '<th style="width: 40px;"><input type="checkbox" id="selectAll" class="form-check-input" onchange="toggleSelectAll(this)"></th>' : ''}
+              <th>
+                <a href="?${sortLinks.salesperson_name}" class="text-white text-decoration-none">
+                  業務${sortIcons.salesperson_name}
+                </a>
+              </th>
+              <th>
+                <a href="?${sortLinks.project_code}" class="text-white text-decoration-none">
+                  專案編號${sortIcons.project_code}
+                </a>
+              </th>
+              <th>
+                <a href="?${sortLinks.project_name}" class="text-white text-decoration-none">
+                  專案名稱${sortIcons.project_name}
+                </a>
+              </th>
+              <th>
+                <a href="?${sortLinks.project_type}" class="text-white text-decoration-none">
+                  類型${sortIcons.project_type}
+                </a>
+              </th>
+              <th>
+                <a href="?${sortLinks.bonus_type}" class="text-white text-decoration-none">
+                  獎金類型${sortIcons.bonus_type}
+                </a>
+              </th>
+              <th class="text-end">
+                <a href="?${sortLinks.bonus_amount}" class="text-white text-decoration-none">
+                  獎金金額${sortIcons.bonus_amount}
+                </a>
+              </th>
+              <th>
+                <a href="?${sortLinks.payment_date}" class="text-white text-decoration-none">
+                  發放日期${sortIcons.payment_date}
+                </a>
+              </th>
+              <th>
+                <a href="?${sortLinks.status}" class="text-white text-decoration-none">
+                  狀態${sortIcons.status}
+                </a>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(bonuses || []).map(b => `
+              <tr>
+                ${locals.canEdit ? '<td><input type="checkbox" name="bonus_ids[]" value="' + b.id + '" class="form-check-input bonus-checkbox" onchange="updateSelectedCount()"></td>' : ''}
+                <td>${b.salesperson_name}</td>
+                <td><a href="/projects/${b.project_id}"><code>${b.project_code}</code></a></td>
+                <td>${b.project_name}</td>
+                <td><span class="badge bg-${typeof typeColorMap !== 'undefined' && typeColorMap[b.project_type] ? typeColorMap[b.project_type] : (b.project_type === '食驗室' ? 'primary' : b.project_type === '純廣' ? 'success' : 'info')}">${b.project_type}</span></td>
+                <td>${b.bonus_type}</td>
+                <td class="text-end fw-bold">$${(b.bonus_amount || 0).toLocaleString()}</td>
+                <td>${b.payment_date || '-'}</td>
+                <td>
+                  <span class="badge bg-${b.status === '已發放' ? 'success' : b.status === '充公' ? 'danger' : 'warning'}">${b.status}</span>
+                </td>
+              </tr>
+            `).join('') || '<tr><td colspan="${locals.canEdit ? 9 : 8}" class="text-center text-muted py-3">尚無獎金記錄</td></tr>'}
+          </tbody>
+        </table>
+      </form>
+    </div>
+  </div>
+  <div class="card-footer text-muted">
+    共 ${(bonuses || []).length} 筆獎金記錄
+  </div>
+</div>
+
+${locals.canEdit ? `
+<script>
+// 全選/取消全選
+function toggleSelectAll(checkbox) {
+  const checkboxes = document.querySelectorAll('.bonus-checkbox');
+  checkboxes.forEach(cb => {
+    cb.checked = checkbox.checked;
+  });
+  updateSelectedCount();
+}
+
+// 更新選取數量
+function updateSelectedCount() {
+  const checkboxes = document.querySelectorAll('.bonus-checkbox:checked');
+  const count = checkboxes.length;
+  document.getElementById('selectedCount').textContent = count;
+  document.getElementById('batchDeleteBtn').style.display = count > 0 ? 'inline-block' : 'none';
+  
+  // 更新全選框狀態
+  const allCheckboxes = document.querySelectorAll('.bonus-checkbox');
+  const selectAllCheckbox = document.getElementById('selectAll');
+  if (allCheckboxes.length > 0) {
+    selectAllCheckbox.checked = count === allCheckboxes.length;
+    selectAllCheckbox.indeterminate = count > 0 && count < allCheckboxes.length;
+  }
+}
+
+// 批次刪除
+function batchDeleteBonuses() {
+  const checkboxes = document.querySelectorAll('.bonus-checkbox:checked');
+  const count = checkboxes.length;
+  
+  if (count === 0) {
+    alert('請至少選擇一筆獎金記錄');
+    return;
+  }
+  
+  if (confirm('確定要刪除選取的 ' + count + ' 筆獎金記錄嗎？\\n此操作無法復原！')) {
+    document.getElementById('batchDeleteForm').submit();
+  }
+}
+</script>
+` : ''}
+`}) %>

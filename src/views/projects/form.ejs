@@ -1,0 +1,264 @@
+<%- include('../layout', { title: title, body: `
+<div class="row mb-4">
+  <div class="col">
+    <h1 class="h3">
+      <i class="bi bi-${project ? 'pencil' : 'plus-lg'}"></i> 
+      ${project ? '編輯專案' : '新增專案'}
+    </h1>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <form action="${action}" method="POST">
+      <div class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label">專案編號 <span class="text-danger">*</span></label>
+          <input type="text" name="project_code" class="form-control" value="${project ? (project.project_code || '') : ''}" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">簽約年度 <span class="text-danger">*</span></label>
+          <input type="number" name="contract_year" class="form-control" value="${project ? (project.contract_year || new Date().getFullYear()) : new Date().getFullYear()}" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">專案月份</label>
+          <select name="contract_month" class="form-select">
+            ${[1,2,3,4,5,6,7,8,9,10,11,12].map(m => '<option value="' + m + '" ' + (project && project.contract_month == m ? 'selected' : '') + '>' + m + '月</option>').join('')}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">狀態</label>
+          <select name="status" class="form-select">
+            <option value="未結案" ${project && project.status === '未結案' ? 'selected' : ''}>未結案</option>
+            <option value="已結案" ${project && project.status === '已結案' ? 'selected' : ''}>已結案</option>
+            <option value="取消" ${project && project.status === '取消' ? 'selected' : ''}>取消</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">專案類型 <span class="text-danger">*</span></label>
+          <select name="project_type" class="form-select" required>
+            <option value="">-- 選擇類型 --</option>
+            ${typeof projectTypes !== 'undefined' && projectTypes ? projectTypes.map(type => {
+              const selected = project && project.project_type === type.type_name ? 'selected' : '';
+              return '<option value="' + type.type_name + '" ' + selected + '>' + type.type_name + '</option>';
+            }).join('') : '<option value="食驗室">食驗室</option><option value="純廣">純廣</option><option value="專案">專案</option>'}
+          </select>
+        </div>
+        
+        <div class="col-12">
+          <label class="form-label">專案名稱 <span class="text-danger">*</span></label>
+          <input type="text" name="project_name" class="form-control" value="${project ? (project.project_name || '').replace(/"/g, '&quot;') : ''}" required>
+        </div>
+        
+        <div class="col-md-4">
+          <label class="form-label">業務人員</label>
+          <select name="salesperson_id" id="salesperson_id" class="form-select select2-dropdown">
+            <option value="">-- 選擇業務 --</option>
+            ${salespeople.map(s => { const selected = project && project.salesperson_id == s.id ? 'selected' : ''; const name = (s.name || '').replace(/"/g, '&quot;'); return '<option value="' + s.id + '" ' + selected + '>' + name + '</option>'; }).join('')}
+          </select>
+          <small class="form-text text-muted">可以輸入名稱快速篩選</small>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">客戶</label>
+          <div class="d-flex gap-2 align-items-start">
+            <div class="flex-grow-1">
+              <select name="customer_id" id="customer_id" class="form-select select2-dropdown">
+                <option value="">-- 選擇客戶 --</option>
+                ${customers.map(c => { const selected = project && project.customer_id == c.id ? 'selected' : ''; const companyName = (c.company_name || '').replace(/"/g, '&quot;'); const customerCode = (c.customer_code || '').replace(/"/g, '&quot;'); return '<option value="' + c.id + '" ' + selected + '>' + companyName + ' (' + customerCode + ')</option>'; }).join('')}
+              </select>
+              <small class="form-text text-muted">找不到客戶？<a href="#" id="quickAddCustomerLink" class="text-primary">快速新增</a></small>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">新客戶</label>
+          <div class="form-check mt-2">
+            <input type="checkbox" name="is_new_customer" value="1" class="form-check-input" ${project && project.is_new_customer ? 'checked' : ''}>
+            <label class="form-check-label">是新客戶</label>
+          </div>
+        </div>
+        
+        <div class="col-md-4">
+          <label class="form-label">價格(含稅)</label>
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            <input type="number" name="price_with_tax" class="form-control" value="${project ? (project.price_with_tax || 0) : 0}" step="1" onchange="calculateWithoutTax()">
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">價格(未稅)</label>
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            <input type="number" name="price_without_tax" class="form-control" value="${project ? (project.price_without_tax || 0) : 0}" step="1">
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">銷貨折讓</label>
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            <input type="number" name="sales_discount" class="form-control" value="${project ? (project.sales_discount || 0) : 0}" step="1" min="0">
+          </div>
+          <small class="form-text text-muted">銷貨折讓金額</small>
+        </div>
+        
+        <div class="col-12">
+          <label class="form-label">備註</label>
+          <textarea name="notes" class="form-control" rows="3">${project ? (project.notes || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</textarea>
+        </div>
+      </div>
+      
+      <hr class="my-4">
+      
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg"></i> ${project ? '更新' : '建立'}
+        </button>
+        <a href="${project ? '/projects/' + project.id : '/projects'}" class="btn btn-secondary">
+          <i class="bi bi-x-lg"></i> 取消
+        </a>
+        ${project ? '<button type="button" class="btn btn-danger ms-auto" onclick="if(confirm(' + "'確定要刪除此專案？'" + ')) document.getElementById(' + "'deleteForm'" + ').submit()"><i class="bi bi-trash"></i> 刪除</button>' : ''}
+      </div>
+    </form>
+    
+    ${project ? '<form id="deleteForm" action="/projects/' + project.id + '/delete" method="POST" style="display:none"></form>' : ''}
+  </div>
+</div>
+
+<!-- 快速新增客戶 Modal -->
+<div class="modal fade" id="quickAddCustomerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title">
+          <i class="bi bi-building-add"></i> 快速新增客戶
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="quickAddCustomerForm">
+          <div class="mb-3">
+            <label class="form-label">客戶編號 <span class="text-danger">*</span></label>
+            <input type="text" name="customer_code" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">公司名稱 <span class="text-danger">*</span></label>
+            <input type="text" name="company_name" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">統一編號</label>
+            <input type="text" name="tax_id" class="form-control" maxlength="8" pattern="[0-9]{8}">
+            <small class="form-text text-muted">8 位數字</small>
+          </div>
+          <div class="mb-3">
+            <div class="form-check">
+              <input type="checkbox" name="is_new_customer" value="1" class="form-check-input" id="quickAddIsNewCustomer">
+              <label class="form-check-label" for="quickAddIsNewCustomer">新客戶</label>
+            </div>
+          </div>
+        </form>
+        <div id="quickAddCustomerError" class="alert alert-danger d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-lg"></i> 取消
+        </button>
+        <button type="button" class="btn btn-primary" id="quickAddCustomerSubmit">
+          <i class="bi bi-check-lg"></i> 新增並選擇
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// 自動計算未稅金額
+function calculateWithoutTax() {
+  const withTax = document.querySelector('input[name="price_with_tax"]').value;
+  const withoutTax = Math.round(withTax / 1.05);
+  document.querySelector('input[name="price_without_tax"]').value = withoutTax;
+}
+
+// 快速新增客戶功能
+document.addEventListener('DOMContentLoaded', function() {
+  const quickAddLink = document.getElementById('quickAddCustomerLink');
+  const quickAddModal = new bootstrap.Modal(document.getElementById('quickAddCustomerModal'));
+  const quickAddForm = document.getElementById('quickAddCustomerForm');
+  const quickAddSubmit = document.getElementById('quickAddCustomerSubmit');
+  const quickAddError = document.getElementById('quickAddCustomerError');
+  
+  // 點擊「快速新增」連結
+  if (quickAddLink) {
+    quickAddLink.addEventListener('click', function(e) {
+      e.preventDefault();
+      quickAddForm.reset();
+      quickAddError.classList.add('d-none');
+      quickAddModal.show();
+    });
+  }
+  
+  // 提交新增客戶
+  if (quickAddSubmit) {
+    quickAddSubmit.addEventListener('click', async function() {
+      const formData = new FormData(quickAddForm);
+      
+      // 驗證必填欄位
+      if (!formData.get('customer_code') || !formData.get('company_name')) {
+        quickAddError.textContent = '請填寫客戶編號和公司名稱';
+        quickAddError.classList.remove('d-none');
+        return;
+      }
+      
+      // 顯示載入狀態
+      quickAddSubmit.disabled = true;
+      quickAddSubmit.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 新增中...';
+      quickAddError.classList.add('d-none');
+      
+      try {
+        // 發送 API 請求
+        const response = await fetch('/customers/quick-add', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            customer_code: formData.get('customer_code'),
+            company_name: formData.get('company_name'),
+            tax_id: formData.get('tax_id') || '',
+            is_new_customer: formData.get('is_new_customer') === '1' ? '1' : '0'
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          // 新增成功，添加到 Select2 並選擇
+          const customer = result.customer;
+          const displayText = customer.company_name + ' (' + customer.customer_code + ')';
+          
+          // 使用 jQuery 添加新選項並選擇
+          const newOption = new Option(displayText, customer.id, true, true);
+          $('#customer_id').append(newOption).trigger('change');
+          
+          // 關閉 Modal
+          quickAddModal.hide();
+          
+          // 顯示成功提示
+          showToast('客戶新增成功：' + customer.company_name, 'success');
+        } else {
+          quickAddError.textContent = result.error || '新增客戶失敗';
+          quickAddError.classList.remove('d-none');
+        }
+      } catch (error) {
+        console.error('快速新增客戶錯誤:', error);
+        quickAddError.textContent = '新增客戶時發生錯誤：' + error.message;
+        quickAddError.classList.remove('d-none');
+      } finally {
+        // 恢復按鈕狀態
+        quickAddSubmit.disabled = false;
+        quickAddSubmit.innerHTML = '<i class="bi bi-check-lg"></i> 新增並選擇';
+      }
+    });
+  }
+});
+</script>
+` }) %>

@@ -1,0 +1,133 @@
+<%- include('../layout', { body: `
+<div class="row mb-4">
+  <div class="col">
+    <h1 class="h3"><i class="bi bi-building"></i> 客戶管理</h1>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newCustomerModal">
+      <i class="bi bi-plus-lg"></i> 新增客戶
+    </button>
+  </div>
+</div>
+
+<!-- 搜尋表單 -->
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="GET" action="/customers" class="row g-3">
+      <div class="col-md-8">
+        <div class="input-group">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input 
+            type="text" 
+            name="search" 
+            class="form-control" 
+            placeholder="搜尋客戶編號、統一編號或公司名稱..." 
+            value="${(typeof searchKeyword !== 'undefined' ? searchKeyword : '') || ''}"
+            autocomplete="off"
+          >
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="btn-group w-100" role="group">
+          <button type="submit" class="btn btn-outline-primary">
+            <i class="bi bi-search"></i> 搜尋
+          </button>
+          ${(typeof searchKeyword !== 'undefined' && searchKeyword) ? `
+            <a href="/customers" class="btn btn-outline-secondary">
+              <i class="bi bi-x-lg"></i> 清除
+            </a>
+          ` : ''}
+        </div>
+      </div>
+      ${(typeof searchKeyword !== 'undefined' && searchKeyword && req && req.query) ? `
+        <input type="hidden" name="sortBy" value="${req.query.sortBy || 'company_name'}">
+        <input type="hidden" name="sortOrder" value="${req.query.sortOrder || 'ASC'}">
+      ` : ''}
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th>
+              <a href="?${(sortLinks && sortLinks.customer_code) || ''}" class="text-white text-decoration-none">
+                客戶編號${(sortIcons && sortIcons.customer_code) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.tax_id) || ''}" class="text-white text-decoration-none">
+                統一編號${(sortIcons && sortIcons.tax_id) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.company_name) || ''}" class="text-white text-decoration-none">
+                公司名稱${(sortIcons && sortIcons.company_name) || ''}
+              </a>
+            </th>
+            <th class="text-center">
+              <a href="?${(sortLinks && sortLinks.project_count) || ''}" class="text-white text-decoration-none">
+                專案數${(sortIcons && sortIcons.project_count) || ''}
+              </a>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          ${(!customers || customers.length === 0) ? `
+            <tr>
+              <td colspan="4" class="text-center text-muted py-3">
+                ${(typeof searchKeyword !== 'undefined' && searchKeyword) ? `找不到符合「<strong>${searchKeyword}</strong>」的客戶` : '尚無客戶'}
+              </td>
+            </tr>
+          ` : (customers || []).map(c => `
+            <tr onclick="location.href='/customers/${c.id}'" style="cursor:pointer">
+              <td><code>${c.customer_code || ''}</code></td>
+              <td>${c.tax_id || '-'}</td>
+              <td><strong>${c.company_name || ''}</strong></td>
+              <td class="text-center">${c.project_count || 0}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer text-muted">
+    ${(typeof searchKeyword !== 'undefined' && searchKeyword) ? `搜尋「<strong>${searchKeyword}</strong>」結果：共 ${(customers || []).length} 位客戶` : `共 ${(customers || []).length} 位客戶`}
+  </div>
+</div>
+
+<!-- 新增客戶 Modal -->
+<div class="modal fade" id="newCustomerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="/customers" method="POST">
+        <div class="modal-header">
+          <h5 class="modal-title">新增客戶</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">客戶編號</label>
+            <input type="text" name="customer_code" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">統一編號</label>
+            <input type="text" name="tax_id" class="form-control" maxlength="8">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">公司名稱</label>
+            <input type="text" name="company_name" class="form-control" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+`}) %>

@@ -1,0 +1,113 @@
+<%- include('../layout', { title: title, body: `
+<div class="row mb-4">
+  <div class="col">
+    <h1 class="h3">
+      <i class="bi bi-${user ? 'pencil' : 'person-plus'}"></i> 
+      ${user ? '編輯使用者' : '新增使用者'}
+    </h1>
+  </div>
+</div>
+
+${error ? `
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle"></i> ${error}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+<div class="card">
+  <div class="card-body">
+    <form action="${action}" method="POST">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">使用者名稱 <span class="text-danger">*</span></label>
+          ${user ? `
+            <input type="text" class="form-control" value="${user.username}" disabled>
+            <small class="text-muted">使用者名稱無法修改</small>
+          ` : `
+            <input type="text" name="username" class="form-control" value="${user ? user.username : ''}" required>
+          `}
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">姓名 <span class="text-danger">*</span></label>
+          <input type="text" name="name" class="form-control" value="${user ? user.name : ''}" required>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">${user ? '新密碼' : '密碼'} ${user ? '' : '<span class="text-danger">*</span>'}</label>
+          <input type="password" name="password" class="form-control" ${user ? '' : 'required'} minlength="6">
+          ${user ? `
+            <small class="text-muted">留空則不修改密碼，至少 6 個字元</small>
+          ` : `
+            <small class="text-muted">至少 6 個字元</small>
+          `}
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">角色 <span class="text-danger">*</span></label>
+          <select name="role" class="form-select" id="roleSelect" required onchange="toggleSalespersonField()">
+            ${typeof roles !== 'undefined' && roles.length > 0 ? 
+              roles.map(r => '<option value="' + r.role_key + '"' + (user && user.role === r.role_key ? ' selected' : '') + '>' + r.role_name + '</option>').join('') 
+              : 
+              '<option value="user" ' + (user && user.role === 'user' ? 'selected' : '') + '>一般使用者</option><option value="admin" ' + (user && user.role === 'admin' ? 'selected' : '') + '>管理員</option><option value="salesperson" ' + (user && user.role === 'salesperson' ? 'selected' : '') + '>業務員</option><option value="boss" ' + (user && user.role === 'boss' ? 'selected' : '') + '>老闆</option>'
+            }
+          </select>
+          <small class="text-muted">請從角色管理中設定各角色的權限</small>
+        </div>
+
+        <div class="col-md-6" id="salespersonField" style="display: ${user && user.role === 'salesperson' ? 'block' : 'none'};">
+          <label class="form-label">關聯業務員 <span class="text-danger">*</span></label>
+          <select name="salesperson_id" class="form-select" id="salespersonSelect">
+            <option value="">請選擇業務員</option>
+            ${salespeople.map(sp => '<option value="' + sp.id + '"' + (user && user.salesperson_id == sp.id ? ' selected' : '') + '>' + sp.name + '</option>').join('')}
+          </select>
+          <small class="text-muted">業務員角色必須關聯一位業務人員</small>
+        </div>
+
+        ${user ? `
+          <div class="col-md-6">
+            <label class="form-label">狀態</label>
+            <select name="is_active" class="form-select">
+              <option value="1" ${user.is_active ? 'selected' : ''}>啟用</option>
+              <option value="0" ${!user.is_active ? 'selected' : ''}>停用</option>
+            </select>
+          </div>
+        ` : ''}
+      </div>
+
+      <div class="mt-4">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg"></i> ${user ? '更新' : '建立'}
+        </button>
+        <a href="/users" class="btn btn-outline-secondary">
+          <i class="bi bi-arrow-left"></i> 返回
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function toggleSalespersonField() {
+  const role = document.getElementById('roleSelect').value;
+  const salespersonField = document.getElementById('salespersonField');
+  const salespersonSelect = document.getElementById('salespersonSelect');
+  
+  if (role === 'salesperson') {
+    salespersonField.style.display = 'block';
+    salespersonSelect.required = true;
+  } else {
+    salespersonField.style.display = 'none';
+    salespersonSelect.required = false;
+    salespersonSelect.value = ''; // 清空選擇
+  }
+}
+
+// 頁面載入時執行一次
+document.addEventListener('DOMContentLoaded', function() {
+  toggleSalespersonField();
+});
+</script>
+` }) %>
+

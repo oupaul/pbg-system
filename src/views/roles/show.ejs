@@ -1,0 +1,271 @@
+<%- include('../layout', { body: `
+<div class="container mt-4">
+  <div class="row">
+    <div class="col-lg-10 offset-lg-1">
+      <!-- 頁面標題 -->
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+          <i class="bi bi-shield-check"></i> 
+          ${role.role_name}
+          ${role.is_system_role ? '<span class="badge bg-info ms-2">系統角色</span>' : ''}
+          ${role.is_active ? '<span class="badge bg-success ms-2">啟用</span>' : '<span class="badge bg-secondary ms-2">停用</span>'}
+        </h2>
+        <div>
+          <a href="/roles/${role.id}/edit" class="btn btn-primary">
+            <i class="bi bi-pencil"></i> 編輯角色
+          </a>
+          <a href="/roles" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> 返回列表
+          </a>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-8">
+          <!-- 基本資訊 -->
+          <div class="card mb-4">
+            <div class="card-header bg-light">
+              <h5 class="mb-0">基本資訊</h5>
+            </div>
+            <div class="card-body">
+              <table class="table table-borderless">
+                <tr>
+                  <td style="width: 150px;"><strong>角色代碼：</strong></td>
+                  <td><code>${role.role_key}</code></td>
+                </tr>
+                <tr>
+                  <td><strong>角色名稱：</strong></td>
+                  <td>${role.role_name}</td>
+                </tr>
+                <tr>
+                  <td><strong>描述：</strong></td>
+                  <td>${role.description || '無'}</td>
+                </tr>
+                <tr>
+                  <td><strong>顯示順序：</strong></td>
+                  <td>${role.display_order}</td>
+                </tr>
+                <tr>
+                  <td><strong>角色類型：</strong></td>
+                  <td>
+                    ${role.is_system_role ? 
+                      '<span class="badge bg-info">系統角色</span>' : 
+                      '<span class="badge bg-secondary">自訂角色</span>'
+                    }
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>狀態：</strong></td>
+                  <td>
+                    ${role.is_active ? 
+                      '<span class="badge bg-success">啟用</span>' : 
+                      '<span class="badge bg-secondary">停用</span>'
+                    }
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>創建時間：</strong></td>
+                  <td>${role.created_at || '-'}</td>
+                </tr>
+                <tr>
+                  <td><strong>更新時間：</strong></td>
+                  <td>${role.updated_at || '-'}</td>
+                </tr>
+              </table>
+            </div>
+          </div>
+
+          <!-- 權限設定 -->
+          <div class="card mb-4">
+            <div class="card-header bg-light">
+              <h5 class="mb-0">權限設定</h5>
+            </div>
+            <div class="card-body">
+              <h6 class="mb-3">資料操作權限</h6>
+              <div class="row mb-4">
+                <div class="col-md-6">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" ${role.can_edit ? 'checked' : ''} disabled>
+                    <label class="form-check-label">
+                      <strong>編輯資料</strong>
+                      <div class="text-muted small">可以新增、修改專案、發票、收款等資料</div>
+                    </label>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" ${role.can_delete ? 'checked' : ''} disabled>
+                    <label class="form-check-label">
+                      <strong>刪除資料</strong>
+                      <div class="text-muted small">可以刪除專案、發票、收款等資料</div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <h6 class="mb-3">系統管理權限</h6>
+              <div class="row mb-4">
+                <div class="col-md-6 mb-3">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" ${role.can_manage_users ? 'checked' : ''} disabled>
+                    <label class="form-check-label">
+                      <strong>使用者管理</strong>
+                      <div class="text-muted small">可以管理系統使用者</div>
+                    </label>
+                  </div>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" ${role.can_manage_roles ? 'checked' : ''} disabled>
+                    <label class="form-check-label">
+                      <strong>角色管理</strong>
+                      <div class="text-muted small">可以管理角色和權限</div>
+                    </label>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" ${role.can_manage_settings ? 'checked' : ''} disabled>
+                    <label class="form-check-label">
+                      <strong>系統設定</strong>
+                      <div class="text-muted small">可以修改系統設定</div>
+                    </label>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" ${role.can_backup_restore ? 'checked' : ''} disabled>
+                    <label class="form-check-label">
+                      <strong>備份還原</strong>
+                      <div class="text-muted small">可以執行備份和還原操作</div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <h6 class="mb-3">專案檢視權限</h6>
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" ${role.can_view_all_projects ? 'checked' : ''} disabled>
+                    <label class="form-check-label">
+                      <strong>檢視所有專案</strong>
+                      <div class="text-muted small">可以查看系統中的所有專案</div>
+                    </label>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" ${role.can_view_own_projects ? 'checked' : ''} disabled>
+                    <label class="form-check-label">
+                      <strong>檢視自己的專案</strong>
+                      <div class="text-muted small">只能查看自己負責的專案（需綁定業務員）</div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <!-- 使用者列表 -->
+          <div class="card">
+            <div class="card-header bg-light">
+              <h5 class="mb-0">
+                使用此角色的使用者
+                <span class="badge bg-primary">${users.length} 人</span>
+              </h5>
+            </div>
+            <div class="card-body">
+              ${users.length === 0 ? `
+                <div class="text-center text-muted py-3">
+                  <i class="bi bi-people" style="font-size: 2rem;"></i>
+                  <p class="mt-2">目前沒有使用者使用此角色</p>
+                </div>
+              ` : `
+                <div class="list-group list-group-flush">
+                  ${users.map(u => `
+                    <div class="list-group-item px-0">
+                      <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                          <strong>${u.name}</strong>
+                          <div class="text-muted small">@${u.username}</div>
+                        </div>
+                        <div>
+                          ${u.is_active ? 
+                            '<span class="badge bg-success">啟用</span>' : 
+                            '<span class="badge bg-secondary">停用</span>'
+                          }
+                        </div>
+                      </div>
+                      ${u.last_login ? `
+                        <div class="text-muted small mt-1">
+                          <i class="bi bi-clock"></i> 最後登入：${u.last_login}
+                        </div>
+                      ` : ''}
+                    </div>
+                  `).join('')}
+                </div>
+              `}
+            </div>
+          </div>
+
+          <!-- 快速操作 -->
+          <div class="card mt-4">
+            <div class="card-header bg-light">
+              <h5 class="mb-0">快速操作</h5>
+            </div>
+            <div class="card-body">
+              <div class="d-grid gap-2">
+                <a href="/roles/${role.id}/edit" class="btn btn-primary">
+                  <i class="bi bi-pencil"></i> 編輯角色
+                </a>
+                ${!role.is_system_role ? `
+                  <button type="button" class="btn btn-danger" onclick="deleteRole()">
+                    <i class="bi bi-trash"></i> 刪除角色
+                  </button>
+                ` : `
+                  <button type="button" class="btn btn-secondary" disabled>
+                    <i class="bi bi-lock"></i> 系統角色不可刪除
+                  </button>
+                `}
+                <a href="/roles" class="btn btn-outline-secondary">
+                  <i class="bi bi-arrow-left"></i> 返回列表
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function deleteRole() {
+  if (!confirm('確定要刪除角色「${role.role_name}」嗎？\\n\\n刪除後角色將被停用，但不會永久刪除。')) {
+    return;
+  }
+
+  fetch('/roles/${role.id}', {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      window.location.href = '/roles?success=' + encodeURIComponent(data.message);
+    } else {
+      alert('刪除失敗：' + (data.error || '未知錯誤'));
+    }
+  })
+  .catch(err => {
+    console.error('刪除角色錯誤:', err);
+    alert('刪除失敗：' + err.message);
+  });
+}
+</script>
+` }) %>

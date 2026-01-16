@@ -1,0 +1,220 @@
+<% 
+  // 確保變數存在
+  const localTypes = typeof types !== 'undefined' ? types : [];
+  const localError = typeof error !== 'undefined' ? error : '';
+  const localSuccess = typeof success !== 'undefined' ? success : '';
+  
+  const badgeColors = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark'];
+  
+  // 顏色說明對照
+  const colorNames = {
+    'primary': '主要色（藍）',
+    'secondary': '次要色（灰）',
+    'success': '成功色（綠）',
+    'danger': '危險色（紅）',
+    'warning': '警告色（黃）',
+    'info': '資訊色（淺藍）',
+    'light': '淺色（淺灰）',
+    'dark': '深色（黑）'
+  };
+  
+  // 構建 body HTML
+  let bodyHtml = '<div class="d-flex justify-content-between align-items-center mb-4">';
+  bodyHtml += '  <h2><i class="bi bi-tags"></i> 專案類型管理</h2>';
+  bodyHtml += '  <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTypeModal">';
+  bodyHtml += '    <i class="bi bi-plus-circle"></i> 新增類型';
+  bodyHtml += '  </button>';
+  bodyHtml += '</div>';
+
+  if (localError) {
+    bodyHtml += '<div class="alert alert-danger alert-dismissible fade show" role="alert">';
+    bodyHtml += '  <i class="bi bi-exclamation-circle"></i> ' + localError;
+    bodyHtml += '  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+    bodyHtml += '</div>';
+  }
+
+  if (localSuccess) {
+    bodyHtml += '<div class="alert alert-success alert-dismissible fade show" role="alert">';
+    bodyHtml += '  <i class="bi bi-check-circle"></i> ' + localSuccess;
+    bodyHtml += '  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+    bodyHtml += '</div>';
+  }
+
+  bodyHtml += '<div class="card">';
+  bodyHtml += '  <div class="card-header bg-primary text-white">';
+  bodyHtml += '    <h5 class="mb-0"><i class="bi bi-list-ul"></i> 專案類型列表</h5>';
+  bodyHtml += '  </div>';
+  bodyHtml += '  <div class="card-body">';
+  
+  if (localTypes.length === 0) {
+    bodyHtml += '    <div class="alert alert-info">目前尚無專案類型，請點擊「新增類型」按鈕新增。</div>';
+  } else {
+    bodyHtml += '    <div class="table-responsive">';
+    bodyHtml += '      <table class="table table-hover">';
+    bodyHtml += '        <thead class="table-light">';
+    bodyHtml += '          <tr>';
+    bodyHtml += '            <th style="width: 60px;">排序</th>';
+    bodyHtml += '            <th>類型名稱</th>';
+    bodyHtml += '            <th>顏色標籤</th>';
+    bodyHtml += '            <th>狀態</th>';
+    bodyHtml += '            <th style="width: 200px;">操作</th>';
+    bodyHtml += '          </tr>';
+    bodyHtml += '        </thead>';
+    bodyHtml += '        <tbody>';
+    
+    localTypes.forEach(type => {
+      const statusBadge = type.is_active === 1 ? 
+        '<span class="badge bg-success">啟用</span>' : 
+        '<span class="badge bg-secondary">停用</span>';
+      const badgePreview = '<span class="badge bg-' + type.badge_color + '">' + type.type_name + '</span>';
+      const colorDescription = colorNames[type.badge_color] || type.badge_color;
+      
+      bodyHtml += '          <tr>';
+      bodyHtml += '            <td>' + type.display_order + '</td>';
+      bodyHtml += '            <td><strong>' + type.type_name + '</strong></td>';
+      bodyHtml += '            <td>' + badgePreview + ' <small class="text-muted">(' + colorDescription + ')</small></td>';
+      bodyHtml += '            <td>' + statusBadge + '</td>';
+      bodyHtml += '            <td>';
+      bodyHtml += '              <button type="button" class="btn btn-sm btn-outline-primary" onclick="editType(' + type.id + ', \'' + type.type_name.replace(/'/g, "\\'") + '\', \'' + type.badge_color + '\', ' + type.display_order + ', ' + type.is_active + ')">';
+      bodyHtml += '                <i class="bi bi-pencil"></i> 編輯';
+      bodyHtml += '              </button>';
+      bodyHtml += '              <form action="/project-types/delete/' + type.id + '" method="POST" style="display:inline" onsubmit="return confirm(\'確定要刪除此類型？\\n\\n注意：如果有專案使用此類型，將無法刪除。\')">';
+      bodyHtml += '                <button type="submit" class="btn btn-sm btn-outline-danger">';
+      bodyHtml += '                  <i class="bi bi-trash"></i> 刪除';
+      bodyHtml += '                </button>';
+      bodyHtml += '              </form>';
+      bodyHtml += '            </td>';
+      bodyHtml += '          </tr>';
+    });
+    
+    bodyHtml += '        </tbody>';
+    bodyHtml += '      </table>';
+    bodyHtml += '    </div>';
+  }
+  
+  bodyHtml += '  </div>';
+  bodyHtml += '</div>';
+
+  // 新增類型 Modal
+  bodyHtml += '<div class="modal fade" id="addTypeModal" tabindex="-1">';
+  bodyHtml += '  <div class="modal-dialog">';
+  bodyHtml += '    <div class="modal-content">';
+  bodyHtml += '      <div class="modal-header">';
+  bodyHtml += '        <h5 class="modal-title"><i class="bi bi-plus-circle"></i> 新增專案類型</h5>';
+  bodyHtml += '        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>';
+  bodyHtml += '      </div>';
+  bodyHtml += '      <form method="POST" action="/project-types/create">';
+  bodyHtml += '        <div class="modal-body">';
+  bodyHtml += '          <div class="mb-3">';
+  bodyHtml += '            <label class="form-label">類型名稱 <span class="text-danger">*</span></label>';
+  bodyHtml += '            <input type="text" name="type_name" class="form-control" required maxlength="50">';
+  bodyHtml += '          </div>';
+  bodyHtml += '          <div class="mb-3">';
+  bodyHtml += '            <label class="form-label">標籤顏色</label>';
+  bodyHtml += '            <select name="badge_color" id="addBadgeColor" class="form-select" onchange="updateColorPreview(\'add\')">';
+  badgeColors.forEach(color => {
+    const colorDesc = colorNames[color] || color;
+    bodyHtml += '              <option value="' + color + '"' + (color === 'info' ? ' selected' : '') + '>' + color + ' - ' + colorDesc + '</option>';
+  });
+  bodyHtml += '            </select>';
+  bodyHtml += '            <div class="mt-2">';
+  bodyHtml += '              <small class="text-muted">預覽：</small>';
+  bodyHtml += '              <span class="badge bg-info ms-2" id="addColorPreview">範例</span>';
+  bodyHtml += '            </div>';
+  bodyHtml += '          </div>';
+  bodyHtml += '          <div class="mb-3">';
+  bodyHtml += '            <label class="form-label">顯示順序</label>';
+  bodyHtml += '            <input type="number" name="display_order" class="form-control" min="0" value="0">';
+  bodyHtml += '            <small class="form-text text-muted">數字越小越靠前，相同數字按名稱排序</small>';
+  bodyHtml += '          </div>';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="modal-footer">';
+  bodyHtml += '          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>';
+  bodyHtml += '          <button type="submit" class="btn btn-primary">新增</button>';
+  bodyHtml += '        </div>';
+  bodyHtml += '      </form>';
+  bodyHtml += '    </div>';
+  bodyHtml += '  </div>';
+  bodyHtml += '</div>';
+
+  // 編輯類型 Modal
+  bodyHtml += '<div class="modal fade" id="editTypeModal" tabindex="-1">';
+  bodyHtml += '  <div class="modal-dialog">';
+  bodyHtml += '    <div class="modal-content">';
+  bodyHtml += '      <div class="modal-header">';
+  bodyHtml += '        <h5 class="modal-title"><i class="bi bi-pencil"></i> 編輯專案類型</h5>';
+  bodyHtml += '        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>';
+  bodyHtml += '      </div>';
+  bodyHtml += '      <form method="POST" action="/project-types/update/" id="editTypeForm">';
+  bodyHtml += '        <div class="modal-body">';
+  bodyHtml += '          <div class="mb-3">';
+  bodyHtml += '            <label class="form-label">類型名稱 <span class="text-danger">*</span></label>';
+  bodyHtml += '            <input type="text" name="type_name" id="editTypeName" class="form-control" required maxlength="50">';
+  bodyHtml += '          </div>';
+  bodyHtml += '          <div class="mb-3">';
+  bodyHtml += '            <label class="form-label">標籤顏色</label>';
+  bodyHtml += '            <select name="badge_color" id="editBadgeColor" class="form-select" onchange="updateColorPreview(\'edit\')">';
+  badgeColors.forEach(color => {
+    const colorDesc = colorNames[color] || color;
+    bodyHtml += '              <option value="' + color + '">' + color + ' - ' + colorDesc + '</option>';
+  });
+  bodyHtml += '            </select>';
+  bodyHtml += '            <div class="mt-2">';
+  bodyHtml += '              <small class="text-muted">預覽：</small>';
+  bodyHtml += '              <span class="badge bg-info ms-2" id="editColorPreview">範例</span>';
+  bodyHtml += '            </div>';
+  bodyHtml += '          </div>';
+  bodyHtml += '          <div class="mb-3">';
+  bodyHtml += '            <label class="form-label">顯示順序</label>';
+  bodyHtml += '            <input type="number" name="display_order" id="editDisplayOrder" class="form-control" min="0" value="0">';
+  bodyHtml += '            <small class="form-text text-muted">數字越小越靠前，相同數字按名稱排序</small>';
+  bodyHtml += '          </div>';
+  bodyHtml += '          <div class="mb-3">';
+  bodyHtml += '            <label class="form-label">狀態</label>';
+  bodyHtml += '            <div class="form-check form-switch">';
+  bodyHtml += '              <input class="form-check-input" type="checkbox" name="is_active" id="editIsActive" value="1" checked>';
+  bodyHtml += '              <label class="form-check-label" for="editIsActive">啟用</label>';
+  bodyHtml += '            </div>';
+  bodyHtml += '            <small class="form-text text-muted">停用的類型將不會出現在新增專案的下拉選單中，但已存在的專案不受影響</small>';
+  bodyHtml += '          </div>';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="modal-footer">';
+  bodyHtml += '          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>';
+  bodyHtml += '          <button type="submit" class="btn btn-primary">儲存</button>';
+  bodyHtml += '        </div>';
+  bodyHtml += '      </form>';
+  bodyHtml += '    </div>';
+  bodyHtml += '  </div>';
+  bodyHtml += '</div>';
+
+  bodyHtml += '<script>';
+  bodyHtml += 'function editType(id, name, color, order, isActive) {';
+  bodyHtml += '  document.getElementById("editTypeForm").action = "/project-types/update/" + id;';
+  bodyHtml += '  document.getElementById("editTypeName").value = name;';
+  bodyHtml += '  document.getElementById("editBadgeColor").value = color;';
+  bodyHtml += '  document.getElementById("editDisplayOrder").value = order;';
+  bodyHtml += '  document.getElementById("editIsActive").checked = isActive === 1;';
+  bodyHtml += '  updateColorPreview("edit");';
+  bodyHtml += '  new bootstrap.Modal(document.getElementById("editTypeModal")).show();';
+  bodyHtml += '}';
+  bodyHtml += 'function updateColorPreview(mode) {';
+  bodyHtml += '  const selectId = mode === "edit" ? "editBadgeColor" : "addBadgeColor";';
+  bodyHtml += '  const previewId = mode === "edit" ? "editColorPreview" : "addColorPreview";';
+  bodyHtml += '  const select = document.getElementById(selectId);';
+  bodyHtml += '  const preview = document.getElementById(previewId);';
+  bodyHtml += '  if (select && preview) {';
+  bodyHtml += '    const selectedColor = select.value;';
+  bodyHtml += '    preview.className = "badge bg-" + selectedColor + " ms-2";';
+  bodyHtml += '  }';
+  bodyHtml += '}';
+  bodyHtml += '// 初始化新增表單的顏色預覽';
+  bodyHtml += 'document.addEventListener("DOMContentLoaded", function() {';
+  bodyHtml += '  const addSelect = document.getElementById("addBadgeColor");';
+  bodyHtml += '  if (addSelect) {';
+  bodyHtml += '    updateColorPreview("add");';
+  bodyHtml += '  }';
+  bodyHtml += '});';
+  bodyHtml += '</script>';
+%>
+
+<%- include('../layout', { title: '專案類型管理', body: bodyHtml }) %>

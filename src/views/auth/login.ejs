@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登入 - <%= typeof locals.pageTitleSuffix !== 'undefined' ? locals.pageTitleSuffix : '業績獎金系統' %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/css/style.css" rel="stylesheet">
+</head>
+<body>
+  <div class="container-fluid">
+    <div class="row justify-content-center align-items-center" style="min-height: 100vh;">
+      <div class="col-md-4">
+        <div class="card shadow">
+          <div class="card-body p-5">
+            <div class="text-center mb-4">
+              <h2 class="mb-2"><i class="bi bi-shield-lock"></i> 登入系統</h2>
+              <p class="text-muted"><%= typeof locals.siteName !== 'undefined' ? locals.siteName : '專案開立發票業績認列獎金計算總表系統' %></p>
+            </div>
+
+            <% if (typeof error !== 'undefined' && error) { %>
+              <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> <%= error %>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+              </div>
+            <% } %>
+
+            <form method="POST" action="/login">
+              <input type="hidden" name="redirect" value="<%= typeof redirect !== 'undefined' ? redirect : '/' %>">
+              
+              <div class="mb-3">
+                <label for="username" class="form-label">帳號</label>
+                <div class="input-group">
+                  <span class="input-group-text"><i class="bi bi-person"></i></span>
+                  <input 
+                    type="text" 
+                    class="form-control" 
+                    id="username" 
+                    name="username" 
+                    placeholder="請輸入帳號"
+                    required 
+                    autofocus
+                  >
+                </div>
+              </div>
+
+              <div class="mb-4">
+                <label for="password" class="form-label">密碼</label>
+                <div class="input-group">
+                  <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                  <input 
+                    type="password" 
+                    class="form-control" 
+                    id="password" 
+                    name="password" 
+                    placeholder="請輸入密碼"
+                    required
+                  >
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn-primary w-100 mb-3">
+                <i class="bi bi-box-arrow-in-right"></i> 登入
+              </button>
+            </form>
+
+            <div class="text-center mt-4">
+              <small class="text-muted">
+                <i class="bi bi-info-circle"></i> 預設帳號：admin / admin123
+              </small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer mt-auto py-3 bg-light">
+    <div class="container text-center">
+      <span class="text-muted"><%= typeof locals.footerText !== 'undefined' ? locals.footerText : '專案開立發票業績認列獎金計算總表系統 ©' %> <%= new Date().getFullYear() %></span>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>

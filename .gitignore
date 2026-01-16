@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Database and data files
+data/
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Uploads and backups
+uploads/
+backups/
+
+# Configuration files (may contain sensitive info)
+deploy.config.json
+deploy.config.sh
+.env
+.env.local
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Build files
+dist/
+build/

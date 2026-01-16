@@ -1,0 +1,310 @@
+/* 專案開立發票業績認列獎金計算總表系統 - 自訂樣式 */
+
+:root {
+  --primary-color: #0d6efd;
+  --secondary-color: #6c757d;
+}
+
+body {
+  background-color: #f8f9fa;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+main {
+  flex: 1;
+}
+
+/* 導航列 */
+.navbar-brand {
+  font-weight: bold;
+}
+
+/* 卡片樣式 */
+.card {
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  border: none;
+}
+
+.card-header {
+  background-color: #fff;
+  border-bottom: 1px solid #e9ecef;
+  font-weight: 600;
+}
+
+/* 表格樣式 */
+.table {
+  margin-bottom: 0;
+}
+
+.table th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.table tbody tr {
+  transition: background-color 0.15s ease-in-out;
+}
+
+.table-hover tbody tr:hover {
+  background-color: rgba(13, 110, 253, 0.05);
+}
+
+/* 程式碼樣式 */
+code {
+  background-color: #e9ecef;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+  color: #d63384;
+}
+
+/* 徽章樣式 */
+.badge {
+  font-weight: 500;
+}
+
+/* 表單樣式 */
+.form-label {
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+}
+
+/* 按鈕樣式 */
+.btn {
+  font-weight: 500;
+}
+
+/* 進度條 */
+.progress {
+  border-radius: 0.5rem;
+}
+
+/* 響應式調整 */
+@media (max-width: 768px) {
+  .card-body {
+    padding: 1rem;
+  }
+  
+  .table-responsive {
+    font-size: 0.875rem;
+  }
+  
+  h1.h3 {
+    font-size: 1.25rem;
+  }
+}
+
+/* 列印樣式 */
+@media print {
+  .navbar, 
+  .btn,
+  footer {
+    display: none !important;
+  }
+  
+  .card {
+    box-shadow: none;
+    border: 1px solid #dee2e6;
+  }
+}
+
+/* 可點擊行 */
+tr[style*="cursor:pointer"]:hover td {
+  background-color: rgba(13, 110, 253, 0.08) !important;
+}
+
+/* 統計卡片動畫 */
+.card-body h2 {
+  transition: transform 0.2s;
+}
+
+.card:hover .card-body h2 {
+  transform: scale(1.05);
+}
+
+/* 表格固定標頭 */
+.sticky-top {
+  background-color: #f8f9fa;
+  z-index: 1;
+}
+
+/* Modal 優化 */
+.modal-header {
+  background-color: #f8f9fa;
+}
+
+/* 載入動畫 */
+.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* 警告訊息 */
+.alert {
+  border: none;
+  border-radius: 0.5rem;
+}
+
+/* 麵包屑 */
+.breadcrumb {
+  background: none;
+  padding: 0;
+  margin: 0;
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+  content: "›";
+}
+
+/* 數字格式 */
+.text-end {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ====================================
+   Select2 下拉選單自訂樣式
+   ==================================== */
+
+/* Select2 容器 */
+.select2-container--bootstrap-5 .select2-selection {
+  min-height: 38px;
+  border: 1px solid #ced4da;
+  border-radius: 0.375rem;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+/* 選擇器焦點狀態 */
+.select2-container--bootstrap-5.select2-container--focus .select2-selection,
+.select2-container--bootstrap-5.select2-container--open .select2-selection {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+}
+
+/* 下拉選單 */
+.select2-container--bootstrap-5 .select2-dropdown {
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 0.375rem;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.175);
+}
+
+/* 搜尋框 */
+.select2-container--bootstrap-5 .select2-search--dropdown .select2-search__field {
+  border: 1px solid #ced4da;
+  border-radius: 0.375rem;
+  padding: 0.375rem 0.75rem;
+}
+
+.select2-container--bootstrap-5 .select2-search--dropdown .select2-search__field:focus {
+  border-color: var(--primary-color);
+  outline: none;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+}
+
+/* 選項 */
+.select2-container--bootstrap-5 .select2-results__option {
+  padding: 0.5rem 0.75rem;
+  transition: background-color 0.15s ease-in-out;
+}
+
+/* 選項 hover 狀態 */
+.select2-container--bootstrap-5 .select2-results__option--highlighted {
+  background-color: var(--primary-color);
+  color: #fff;
+}
+
+/* 選項選中狀態 */
+.select2-container--bootstrap-5 .select2-results__option--selected {
+  background-color: #e9ecef;
+  color: #212529;
+}
+
+.select2-container--bootstrap-5 .select2-results__option[aria-selected=true] {
+  background-color: #e9ecef;
+  color: #212529;
+}
+
+/* 無結果訊息 */
+.select2-container--bootstrap-5 .select2-results__message {
+  color: #6c757d;
+  padding: 0.75rem;
+}
+
+/* 清除按鈕 */
+.select2-container--bootstrap-5 .select2-selection__clear {
+  color: #6c757d;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 0.5rem;
+  margin-top: -0.125rem;
+  transition: color 0.15s ease-in-out;
+}
+
+.select2-container--bootstrap-5 .select2-selection__clear:hover {
+  color: #dc3545;
+}
+
+/* 選擇器箭頭 */
+.select2-container--bootstrap-5 .select2-selection__arrow {
+  height: 36px;
+  width: 30px;
+}
+
+.select2-container--bootstrap-5 .select2-selection__arrow b {
+  border-color: #6c757d transparent transparent transparent;
+  border-width: 5px 4px 0 4px;
+}
+
+.select2-container--bootstrap-5.select2-container--open .select2-selection__arrow b {
+  border-color: transparent transparent #6c757d transparent;
+  border-width: 0 4px 5px 4px;
+}
+
+/* 單選 placeholder */
+.select2-container--bootstrap-5 .select2-selection--single .select2-selection__placeholder {
+  color: #6c757d;
+}
+
+/* 單選已選擇的文字 */
+.select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+  padding-left: 0.75rem;
+  padding-right: 2rem;
+  line-height: 36px;
+  color: #212529;
+}
+
+/* 確保 select2-dropdown 與 Bootstrap 樣式協調 */
+.select2-dropdown {
+  z-index: 1056 !important; /* 確保在 modal 之上 */
+}
+
+/* 載入中狀態 */
+.select2-container--bootstrap-5 .select2-results__option--loading {
+  padding-left: 2.5rem;
+  background: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="%236c757d"><circle cx="10" cy="10" r="2"/></svg>') no-repeat left 0.75rem center;
+  background-size: 1rem 1rem;
+}
+
+/* 響應式調整 */
+@media (max-width: 768px) {
+  .select2-container--bootstrap-5 .select2-selection {
+    min-height: 36px;
+  }
+  
+  .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+    line-height: 34px;
+  }
+  
+  .select2-container--bootstrap-5 .select2-results__option {
+    padding: 0.5rem;
+    font-size: 0.875rem;
+  }
+}

@@ -1,0 +1,161 @@
+<%- include('../layout', { title: salesperson.name, body: `
+<div class="row mb-4">
+  <div class="col">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/salespeople">業務管理</a></li>
+        <li class="breadcrumb-item active">${salesperson.name}</li>
+      </ol>
+    </nav>
+    <h1 class="h3 mt-2">${salesperson.name}</h1>
+  </div>
+  <div class="col-auto">
+    <form class="d-flex" method="get">
+      <select name="year" class="form-select" onchange="this.form.submit()">
+        <option value="all" ${selectedYear === 'all' ? 'selected' : ''}>全部年度</option>
+        ${years.map(y => `<option value="${y}" ${y == selectedYear ? 'selected' : ''}>${y}</option>`).join('')}
+      </select>
+    </form>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-md-3">
+    <div class="card bg-primary text-white">
+      <div class="card-body text-center">
+        <h6>專案數</h6>
+        <h2>${(performance && performance.project_count) || 0}</h2>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card bg-success text-white">
+      <div class="card-body text-center">
+        <h6>總金額</h6>
+        <h2>$${((performance && performance.total_amount) || 0).toLocaleString()}</h2>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card bg-info text-white">
+      <div class="card-body text-center">
+        <h6>總獎金</h6>
+        <h2>$${bonuses.reduce((sum, b) => sum + (b.bonus_amount || 0), 0).toLocaleString()}</h2>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body text-center">
+        <h6>狀態</h6>
+        <span class="badge bg-${salesperson.status === 'active' ? 'success' : 'danger'} fs-4">
+          ${salesperson.status === 'active' ? '在職' : '離職'}
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-folder"></i> 專案列表</div>
+      <div class="card-body p-0">
+        <div class="table-responsive" style="max-height: 400px;">
+          <table class="table table-hover table-sm mb-0">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th>專案編號</th>
+                <th>類型</th>
+                <th class="text-end">金額</th>
+                <th>狀態</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${projects.length === 0 ? '<tr><td colspan="4" class="text-center text-muted py-3">尚無專案</td></tr>' : projects.map(p => `
+                <tr onclick="location.href='/projects/${p.id}'" style="cursor: pointer;">
+                  <td><code>${p.project_code}</code></td>
+                  <td>
+                    <span class="badge bg-${p.project_type === '食驗室' ? 'primary' : p.project_type === '純廣' ? 'success' : 'info'}">
+                      ${p.project_type}
+                    </span>
+                  </td>
+                  <td class="text-end">$${(p.price_with_tax || 0).toLocaleString()}</td>
+                  <td>
+                    <span class="badge bg-${p.status === '已結案' ? 'secondary' : 'warning'}">
+                      ${p.status}
+                    </span>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-award"></i> 獎金列表</div>
+      <div class="card-body p-0">
+        <div class="table-responsive" style="max-height: 400px;">
+          <table class="table table-hover table-sm mb-0">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th>專案</th>
+                <th>類型</th>
+                <th class="text-end">金額</th>
+                <th>狀態</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${bonuses.length === 0 ? '<tr><td colspan="4" class="text-center text-muted py-3">尚無獎金</td></tr>' : bonuses.map(b => `
+                <tr>
+                  <td><a href="/projects/${b.project_id}"><code>${b.project_code}</code></a></td>
+                  <td>${b.bonus_type}</td>
+                  <td class="text-end fw-bold">$${(b.bonus_amount || 0).toLocaleString()}</td>
+                  <td>
+                    <span class="badge bg-${b.status === '已發放' ? 'success' : b.status === '充公' ? 'danger' : 'warning'}">
+                      ${b.status}
+                    </span>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-4">
+  <div class="card-header"><i class="bi bi-gear"></i> 編輯業務資料</div>
+  <div class="card-body">
+    <form action="/salespeople/${salesperson.id}" method="POST">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">姓名</label>
+          <input type="text" name="name" class="form-control" value="${salesperson.name}" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">狀態</label>
+          <select name="status" class="form-select">
+            <option value="active" ${salesperson.status === 'active' ? 'selected' : ''}>在職</option>
+            <option value="resigned" ${salesperson.status === 'resigned' ? 'selected' : ''}>離職</option>
+            <option value="suspended" ${salesperson.status === 'suspended' ? 'selected' : ''}>停用</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">離職日期</label>
+          <input type="date" name="resigned_date" class="form-control" value="${salesperson.resigned_date || ''}">
+        </div>
+        <div class="col-12">
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> 更新</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+` }) %>

@@ -1,0 +1,355 @@
+<%- include('../layout', { body: `
+<div class="container mt-4">
+  <div class="row">
+    <div class="col-md-10 offset-md-1 col-lg-8 offset-lg-2">
+      <!-- 頁面標題 -->
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+          <i class="bi bi-shield-check"></i> 
+          ${isEdit ? '編輯角色' : '新增角色'}
+        </h2>
+        <a href="/roles" class="btn btn-outline-secondary">
+          <i class="bi bi-arrow-left"></i> 返回列表
+        </a>
+      </div>
+
+      ${role && role.is_system_role ? `
+        <div class="alert alert-warning">
+          <i class="bi bi-exclamation-triangle"></i> 
+          <strong>注意：</strong> 這是系統預設角色，角色代碼不可修改。
+        </div>
+      ` : ''}
+
+      <!-- 表單 -->
+      <form id="roleForm" onsubmit="return handleSubmit(event)">
+        <div class="card">
+          <div class="card-header bg-light">
+            <h5 class="mb-0">基本資訊</h5>
+          </div>
+          <div class="card-body">
+            <!-- 角色代碼 -->
+            <div class="mb-3">
+              <label for="role_key" class="form-label">
+                角色代碼 <span class="text-danger">*</span>
+                <small class="text-muted">(用於系統內部識別，建議使用英文)</small>
+              </label>
+              <input 
+                type="text" 
+                class="form-control" 
+                id="role_key" 
+                name="role_key" 
+                value="${role ? role.role_key : ''}"
+                ${isEdit && role && role.is_system_role ? 'readonly' : 'required'}
+                placeholder="例如：manager, staff, guest"
+                pattern="[a-z_]+"
+                title="只能使用小寫英文字母和底線"
+              >
+              <div class="form-text">
+                ${isEdit && role && role.is_system_role ? '系統角色的代碼不可修改' : '只能使用小寫英文字母和底線'}
+              </div>
+            </div>
+
+            <!-- 角色名稱 -->
+            <div class="mb-3">
+              <label for="role_name" class="form-label">
+                角色名稱 <span class="text-danger">*</span>
+              </label>
+              <input 
+                type="text" 
+                class="form-control" 
+                id="role_name" 
+                name="role_name" 
+                value="${role ? role.role_name : ''}"
+                required
+                placeholder="例如：專案經理、一般員工"
+              >
+            </div>
+
+            <!-- 描述 -->
+            <div class="mb-3">
+              <label for="description" class="form-label">描述</label>
+              <textarea 
+                class="form-control" 
+                id="description" 
+                name="description" 
+                rows="3"
+                placeholder="簡單描述此角色的職責和權限..."
+              >${role ? (role.description || '') : ''}</textarea>
+            </div>
+
+            <!-- 排序 -->
+            <div class="mb-3">
+              <label for="display_order" class="form-label">顯示順序</label>
+              <input 
+                type="number" 
+                class="form-control" 
+                id="display_order" 
+                name="display_order" 
+                value="${role ? role.display_order : 0}"
+                min="0"
+              >
+              <div class="form-text">數字越小越靠前</div>
+            </div>
+
+            <!-- 狀態 -->
+            <div class="mb-3">
+              <div class="form-check form-switch">
+                <input 
+                  class="form-check-input" 
+                  type="checkbox" 
+                  id="is_active" 
+                  name="is_active"
+                  ${!role || role.is_active ? 'checked' : ''}
+                >
+                <label class="form-check-label" for="is_active">
+                  啟用此角色
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 資料操作權限 -->
+        <div class="card mt-4">
+          <div class="card-header bg-light">
+            <h5 class="mb-0">資料操作權限</h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <div class="form-check form-switch mb-3">
+                  <input 
+                    class="form-check-input" 
+                    type="checkbox" 
+                    id="can_edit" 
+                    name="can_edit"
+                    ${role && role.can_edit ? 'checked' : ''}
+                  >
+                  <label class="form-check-label" for="can_edit">
+                    <strong>編輯資料</strong>
+                    <div class="text-muted small">可以新增、修改專案、發票、收款等資料</div>
+                  </label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check form-switch mb-3">
+                  <input 
+                    class="form-check-input" 
+                    type="checkbox" 
+                    id="can_delete" 
+                    name="can_delete"
+                    ${role && role.can_delete ? 'checked' : ''}
+                  >
+                  <label class="form-check-label" for="can_delete">
+                    <strong>刪除資料</strong>
+                    <div class="text-muted small">可以刪除專案、發票、收款等資料</div>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 系統管理權限 -->
+        <div class="card mt-4">
+          <div class="card-header bg-light">
+            <h5 class="mb-0">系統管理權限</h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <div class="form-check form-switch mb-3">
+                  <input 
+                    class="form-check-input" 
+                    type="checkbox" 
+                    id="can_manage_users" 
+                    name="can_manage_users"
+                    ${role && role.can_manage_users ? 'checked' : ''}
+                  >
+                  <label class="form-check-label" for="can_manage_users">
+                    <strong>使用者管理</strong>
+                    <div class="text-muted small">可以管理系統使用者</div>
+                  </label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check form-switch mb-3">
+                  <input 
+                    class="form-check-input" 
+                    type="checkbox" 
+                    id="can_manage_roles" 
+                    name="can_manage_roles"
+                    ${role && role.can_manage_roles ? 'checked' : ''}
+                  >
+                  <label class="form-check-label" for="can_manage_roles">
+                    <strong>角色管理</strong>
+                    <div class="text-muted small">可以管理角色和權限</div>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-md-6">
+                <div class="form-check form-switch mb-3">
+                  <input 
+                    class="form-check-input" 
+                    type="checkbox" 
+                    id="can_manage_settings" 
+                    name="can_manage_settings"
+                    ${role && role.can_manage_settings ? 'checked' : ''}
+                  >
+                  <label class="form-check-label" for="can_manage_settings">
+                    <strong>系統設定</strong>
+                    <div class="text-muted small">可以修改系統設定</div>
+                  </label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check form-switch mb-3">
+                  <input 
+                    class="form-check-input" 
+                    type="checkbox" 
+                    id="can_backup_restore" 
+                    name="can_backup_restore"
+                    ${role && role.can_backup_restore ? 'checked' : ''}
+                  >
+                  <label class="form-check-label" for="can_backup_restore">
+                    <strong>備份還原</strong>
+                    <div class="text-muted small">可以執行備份和還原操作</div>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 專案檢視權限 -->
+        <div class="card mt-4">
+          <div class="card-header bg-light">
+            <h5 class="mb-0">專案檢視權限</h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <div class="form-check form-switch mb-3">
+                  <input 
+                    class="form-check-input" 
+                    type="checkbox" 
+                    id="can_view_all_projects" 
+                    name="can_view_all_projects"
+                    ${!role || role.can_view_all_projects ? 'checked' : ''}
+                  >
+                  <label class="form-check-label" for="can_view_all_projects">
+                    <strong>檢視所有專案</strong>
+                    <div class="text-muted small">可以查看系統中的所有專案</div>
+                  </label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check form-switch mb-3">
+                  <input 
+                    class="form-check-input" 
+                    type="checkbox" 
+                    id="can_view_own_projects" 
+                    name="can_view_own_projects"
+                    ${!role || role.can_view_own_projects ? 'checked' : ''}
+                  >
+                  <label class="form-check-label" for="can_view_own_projects">
+                    <strong>檢視自己的專案</strong>
+                    <div class="text-muted small">只能查看自己負責的專案（需綁定業務員）</div>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="alert alert-info mt-2">
+              <i class="bi bi-info-circle"></i> 
+              如果兩者都勾選，則可以檢視所有專案。如果只勾選「檢視自己的專案」，則需要在使用者管理中綁定業務員。
+            </div>
+          </div>
+        </div>
+
+        <!-- 操作按鈕 -->
+        <div class="card mt-4">
+          <div class="card-body">
+            <div class="d-flex justify-content-between">
+              <a href="/roles" class="btn btn-outline-secondary">
+                <i class="bi bi-x-circle"></i> 取消
+              </a>
+              <button type="submit" class="btn btn-primary" id="submitBtn">
+                <i class="bi bi-check-circle"></i> ${isEdit ? '更新角色' : '建立角色'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function handleSubmit(event) {
+  event.preventDefault();
+  
+  const form = document.getElementById('roleForm');
+  const submitBtn = document.getElementById('submitBtn');
+  const formData = new FormData(form);
+  
+  // 停用提交按鈕
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>處理中...';
+  
+  // 手動處理所有 checkbox，確保未勾選的也有值（設為 'off' 而不是不傳遞）
+  const checkboxes = form.querySelectorAll('input[type="checkbox"]');
+  checkboxes.forEach(checkbox => {
+    if (!checkbox.checked && checkbox.name) {
+      // 如果沒有勾選，確保不會傳遞這個欄位
+      // URLSearchParams 會自動處理，只傳遞有值的
+      formData.delete(checkbox.name);
+    }
+  });
+  
+  const url = '${isEdit && role ? `/roles/${role.id}` : "/roles"}';
+  const method = 'POST'; // 統一使用 POST 方法，後端會處理新增和更新
+  const isEditMode = ${isEdit ? 'true' : 'false'};
+  
+  console.log('提交到:', url, '方法:', method);
+  console.log('表單資料:', Array.from(formData.entries()));
+  console.log('是否為編輯模式:', isEditMode);
+  
+  fetch(url, {
+    method: method,
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: new URLSearchParams(formData)
+  })
+  .then(response => {
+    console.log('響應狀態:', response.status);
+    if (!response.ok) {
+      return response.text().then(text => {
+        throw new Error('伺服器錯誤: ' + response.status + ' - ' + text);
+      });
+    }
+    return response.json();
+  })
+  .then(data => {
+    console.log('響應資料:', data);
+    if (data.success) {
+      window.location.href = '/roles?success=' + encodeURIComponent(data.message);
+    } else {
+      alert('操作失敗：' + (data.error || '未知錯誤'));
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> ' + (isEditMode ? '更新角色' : '建立角色');
+    }
+  })
+  .catch(err => {
+    console.error('提交錯誤:', err);
+    alert('操作失敗：' + err.message);
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> ' + (isEditMode ? '更新角色' : '建立角色');
+  });
+  
+  return false;
+}
+</script>
+` }) %>

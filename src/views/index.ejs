@@ -1,0 +1,356 @@
+<%- include('layout', { body: ` 
+${locals.user && locals.user.role === 'salesperson' ? `
+<div class="row mb-4">
+  <div class="col">
+    <h1 class="h3"><i class="bi bi-info-circle"></i> 歡迎</h1>
+  </div>
+</div>
+
+<div class="alert alert-info">
+  <h5><i class="bi bi-person-check"></i> 歡迎，${locals.user.name}！</h5>
+  <p class="mb-0">您的帳號為業務員，可以查看專案資訊。</p>
+  <hr>
+  <p class="mb-0">
+    <a href="/projects" class="btn btn-primary">
+      <i class="bi bi-folder"></i> 前往專案管理
+    </a>
+  </p>
+</div>
+` : `
+<div class="row mb-4">
+  <div class="col">
+    <h1 class="h3"><i class="bi bi-speedometer2"></i> 儀表板</h1>
+  </div>
+  <div class="col-auto">
+    <form class="d-flex" method="get">
+      <select name="year" class="form-select" onchange="this.form.submit()">
+        <option value="all" ${selectedYear === 'all' ? 'selected' : ''}>全部年度</option>
+        ${years.map(y => '<option value="' + y + '" ' + (y == selectedYear ? 'selected' : '') + '>' + y + '</option>').join('')}
+      </select>
+    </form>
+  </div>
+</div>
+
+<!-- 調試資訊區塊（僅管理員可見） -->
+${typeof showNotification !== 'undefined' && locals.user && locals.user.role === 'admin' ? `
+<div class="alert alert-info alert-dismissible fade show mb-3" role="alert">
+  <h6 class="alert-heading"><i class="bi bi-info-circle"></i> 通知系統狀態（調試資訊）</h6>
+  <ul class="mb-0 small">
+    <li>當前月份：<strong>${currentYearMonth || '未知'}</strong></li>
+    <li>當月剩餘天數：<strong>${daysUntilEndOfMonth !== undefined ? daysUntilEndOfMonth : '未知'}</strong> 天</li>
+    <li>通知條件：剩餘 ≤ 6 天（即倒數第 7 天開始）</li>
+    <li>是否顯示通知：<strong class="${showNotification ? 'text-success' : 'text-danger'}">${showNotification ? '✓ 是' : '✗ 否'}</strong></li>
+    <li>符合條件的專案數：<strong>${upcomingInvoiceProjects ? upcomingInvoiceProjects.length : 0}</strong> 個</li>
+    ${upcomingInvoiceProjects && upcomingInvoiceProjects.length === 0 ? '<li class="text-muted">提示：沒有專案的「預計開票年月」設為本月且狀態為「未結案」</li>' : ''}
+  </ul>
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+` : ''}
+
+${showNotification && (typeof upcomingInvoiceProjects !== 'undefined' && upcomingInvoiceProjects.length > 0 || typeof overdueInvoiceProjects !== 'undefined' && overdueInvoiceProjects.length > 0) ? `
+<!-- 開票提醒通知 -->
+<div class="alert alert-warning alert-dismissible fade show mb-4" role="alert">
+  <div class="d-flex align-items-start">
+    <div class="flex-shrink-0">
+      <i class="bi bi-exclamation-triangle-fill fs-3 me-3"></i>
+    </div>
+    <div class="flex-grow-1">
+      <h5 class="alert-heading mb-2">
+        <i class="bi bi-bell-fill"></i> 開票提醒通知
+      </h5>
+      <p class="mb-2">
+        ${typeof upcomingInvoiceProjects !== 'undefined' && upcomingInvoiceProjects.length > 0 ? `<strong>本月還剩 ${daysUntilEndOfMonth + 1} 天！</strong>` : ''}
+        以下 <span class="badge bg-danger">${typeof upcomingInvoiceProjects !== 'undefined' && typeof overdueInvoiceProjects !== 'undefined' ? (upcomingInvoiceProjects.length + overdueInvoiceProjects.length) : (upcomingInvoiceProjects ? upcomingInvoiceProjects.length : 0)}</span> 個專案需要開立發票：
+        ${typeof overdueInvoiceProjects !== 'undefined' && overdueInvoiceProjects.length > 0 ? `
+          <span class="badge bg-warning text-dark ms-2">含 ${overdueInvoiceProjects.length} 個已過期專案</span>
+        ` : ''}
+        ${typeof upcomingInvoiceProjects !== 'undefined' && upcomingInvoiceProjects.length === 0 && typeof overdueInvoiceProjects !== 'undefined' && overdueInvoiceProjects.length > 0 ? `
+          <span class="text-danger ms-2"><i class="bi bi-exclamation-triangle"></i> 有專案已超過預計開票日期</span>
+        ` : ''}
+      </p>
+      <hr>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>專案編號</th>
+              <th>專案名稱</th>
+              <th>預計開票年月</th>
+              <th>業務</th>
+              <th>專案金額</th>
+              <th>已開發票</th>
+              <th>未開發票</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${upcomingInvoiceProjects.map(p => {
+              const isOverdue = p.notification_type === 'overdue' || (typeof overdueInvoiceProjects !== 'undefined' && overdueInvoiceProjects.some(op => op.id === p.id));
+              return `
+              <tr class="${isOverdue ? 'table-danger' : ''}">
+                <td><code>${p.project_code}</code></td>
+                <td>
+                  <span class="badge bg-${typeof typeColorMap !== 'undefined' && typeColorMap[p.project_type] ? typeColorMap[p.project_type] : (p.project_type === '食驗室' ? 'primary' : p.project_type === '純廣' ? 'success' : 'info')}">${p.project_type}</span>
+                  ${p.project_name}
+                </td>
+                <td>
+                  ${p.expected_invoice_year_month || '-'}
+                  ${isOverdue ? '<span class="badge bg-danger ms-1">已過期</span>' : ''}
+                </td>
+                <td>${p.salesperson_name || '-'}</td>
+                <td class="text-end">$${(p.price_with_tax || 0).toLocaleString()}</td>
+                <td class="text-end ${p.total_invoiced > 0 ? 'text-success' : 'text-muted'}">
+                  $${(p.total_invoiced || 0).toLocaleString()}
+                </td>
+                <td class="text-end ${p.uninvoiced_amount > 0 ? 'text-danger fw-bold' : ''}">
+                  $${(p.uninvoiced_amount || 0).toLocaleString()}
+                </td>
+                <td>
+                  <a href="/projects/${p.id}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-arrow-right"></i> 查看
+                  </a>
+                </td>
+              </tr>
+            `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-3">
+        <a href="/projects?expected_invoice_year_month=${currentYearMonth}&status=未結案" class="btn btn-sm btn-warning">
+          <i class="bi bi-filter"></i> 查看所有預計本月開票專案
+        </a>
+      </div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+</div>
+` : ''}
+
+<div class="row g-4 mb-4">
+  <div class="col-md-3">
+    <div class="card bg-primary text-white h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h6 class="card-subtitle mb-2">總專案數</h6>
+            <h2 class="card-title mb-0">${stats.total_projects || 0}</h2>
+          </div>
+          <i class="bi bi-folder fs-1 opacity-50"></i>
+        </div>
+        <small>未結案: ${stats.open_projects || 0} | 已結案: ${stats.closed_projects || 0}</small>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-3">
+    <div class="card bg-success text-white h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h6 class="card-subtitle mb-2">總金額(含稅)</h6>
+            <h2 class="card-title mb-0">$${(stats.total_amount || 0).toLocaleString()}</h2>
+          </div>
+          <i class="bi bi-cash-stack fs-1 opacity-50"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  ${locals.user && locals.user.role === 'admin' ? `
+  <div class="col-md-3">
+    <div class="card bg-info text-white h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h6 class="card-subtitle mb-2">總獎金</h6>
+            <h2 class="card-title mb-0">$${(bonusStats.total_bonus || 0).toLocaleString()}</h2>
+          </div>
+          <i class="bi bi-award fs-1 opacity-50"></i>
+        </div>
+        <small>已發放: $${(bonusStats.paid_bonus || 0).toLocaleString()}</small>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-3">
+    <div class="card bg-warning text-dark h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h6 class="card-subtitle mb-2">待發放獎金</h6>
+            <h2 class="card-title mb-0">$${(bonusStats.pending_bonus || 0).toLocaleString()}</h2>
+          </div>
+          <i class="bi bi-hourglass-split fs-1 opacity-50"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  ` : ''}
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-md-3">
+    <div class="card bg-secondary text-white h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h6 class="card-subtitle mb-2">已開立發票總額</h6>
+            <h2 class="card-title mb-0">$${(invoiceStats.total_invoiced || 0).toLocaleString()}</h2>
+          </div>
+          <i class="bi bi-receipt fs-1 opacity-50"></i>
+        </div>
+        <small>發票筆數: ${invoiceStats.invoice_count || 0} | 專案數: ${invoiceStats.projects_with_invoices || 0}</small>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-3">
+    <div class="card bg-danger text-white h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h6 class="card-subtitle mb-2">未開立發票金額</h6>
+            <h2 class="card-title mb-0">$${((stats.total_amount || 0) - (invoiceStats.total_invoiced || 0)).toLocaleString()}</h2>
+          </div>
+          <i class="bi bi-file-earmark-x fs-1 opacity-50"></i>
+        </div>
+        <small>${stats.total_amount ? (((stats.total_amount - (invoiceStats.total_invoiced || 0)) / stats.total_amount * 100).toFixed(1)) : '0'}% 未開立</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <i class="bi bi-pie-chart"></i> 專案類型分布
+        <small class="text-muted ms-2">(點擊類型可查看該類型專案)</small>
+      </div>
+      <div class="card-body">
+        ${typeof projectTypeStats !== 'undefined' && projectTypeStats.length > 0 ? projectTypeStats.map(typeStat => {
+          const percentage = stats.total_amount && stats.total_amount > 0 ? (typeStat.amount / stats.total_amount * 100) : 0;
+          const typeUrl = '/projects?type=' + encodeURIComponent(typeStat.type_name);
+          return `
+        <div class="mb-3 project-type-item" style="cursor: pointer;" onclick="window.location.href='${typeUrl}'" title="點擊查看 ${typeStat.type_name} 類型的專案">
+          <div class="d-flex justify-content-between mb-1">
+            <span><i class="bi bi-circle-fill text-${typeStat.badge_color || 'info'}"></i> <span class="text-decoration-underline">${typeStat.type_name}</span></span>
+            <span>$${(typeStat.amount || 0).toLocaleString()}</span>
+          </div>
+          <div class="progress" style="height: 10px;">
+            <div class="progress-bar bg-${typeStat.badge_color || 'info'}" style="width: ${percentage}%"></div>
+          </div>
+        </div>
+        `;
+        }).join('') : `
+        <div class="mb-3 project-type-item" style="cursor: pointer;" onclick="window.location.href='/projects?type=' + encodeURIComponent('食驗室')" title="點擊查看 食驗室 類型的專案">
+          <div class="d-flex justify-content-between mb-1">
+            <span><i class="bi bi-circle-fill text-primary"></i> <span class="text-decoration-underline">食驗室</span></span>
+            <span>$${(stats.lab_amount || 0).toLocaleString()}</span>
+          </div>
+          <div class="progress" style="height: 10px;">
+            <div class="progress-bar bg-primary" style="width: ${stats.total_amount ? (stats.lab_amount/stats.total_amount*100) : 0}%"></div>
+          </div>
+        </div>
+        <div class="mb-3 project-type-item" style="cursor: pointer;" onclick="window.location.href='/projects?type=' + encodeURIComponent('純廣')" title="點擊查看 純廣 類型的專案">
+          <div class="d-flex justify-content-between mb-1">
+            <span><i class="bi bi-circle-fill text-success"></i> <span class="text-decoration-underline">純廣</span></span>
+            <span>$${(stats.ad_amount || 0).toLocaleString()}</span>
+          </div>
+          <div class="progress" style="height: 10px;">
+            <div class="progress-bar bg-success" style="width: ${stats.total_amount ? (stats.ad_amount/stats.total_amount*100) : 0}%"></div>
+          </div>
+        </div>
+        <div class="mb-3 project-type-item" style="cursor: pointer;" onclick="window.location.href='/projects?type=' + encodeURIComponent('專案')" title="點擊查看 專案 類型的專案">
+          <div class="d-flex justify-content-between mb-1">
+            <span><i class="bi bi-circle-fill text-info"></i> <span class="text-decoration-underline">專案</span></span>
+            <span>$${(stats.project_amount || 0).toLocaleString()}</span>
+          </div>
+          <div class="progress" style="height: 10px;">
+            <div class="progress-bar bg-info" style="width: ${stats.total_amount ? (stats.project_amount/stats.total_amount*100) : 0}%"></div>
+          </div>
+        </div>
+        `}
+      </div>
+    </div>
+  </div>
+  
+  <style>
+    .project-type-item {
+      transition: all 0.2s ease;
+      border-radius: 4px;
+      padding: 8px;
+      margin: -8px;
+    }
+    .project-type-item:hover {
+      background-color: rgba(0, 123, 255, 0.05);
+      transform: translateX(4px);
+    }
+    .project-type-item .text-decoration-underline {
+      text-decoration: underline;
+    }
+  </style>
+  
+  <div class="col-md-8">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-clock-history"></i> 最近專案</span>
+        <a href="/projects${selectedYear === 'all' ? '' : '?year=' + selectedYear}" class="btn btn-sm btn-outline-primary">查看全部</a>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>專案編號</th>
+                <th>專案名稱</th>
+                <th>類型</th>
+                <th>業務</th>
+                <th>金額</th>
+                <th>狀態</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${recentProjects.length ? recentProjects.map(p => {
+                const typeColor = typeof typeColorMap !== 'undefined' && typeColorMap[p.project_type] ? typeColorMap[p.project_type] : 'info';
+                return `
+                <tr onclick="location.href='/projects/${p.id}'" style="cursor:pointer">
+                  <td><code>${p.project_code}</code></td>
+                  <td>${p.project_name}</td>
+                  <td><span class="badge bg-${typeColor}">${p.project_type}</span></td>
+                  <td>${p.salesperson_name || '-'}</td>
+                  <td>$${(p.price_with_tax || 0).toLocaleString()}</td>
+                  <td><span class="badge bg-${p.status === '已結案' ? 'secondary' : 'warning'}">${p.status}</span></td>
+                </tr>
+              `;
+              }).join('') : '<tr><td colspan="6" class="text-center text-muted py-4">尚無專案資料</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+${locals.user && locals.user.role === 'boss' ? '' : `
+<div class="row g-4">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-lightning"></i> 快速操作
+      </div>
+      <div class="card-body">
+        <div class="d-grid gap-2 d-md-flex">
+          <a href="/projects/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 新增專案</a>
+          <a href="/import-export" class="btn btn-outline-secondary"><i class="bi bi-upload"></i> 匯入Excel</a>
+          ${selectedYear !== 'all' ? '<a href="/import-export/export/projects/' + selectedYear + '" class="btn btn-outline-success"><i class="bi bi-download"></i> 匯出專案總表</a>' : ''}
+          ${selectedYear !== 'all' ? '<a href="/import-export/export/bonuses/' + selectedYear + '" class="btn btn-outline-info"><i class="bi bi-download"></i> 匯出獎金報表</a>' : ''}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`}
+`}
+`}) %>

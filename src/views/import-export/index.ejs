@@ -1,0 +1,149 @@
+<%- include('../layout', { body: `
+<div class="row mb-4">
+  <div class="col">
+    <h1 class="h3"><i class="bi bi-arrow-left-right"></i> 匯入/匯出</h1>
+  </div>
+</div>
+
+${result ? `
+  <div class="alert alert-${result.success ? (result.warning ? 'warning' : 'success') : 'danger'} alert-dismissible fade show">
+    <h5>${result.success ? (result.warning ? '⚠️ 匯入完成（有錯誤）' : '✅ 匯入成功！') : '❌ 匯入失敗'}</h5>
+    ${result.success ? `
+      <ul class="mb-0">
+        <li>專案: ${result.results.projects || 0} 筆</li>
+        <li>發票: ${result.results.invoices || 0} 筆</li>
+        <li>收款: ${result.results.payments || 0} 筆</li>
+        <li>獎金: ${result.results.bonuses || 0} 筆</li>
+        <li>業務: ${result.results.salespeople || 0} 筆</li>
+        <li>客戶: ${result.results.customers || 0} 筆</li>
+      </ul>
+      ${result.warning ? `<p class="mb-0 mt-2 text-warning"><strong>${result.warning}</strong></p>` : ''}
+      ${result.errorCount > 0 ? `
+        <details class="mt-2">
+          <summary class="text-danger cursor-pointer">查看錯誤詳情 (${result.errorCount} 個錯誤)</summary>
+          <ul class="mt-2 mb-0 small">
+            ${result.errors.slice(0, 20).map(err => `<li>${err.message || err}</li>`).join('')}
+            ${result.errors.length > 20 ? `<li>... 還有 ${result.errors.length - 20} 個錯誤</li>` : ''}
+          </ul>
+        </details>
+      ` : ''}
+    ` : `<p class="mb-0">${result.error || '匯入過程中發生錯誤'}</p>
+      ${result.errors && result.errors.length > 0 ? `
+        <details class="mt-2">
+          <summary>查看錯誤詳情</summary>
+          <ul class="mt-2 mb-0 small">
+            ${result.errors.slice(0, 10).map(err => `<li>${err.message || err}</li>`).join('')}
+          </ul>
+        </details>
+      ` : ''}
+    `}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+<div class="row g-4">
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header bg-primary text-white">
+        <i class="bi bi-upload"></i> 匯入Excel
+      </div>
+      <div class="card-body">
+        <p class="text-muted">上傳專案總表Excel檔案，系統將自動解析並匯入資料。</p>
+        <div class="mb-3">
+          <a href="/import-export/template" class="btn btn-outline-primary btn-sm mb-3">
+            <i class="bi bi-download"></i> 下載範例檔案
+          </a>
+        </div>
+        <form action="/import-export/import" method="POST" enctype="multipart/form-data">
+          <div class="mb-3">
+            <label class="form-label">選擇檔案</label>
+            <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required>
+            <div class="form-text">支援 .xlsx, .xls 格式</div>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-cloud-upload"></i> 開始匯入
+          </button>
+        </form>
+      </div>
+      <div class="card-footer">
+        <small class="text-muted">
+          <i class="bi bi-info-circle"></i> 匯入時會自動建立不存在的業務人員和客戶
+        </small>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header bg-success text-white">
+        <i class="bi bi-download"></i> 匯出報表
+      </div>
+      <div class="card-body">
+        <p class="text-muted">選擇年度後匯出報表。</p>
+        
+        <div class="mb-4">
+          <h6>專案總表</h6>
+          <p class="small text-muted">包含專案、發票、收款、獎金等完整資料</p>
+          <div class="d-flex gap-2 flex-wrap">
+            ${years.map(y => `
+              <a href="/import-export/export/projects/${y}" class="btn btn-outline-success">
+                <i class="bi bi-file-earmark-excel"></i> ${y}年
+              </a>
+            `).join('') || '<span class="text-muted">尚無資料</span>'}
+          </div>
+        </div>
+        
+        <hr>
+        
+        <div>
+          <h6>獎金報表</h6>
+          <p class="small text-muted">依業務人員彙整的獎金明細</p>
+          <div class="d-flex gap-2 flex-wrap">
+            ${years.map(y => `
+              <a href="/import-export/export/bonuses/${y}" class="btn btn-outline-info">
+                <i class="bi bi-file-earmark-excel"></i> ${y}年
+              </a>
+            `).join('') || '<span class="text-muted">尚無資料</span>'}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-4">
+  <div class="card-header">
+    <i class="bi bi-question-circle"></i> Excel格式說明
+  </div>
+  <div class="card-body">
+    <p>匯入的Excel檔案應包含以下欄位（依序）：</p>
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered">
+        <thead class="table-light">
+          <tr>
+            <th>欄位</th>
+            <th>說明</th>
+            <th>範例</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>A: 簽約年度</td><td>西元年</td><td>2023</td></tr>
+          <tr><td>B: 狀態</td><td>未結案/已結案</td><td>未結案</td></tr>
+          <tr><td>C: 類型</td><td>食驗室/純廣/專案</td><td>食驗室</td></tr>
+          <tr><td>D: 業務</td><td>業務人員姓名</td><td>王小明</td></tr>
+          <tr><td>E: 專案月份</td><td>數字或X月</td><td>7月</td></tr>
+          <tr><td>F: 新客戶</td><td>新客戶/舊客戶</td><td>舊客戶</td></tr>
+          <tr><td>G: 專案編號</td><td>唯一識別碼</td><td>CU20230706</td></tr>
+          <tr><td>H: 客戶編號</td><td>客戶代碼</td><td>90546191</td></tr>
+          <tr><td>I: 統一編號</td><td>8碼統編</td><td>90546191</td></tr>
+          <tr><td>J: 公司名稱</td><td>客戶全名</td><td>XX股份有限公司</td></tr>
+          <tr><td>K: 專案名稱</td><td>專案說明</td><td>XX年度食驗室</td></tr>
+          <tr><td>L: 價格(含稅)</td><td>合約金額</td><td>651000</td></tr>
+          <tr><td>M-AI: 其他欄位</td><td>發票、收款、獎金等</td><td>...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="mb-0 mt-3"><strong>注意：</strong>日期格式請使用民國年格式（如 112/08/10）</p>
+  </div>
+</div>
+`}) %>

@@ -1,0 +1,98 @@
+<%- include('../layout', { title: '近期收款查詢', body: `
+<div class="row mb-4">
+  <div class="col">
+    <h1 class="h3">
+      <i class="bi bi-cash-coin"></i> 近期收款查詢
+    </h1>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="get" class="row g-3 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label">查詢天數</label>
+        <select name="days" class="form-select" onchange="this.form.submit()">
+          ${validDays.map(d => `
+            <option value="${d}" ${days === d ? 'selected' : ''}>最近 ${d} 天</option>
+          `).join('')}
+        </select>
+      </div>
+      <div class="col-md-9">
+        <div class="alert alert-info mb-0">
+          <i class="bi bi-info-circle"></i> 
+          顯示最近 <strong>${days}</strong> 天的收款記錄，共 <strong>${totalCount}</strong> 筆，總金額 <strong>$${totalAmount.toLocaleString()}</strong>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+${payments.length === 0 ? `
+<div class="alert alert-warning">
+  <i class="bi bi-exclamation-triangle"></i> 最近 ${days} 天內沒有收款記錄
+</div>
+` : `
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>收款日期</th>
+            <th>專案編號</th>
+            <th>專案名稱</th>
+            <th>專案類型</th>
+            <th>客戶</th>
+            <th>業務</th>
+            <th>發票號碼</th>
+            <th class="text-end">收款金額</th>
+            <th class="text-end">差異</th>
+            <th>備註</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${payments.map(p => `
+            <tr>
+              <td>${p.payment_date || '-'}</td>
+              <td><code>${p.project_code || '-'}</code></td>
+              <td>${p.project_name || '-'}</td>
+              <td>
+                <span class="badge bg-${typeColorMap[p.project_type] || 'info'}">${p.project_type || '-'}</span>
+              </td>
+              <td>${p.company_name || '-'}${p.customer_code ? ' (' + p.customer_code + ')' : ''}</td>
+              <td>${p.salesperson_name || '-'}</td>
+              <td><code>${p.invoice_number || '-'}</code></td>
+              <td class="text-end fw-bold text-success">
+                $${(p.bank_deposit_amount || 0).toLocaleString()}
+              </td>
+              <td class="text-end ${p.payment_difference && p.payment_difference !== 0 ? 'text-warning' : ''}">
+                ${p.payment_difference && p.payment_difference !== 0 ? `
+                  <span class="badge bg-warning">${p.payment_difference > 0 ? '+' : ''}$${p.payment_difference.toLocaleString()}</span>
+                  ${p.difference_type ? '<br><small class="text-muted">' + p.difference_type + '</small>' : ''}
+                ` : '-'}
+              </td>
+              <td>${p.notes || '-'}</td>
+              <td>
+                <a href="/projects/${p.project_id}" class="btn btn-sm btn-outline-primary">
+                  <i class="bi bi-arrow-right"></i> 查看專案
+                </a>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+        <tfoot class="table-light">
+          <tr>
+            <th colspan="7" class="text-end">總計：</th>
+            <th class="text-end text-success">$${totalAmount.toLocaleString()}</th>
+            <th colspan="3"></th>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+`}
+` }) %>
+
