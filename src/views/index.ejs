@@ -219,6 +219,21 @@ ${showNotification && (typeof upcomingInvoiceProjects !== 'undefined' && upcomin
       </div>
     </div>
   </div>
+  
+  <div class="col-md-3">
+    <div class="card text-white h-100" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h6 class="card-subtitle mb-2">已開立發票未收款總額</h6>
+            <h2 class="card-title mb-0">$${(typeof totalUnpaidInvoiced !== 'undefined' ? totalUnpaidInvoiced : 0).toLocaleString()}</h2>
+          </div>
+          <i class="bi bi-cash-coin fs-1 opacity-50"></i>
+        </div>
+        <small>已開票: $${(invoiceStats.total_invoiced || 0).toLocaleString()} | 已收款: $${(typeof paymentStats !== 'undefined' && paymentStats.total_received ? paymentStats.total_received : 0).toLocaleString()}</small>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="row g-4 mb-4">

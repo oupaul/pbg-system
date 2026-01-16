@@ -156,6 +156,56 @@ router.get('/', (req, res) => {
     invoice_count: 0
   };
 
+  // 取得收款統計（已收款總額，考慮匯費差異）
+  let paymentStats;
+  const Payment = require('../models/Payment');
+  if (selectedYear) {
+    const payments = db.prepare(`
+      SELECT pm.bank_deposit_amount, pm.payment_difference, pm.difference_type
+      FROM payments pm
+      JOIN projects p ON pm.project_id = p.id
+      WHERE p.contract_year = ?
+    `).all(selectedYear);
+    
+    const totalReceived = payments.reduce((sum, p) => {
+      return sum + Payment.calculateActualReceived(p);
+    }, 0);
+    
+    // 計算銷貨折讓總額
+    const salesDiscountResult = db.prepare(`
+      SELECT COALESCE(SUM(p.sales_discount), 0) as total_sales_discount
+      FROM projects p
+      WHERE p.contract_year = ?
+    `).get(selectedYear);
+    
+    paymentStats = {
+      total_received: totalReceived,
+      total_sales_discount: salesDiscountResult ? (salesDiscountResult.total_sales_discount || 0) : 0
+    };
+  } else {
+    const payments = db.prepare('SELECT bank_deposit_amount, payment_difference, difference_type FROM payments').all();
+    
+    const totalReceived = payments.reduce((sum, p) => {
+      return sum + Payment.calculateActualReceived(p);
+    }, 0);
+    
+    // 計算銷貨折讓總額
+    const salesDiscountResult = db.prepare('SELECT COALESCE(SUM(sales_discount), 0) as total_sales_discount FROM projects').get();
+    
+    paymentStats = {
+      total_received: totalReceived,
+      total_sales_discount: salesDiscountResult ? (salesDiscountResult.total_sales_discount || 0) : 0
+    };
+  }
+  
+  paymentStats = paymentStats || {
+    total_received: 0,
+    total_sales_discount: 0
+  };
+  
+  // 計算已開立發票未收款總額 = 已開立發票總額 - 已收款總額 - 銷貨折讓總額
+  const totalUnpaidInvoiced = (invoiceStats.total_invoiced || 0) - (paymentStats.total_received || 0) - (paymentStats.total_sales_discount || 0);
+  
   // 檢查即將到期的預計開票專案（從系統設定讀取通知天數）
   const now = new Date();
   const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`; // YYYY-MM
@@ -247,6 +297,8 @@ router.get('/', (req, res) => {
     stats,
     bonusStats,
     invoiceStats,
+    paymentStats,
+    totalUnpaidInvoiced, // 已開立發票未收款總額
     recentProjects,
     upcomingInvoiceProjects: allInvoiceProjects, // 合併後的列表（包含當月和過期的）
     overdueInvoiceProjects: overdueInvoiceProjects, // 過期專案（用於顯示區分）
