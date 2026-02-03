@@ -27,17 +27,19 @@ const Invoice = {
     const invoiceDate = data.invoice_date || null;
     const invoiceNumber = data.invoice_number || null;
     const amountWithTax = data.amount_with_tax !== undefined && data.amount_with_tax !== null ? parseFloat(data.amount_with_tax) : 0;
+    const expectedPaymentDate = data.expected_payment_date || null;
     
     const stmt = db.prepare(`
-      INSERT INTO invoices (project_id, invoice_date, invoice_number, amount_with_tax)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO invoices (project_id, invoice_date, invoice_number, amount_with_tax, expected_payment_date)
+      VALUES (?, ?, ?, ?, ?)
     `);
     
     const result = stmt.run(
       projectId,
       invoiceDate,
       invoiceNumber,
-      amountWithTax
+      amountWithTax,
+      expectedPaymentDate
     );
     
     const invoiceId = result.lastInsertRowid;
@@ -82,6 +84,14 @@ const Invoice = {
       newData.amount_with_tax = data.amount_with_tax;
     } else {
       newData.amount_with_tax = oldRecord.amount_with_tax;
+    }
+    
+    if (data.expected_payment_date !== undefined) {
+      fields.push('expected_payment_date = ?');
+      values.push(data.expected_payment_date || null);
+      newData.expected_payment_date = data.expected_payment_date || null;
+    } else {
+      newData.expected_payment_date = oldRecord.expected_payment_date;
     }
     
     // 如果沒有要更新的欄位，直接返回

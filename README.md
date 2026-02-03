@@ -1,17 +1,18 @@
 # 專案開立發票業績認列獎金計算總表系統
 
-[![版本](https://img.shields.io/badge/版本-v1.8.9-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
+[![版本](https://img.shields.io/badge/版本-v1.9.0-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![資料庫](https://img.shields.io/badge/資料庫-better--sqlite3-orange.svg)](https://github.com/WiseLibs/better-sqlite3)
 [![授權](https://img.shields.io/badge/授權-MIT-lightgrey.svg)](LICENSE)
 
 基於 Node.js + SQLite 的專案管理與獎金計算系統，用於管理專案、發票、收款及業務獎金。
 
-## 🚀 最新更新（v1.8.9 - 2026-01-13）
+## 🚀 最新更新（v1.9.0 - 2026-02-02）
 
-- 🔧 **未收款篩選修復** - 修正未收款篩選邏輯，正確顯示所有有未收款金額的專案
-- 📊 **排序功能增強** - 新增未開發票、未收款、預計開票欄位排序功能
-- 🛠️ **腳本動態化** - 修復腳本硬編碼問題，改為動態讀取部署配置
+- 📊 **儀表板增強** - 新增「已開立發票未收款總額」統計卡片
+- 📋 **發票明細預計收款日** - 發票新增/編輯支援預計收款日欄位
+- 🛠️ **自動備份排程修復** - 部署時自動設定每日備份，無需二次輸入
+- 🔄 **向後兼容** - 應用啟動時自動檢查並添加 expected_payment_date 欄位
 
 [查看完整更新日誌](#更新日誌)
 
@@ -1094,6 +1095,7 @@ sudo ./uninstall.sh
 - 發票開立記錄
 - 發票金額追蹤
 - 未開發票金額自動計算
+- **預計收款日**：每筆發票可記錄預計收款日期，便於應收帳款追蹤
 
 ### 收款管理
 - 收款記錄登錄
@@ -1740,6 +1742,46 @@ invoice-bonus-system/
 - ✅ 完全向後兼容，不影響現有功能
 - ✅ 原有的 4 個預設角色繼續正常工作
 - ✅ 使用者資料不受影響
+
+---
+
+### 2026-02-02 - v1.9.0 功能增強 ✨
+
+#### 新增功能
+
+**1. 儀表板已開立發票未收款總額**
+- ✅ 新增「已開立發票未收款總額」統計卡片
+- ✅ 計算公式：已開立發票總額 - 已收款總額 - 銷貨折讓總額
+- ✅ 支援年度篩選，顯示已開票與已收款作為參考
+- ✅ 影響範圍：儀表板發票統計區塊
+
+**2. 發票明細預計收款日欄位**
+- ✅ invoices 表新增 `expected_payment_date` 欄位（TEXT, 可選填）
+- ✅ 發票新增/編輯表單支援預計收款日輸入
+- ✅ 發票明細表格顯示預計收款日
+- ✅ 應用啟動時自動檢查並添加欄位，確保向後兼容
+- ✅ 遷移腳本：`migrate:invoice-expected-payment-date`
+
+**3. 自動備份排程修復**
+- ✅ 修正 deploy.sh 呼叫 setup-backup-timer.sh 時未傳參數導致互動卡住
+- ✅ 預設傳入 "1"（每日凌晨 2:00）避免非互動或直接 Enter 導致未建立 timer
+- ✅ 新增驗證邏輯確認 timer 是否建立成功
+
+#### 技術改進
+
+- 🎯 **儀表板統計**：新增 paymentStats 計算，使用 Payment.calculateActualReceived 確保收款金額一致
+- 📋 **資料庫遷移**：新增 migrate_invoice_expected_payment_date.js，整合至 deploy.sh
+- 🛠️ **部署體驗**：自動備份設定無需二次選擇，一次完成
+
+#### 修改檔案
+
+- `src/routes/index.js` - 新增收款統計與未收款總額計算
+- `src/views/index.ejs` - 新增未收款總額卡片
+- `src/models/Invoice.js` - 新增 expected_payment_date 支援
+- `src/routes/invoices.js` - 傳遞 expected_payment_date
+- `src/views/projects/show.ejs` - 發票表單與表格新增預計收款日
+- `src/app.js` - 啟動時自動檢查並添加 expected_payment_date 欄位
+- `deploy.sh` - 自動備份傳入預設參數 "1"
 
 ---
 

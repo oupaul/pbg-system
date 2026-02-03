@@ -57,6 +57,19 @@ const deployConfig = require('./config/deploy');
 // 載入資料庫
 const db = require('./models/db');
 
+// 確保 invoices 表有 expected_payment_date 欄位（向後兼容）
+try {
+  const tableInfo = db.prepare('PRAGMA table_info(invoices)').all();
+  const hasExpectedPaymentDate = tableInfo.some(col => col.name === 'expected_payment_date');
+  if (!hasExpectedPaymentDate) {
+    console.log('[啟動] 添加 expected_payment_date 欄位到 invoices 表...');
+    db.exec('ALTER TABLE invoices ADD COLUMN expected_payment_date TEXT');
+    console.log('[啟動] ✓ expected_payment_date 欄位已添加');
+  }
+} catch (err) {
+  console.warn('[啟動] 檢查 expected_payment_date 欄位時發生錯誤:', err.message);
+}
+
 // 輔助函數：獲取系統設定
 function getSystemSetting(key, defaultValue = null) {
   try {

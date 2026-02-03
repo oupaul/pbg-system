@@ -409,6 +409,7 @@ if [ -d "${PROJECT_DIR}/migrations" ]; then
               npm run migrate:sales-discount || warning "銷貨折讓欄位遷移失敗（可能已存在）"
               npm run migrate:costs || warning "成本明細表遷移失敗（可能已存在）"
               npm run migrate:update-total-received || warning "更新收款總額計算遷移失敗（可能已存在）"
+              npm run migrate:invoice-expected-payment-date || warning "發票預計收款日欄位遷移失敗（可能已存在）"
         
         # 首次安裝時插入種子資料
         if [ "$IS_FIRST_INSTALL" = true ]; then
@@ -433,6 +434,7 @@ if [ -d "${PROJECT_DIR}/migrations" ]; then
               npm run migrate:sales-discount || warning "銷貨折讓欄位遷移失敗（可能已存在）"
               npm run migrate:costs || warning "成本明細表遷移失敗（可能已存在）"
               npm run migrate:update-total-received || warning "更新收款總額計算遷移失敗（可能已存在）"
+              npm run migrate:invoice-expected-payment-date || warning "發票預計收款日欄位遷移失敗（可能已存在）"
         log "✓ 增量遷移完成"
     fi
 else
@@ -681,7 +683,14 @@ else
     if [[ ! "$SETUP_BACKUP" =~ ^[Nn]$ ]]; then
         if [ -f "${PROJECT_DIR}/setup-backup-timer.sh" ]; then
             chmod +x "${PROJECT_DIR}/setup-backup-timer.sh"
-            bash "${PROJECT_DIR}/setup-backup-timer.sh"
+            # 傳入 "1" 為預設每日備份，避免非互動或直接 Enter 導致未建立 timer
+            log "設定自動備份（預設：每日凌晨 2:00）..."
+            bash "${PROJECT_DIR}/setup-backup-timer.sh" "1"
+            if systemctl list-unit-files | grep -q "^${BACKUP_SERVICE_NAME}.timer"; then
+                log "✓ 自動備份已設定完成"
+            else
+                warning "自動備份設定可能未完成，請手動執行: sudo ${PROJECT_DIR}/setup-backup-timer.sh"
+            fi
         else
             warning "找不到備份設定腳本: ${PROJECT_DIR}/setup-backup-timer.sh"
             info "您可以稍後手動執行: sudo ${PROJECT_DIR}/setup-backup-timer.sh"

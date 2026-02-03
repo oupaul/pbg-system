@@ -289,6 +289,7 @@ function resetExpectedInvoice() {
           <tr>
             <th>發票日期</th>
             <th>發票號碼</th>
+            <th>預計收款日</th>
             <th class="text-end">金額(含稅)</th>
             <th></th>
           </tr>
@@ -298,13 +299,14 @@ function resetExpectedInvoice() {
             <tr>
               <td>${inv.invoice_date || '-'}</td>
               <td><code>${inv.invoice_number || '-'}</code></td>
+              <td>${inv.expected_payment_date || '-'}</td>
               <td class="text-end">$${(inv.amount_with_tax || 0).toLocaleString()}</td>
               <td class="text-end">
                 ${locals.canEdit ? '<button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editInvoiceModal' + inv.id + '"><i class="bi bi-pencil"></i></button>' : ''}
                 ${locals.canEdit ? '<form action="/invoices/' + inv.id + '/delete" method="POST" style="display:inline" onsubmit="return confirm(\'確定刪除？\')"><button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>' : ''}
               </td>
             </tr>
-          `).join('') : '<tr><td colspan="4" class="text-center text-muted py-3">尚無發票</td></tr>'}
+          `).join('') : '<tr><td colspan="5" class="text-center text-muted py-3">尚無發票</td></tr>'}
         </tbody>
       </table>
     </div>
@@ -451,6 +453,10 @@ ${locals.user && (locals.user.role === 'admin' || locals.user.role === 'user') ?
           <div class="mb-3">
             <label class="form-label">發票號碼</label>
             <input type="text" name="invoice_number" class="form-control" placeholder="XX12345678">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">預計收款日</label>
+            <input type="date" name="expected_payment_date" class="form-control">
           </div>
           <div class="mb-3">
             <label class="form-label">金額(含稅)</label>
@@ -674,6 +680,10 @@ ${invoices.map(inv => `
           <div class="mb-3">
             <label class="form-label">發票號碼</label>
             <input type="text" name="invoice_number" class="form-control" value="${inv.invoice_number || ''}" placeholder="XX12345678">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">預計收款日</label>
+            <input type="date" name="expected_payment_date" class="form-control" value="${inv.expected_payment_date || ''}">
           </div>
           <div class="mb-3">
             <label class="form-label">金額(含稅)</label>

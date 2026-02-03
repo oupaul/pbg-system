@@ -12,6 +12,7 @@ router.post('/', (req, res) => {
       invoice_date: req.body.invoice_date,
       invoice_number: req.body.invoice_number,
       amount_with_tax: parseFloat(req.body.amount_with_tax) || 0,
+      expected_payment_date: req.body.expected_payment_date || null,
       userInfo: getUserInfo(req)
     });
 
@@ -38,6 +39,7 @@ router.post('/:id', (req, res) => {
       invoice_date: req.body.invoice_date,
       invoice_number: req.body.invoice_number,
       amount_with_tax: parseFloat(req.body.amount_with_tax) || 0,
+      expected_payment_date: (req.body.expected_payment_date && String(req.body.expected_payment_date).trim()) || null,
       userInfo: getUserInfo(req)
     });
 
