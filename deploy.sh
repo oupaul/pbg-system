@@ -564,7 +564,11 @@ BACKUP_DIR_NAME="${BACKUP_DIR_NAME}"
 INSTALL_DIR="${INSTALL_DIR}"
 BACKUP_DIR="${BACKUP_DIR}"
 EOF
-chmod 644 "$DEPLOY_CONFIG_FILE" 2>/dev/null || true
+chmod 755 "$DEPLOY_CONFIG_FILE" 2>/dev/null || true
+
+# 確保備份相關腳本可執行（供後續 setup-backup-timer 與 systemd 排程使用）
+chmod +x "${PROJECT_DIR}/backup.sh" 2>/dev/null || true
+chmod +x "${PROJECT_DIR}/setup-backup-timer.sh" 2>/dev/null || true
 
 # 步驟 6: 啟動服務
 log "步驟 6/6: 啟動服務..."

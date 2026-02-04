@@ -1,18 +1,17 @@
 # 專案開立發票業績認列獎金計算總表系統
 
-[![版本](https://img.shields.io/badge/版本-v1.9.0-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
+[![版本](https://img.shields.io/badge/版本-v1.9.1-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![資料庫](https://img.shields.io/badge/資料庫-better--sqlite3-orange.svg)](https://github.com/WiseLibs/better-sqlite3)
 [![授權](https://img.shields.io/badge/授權-MIT-lightgrey.svg)](LICENSE)
 
 基於 Node.js + SQLite 的專案管理與獎金計算系統，用於管理專案、發票、收款及業務獎金。
 
-## 🚀 最新更新（v1.9.0 - 2026-02-02）
+## 🚀 最新更新（v1.9.1 - 2026-02-04）
 
-- 📊 **儀表板增強** - 新增「已開立發票未收款總額」統計卡片
-- 📋 **發票明細預計收款日** - 發票新增/編輯支援預計收款日欄位
-- 🛠️ **自動備份排程修復** - 部署時自動設定每日備份，無需二次輸入
-- 🔄 **向後兼容** - 應用啟動時自動檢查並添加 expected_payment_date 欄位
+- 📝 **修改紀錄易讀** - 欄位改為中文顯示，ID/專案顯示可識別資訊
+- 🔍 **逾期未收款篩選** - 專案管理新增「逾期未收款」快速篩選
+- 🛠️ **備份部署修復** - deploy.config.sh 與 backup 腳本權限設定，確保排程備份正確佈署
 
 [查看完整更新日誌](#更新日誌)
 
@@ -1088,6 +1087,7 @@ sudo ./uninstall.sh
 - **快速篩選按鈕**：
   - 未開立發票專案
   - 未收款專案
+  - 逾期未收款專案（預計收款日已過期）
 - **靈活排序**：支援所有欄位正序/逆序排序
   - 新增：未開發票、未收款、預計開票欄位支援排序功能
 
@@ -1188,6 +1188,7 @@ sudo ./uninstall.sh
 - 完整記錄所有資料異動
 - 支援建立、更新、刪除操作記錄
 - 記錄變更前後資料對比
+- **中文易讀**：欄位名稱與資料表改為中文顯示，ID/專案顯示可識別資訊
 - 支援依資料表、操作類型、時間範圍篩選
 - 顯示操作人員與操作時間
 
@@ -1742,6 +1743,38 @@ invoice-bonus-system/
 - ✅ 完全向後兼容，不影響現有功能
 - ✅ 原有的 4 個預設角色繼續正常工作
 - ✅ 使用者資料不受影響
+
+---
+
+### 2026-02-04 - v1.9.1 易讀性與篩選增強 ✨
+
+#### 新增功能
+
+**1. 修改紀錄易讀性改進**
+- ✅ 資料庫欄位名稱改為中文顯示（如：project_code → 專案編號、invoice_date → 發票日期）
+- ✅ 資料表與操作類型改為中文（projects → 專案、create → 新增）
+- ✅ ID 與專案欄位顯示可識別資訊（如：123 (P001 食驗室 - 專案名稱)）
+- ✅ 影響範圍：修改記錄頁面全部顯示內容
+
+**2. 逾期未收款篩選**
+- ✅ 專案管理新增「逾期未收款」快速篩選按鈕
+- ✅ 篩選條件：有未收款金額且至少一筆發票的預計收款日已過期
+- ✅ 排除「非營利專案」與「廣告交換」類型
+- ✅ 影響範圍：專案管理頁面篩選功能
+
+**3. 備份部署權限修復**
+- ✅ deploy.config.sh 權限從 644 改為 755，確保可被正確讀取
+- ✅ 建立 deploy.config.sh 後自動設定 backup.sh 與 setup-backup-timer.sh 為可執行
+- ✅ 解決排程備份因腳本權限導致無法正確佈署的問題
+
+#### 修改檔案
+
+- `src/routes/auditLogs.js` - 欄位對應、專案解析、formatJsonWithHighlights
+- `src/views/audit-logs/index.ejs` - 使用中文標籤顯示
+- `src/models/Project.js` - 新增 overdue_unpaid 篩選
+- `src/routes/projects.js` - 新增 overdue_unpaid 參數與查詢
+- `src/views/projects/index.ejs` - 逾期未收款按鈕與 badge
+- `deploy.sh` - deploy.config.sh 權限 755、備份腳本 chmod +x
 
 ---
 

@@ -291,6 +291,7 @@ function resetExpectedInvoice() {
             <th>發票號碼</th>
             <th>預計收款日</th>
             <th class="text-end">金額(含稅)</th>
+            <th>收款狀態</th>
             <th></th>
           </tr>
         </thead>
@@ -301,12 +302,13 @@ function resetExpectedInvoice() {
               <td><code>${inv.invoice_number || '-'}</code></td>
               <td>${inv.expected_payment_date || '-'}</td>
               <td class="text-end">$${(inv.amount_with_tax || 0).toLocaleString()}</td>
+              <td><span class="${typeof inv.paymentStatus !== 'undefined' ? inv.paymentStatus.class : 'text-muted'}">${typeof inv.paymentStatus !== 'undefined' ? inv.paymentStatus.text : '-'}</span></td>
               <td class="text-end">
                 ${locals.canEdit ? '<button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editInvoiceModal' + inv.id + '"><i class="bi bi-pencil"></i></button>' : ''}
                 ${locals.canEdit ? '<form action="/invoices/' + inv.id + '/delete" method="POST" style="display:inline" onsubmit="return confirm(\'確定刪除？\')"><button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>' : ''}
               </td>
             </tr>
-          `).join('') : '<tr><td colspan="5" class="text-center text-muted py-3">尚無發票</td></tr>'}
+          `).join('') : '<tr><td colspan="6" class="text-center text-muted py-3">尚無發票</td></tr>'}
         </tbody>
       </table>
     </div>

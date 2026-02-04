@@ -80,6 +80,12 @@ const Project = {
       sql += ` AND (total_invoiced > 0) AND (total_invoiced - COALESCE(total_received, 0) - COALESCE(sales_discount, 0) > 0) AND project_type NOT IN ('非營利專案', '廣告交換')`;
     }
 
+    // 新增：篩選逾期未收款專案（有未收款且至少一筆發票的預計收款日已過期）
+    if (filters.overdue_unpaid === true || filters.overdue_unpaid === 'true') {
+      sql += ` AND (total_invoiced > 0) AND (total_invoiced - COALESCE(total_received, 0) - COALESCE(sales_discount, 0) > 0) AND project_type NOT IN ('非營利專案', '廣告交換')`;
+      sql += ` AND id IN (SELECT DISTINCT project_id FROM invoices WHERE expected_payment_date IS NOT NULL AND TRIM(expected_payment_date) <> '' AND date(expected_payment_date) < date('now', 'localtime'))`;
+    }
+
     // 新增：篩選預計開票年月
     if (filters.expected_invoice_year_month) {
       sql += ` AND expected_invoice_year_month = ?`;

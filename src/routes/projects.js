@@ -52,7 +52,8 @@ router.get('/', (req, res) => {
     keyword: req.query.keyword, // 新增關鍵字搜尋
     expected_invoice_year_month: req.query.expected_invoice_year_month, // 新增預計開票年月篩選
     uninvoiced: req.query.uninvoiced === 'true' || req.query.uninvoiced === true, // 未開立發票
-    unpaid: req.query.unpaid === 'true' || req.query.unpaid === true, // 有開發票但還未有收款記錄
+    unpaid: req.query.unpaid === 'true' || req.query.unpaid === true, // 有未收款金額
+    overdue_unpaid: req.query.overdue_unpaid === 'true' || req.query.overdue_unpaid === true, // 逾期未收款
     sortBy: req.query.sortBy || 'contract_year', // 排序欄位
     sortOrder: req.query.sortOrder || 'DESC' // 排序方向
   };
@@ -88,6 +89,7 @@ router.get('/', (req, res) => {
     if (filters.expected_invoice_year_month) params.append('expected_invoice_year_month', filters.expected_invoice_year_month);
     if (filters.uninvoiced) params.append('uninvoiced', 'true');
     if (filters.unpaid) params.append('unpaid', 'true');
+    if (filters.overdue_unpaid) params.append('overdue_unpaid', 'true');
     params.append('sortBy', newSortBy);
     params.append('sortOrder', newSortOrder);
     return params.toString();
@@ -305,6 +307,53 @@ router.get('/:id', (req, res) => {
   const Cost = require('../models/Cost');
   const costs = Cost.findByProject(project.id);
 
+  // 計算每筆發票的收款狀態（與收款明細比對）
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const diffDays = (d1, d2) => Math.round((new Date(d1) - new Date(d2)) / (1000 * 60 * 60 * 24));
+
+  const invoicesWithStatus = invoices.map(inv => {
+    const invPayments = payments.filter(p => p.invoice_id === inv.id);
+    const expectedDate = inv.expected_payment_date || null;
+    let paymentStatus = { text: '-', class: 'text-muted' };
+
+    if (invPayments.length > 0) {
+      // 有收款記錄：取最早一筆有日期的收款（若都無日期則取第一筆）
+      const withDate = invPayments.filter(p => p.payment_date);
+      const sortedPayments = (withDate.length ? withDate : invPayments)
+        .slice().sort((a, b) => (a.payment_date || '').localeCompare(b.payment_date || ''));
+      const firstPaymentDate = sortedPayments[0]?.payment_date;
+
+      if (!firstPaymentDate) {
+        paymentStatus = { text: '已收款', class: 'text-success' };
+      } else if (!expectedDate) {
+        paymentStatus = { text: '已收款', class: 'text-success' };
+      } else if (firstPaymentDate === expectedDate) {
+        paymentStatus = { text: '準時到款', class: 'text-success' };
+      } else if (firstPaymentDate > expectedDate) {
+        const days = diffDays(firstPaymentDate, expectedDate);
+        paymentStatus = { text: `款項到帳但逾期${days}天`, class: 'text-warning' };
+      } else {
+        const days = diffDays(expectedDate, firstPaymentDate);
+        paymentStatus = { text: `提前${days}天到款`, class: 'text-info' };
+      }
+    } else {
+      // 無收款記錄：依預計收款日與當天比較
+      if (!expectedDate) {
+        paymentStatus = { text: '-', class: 'text-muted' };
+      } else if (expectedDate > today) {
+        const days = diffDays(expectedDate, today);
+        paymentStatus = { text: `將於${days}天後收款`, class: 'text-primary' };
+      } else if (expectedDate < today) {
+        const days = diffDays(today, expectedDate);
+        paymentStatus = { text: `已逾期${days}天`, class: 'text-danger' };
+      } else {
+        paymentStatus = { text: '預計今日收款', class: 'text-warning' };
+      }
+    }
+
+    return { ...inv, paymentStatus };
+  });
+
   // 找出已被選取的發票 ID（用於新增收款時排除）
   const usedInvoiceIds = new Set(payments.filter(p => p.invoice_id).map(p => p.invoice_id));
 
@@ -331,7 +380,7 @@ router.get('/:id', (req, res) => {
   res.render('projects/show', {
     title: project.project_name,
     project,
-    invoices,
+    invoices: invoicesWithStatus,
     payments,
     costs,
     bonuses,

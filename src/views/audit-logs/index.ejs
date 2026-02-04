@@ -12,7 +12,7 @@
         <select name="table_name" class="form-select">
           <option value="">全部</option>
           ${tableNames.map(table => `
-            <option value="${table}" ${filters.tableName === table ? 'selected' : ''}>${table}</option>
+            <option value="${table}" ${filters.tableName === table ? 'selected' : ''}>${typeof tableLabels !== 'undefined' && tableLabels[table] ? tableLabels[table] : table}</option>
           `).join('')}
         </select>
       </div>
@@ -21,7 +21,7 @@
         <select name="action" class="form-select">
           <option value="">全部</option>
           ${actions.map(action => `
-            <option value="${action}" ${filters.action === action ? 'selected' : ''}>${action}</option>
+            <option value="${action}" ${filters.action === action ? 'selected' : ''}>${typeof actionLabels !== 'undefined' && actionLabels[action] ? actionLabels[action] : action}</option>
           `).join('')}
         </select>
       </div>
@@ -96,7 +96,7 @@
                     <span class="badge bg-danger">刪除</span>
                   ` : ''}
                 </td>
-                <td><code>${log.table_name}</code></td>
+                <td><code>${typeof tableLabels !== 'undefined' && tableLabels[log.table_name] ? tableLabels[log.table_name] : log.table_name}</code></td>
                 <td>${log.record_id}</td>
                 <td>
                   ${log.action === 'create' && log.new_value_parsed ? `
@@ -104,7 +104,7 @@
                       <i class="bi bi-eye"></i> 查看
                     </button>
                     <div class="collapse mt-2" id="new-${log.id}">
-                      <pre class="bg-light p-2 rounded">${JSON.stringify(log.new_value_parsed, null, 2)}</pre>
+                      <pre class="bg-light p-2 rounded">${log.new_value_html || JSON.stringify(log.new_value_parsed, null, 2)}</pre>
                     </div>
                   ` : log.action === 'update' ? `
                     <button class="btn btn-sm btn-outline-info" type="button" data-bs-toggle="collapse" data-bs-target="#diff-${log.id}">
@@ -127,7 +127,7 @@
                       <i class="bi bi-eye"></i> 查看
                     </button>
                     <div class="collapse mt-2" id="old-${log.id}">
-                      <pre class="bg-light p-2 rounded">${JSON.stringify(log.old_value_parsed, null, 2)}</pre>
+                      <pre class="bg-light p-2 rounded">${log.old_value_html || JSON.stringify(log.old_value_parsed, null, 2)}</pre>
                     </div>
                   ` : ''}
                 </td>
