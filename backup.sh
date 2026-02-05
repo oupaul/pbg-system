@@ -90,7 +90,8 @@ list_install_dirs() {
 }
 
 # 選擇安裝目錄（非交互模式下自動選擇）
-if [ -n "$NON_INTERACTIVE" ]; then
+# 條件：NON_INTERACTIVE 有設定，或 stdin 非 TTY（如 systemd 排程執行）
+if [ -n "$NON_INTERACTIVE" ] || [ ! -t 0 ]; then
     # 非交互模式：自動選擇當前目錄或安裝目錄
     if [ -f "${SCRIPT_DIR}/package.json" ]; then
         SELECTED_INSTALL_DIR="$SCRIPT_DIR"

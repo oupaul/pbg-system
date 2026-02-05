@@ -89,10 +89,11 @@ else
     echo "  1) 每日備份 - 每天凌晨 2:00"
     echo "  2) 每週備份 - 每週日凌晨 2:00"
     echo "  3) 每日兩次 - 每天 2:00 和 14:00"
-    echo "  4) 自訂時間 - 使用 systemd OnCalendar 格式"
+    echo "  4) 進階自訂 - 使用 systemd OnCalendar 格式"
     echo "  5) 停用自動備份"
+    echo "  6) 每日自訂時間 - 輸入 時:分（如 03:30 表示每天 3:30）"
     echo ""
-    read -p "請輸入選項 [1-5]: " SCHEDULE_OPTION
+    read -p "請輸入選項 [1-6]: " SCHEDULE_OPTION
 fi
 
 # 設定 systemd timer 的 OnCalendar 值
@@ -126,6 +127,36 @@ case "$SCHEDULE_OPTION" in
         ON_CALENDAR="custom"
         ON_CALENDAR_TIME="$CUSTOM_TIME"
         DESCRIPTION="自訂時間自動備份: $CUSTOM_TIME"
+        ;;
+    6)
+        # 每日自訂時間：輸入 時:分，轉換為 OnCalendar 格式
+        if [ -z "$CUSTOM_TIME" ]; then
+            echo ""
+            echo "請輸入每日備份時間（格式：時:分，24小時制）"
+            echo "  範例：03:30 表示每天凌晨 3:30"
+            echo "  範例：14:00 表示每天下午 2:00"
+            echo ""
+            read -p "請輸入時間 [02:00]: " CUSTOM_TIME
+            CUSTOM_TIME="${CUSTOM_TIME:-02:00}"
+        fi
+        # 轉換 HH:MM 為 HH:MM:00，並驗證格式
+        if [[ "$CUSTOM_TIME" =~ ^([0-9]{1,2}):([0-5][0-9])$ ]]; then
+            HOUR=$((10#${BASH_REMATCH[1]}))
+            MIN=$((10#${BASH_REMATCH[2]}))
+            if [ "$HOUR" -ge 0 ] 2>/dev/null && [ "$HOUR" -le 23 ] 2>/dev/null; then
+                HOUR=$(printf "%02d" "$HOUR")
+                MIN=$(printf "%02d" "$MIN")
+                ON_CALENDAR="daily-custom"
+                ON_CALENDAR_TIME="*-*-* ${HOUR}:${MIN}:00"
+                DESCRIPTION="每日 ${HOUR}:${MIN} 自動備份"
+            else
+                echo -e "${RED}[錯誤]${NC} 小時需為 0-23"
+                exit 1
+            fi
+        else
+            echo -e "${RED}[錯誤]${NC} 時間格式錯誤，請使用 時:分（如 03:30）"
+            exit 1
+        fi
         ;;
     5)
         echo ""
@@ -175,7 +206,9 @@ Type=oneshot
 User=root
 Group=root
 WorkingDirectory=${INSTALL_DIR}
-ExecStart=${BACKUP_SCRIPT}
+# 必須設定 NON_INTERACTIVE，否則 backup.sh 會進入互動模式等待選擇，導致排程備份失敗
+# 使用 /bin/bash -c 內聯設定，確保變數必定傳遞（部分環境 Environment= 可能未生效）
+ExecStart=/bin/bash -c 'NON_INTERACTIVE=1 exec '"${BACKUP_SCRIPT}"
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=${BACKUP_SERVICE_NAME}
@@ -217,10 +250,10 @@ echo -e "${GREEN}✓ Timer 文件已創建${NC}"
 echo "重新載入 systemd..."
 systemctl daemon-reload
 
-# 啟用並啟動 timer
+# 啟用並啟動 timer（restart 可強制 systemd 正確計算 NEXT 時間，避免顯示 n/a）
 echo "啟用 timer..."
 systemctl enable ${BACKUP_SERVICE_NAME}.timer
-systemctl start ${BACKUP_SERVICE_NAME}.timer
+systemctl restart ${BACKUP_SERVICE_NAME}.timer
 
 echo ""
 echo "============================================"

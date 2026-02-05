@@ -1,17 +1,17 @@
 # 專案開立發票業績認列獎金計算總表系統
 
-[![版本](https://img.shields.io/badge/版本-v1.9.1-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
+[![版本](https://img.shields.io/badge/版本-v1.9.2-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![資料庫](https://img.shields.io/badge/資料庫-better--sqlite3-orange.svg)](https://github.com/WiseLibs/better-sqlite3)
 [![授權](https://img.shields.io/badge/授權-MIT-lightgrey.svg)](LICENSE)
 
 基於 Node.js + SQLite 的專案管理與獎金計算系統，用於管理專案、發票、收款及業務獎金。
 
-## 🚀 最新更新（v1.9.1 - 2026-02-04）
+## 🚀 最新更新（v1.9.2 - 2026-02-07）
 
-- 📝 **修改紀錄易讀** - 欄位改為中文顯示，ID/專案顯示可識別資訊
-- 🔍 **逾期未收款篩選** - 專案管理新增「逾期未收款」快速篩選
-- 🛠️ **備份部署修復** - deploy.config.sh 與 backup 腳本權限設定，確保排程備份正確佈署
+- 🔧 **排程備份修復** - 解決 systemd 執行時 backup.sh 進入互動模式導致「無效的選擇」迴圈
+- ⏰ **備份自訂時間** - setup-backup-timer 新增選項 6：每日自訂時間（輸入 時:分）
+- 📋 **排程檢查指南** - 新增「自動備份排程檢查與修正指南.md」
 
 [查看完整更新日誌](#更新日誌)
 
@@ -534,10 +534,11 @@ sudo ./setup-backup-timer.sh
 1. **每日備份** - 每天凌晨 2:00
 2. **每週備份** - 每週日凌晨 2:00
 3. **每日兩次** - 每天 2:00 和 14:00
-4. **自訂時間** - 使用 systemd OnCalendar 格式
+4. **進階自訂** - 使用 systemd OnCalendar 格式
 5. **停用自動備份**
+6. **每日自訂時間** - 輸入 時:分（如 `03:30` 表示每天 3:30）
 
-#### 自訂時間格式範例
+#### 自訂時間格式範例（選項 4 進階）
 
 ```bash
 # 每天凌晨 3:00
@@ -600,16 +601,26 @@ sudo journalctl -u project-system-backup.service -n 50
 
 > **提示**：`setup-backup-timer.sh` 腳本會自動從安裝目錄下的 `deploy.config.sh` 讀取配置，因此無需手動指定服務名稱。如果配置文件不存在，會使用預設值。
 
+#### 自動備份排程問題排查
+
+若部署完成後自動備份未正確顯示下次執行時間，請參閱 **[自動備份排程檢查與修正指南.md](自動備份排程檢查與修正指南.md)**，內含：
+- 檢查方式（timer 狀態、下次執行時間、腳本權限）
+- 修正方式（daemon-reload、手動設定、權限修復）
+- 常見原因與解決對照表
+
 #### 非互動模式（腳本自動化）
 
 ```bash
-# 設定每日備份
+# 設定每日備份（凌晨 2:00）
 sudo ./setup-backup-timer.sh 1
 
 # 設定每週備份
 sudo ./setup-backup-timer.sh 2
 
-# 設定自訂時間
+# 設定每日自訂時間（如每天 3:30）
+sudo ./setup-backup-timer.sh 6 03:30
+
+# 設定進階自訂時間
 sudo ./setup-backup-timer.sh 4 "*-*-* 03:00:00"
 
 # 停用自動備份
@@ -1743,6 +1754,34 @@ invoice-bonus-system/
 - ✅ 完全向後兼容，不影響現有功能
 - ✅ 原有的 4 個預設角色繼續正常工作
 - ✅ 使用者資料不受影響
+
+---
+
+### 2026-02-07 - v1.9.2 排程備份修復 🔧
+
+#### 問題修復
+
+**1. 排程備份「無效的選擇」迴圈**
+- ✅ 現象：systemd 排程執行時 journal 大量顯示「無效的選擇，請輸入 1-2 之間的數字」
+- ✅ 原因：backup.sh 在非 TTY 環境仍進入互動模式（選擇安裝目錄）
+- ✅ 修復：setup-backup-timer 產生的 service 改用 `ExecStart=/bin/bash -c 'NON_INTERACTIVE=1 exec /path/backup.sh'` 強制非互動
+- ✅ 備援：backup.sh 增加 `[ ! -t 0 ]` 檢查，stdin 非 TTY 時自動走非互動模式
+
+**2. Timer 下次執行時間顯示 n/a**
+- ✅ setup-backup-timer 改為 `systemctl restart`（取代 start），強制 systemd 正確計算 NEXT
+
+**3. 每日自訂時間選項**
+- ✅ 新增選項 6：輸入 時:分（如 03:30）設定每日自訂備份時間
+- ✅ 非互動用法：`./setup-backup-timer.sh 6 03:30`
+
+#### 新增文件
+
+- `自動備份排程檢查與修正指南.md` - 檢查方式、修正步驟、常見原因對照
+
+#### 修改檔案
+
+- `backup.sh` - 非互動條件增加 `[ ! -t 0 ]`
+- `setup-backup-timer.sh` - ExecStart 改 bash -c 內聯 NON_INTERACTIVE、restart 取代 start、選項 6
 
 ---
 

@@ -691,9 +691,13 @@ else
             log "設定自動備份（預設：每日凌晨 2:00）..."
             bash "${PROJECT_DIR}/setup-backup-timer.sh" "1"
             if systemctl list-unit-files | grep -q "^${BACKUP_SERVICE_NAME}.timer"; then
+                # 重新載入並啟動 timer，確保 NEXT 正確顯示（避免 Trigger: n/a）
+                systemctl daemon-reload
+                systemctl restart "${BACKUP_SERVICE_NAME}.timer"
                 log "✓ 自動備份已設定完成"
             else
                 warning "自動備份設定可能未完成，請手動執行: sudo ${PROJECT_DIR}/setup-backup-timer.sh"
+                info "詳細檢查方式請參閱：自動備份排程檢查與修正指南.md"
             fi
         else
             warning "找不到備份設定腳本: ${PROJECT_DIR}/setup-backup-timer.sh"
@@ -715,7 +719,7 @@ echo "============================================"
 echo ""
 echo "備份管理："
 echo "  手動備份:     sudo ${PROJECT_DIR}/backup.sh"
-echo "  設定自動備份:  sudo ${PROJECT_DIR}/setup-backup-timer.sh"
+echo "  設定自動備份:  sudo ${PROJECT_DIR}/setup-backup-timer.sh  # 可自訂時間（選項 6 輸入 時:分）"
 if [ $BACKUP_TIMER_EXISTS -eq 1 ]; then
     echo "  查看備份計畫:  sudo systemctl list-timers ${BACKUP_SERVICE_NAME}.timer"
     echo "  立即執行備份:  sudo systemctl start ${BACKUP_SERVICE_NAME}.service"
