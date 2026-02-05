@@ -210,7 +210,12 @@
     bodyHtml += '          <strong>備份檔案數量：</strong>';
     bodyHtml += (healthInfo.backup.count || 0);
     bodyHtml += '        </div>';
-    
+    if (healthInfo.backup.scheduleNextRun) {
+      bodyHtml += '        <div class="mb-3">';
+      bodyHtml += '          <strong>排程下次執行：</strong>';
+      bodyHtml += '<span class="text-success">' + healthInfo.backup.scheduleNextRun + '</span>';
+      bodyHtml += '        </div>';
+    }
     if (healthInfo.backup.latestBackup) {
       bodyHtml += '        <hr>';
       bodyHtml += '        <h6>最近備份：</h6>';

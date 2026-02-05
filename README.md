@@ -1,17 +1,15 @@
 # 專案開立發票業績認列獎金計算總表系統
 
-[![版本](https://img.shields.io/badge/版本-v1.9.2-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
+[![版本](https://img.shields.io/badge/版本-v1.9.3-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![資料庫](https://img.shields.io/badge/資料庫-better--sqlite3-orange.svg)](https://github.com/WiseLibs/better-sqlite3)
 [![授權](https://img.shields.io/badge/授權-MIT-lightgrey.svg)](LICENSE)
 
 基於 Node.js + SQLite 的專案管理與獎金計算系統，用於管理專案、發票、收款及業務獎金。
 
-## 🚀 最新更新（v1.9.2 - 2026-02-07）
+## 🚀 最新更新（v1.9.3 - 2026-02-07）
 
-- 🔧 **排程備份修復** - 解決 systemd 執行時 backup.sh 進入互動模式導致「無效的選擇」迴圈
-- ⏰ **備份自訂時間** - setup-backup-timer 新增選項 6：每日自訂時間（輸入 時:分）
-- 📋 **排程檢查指南** - 新增「自動備份排程檢查與修正指南.md」
+- 📊 **健康狀態備份排程** - 系統健康頁面備份狀態區塊新增「排程下次執行」顯示
 
 [查看完整更新日誌](#更新日誌)
 
@@ -1207,7 +1205,7 @@ sudo ./uninstall.sh
 - **資料庫狀態**：顯示資料庫檔案大小、修改時間、資料表數量及各資料表記錄數
 - **系統資訊**：Node.js 版本、作業系統、運行時間、記憶體使用情況
 - **資料統計**：各類資料數量統計及金額統計
-- **備份狀態**：備份檔案數量及最近備份資訊
+- **備份狀態**：備份檔案數量、排程下次執行時間、最近備份資訊
 - **最近活動**：顯示最近 10 筆審計日誌記錄
 
 ## 目錄結構
@@ -1754,6 +1752,22 @@ invoice-bonus-system/
 - ✅ 完全向後兼容，不影響現有功能
 - ✅ 原有的 4 個預設角色繼續正常工作
 - ✅ 使用者資料不受影響
+
+---
+
+### 2026-02-07 - v1.9.3 健康狀態備份排程顯示 ✨
+
+#### 新增功能
+
+**系統健康狀態頁面**
+- ✅ 備份狀態區塊新增「排程下次執行」顯示
+- ✅ 透過 systemctl list-timers 取得備份 timer 下次執行時間（僅 Linux）
+- ✅ 若未設定排程或無法取得則不顯示
+
+#### 修改檔案
+
+- `src/routes/health.js` - 取得排程備份下次執行時間
+- `src/views/health/index.ejs` - 顯示排程下次執行欄位
 
 ---
 

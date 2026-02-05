@@ -3,9 +3,11 @@ const router = express.Router();
 const db = require('../models/db');
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 const { requireAuth } = require('../middleware/auth');
 const BackupRestoreService = require('../services/BackupRestoreService');
 const AuditLogService = require('../services/AuditLogService');
+const loadDeployConfig = require('../config/deploy');
 
 // 輔助函數：檢查是否為管理員
 function requireAdmin(req, res, next) {
@@ -187,8 +189,35 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
           filename: backups[0].filename,
           size: backups[0].sizeFormatted,
           created: backups[0].created
-        } : null
+        } : null,
+        scheduleNextRun: null
       };
+
+      // 取得排程備份下次執行時間（僅 Linux 且 systemd 可用時）
+      if (process.platform === 'linux') {
+        try {
+          const deployConfig = typeof loadDeployConfig === 'function' ? loadDeployConfig() : loadDeployConfig;
+          const serviceName = deployConfig?.serviceName || 'invoice-bonus-system';
+          const timerName = `${serviceName}-backup.timer`;
+          const out = execSync(`systemctl list-timers ${timerName} --no-pager 2>/dev/null || true`, { encoding: 'utf8', timeout: 3000 });
+          // 解析輸出：找尋包含 timer 名稱的資料行，NEXT 欄位格式如 "Sat 2026-02-07 02:01:18 CST"
+          const lines = out.trim().split('\n');
+          for (const line of lines) {
+            if (line.includes(timerName)) {
+              const match = line.match(/^(\S+\s+\S+\s+\S+\s+\S+\s+\S+)/);
+              if (match) {
+                const nextStr = match[1].trim();
+                if (nextStr !== 'NEXT' && nextStr !== '-') {
+                  healthInfo.backup.scheduleNextRun = nextStr;
+                  break;
+                }
+              }
+            }
+          }
+        } catch (e) {
+          // systemctl 可能不存在或無權限，忽略
+        }
+      }
     } catch (err) {
       healthInfo.backup.error = err.message;
     }
