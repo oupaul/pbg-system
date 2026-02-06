@@ -1,15 +1,17 @@
 # 專案開立發票業績認列獎金計算總表系統
 
-[![版本](https://img.shields.io/badge/版本-v1.9.3-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
+[![版本](https://img.shields.io/badge/版本-v1.9.4-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![資料庫](https://img.shields.io/badge/資料庫-better--sqlite3-orange.svg)](https://github.com/WiseLibs/better-sqlite3)
 [![授權](https://img.shields.io/badge/授權-MIT-lightgrey.svg)](LICENSE)
 
 基於 Node.js + SQLite 的專案管理與獎金計算系統，用於管理專案、發票、收款及業務獎金。
 
-## 🚀 最新更新（v1.9.3 - 2026-02-07）
+## 🚀 最新更新（v1.9.4 - 2026-02-07）
 
-- 📊 **健康狀態備份排程** - 系統健康頁面備份狀態區塊新增「排程下次執行」顯示
+- 🔧 **備份還原修復** - uninstall.sh WAL checkpoint 順序、restore.sh 驗證邏輯與 WAL/SHM 清除、誤判還原處理
+- 📋 **部署顯示名稱** - 備份還原頁面瀏覽器分頁與左上角名稱依部署設定顯示
+- 🚪 **登入表單** - 排除全域 spinner 避免還原後登入卡住
 
 [查看完整更新日誌](#更新日誌)
 
@@ -1752,6 +1754,40 @@ invoice-bonus-system/
 - ✅ 完全向後兼容，不影響現有功能
 - ✅ 原有的 4 個預設角色繼續正常工作
 - ✅ 使用者資料不受影響
+
+---
+
+### 2026-02-07 - v1.9.4 備份還原與顯示修復 🔧
+
+#### 備份還原修復
+
+**1. uninstall.sh WAL checkpoint 順序**
+- ✅ 修正：將 WAL checkpoint 移至**備份前**執行（原在備份後，導致備份不完整）
+- ✅ 確保備份的資料庫主檔包含完整資料
+
+**2. restore.sh 還原流程增強**
+- ✅ 還原前驗證備份檔案中的資料庫有效性（資料表數量）
+- ✅ 複製後執行 `sync` 確保寫入磁碟
+- ✅ 使用 `sqlite3 -readonly` 驗證，避免建立 WAL/SHM 干擾
+- ✅ 驗證失敗時二次驗證，避免 WAL 延遲誤判
+- ✅ 誤判時將檔案移出後再次驗證，確認後還原正確檔案
+- ✅ 關鍵時機清除 WAL/SHM：複製前、還原後、最終驗證前、結構檢查前
+
+**3. 修改檔案**
+- `uninstall.sh` - WAL checkpoint 順序
+- `restore.sh` - 驗證邏輯、sync、WAL/SHM 清除、誤判處理
+
+#### 部署顯示名稱
+
+- ✅ 備份還原頁面瀏覽器分頁標題改為使用 `pageTitleSuffix`
+- ✅ 備份還原頁面左上角名稱改為使用 `siteName`
+- ✅ 修改檔案：`src/views/backup-restore/index.ejs`
+
+#### 登入表單
+
+- ✅ 登入表單排除全域表單 spinner，避免還原後若後端無回應時按鈕卡在「處理中...」
+- ✅ 修改檔案：`public/js/main.js`
+- ✅ 還原後若登入卡住，建議執行：`sudo systemctl restart project-system-dev`
 
 ---
 

@@ -564,17 +564,19 @@ if [ -n "$DB_SOURCE" ] && [ -f "$DB_SOURCE" ]; then
     log "複製資料庫檔案從 $DB_SOURCE 到 ${PROJECT_DIR}/data/invoice_bonus.db"
     
     # 如果目標檔案存在，先移除（確保完全替換）
-    # ⚠️ 重要：also remove WAL and SHM files (better-sqlite3 WAL mode)
-    if [ -f "${PROJECT_DIR}/data/invoice_bonus.db" ]; then
-        log "移除現有資料庫檔案和 WAL 檔案..."
-        rm -f "${PROJECT_DIR}/data/invoice_bonus.db" || warning "無法移除現有資料庫檔案"
-        rm -f "${PROJECT_DIR}/data/invoice_bonus.db-wal" || true
-        rm -f "${PROJECT_DIR}/data/invoice_bonus.db-shm" || true
-        log "✓ 已清理所有資料庫相關檔案（包含 WAL/SHM）"
-    fi
+    # ⚠️ 重要：必須同時移除 WAL 和 SHM，否則還原後 sqlite3 會讀取到錯誤資料
+    log "移除現有資料庫檔案和 WAL/SHM 檔案..."
+    rm -f "${PROJECT_DIR}/data/invoice_bonus.db" 2>/dev/null || true
+    rm -f "${PROJECT_DIR}/data/invoice_bonus.db-wal" 2>/dev/null || true
+    rm -f "${PROJECT_DIR}/data/invoice_bonus.db-shm" 2>/dev/null || true
+    sleep 1
+    log "✓ 已清理所有資料庫相關檔案（包含 WAL/SHM）"
     
     # 執行複製
     cp "$DB_SOURCE" "${PROJECT_DIR}/data/invoice_bonus.db" || error "資料庫還原失敗: 無法複製檔案"
+    
+    # 強制同步到磁碟，確保檔案完全寫入後再驗證
+    sync 2>/dev/null || true
     
     # 設置正確的權限和所有權
     chmod 644 "${PROJECT_DIR}/data/invoice_bonus.db" || warning "無法設置資料庫檔案權限"
@@ -604,19 +606,33 @@ if [ -n "$DB_SOURCE" ] && [ -f "$DB_SOURCE" ]; then
     # 嘗試驗證資料庫內容（如果 sqlite3 可用）
     if command -v sqlite3 >/dev/null 2>&1; then
         log "驗證資料庫內容..."
-        # 等待一下，確保檔案已完全寫入
+        # 等待檔案系統同步
         sleep 2
-        TABLE_COUNT=$(sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" "SELECT COUNT(*) FROM sqlite_master WHERE type='table';" 2>/dev/null || echo "0")
+        
+        # 使用 -readonly 避免建立 WAL/SHM（舊版 sqlite3 可能不支援，失敗時不帶此參數重試）
+        TABLE_COUNT=$(sqlite3 -readonly "${PROJECT_DIR}/data/invoice_bonus.db" "SELECT COUNT(*) FROM sqlite_master WHERE type='table';" 2>/dev/null || echo "0")
+        if [ "$TABLE_COUNT" = "0" ]; then
+            TABLE_COUNT=$(sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" "SELECT COUNT(*) FROM sqlite_master WHERE type='table';" 2>/dev/null || echo "0")
+        fi
+        
+        # 若驗證失敗，擷取 sqlite3 錯誤訊息供診斷（僅 stderr，避免將 SELECT 1 的輸出 "1" 當成錯誤）
+        if [ "$TABLE_COUNT" = "0" ]; then
+            SQLITE_ERR=$(sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" "SELECT 1;" 2>&1 1>/dev/null || true)
+            if [ -n "$SQLITE_ERR" ]; then
+                warning "sqlite3 讀取錯誤: $SQLITE_ERR"
+            fi
+        fi
+        
         log "資料表數量: $TABLE_COUNT"
         
         if [ "$TABLE_COUNT" -gt 0 ]; then
             log "資料庫包含 $TABLE_COUNT 個資料表"
             # 檢查是否有資料
-            PROJECT_COUNT=$(sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" "SELECT COUNT(*) FROM projects;" 2>/dev/null || echo "0")
-            CUSTOMER_COUNT=$(sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" "SELECT COUNT(*) FROM customers;" 2>/dev/null || echo "0")
-            INVOICE_COUNT=$(sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" "SELECT COUNT(*) FROM invoices;" 2>/dev/null || echo "0")
-            PAYMENT_COUNT=$(sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" "SELECT COUNT(*) FROM payments;" 2>/dev/null || echo "0")
-            USER_COUNT=$(sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" "SELECT COUNT(*) FROM users;" 2>/dev/null || echo "0")
+            PROJECT_COUNT=$(sqlite3 -readonly "${PROJECT_DIR}/data/invoice_bonus.db" "SELECT COUNT(*) FROM projects;" 2>/dev/null || echo "0")
+            CUSTOMER_COUNT=$(sqlite3 -readonly "${PROJECT_DIR}/data/invoice_bonus.db" "SELECT COUNT(*) FROM customers;" 2>/dev/null || echo "0")
+            INVOICE_COUNT=$(sqlite3 -readonly "${PROJECT_DIR}/data/invoice_bonus.db" "SELECT COUNT(*) FROM invoices;" 2>/dev/null || echo "0")
+            PAYMENT_COUNT=$(sqlite3 -readonly "${PROJECT_DIR}/data/invoice_bonus.db" "SELECT COUNT(*) FROM payments;" 2>/dev/null || echo "0")
+            USER_COUNT=$(sqlite3 -readonly "${PROJECT_DIR}/data/invoice_bonus.db" "SELECT COUNT(*) FROM users;" 2>/dev/null || echo "0")
             log "資料統計：專案 $PROJECT_COUNT 筆，客戶 $CUSTOMER_COUNT 筆，發票 $INVOICE_COUNT 筆，收款 $PAYMENT_COUNT 筆，用戶 $USER_COUNT 筆"
             
             if [ "$PROJECT_COUNT" -eq 0 ] && [ "$CUSTOMER_COUNT" -eq 0 ] && [ "$INVOICE_COUNT" -eq 0 ] && [ "$USER_COUNT" -eq 0 ]; then
@@ -625,31 +641,47 @@ if [ -n "$DB_SOURCE" ] && [ -f "$DB_SOURCE" ]; then
                 log "✓ 資料庫包含資料，還原成功"
             fi
         else
-            warning "資料庫檔案存在但沒有資料表，可能損壞或格式不兼容（舊版 sql.js）"
-            warning "嘗試自動修復資料庫結構..."
+            warning "初次驗證顯示 0 個資料表，進行二次驗證（可能為 WAL 模式延遲）..."
+            sleep 2
+            TABLE_COUNT_RETRY=$(sqlite3 -readonly "${PROJECT_DIR}/data/invoice_bonus.db" "SELECT COUNT(*) FROM sqlite_master WHERE type='table';" 2>/dev/null || echo "0")
             
-            # 備份損壞的資料庫
-            mv "${PROJECT_DIR}/data/invoice_bonus.db" "${PROJECT_DIR}/data/invoice_bonus.db.corrupted-$(date +%Y%m%d_%H%M%S)"
-            log "已備份損壞的資料庫檔案"
-            
-            # 執行資料庫遷移來重建結構
-            log "執行資料庫遷移..."
-            cd "${PROJECT_DIR}"
-            npm run migrate >/dev/null 2>&1
-            
-            if [ $? -eq 0 ]; then
-                # 再次驗證
-                NEW_TABLE_COUNT=$(sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" "SELECT COUNT(*) FROM sqlite_master WHERE type='table';" 2>/dev/null || echo "0")
-                if [ "$NEW_TABLE_COUNT" -gt 0 ]; then
-                    warning "✓ 資料庫結構已重建（$NEW_TABLE_COUNT 個資料表）"
-                    warning "⚠️  注意：資料庫已重建為全新結構，原備份資料不兼容"
-                    warning "⚠️  預設管理員帳號: admin / admin123"
-                    warning "⚠️  請使用今天的備份（編號 3 或 4）來恢復實際資料"
-                else
-                    error "資料庫修復失敗"
-                fi
+            if [ "$TABLE_COUNT_RETRY" -gt 0 ]; then
+                log "✓ 二次驗證成功，資料庫包含 $TABLE_COUNT_RETRY 個資料表"
             else
-                error "資料庫遷移失敗，請手動執行: cd ${PROJECT_DIR} && npm run migrate"
+                # 備份「可能損壞」的檔案（可能其實是好的，驗證有誤）
+                CORRUPTED_BACKUP="${PROJECT_DIR}/data/invoice_bonus.db.corrupted-$(date +%Y%m%d_%H%M%S)"
+                mv "${PROJECT_DIR}/data/invoice_bonus.db" "$CORRUPTED_BACKUP"
+                log "已備份至: $(basename $CORRUPTED_BACKUP)"
+                
+                # 再次確認被移走的檔案是否真的損壞（避免誤判）
+                CORRUPTED_TABLE_COUNT=$(sqlite3 -readonly "$CORRUPTED_BACKUP" "SELECT COUNT(*) FROM sqlite_master WHERE type='table';" 2>/dev/null || echo "0")
+                if [ "$CORRUPTED_TABLE_COUNT" -gt 0 ]; then
+                    warning "發現驗證誤判：備份檔案實際包含 $CORRUPTED_TABLE_COUNT 個資料表，還原正確檔案..."
+                    # ⚠️ 關鍵：清除可能殘留的 WAL/SHM，避免與主檔衝突導致讀取錯誤
+                    rm -f "${PROJECT_DIR}/data/invoice_bonus.db-wal" "${PROJECT_DIR}/data/invoice_bonus.db-shm"
+                    cp "$CORRUPTED_BACKUP" "${PROJECT_DIR}/data/invoice_bonus.db"
+                    sync 2>/dev/null || true
+                    log "✓ 已還原正確的資料庫"
+                    rm -f "$CORRUPTED_BACKUP"
+                else
+                    warning "資料庫檔案確實無法讀取，嘗試重建結構..."
+                    log "執行資料庫遷移..."
+                    cd "${PROJECT_DIR}"
+                    npm run migrate >/dev/null 2>&1
+                    
+                    if [ $? -eq 0 ]; then
+                        NEW_TABLE_COUNT=$(sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" "SELECT COUNT(*) FROM sqlite_master WHERE type='table';" 2>/dev/null || echo "0")
+                        if [ "$NEW_TABLE_COUNT" -gt 0 ]; then
+                            warning "✓ 資料庫結構已重建（$NEW_TABLE_COUNT 個資料表）"
+                            warning "⚠️  原備份資料不兼容，預設管理員: admin / admin123"
+                            warning "⚠️  可嘗試從 $(basename $CORRUPTED_BACKUP) 手動恢復"
+                        else
+                            error "資料庫修復失敗"
+                        fi
+                    else
+                        error "資料庫遷移失敗，請手動執行: cd ${PROJECT_DIR} && npm run migrate"
+                    fi
+                fi
             fi
         fi
     else
@@ -783,6 +815,8 @@ fi
 
 # 最終驗證
 log "進行最終驗證..."
+# 清除可能殘留的 WAL/SHM，確保驗證讀取正確的主檔內容
+rm -f "${PROJECT_DIR}/data/invoice_bonus.db-wal" "${PROJECT_DIR}/data/invoice_bonus.db-shm" 2>/dev/null || true
 if [ -f "${PROJECT_DIR}/data/invoice_bonus.db" ]; then
     FINAL_SIZE=$(stat -f%z "${PROJECT_DIR}/data/invoice_bonus.db" 2>/dev/null || stat -c%s "${PROJECT_DIR}/data/invoice_bonus.db" 2>/dev/null || echo "0")
     if [ "$FINAL_SIZE" -gt 0 ]; then
@@ -842,6 +876,8 @@ fi
 log "檢查資料庫結構是否需要更新..."
 if command -v sqlite3 >/dev/null 2>&1; then
     if [ -f "${PROJECT_DIR}/data/invoice_bonus.db" ]; then
+        # 確保無殘留 WAL/SHM 干擾結構檢查
+        rm -f "${PROJECT_DIR}/data/invoice_bonus.db-wal" "${PROJECT_DIR}/data/invoice_bonus.db-shm" 2>/dev/null || true
         # 檢查 expected_invoice_year_month 欄位是否存在
         FIELD_EXISTS=$(sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" "PRAGMA table_info(projects);" 2>/dev/null | grep "expected_invoice_year_month" || echo "")
         
@@ -1033,6 +1069,7 @@ info "上傳目錄: ${PROJECT_DIR}/uploads"
 echo ""
 echo "建議操作："
 echo "  1. 檢查系統是否正常運作"
-echo "  2. 如有問題，可使用備份還原: $TEMP_BACKUP"
+echo "  2. 若登入卡住轉圈，請重啟服務：sudo systemctl restart ${SERVICE_NAME}"
+echo "  3. 如有問題，可使用備份還原: $TEMP_BACKUP"
 echo ""
 

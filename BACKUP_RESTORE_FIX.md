@@ -296,7 +296,37 @@ sqlite3 /opt/invoice-bonus-system/data/invoice_bonus.db < /path/to/update_view.s
 
 ---
 
-**版本：** v1.7.4  
-**日期：** 2025-12-26  
+## 2026-02-07 - v1.9.4 還原流程增強
+
+### 問題描述
+
+- 備份檔案還原後驗證顯示 0 個資料表（實際有資料）
+- 誤判為損壞而執行 migrate 重建空資料庫，導致資料遺失
+- uninstall.sh 備份時 WAL checkpoint 在備份**後**執行，備份可能不完整
+
+### 修復內容
+
+**uninstall.sh**
+- WAL checkpoint 移至備份**前**執行
+- 備份後 sleep 1 確保 checkpoint 完成
+
+**restore.sh**
+- 還原前驗證備份檔案中的資料庫有效性
+- 複製後執行 `sync` 確保寫入磁碟
+- 使用 `sqlite3 -readonly` 驗證，避免建立 WAL/SHM
+- 驗證失敗時：二次驗證 → 移出檔案再驗證 → 若有效則還原（避免誤判）
+- 關鍵時機清除 WAL/SHM：複製前、誤判還原時、最終驗證前、結構檢查前
+
+### 若登入卡住
+
+還原後若登入卡住轉圈，請重啟服務：
+```bash
+sudo systemctl restart project-system-dev
+```
+
+---
+
+**版本：** v1.9.4  
+**日期：** 2026-02-07  
 **狀態：** ✅ 已修復並測試
 

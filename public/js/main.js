@@ -51,8 +51,11 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
-  // 表單提交時顯示載入狀態
+  // 表單提交時顯示載入狀態（排除登入表單，避免還原後若後端無回應時卡住）
   document.querySelectorAll('form').forEach(function(form) {
+    if (form.action && form.action.includes('/login')) {
+      return; // 登入表單使用獨立處理
+    }
     form.addEventListener('submit', function(e) {
       const btn = this.querySelector('button[type="submit"]');
       if (btn && !btn.disabled) {
