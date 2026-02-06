@@ -262,7 +262,16 @@ mkdir -p "$TEMP_BACKUP_DIR"
 
 # 備份資料庫
 if [ -f "${PROJECT_DIR}/data/invoice_bonus.db" ]; then
-    # 驗證資料庫檔案大小
+    # ⚠️ 重要：先執行 WAL checkpoint，確保所有資料都寫入主檔案
+    # 這必須在備份之前執行，否則備份的資料庫可能不完整
+    if command -v sqlite3 >/dev/null 2>&1; then
+        log "執行 WAL checkpoint（合併 WAL 到主檔案）..."
+        sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" "PRAGMA wal_checkpoint(TRUNCATE);" 2>/dev/null || warning "WAL checkpoint 失敗，但繼續備份"
+        # 等待一下，確保 checkpoint 完成
+        sleep 1
+    fi
+    
+    # 驗證資料庫檔案大小（checkpoint 後）
     DB_FILE_SIZE=$(stat -f%z "${PROJECT_DIR}/data/invoice_bonus.db" 2>/dev/null || stat -c%s "${PROJECT_DIR}/data/invoice_bonus.db" 2>/dev/null || echo "0")
     if [ "$DB_FILE_SIZE" -lt 1000 ]; then
         warning "資料庫檔案過小 (${DB_FILE_SIZE} bytes)，可能為空或損壞"
@@ -279,12 +288,6 @@ if [ -f "${PROJECT_DIR}/data/invoice_bonus.db" ]; then
     
     DB_SIZE=$(du -h "${PROJECT_DIR}/data/invoice_bonus.db" | cut -f1)
     log "資料庫已備份，大小: $DB_SIZE"
-    
-    # ⚠️ 重要：執行 WAL checkpoint，確保所有資料都寫入主檔案
-    if command -v sqlite3 >/dev/null 2>&1; then
-        log "執行 WAL checkpoint（合併 WAL 到主檔案）..."
-        sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" "PRAGMA wal_checkpoint(TRUNCATE);" 2>/dev/null || warning "WAL checkpoint 失敗，但繼續備份"
-    fi
     
     # 驗證資料庫內容（使用備份檔案統計，與 backup.sh 邏輯一致）
     if command -v sqlite3 >/dev/null 2>&1; then

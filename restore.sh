@@ -468,6 +468,34 @@ if [ -n "$DB_SOURCE" ] && [ -f "$DB_SOURCE" ]; then
         warning "資料庫檔案過小 (${SOURCE_SIZE} bytes)，可能損壞或為空"
     fi
     
+    # ⚠️ 重要：在還原前先驗證備份檔案中的資料庫是否有效
+    if command -v sqlite3 >/dev/null 2>&1; then
+        log "驗證備份檔案中的資料庫..."
+        BACKUP_TABLE_COUNT=$(sqlite3 "$DB_SOURCE" "SELECT COUNT(*) FROM sqlite_master WHERE type='table';" 2>/dev/null || echo "0")
+        
+        if [ "$BACKUP_TABLE_COUNT" -eq 0 ]; then
+            error "備份檔案中的資料庫無效：沒有資料表。這可能是因為備份時 WAL checkpoint 未正確執行。請使用其他備份檔案。"
+        else
+            log "✓ 備份檔案中的資料庫有效，包含 $BACKUP_TABLE_COUNT 個資料表"
+            
+            # 檢查備份檔案中的資料數量
+            BACKUP_PROJECT_COUNT=$(sqlite3 "$DB_SOURCE" "SELECT COUNT(*) FROM projects;" 2>/dev/null || echo "0")
+            BACKUP_CUSTOMER_COUNT=$(sqlite3 "$DB_SOURCE" "SELECT COUNT(*) FROM customers;" 2>/dev/null || echo "0")
+            BACKUP_INVOICE_COUNT=$(sqlite3 "$DB_SOURCE" "SELECT COUNT(*) FROM invoices;" 2>/dev/null || echo "0")
+            BACKUP_USER_COUNT=$(sqlite3 "$DB_SOURCE" "SELECT COUNT(*) FROM users;" 2>/dev/null || echo "0")
+            
+            log "備份檔案中的資料統計："
+            log "  - 專案: $BACKUP_PROJECT_COUNT 筆"
+            log "  - 客戶: $BACKUP_CUSTOMER_COUNT 筆"
+            log "  - 發票: $BACKUP_INVOICE_COUNT 筆"
+            log "  - 使用者: $BACKUP_USER_COUNT 筆"
+            
+            if [ "$BACKUP_PROJECT_COUNT" -eq 0 ] && [ "$BACKUP_CUSTOMER_COUNT" -eq 0 ] && [ "$BACKUP_INVOICE_COUNT" -eq 0 ] && [ "$BACKUP_USER_COUNT" -eq 0 ]; then
+                warning "備份檔案中的資料庫為空，但結構完整。將繼續還原..."
+            fi
+        fi
+    fi
+    
     # 確保目標目錄存在
     mkdir -p "${PROJECT_DIR}/data" || error "無法創建資料目錄: ${PROJECT_DIR}/data"
     
