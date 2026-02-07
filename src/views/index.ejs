@@ -236,6 +236,93 @@ ${showNotification && (typeof upcomingInvoiceProjects !== 'undefined' && upcomin
   </div>
 </div>
 
+${typeof receivablesAging !== 'undefined' && receivablesAging && receivablesAging.total > 0 ? `
+<div class="row g-4 mb-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-calendar-range"></i> 應收帳款帳齡分析
+        <small class="text-muted ms-2">（依發票預計收款日）</small>
+      </div>
+      <div class="card-body">
+        <div class="row g-3 mb-3">
+          <div class="col-md-2">
+            <div class="border rounded p-2 text-center ${receivablesAging.buckets.notYetDue.amount > 0 ? 'bg-success bg-opacity-10' : ''}">
+              <div class="small text-muted">未到期</div>
+              <div class="fw-bold">$${(receivablesAging.buckets.notYetDue.amount || 0).toLocaleString()}</div>
+              <div class="small">${receivablesAging.buckets.notYetDue.count || 0} 筆</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="border rounded p-2 text-center ${receivablesAging.buckets.days1_30.amount > 0 ? 'bg-warning bg-opacity-25' : ''}">
+              <div class="small text-muted">1-30 天</div>
+              <div class="fw-bold">$${(receivablesAging.buckets.days1_30.amount || 0).toLocaleString()}</div>
+              <div class="small">${receivablesAging.buckets.days1_30.count || 0} 筆</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="border rounded p-2 text-center ${receivablesAging.buckets.days31_60.amount > 0 ? 'bg-warning bg-opacity-25' : ''}">
+              <div class="small text-muted">31-60 天</div>
+              <div class="fw-bold">$${(receivablesAging.buckets.days31_60.amount || 0).toLocaleString()}</div>
+              <div class="small">${receivablesAging.buckets.days31_60.count || 0} 筆</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="border rounded p-2 text-center ${receivablesAging.buckets.days61_90.amount > 0 ? 'bg-danger bg-opacity-25' : ''}">
+              <div class="small text-muted">61-90 天</div>
+              <div class="fw-bold">$${(receivablesAging.buckets.days61_90.amount || 0).toLocaleString()}</div>
+              <div class="small">${receivablesAging.buckets.days61_90.count || 0} 筆</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="border rounded p-2 text-center ${receivablesAging.buckets.over90.amount > 0 ? 'bg-danger bg-opacity-25' : ''}">
+              <div class="small text-muted">90 天以上</div>
+              <div class="fw-bold">$${(receivablesAging.buckets.over90.amount || 0).toLocaleString()}</div>
+              <div class="small">${receivablesAging.buckets.over90.count || 0} 筆</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="border rounded p-2 text-center ${receivablesAging.buckets.noDate.amount > 0 ? 'bg-secondary bg-opacity-25' : ''}">
+              <div class="small text-muted">未設預計日</div>
+              <div class="fw-bold">$${(receivablesAging.buckets.noDate.amount || 0).toLocaleString()}</div>
+              <div class="small">${receivablesAging.buckets.noDate.count || 0} 筆</div>
+            </div>
+          </div>
+        </div>
+        <details>
+          <summary class="btn btn-sm btn-outline-secondary">展開明細</summary>
+          <div class="table-responsive mt-2">
+            <table class="table table-sm table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>專案</th>
+                  <th>發票號碼</th>
+                  <th>業務</th>
+                  <th class="text-end">未收金額</th>
+                  <th>預計收款日</th>
+                  <th>帳齡</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${[
+                  { b: receivablesAging.buckets.notYetDue, label: '未到期' },
+                  { b: receivablesAging.buckets.days1_30, label: '1-30天' },
+                  { b: receivablesAging.buckets.days31_60, label: '31-60天' },
+                  { b: receivablesAging.buckets.days61_90, label: '61-90天' },
+                  { b: receivablesAging.buckets.over90, label: '90天以上' },
+                  { b: receivablesAging.buckets.noDate, label: '未設預計日' }
+                ].map(function(g){ return g.b.items.map(function(item){ return '<tr><td><code>'+item.project_code+'</code> '+item.project_name+'</td><td><code>'+(item.invoice_number||'-')+'</code></td><td>'+item.salesperson_name+'</td><td class="text-end">$'+(item.amount||0).toLocaleString()+'</td><td>'+(item.expected_payment_date||'-')+'</td><td><span class="badge bg-secondary">'+g.label+'</span></td><td><a href="/projects/'+item.project_id+'" class="btn btn-sm btn-outline-primary">查看</a></td></tr>'; }).join(''); }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+</div>
+` : ''}
+
 <div class="row g-4 mb-4">
   <div class="col-md-4">
     <div class="card h-100">

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
 const Project = require('../models/Project');
+const ReceivablesAgingService = require('../services/ReceivablesAgingService');
 
 router.get('/', (req, res) => {
   const currentYear = new Date().getFullYear();
@@ -291,6 +292,12 @@ router.get('/', (req, res) => {
   
   // 合併兩個列表（當月的在前，過期的在後）
   const allInvoiceProjects = [...upcomingInvoiceProjects, ...overdueInvoiceProjects];
+
+  // 應收帳款帳齡分析（admin/user 可見）
+  let receivablesAging = null;
+  if (req.user && (req.user.role === 'admin' || req.user.role === 'user')) {
+    receivablesAging = ReceivablesAgingService.getAgingReport(selectedYear);
+  }
   
   res.render('index', {
     title: '首頁',
@@ -308,7 +315,8 @@ router.get('/', (req, res) => {
     typeColorMap,
     projectTypeStats, // 專案類型統計（動態）
     currentYearMonth,
-    daysUntilEndOfMonth
+    daysUntilEndOfMonth,
+    receivablesAging
   });
 });
 

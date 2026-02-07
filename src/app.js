@@ -178,6 +178,7 @@ try {
   app.use('/settings', requireAuth, settingsRoutes);
   app.use('/project-types', requireAuth, projectTypesRoutes);
   app.use('/recent-payments', requireAuth, recentPaymentsRoutes);
+  app.use('/search', requireAuth, require('./routes/search'));
   app.use('/health', requireAuth, healthRoutes);
   app.use('/roles', requireAuth, roleRoutes);
   app.use('/api', requireAuth, apiRoutes);

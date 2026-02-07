@@ -1,15 +1,17 @@
 # 專案開立發票業績認列獎金計算總表系統
 
-[![版本](https://img.shields.io/badge/版本-v1.10.0-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
+[![版本](https://img.shields.io/badge/版本-v1.11.0-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![資料庫](https://img.shields.io/badge/資料庫-better--sqlite3-orange.svg)](https://github.com/WiseLibs/better-sqlite3)
 [![授權](https://img.shields.io/badge/授權-MIT-lightgrey.svg)](LICENSE)
 
 基於 Node.js + SQLite 的專案管理與獎金計算系統，用於管理專案、發票、收款及業務獎金。
 
-## 🚀 最新更新（v1.10.0 - 2026-02-07）
+## 🚀 最新更新（v1.11.0 - 2026-02-07）
 
-- 📋 **發票作廢與折讓** - 支援發票作廢、作廢重開、整筆折讓，保留軌跡，已開立/應收僅計有效發票
+- 📊 **應收帳款帳齡分析** - 儀表板顯示未收款依預計收款日分佈（未到期、1-30天、31-60天、61-90天、90天以上）
+- 🔍 **全域快速搜尋** - 導覽列搜尋專案、客戶、發票，支援關鍵字跨欄位查詢
+- 📋 **發票作廢與折讓** - 支援發票作廢、作廢重開、整筆折讓，保留軌跡
 - 🔧 **備份還原修復** - uninstall.sh WAL checkpoint 順序、restore.sh 驗證邏輯與 WAL/SHM 清除
 - 📋 **部署顯示名稱** - 備份還原頁面瀏覽器分頁與左上角名稱依部署設定顯示
 - 🚪 **登入表單** - 排除全域 spinner 避免還原後登入卡住
@@ -1755,6 +1757,30 @@ invoice-bonus-system/
 - ✅ 完全向後兼容，不影響現有功能
 - ✅ 原有的 4 個預設角色繼續正常工作
 - ✅ 使用者資料不受影響
+
+---
+
+### 2026-02-07 - v1.11.0 應收帳款帳齡分析與全域搜尋 📊
+
+#### 應收帳款帳齡分析
+
+- ✅ 儀表板新增「應收帳款帳齡分析」區塊（admin/user 可見）
+- ✅ 依發票預計收款日分類：未到期、1-30 天、31-60 天、61-90 天、90 天以上、未設預計日
+- ✅ 各區間顯示金額與筆數，可展開查看明細
+- ✅ 支援年度篩選
+- ✅ 相關檔案：`src/services/ReceivablesAgingService.js`、`src/routes/index.js`、`src/views/index.ejs`
+
+#### 全域快速搜尋
+
+- ✅ 導覽列新增搜尋入口與搜尋框
+- ✅ 搜尋範圍：專案編號、專案名稱、客戶編號、公司名稱、發票號碼
+- ✅ 至少輸入 2 字元，結果分類顯示（專案、客戶、發票）
+- ✅ 依使用者權限過濾（業務員僅見自己的專案）
+- ✅ 相關檔案：`src/routes/search.js`、`src/views/search/index.ejs`、`src/views/layout.ejs`、`src/app.js`
+
+#### 技術文件
+
+- `應收帳款帳齡與全域搜尋功能說明.md` - 功能說明
 
 ---
 
