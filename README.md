@@ -1,18 +1,15 @@
 # 專案開立發票業績認列獎金計算總表系統
 
-[![版本](https://img.shields.io/badge/版本-v1.12.0-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
+[![版本](https://img.shields.io/badge/版本-v1.13.0-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![資料庫](https://img.shields.io/badge/資料庫-better--sqlite3-orange.svg)](https://github.com/WiseLibs/better-sqlite3)
 [![授權](https://img.shields.io/badge/授權-MIT-lightgrey.svg)](LICENSE)
 
 基於 Node.js + SQLite 的專案管理與獎金計算系統，用於管理專案、發票、收款及業務獎金。
 
-## 🚀 最新更新（v1.12.0 - 2026-02-07）
+## 🚀 最新更新（v1.13.0 - 2026-02-07）
 
-- 📊 **業務績效儀表板** - 依業務彙總專案數、金額、已開發票、收款、獎金等，支援年度篩選
-- 📄 **PDF 匯出** - 專案總表、獎金報表、應收帳齡分析支援 PDF 格式匯出
-- 📗 **應收帳齡 Excel 匯出** - 帳齡分析新增 Excel 格式匯出
-- 📐 **PDF 版面優化** - 欄寬、列高、間距調整，改善閱讀體驗
+- 📊 **專案毛利分析** - 方案 A：以專案未稅價格為收入，毛利 = 收入 − 成本，支援專案明細、依業務、依類型彙總
 
 [查看完整更新日誌](#更新日誌)
 
@@ -1137,6 +1134,14 @@ sudo ./uninstall.sh
 - 業務員角色僅能檢視自己的績效
 - 快速連結至專案列表與獎金明細
 
+### 專案毛利分析 🆕
+- 方案 A：收入 = 專案未稅價格，毛利 = 收入 − 總成本，毛利率 = 毛利 ÷ 收入 × 100%
+- 專案明細：各專案收入、成本、毛利、毛利率
+- 依業務彙總：各業務專案數、總收入、總成本、總毛利
+- 依類型彙總：各專案類型的收入、成本、毛利統計
+- 年度篩選，支援全部年度或特定年度
+- 僅 admin、user 可見
+
 ### 客戶管理
 - 客戶資料維護
 - 統一編號記錄
@@ -1769,6 +1774,26 @@ invoice-bonus-system/
 - ✅ 完全向後兼容，不影響現有功能
 - ✅ 原有的 4 個預設角色繼續正常工作
 - ✅ 使用者資料不受影響
+
+---
+
+### 2026-02-07 - v1.13.0 專案毛利分析 📊
+
+#### 專案毛利分析（方案 A）
+
+- ✅ 新增「毛利分析」頁面，依專案未稅價格計算毛利
+- ✅ 公式：收入 = price_without_tax，毛利 = 收入 − 總成本，毛利率 = 毛利 ÷ 收入 × 100%
+- ✅ 專案明細分頁：專案編號、名稱、年度、類型、業務、收入、成本、毛利、毛利率
+- ✅ 依業務彙總分頁：專案數、總收入、總成本、總毛利、毛利率
+- ✅ 依類型彙總分頁：專案類型、專案數、總收入、總成本、總毛利、毛利率
+- ✅ 彙總卡片：總收入、總成本、總毛利、平均毛利率
+- ✅ 年度篩選、快速連結至專案詳情與專案列表
+- ✅ 權限：僅 admin、user 可見
+- ✅ 相關檔案：`src/services/GrossProfitAnalysisService.js`、`src/routes/grossProfit.js`、`src/views/gross-profit/index.ejs`
+
+#### 技術文件
+
+- `專案毛利分析功能說明.md` - 功能說明
 
 ---
 

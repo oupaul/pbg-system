@@ -160,6 +160,8 @@ try {
   console.log('[啟動] ✓ roles 路由載入完成');
   const salesPerformanceRoutes = require('./routes/salesPerformance');
   console.log('[啟動] ✓ salesPerformance 路由載入完成');
+  const grossProfitRoutes = require('./routes/grossProfit');
+  console.log('[啟動] ✓ grossProfit 路由載入完成');
 
   // 認證路由（不需要登入）- 必須在其他路由之前
   // authRoutes 內部已經定義了 /login 和 /logout 路徑
@@ -181,6 +183,7 @@ try {
   app.use('/project-types', requireAuth, projectTypesRoutes);
   app.use('/recent-payments', requireAuth, recentPaymentsRoutes);
   app.use('/sales-performance', requireAuth, salesPerformanceRoutes);
+  app.use('/gross-profit', requireAuth, grossProfitRoutes);
   app.use('/search', requireAuth, require('./routes/search'));
   app.use('/health', requireAuth, healthRoutes);
   app.use('/roles', requireAuth, roleRoutes);

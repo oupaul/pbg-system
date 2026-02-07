@@ -1,0 +1,144 @@
+<%- include('../layout', { body: `
+<div class="row mb-4">
+  <div class="col">
+    <h1 class="h3"><i class="bi bi-pie-chart"></i> 專案毛利分析</h1>
+  </div>
+  <div class="col-auto">
+    <form class="d-flex" method="get">
+      <select name="year" class="form-select" onchange="this.form.submit()">
+        <option value="all" ${selectedYear === 'all' ? 'selected' : ''}>全部年度</option>
+        ${(years || []).map(y => '<option value="' + y + '" ' + (y == selectedYear ? 'selected' : '') + '>' + y + '</option>').join('')}
+      </select>
+    </form>
+  </div>
+</div>
+
+<p class="text-muted small mb-3">方案 A：收入 = 專案未稅價格，毛利 = 收入 − 總成本，毛利率 = 毛利 ÷ 收入 × 100%</p>
+
+<!-- 彙總卡片 -->
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="text-muted">總收入（未稅）</h6>
+        <h4 class="mb-0">$${(totals.revenue || 0).toLocaleString()}</h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="text-muted">總成本</h6>
+        <h4 class="mb-0 text-danger">$${(totals.cost || 0).toLocaleString()}</h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="text-muted">總毛利</h6>
+        <h4 class="mb-0 ${(totals.grossProfit || 0) >= 0 ? 'text-success' : 'text-danger'}">$${(totals.grossProfit || 0).toLocaleString()}</h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="text-muted">平均毛利率</h6>
+        <h4 class="mb-0">${(totals.grossMarginPct || 0)}%</h4>
+      </div>
+    </div>
+  </div>
+</div>
+
+<ul class="nav nav-tabs mb-3" id="grossProfitTabs">
+  <li class="nav-item">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#byProject">專案明細</button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#bySalesperson">依業務彙總</button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#byType">依類型彙總</button>
+  </li>
+</ul>
+
+<div class="tab-content">
+  <div class="tab-pane fade show active" id="byProject">
+    <div class="card">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-dark">
+              <tr>
+                <th>專案編號</th>
+                <th>專案名稱</th>
+                <th>年度</th>
+                <th>類型</th>
+                <th>業務</th>
+                <th class="text-end">收入（未稅）</th>
+                <th class="text-end">成本</th>
+                <th class="text-end">毛利</th>
+                <th class="text-end">毛利率</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(byProject || []).length ? (byProject || []).map(r => '<tr><td><a href="/projects/' + r.id + '"><code>' + (r.project_code || '') + '</code></a></td><td>' + (r.project_name || '').substring(0, 25) + '</td><td>' + (r.contract_year || '') + '</td><td><span class="badge bg-secondary">' + (r.project_type || '') + '</span></td><td>' + (r.salesperson_name || '-') + '</td><td class="text-end">$' + (r.revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">$' + (r.total_cost || 0).toLocaleString() + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger fw-bold') + '">$' + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">' + (r.gross_margin_pct || 0) + '%</td><td><a href="/projects/' + r.id + '" class="btn btn-sm btn-outline-primary">詳情</a></td></tr>').join('') : '<tr><td colspan="10" class="text-center text-muted py-4">尚無資料</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="bySalesperson">
+    <div class="card">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-dark">
+              <tr>
+                <th>業務</th>
+                <th class="text-center">專案數</th>
+                <th class="text-end">總收入</th>
+                <th class="text-end">總成本</th>
+                <th class="text-end">總毛利</th>
+                <th class="text-end">毛利率</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(bySalesperson || []).length ? (bySalesperson || []).map(r => '<tr><td><strong>' + (r.name || '') + '</strong></td><td class="text-center">' + (r.project_count || 0) + '</td><td class="text-end">$' + (r.total_revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">$' + (r.total_cost || 0).toLocaleString() + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger') + '">$' + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">' + (r.gross_margin_pct || 0) + '%</td><td><a href="/projects?salesperson=' + encodeURIComponent(r.name) + (selectedYear !== 'all' ? '&year=' + selectedYear : '') + '" class="btn btn-sm btn-outline-primary">專案</a></td></tr>').join('') : '<tr><td colspan="7" class="text-center text-muted py-4">尚無資料</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="byType">
+    <div class="card">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-dark">
+              <tr>
+                <th>專案類型</th>
+                <th class="text-center">專案數</th>
+                <th class="text-end">總收入</th>
+                <th class="text-end">總成本</th>
+                <th class="text-end">總毛利</th>
+                <th class="text-end">毛利率</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(byType || []).length ? (byType || []).map(r => '<tr><td><span class="badge bg-info">' + (r.project_type || '') + '</span></td><td class="text-center">' + (r.project_count || 0) + '</td><td class="text-end">$' + (r.total_revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">$' + (r.total_cost || 0).toLocaleString() + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger') + '">$' + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">' + (r.gross_margin_pct || 0) + '%</td></tr>').join('') : '<tr><td colspan="6" class="text-center text-muted py-4">尚無資料</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+` }) %>
