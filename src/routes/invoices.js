@@ -73,4 +73,72 @@ router.post('/:id/delete', (req, res) => {
   }
 });
 
+// 作廢發票
+router.post('/:id/void', (req, res) => {
+  let projectId;
+  try {
+    const invoice = Invoice.findById(req.params.id);
+    if (!invoice) {
+      return res.redirect('/projects?error=' + encodeURIComponent('找不到發票'));
+    }
+    projectId = invoice.project_id;
+    Invoice.void(req.params.id, {
+      voided_at: req.body.voided_at || undefined,
+      void_reason: (req.body.void_reason || '').trim() || undefined
+    }, getUserInfo(req));
+    res.redirect(`/projects/${projectId}?success=` + encodeURIComponent('發票已作廢'));
+  } catch (err) {
+    console.error(err);
+    res.redirect(`/projects/${projectId || ''}?error=` + encodeURIComponent(err.message));
+  }
+});
+
+// 作廢並重開
+router.post('/:id/void-and-reissue', (req, res) => {
+  let projectId;
+  try {
+    const invoice = Invoice.findById(req.params.id);
+    if (!invoice) {
+      return res.redirect('/projects?error=' + encodeURIComponent('找不到發票'));
+    }
+    projectId = invoice.project_id;
+    Invoice.voidAndReissue(req.params.id, {
+      invoice_date: req.body.invoice_date,
+      invoice_number: req.body.invoice_number,
+      amount_with_tax: req.body.amount_with_tax,
+      expected_payment_date: req.body.expected_payment_date || null
+    }, {
+      void_reason: (req.body.void_reason || '').trim() || undefined
+    }, getUserInfo(req));
+    res.redirect(`/projects/${projectId}?success=` + encodeURIComponent('發票已作廢並重開'));
+  } catch (err) {
+    console.error(err);
+    if (!projectId) {
+      const inv = Invoice.findById(req.params.id);
+      projectId = inv ? inv.project_id : '';
+    }
+    res.redirect(`/projects/${projectId}?error=` + encodeURIComponent(err.message));
+  }
+});
+
+// 整筆折讓
+router.post('/:id/allowance', (req, res) => {
+  let projectId;
+  try {
+    const invoice = Invoice.findById(req.params.id);
+    if (!invoice) {
+      return res.redirect('/projects?error=' + encodeURIComponent('找不到發票'));
+    }
+    projectId = invoice.project_id;
+    Invoice.setAllowance(req.params.id, {
+      voided_at: req.body.voided_at || undefined,
+      void_reason: (req.body.void_reason || '').trim() || undefined
+    }, getUserInfo(req));
+    res.redirect(`/projects/${projectId}?success=` + encodeURIComponent('發票已設為整筆折讓'));
+  } catch (err) {
+    console.error(err);
+    res.redirect(`/projects/${projectId || ''}?error=` + encodeURIComponent(err.message));
+  }
+});
+
 module.exports = router;

@@ -287,56 +287,9 @@ if [ -f "${PROJECT_DIR}/data/invoice_bonus.db" ]; then
             log "✓ expected_invoice_year_month 欄位已存在"
         fi
         
-        # 強制更新視圖定義（確保包含所有最新欄位）
-        log "更新 v_project_summary 視圖..."
-        sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" <<'EOF'
-BEGIN TRANSACTION;
-DROP VIEW IF EXISTS v_project_summary;
-CREATE VIEW v_project_summary AS
-SELECT 
-  p.id,
-  p.project_code,
-  p.contract_year,
-  p.contract_month,
-  p.status,
-  p.project_type,
-  p.project_name,
-  p.price_with_tax,
-  p.price_without_tax,
-  p.is_new_customer,
-  p.salesperson_id,
-  p.customer_id,
-  p.expected_invoice_year_month,
-  p.notes,
-  p.created_at,
-  p.updated_at,
-  s.name as salesperson_name,
-  s.status as salesperson_status,
-  c.customer_code,
-  c.tax_id,
-  c.company_name,
-  COALESCE((SELECT SUM(amount_with_tax) FROM invoices WHERE project_id = p.id), 0) as total_invoiced,
-  p.price_with_tax - COALESCE((SELECT SUM(amount_with_tax) FROM invoices WHERE project_id = p.id), 0) as uninvoiced_amount,
-  COALESCE((SELECT SUM(bank_deposit_amount) FROM payments WHERE project_id = p.id), 0) as total_received
-FROM projects p
-LEFT JOIN salespeople s ON p.salesperson_id = s.id
-LEFT JOIN customers c ON p.customer_id = c.id;
-COMMIT;
-EOF
-        
-        if [ $? -eq 0 ]; then
-            log "✓ 視圖更新成功"
-            
-            # 驗證視圖是否包含 expected_invoice_year_month
-            VIEW_CHECK=$(sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" "SELECT sql FROM sqlite_master WHERE type='view' AND name='v_project_summary';" | grep "expected_invoice_year_month" || echo "")
-            if [ -n "$VIEW_CHECK" ]; then
-                log "✓ 視圖驗證成功（包含 expected_invoice_year_month）"
-            else
-                warning "視圖驗證失敗，但會繼續部署"
-            fi
-        else
-            warning "視圖更新失敗，繼續部署..."
-        fi
+        # 視圖將由 migrate:invoice-status 在步驟 5 更新（含 sales_discount、匯費、有效發票篩選）
+        # 此處僅確保 expected_invoice_year_month 欄位存在，視圖由 migration 統一處理
+        log "✓ 資料庫結構檢查完成（v_project_summary 將於步驟 5 由 migration 更新）"
     else
         log "projects 表不存在，將在步驟 5 中創建"
     fi
@@ -410,6 +363,7 @@ if [ -d "${PROJECT_DIR}/migrations" ]; then
               npm run migrate:costs || warning "成本明細表遷移失敗（可能已存在）"
               npm run migrate:update-total-received || warning "更新收款總額計算遷移失敗（可能已存在）"
               npm run migrate:invoice-expected-payment-date || warning "發票預計收款日欄位遷移失敗（可能已存在）"
+        (npm run migrate:invoice-status 2>/dev/null || node migrations/migrate_invoice_status.js) || warning "發票作廢/折讓功能遷移失敗（可能已存在）"
         
         # 首次安裝時插入種子資料
         if [ "$IS_FIRST_INSTALL" = true ]; then
@@ -435,6 +389,7 @@ if [ -d "${PROJECT_DIR}/migrations" ]; then
               npm run migrate:costs || warning "成本明細表遷移失敗（可能已存在）"
               npm run migrate:update-total-received || warning "更新收款總額計算遷移失敗（可能已存在）"
               npm run migrate:invoice-expected-payment-date || warning "發票預計收款日欄位遷移失敗（可能已存在）"
+        (npm run migrate:invoice-status 2>/dev/null || node migrations/migrate_invoice_status.js) || warning "發票作廢/折讓功能遷移失敗（可能已存在）"
         log "✓ 增量遷移完成"
     fi
 else

@@ -214,7 +214,7 @@ router.get('/stats/dashboard/:year', (req, res) => {
         SUM(amount_with_tax) as total
       FROM invoices i
       JOIN projects p ON i.project_id = p.id
-      WHERE p.contract_year = ?
+      WHERE p.contract_year = ? AND (i.status IS NULL OR i.status = '有效')
       GROUP BY strftime('%m', invoice_date)
       ORDER BY month
     `).all(year);

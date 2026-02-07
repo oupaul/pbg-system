@@ -20,6 +20,8 @@ const FIELD_LABELS = {
   invoices: {
     id: 'ID', project_id: '專案', invoice_date: '發票日期', invoice_number: '發票號碼',
     amount_with_tax: '金額(含稅)', expected_payment_date: '預計收款日',
+    status: '狀態', voided_at: '作廢/折讓日期', void_reason: '作廢/折讓原因',
+    replacement_invoice_id: '重開發票ID', original_invoice_id: '原發票ID',
     created_at: '建立時間', updated_at: '更新時間'
   },
   payments: {

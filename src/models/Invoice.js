@@ -1,6 +1,9 @@
 const db = require('./db');
 const AuditLogService = require('../services/AuditLogService');
 
+// 有效發票條件：用於 total_invoiced 等計算
+const VALID_STATUS_CONDITION = `(status IS NULL OR status = '有效')`;
+
 const Invoice = {
   // 取得專案的所有發票
   findByProject(projectId) {
@@ -22,16 +25,17 @@ const Invoice = {
 
   // 新增發票
   create(data) {
-    // 確保所有參數都有預設值，避免 undefined
     const projectId = data.project_id !== undefined && data.project_id !== null ? parseInt(data.project_id) : null;
     const invoiceDate = data.invoice_date || null;
     const invoiceNumber = data.invoice_number || null;
     const amountWithTax = data.amount_with_tax !== undefined && data.amount_with_tax !== null ? parseFloat(data.amount_with_tax) : 0;
     const expectedPaymentDate = data.expected_payment_date || null;
+    const status = data.status || '有效';
+    const originalInvoiceId = data.original_invoice_id || null;
     
     const stmt = db.prepare(`
-      INSERT INTO invoices (project_id, invoice_date, invoice_number, amount_with_tax, expected_payment_date)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO invoices (project_id, invoice_date, invoice_number, amount_with_tax, expected_payment_date, status, original_invoice_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
     
     const result = stmt.run(
@@ -39,13 +43,16 @@ const Invoice = {
       invoiceDate,
       invoiceNumber,
       amountWithTax,
-      expectedPaymentDate
+      expectedPaymentDate,
+      status,
+      originalInvoiceId
     );
     
     const invoiceId = result.lastInsertRowid;
+    const insertedData = { ...data, status, original_invoice_id: originalInvoiceId };
     
     // 記錄修改
-    AuditLogService.logCreate('invoices', invoiceId, data, data.userInfo);
+    AuditLogService.logCreate('invoices', invoiceId, insertedData, data.userInfo);
     
     return invoiceId;
   },
@@ -94,6 +101,42 @@ const Invoice = {
       newData.expected_payment_date = oldRecord.expected_payment_date;
     }
     
+    if (data.status !== undefined) {
+      fields.push('status = ?');
+      values.push(data.status);
+      newData.status = data.status;
+    } else {
+      newData.status = oldRecord.status;
+    }
+    if (data.voided_at !== undefined) {
+      fields.push('voided_at = ?');
+      values.push(data.voided_at || null);
+      newData.voided_at = data.voided_at || null;
+    } else {
+      newData.voided_at = oldRecord.voided_at;
+    }
+    if (data.void_reason !== undefined) {
+      fields.push('void_reason = ?');
+      values.push(data.void_reason || null);
+      newData.void_reason = data.void_reason || null;
+    } else {
+      newData.void_reason = oldRecord.void_reason;
+    }
+    if (data.replacement_invoice_id !== undefined) {
+      fields.push('replacement_invoice_id = ?');
+      values.push(data.replacement_invoice_id || null);
+      newData.replacement_invoice_id = data.replacement_invoice_id || null;
+    } else {
+      newData.replacement_invoice_id = oldRecord.replacement_invoice_id;
+    }
+    if (data.original_invoice_id !== undefined) {
+      fields.push('original_invoice_id = ?');
+      values.push(data.original_invoice_id || null);
+      newData.original_invoice_id = data.original_invoice_id || null;
+    } else {
+      newData.original_invoice_id = oldRecord.original_invoice_id;
+    }
+    
     // 如果沒有要更新的欄位，直接返回
     if (fields.length === 0) return false;
     
@@ -128,16 +171,23 @@ const Invoice = {
     return result.changes > 0;
   },
 
-  // 取得專案已開發票總額
+  // 取得專案已開發票總額（僅計有效發票）
   getTotalByProject(projectId) {
     const result = db.prepare(`
       SELECT COALESCE(SUM(amount_with_tax), 0) as total
-      FROM invoices WHERE project_id = ?
+      FROM invoices WHERE project_id = ? AND ${VALID_STATUS_CONDITION}
     `).get(projectId);
     return result.total;
   },
 
-  // 取得月份發票統計
+  // 取得專案有效發票列表（用於收款對應等）
+  findValidByProject(projectId) {
+    return db.prepare(`
+      SELECT * FROM invoices WHERE project_id = ? AND ${VALID_STATUS_CONDITION} ORDER BY invoice_date
+    `).all(projectId);
+  },
+
+  // 取得月份發票統計（僅計有效發票）
   getMonthlyStats(year, month) {
     return db.prepare(`
       SELECT 
@@ -146,7 +196,80 @@ const Invoice = {
       FROM invoices
       WHERE strftime('%Y', invoice_date) = ? 
         AND strftime('%m', invoice_date) = ?
+        AND ${VALID_STATUS_CONDITION}
     `).get(String(year), String(month).padStart(2, '0'));
+  },
+
+  // 作廢發票
+  void(id, { voided_at, void_reason } = {}, userInfo = null) {
+    const old = this.findById(id);
+    if (!old) return null;
+    if (old.status === '作廢' || old.status === '整筆折讓') {
+      throw new Error(`發票已是「${old.status}」狀態，無法重複操作`);
+    }
+    this.update(id, {
+      status: '作廢',
+      voided_at: voided_at || new Date().toISOString().slice(0, 19).replace('T', ' '),
+      void_reason: void_reason || null,
+      expected_payment_date: null, // 作廢後不再期待收款，清除預計收款日
+      userInfo
+    });
+    return this.findById(id);
+  },
+
+  // 作廢並重開：將原發票作廢，建立新發票並建立關聯
+  voidAndReissue(originalId, newInvoiceData, { void_reason } = {}, userInfo = null) {
+    const original = this.findById(originalId);
+    if (!original) return null;
+    if (original.status === '作廢' || original.status === '整筆折讓') {
+      throw new Error(`發票已是「${original.status}」狀態，無法重複操作`);
+    }
+    const voidedAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    this.update(originalId, {
+      status: '作廢',
+      voided_at: voidedAt,
+      void_reason: void_reason || null,
+      expected_payment_date: null, // 作廢後不再期待收款，清除預計收款日
+      userInfo
+    });
+    const newId = this.create({
+      project_id: original.project_id,
+      invoice_date: newInvoiceData.invoice_date || null,
+      invoice_number: newInvoiceData.invoice_number || null,
+      amount_with_tax: newInvoiceData.amount_with_tax !== undefined ? parseFloat(newInvoiceData.amount_with_tax) : original.amount_with_tax,
+      expected_payment_date: newInvoiceData.expected_payment_date || original.expected_payment_date || null,
+      original_invoice_id: originalId,
+      userInfo
+    });
+    this.update(originalId, {
+      replacement_invoice_id: newId,
+      userInfo
+    });
+    return { original: this.findById(originalId), replacement: this.findById(newId) };
+  },
+
+  // 整筆折讓
+  setAllowance(id, { voided_at, void_reason } = {}, userInfo = null) {
+    const old = this.findById(id);
+    if (!old) return null;
+    if (old.status === '作廢' || old.status === '整筆折讓') {
+      throw new Error(`發票已是「${old.status}」狀態，無法重複操作`);
+    }
+    this.update(id, {
+      status: '整筆折讓',
+      voided_at: voided_at || new Date().toISOString().slice(0, 19).replace('T', ' '),
+      void_reason: void_reason || null,
+      expected_payment_date: null, // 整筆折讓後不再期待收款，清除預計收款日
+      userInfo
+    });
+    return this.findById(id);
+  },
+
+  // 判斷是否為有效發票（供外部使用）
+  isValid(invoice) {
+    if (!invoice) return false;
+    const s = invoice.status;
+    return s == null || s === '' || s === '有效';
   }
 };
 

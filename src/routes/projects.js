@@ -357,8 +357,11 @@ router.get('/:id', (req, res) => {
   // 找出已被選取的發票 ID（用於新增收款時排除）
   const usedInvoiceIds = new Set(payments.filter(p => p.invoice_id).map(p => p.invoice_id));
 
-  // 計算彙總
-  const totalInvoiced = invoices.reduce((sum, i) => sum + (i.amount_with_tax || 0), 0);
+  // 有效發票（供收款對應選擇，僅 有效 狀態）
+  const validInvoices = Invoice.findValidByProject ? Invoice.findValidByProject(project.id) : invoices.filter(i => !i.status || i.status === '有效');
+
+  // 計算彙總（僅計有效發票）
+  const totalInvoiced = Invoice.getTotalByProject(project.id);
   // 計算實際收款金額（考慮匯費差異）- 使用 Payment.calculateActualReceived 方法保持一致性
   const totalReceived = payments.reduce((sum, p) => sum + Payment.calculateActualReceived(p), 0);
   const totalBonus = bonuses.reduce((sum, b) => sum + (b.bonus_amount || 0), 0);
@@ -381,11 +384,14 @@ router.get('/:id', (req, res) => {
     title: project.project_name,
     project,
     invoices: invoicesWithStatus,
+    validInvoices, // 有效發票（收款對應用）
     payments,
     costs,
     bonuses,
     typeColorMap,
     usedInvoiceIds: Array.from(usedInvoiceIds), // 已使用的發票 ID 列表
+    success: req.query.success ? decodeURIComponent(req.query.success) : null,
+    error: req.query.error ? decodeURIComponent(req.query.error) : null,
     summary: {
       totalInvoiced,
       uninvoiced: project.price_with_tax - totalInvoiced,

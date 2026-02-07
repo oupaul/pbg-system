@@ -151,7 +151,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
       
       // 計算總金額統計
       const totalProjectAmount = db.prepare('SELECT COALESCE(SUM(price_with_tax), 0) as total FROM projects').get().total || 0;
-      const totalInvoiced = db.prepare('SELECT COALESCE(SUM(amount_with_tax), 0) as total FROM invoices').get().total || 0;
+      const totalInvoiced = db.prepare("SELECT COALESCE(SUM(amount_with_tax), 0) as total FROM invoices WHERE (status IS NULL OR status = '有效')").get().total || 0;
       // 計算實際收款總額（考慮匯費差異）
       const payments = db.prepare('SELECT bank_deposit_amount, payment_difference, difference_type FROM payments').all();
       const totalReceived = payments.reduce((sum, p) => {

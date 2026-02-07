@@ -56,6 +56,7 @@ class ExcelExportService {
       const invoices = db.prepare(`
         SELECT * FROM invoices WHERE project_id = ? ORDER BY invoice_date
       `).all(project.id);
+      const validInvoices = invoices.filter(i => !i.status || i.status === '有效');
 
       // 取得收款明細
       const payments = db.prepare(`
@@ -67,8 +68,8 @@ class ExcelExportService {
         SELECT * FROM bonus_calculations WHERE project_id = ?
       `).all(project.id);
 
-      // 計算彙總
-      const totalInvoiced = invoices.reduce((sum, i) => sum + (i.amount_with_tax || 0), 0);
+      // 計算彙總（僅計有效發票）
+      const totalInvoiced = validInvoices.reduce((sum, i) => sum + (i.amount_with_tax || 0), 0);
       const uninvoiced = project.price_with_tax - totalInvoiced;
 
       // 找出各類獎金

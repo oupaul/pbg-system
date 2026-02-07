@@ -1,15 +1,16 @@
 # 專案開立發票業績認列獎金計算總表系統
 
-[![版本](https://img.shields.io/badge/版本-v1.9.4-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
+[![版本](https://img.shields.io/badge/版本-v1.10.0-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![資料庫](https://img.shields.io/badge/資料庫-better--sqlite3-orange.svg)](https://github.com/WiseLibs/better-sqlite3)
 [![授權](https://img.shields.io/badge/授權-MIT-lightgrey.svg)](LICENSE)
 
 基於 Node.js + SQLite 的專案管理與獎金計算系統，用於管理專案、發票、收款及業務獎金。
 
-## 🚀 最新更新（v1.9.4 - 2026-02-07）
+## 🚀 最新更新（v1.10.0 - 2026-02-07）
 
-- 🔧 **備份還原修復** - uninstall.sh WAL checkpoint 順序、restore.sh 驗證邏輯與 WAL/SHM 清除、誤判還原處理
+- 📋 **發票作廢與折讓** - 支援發票作廢、作廢重開、整筆折讓，保留軌跡，已開立/應收僅計有效發票
+- 🔧 **備份還原修復** - uninstall.sh WAL checkpoint 順序、restore.sh 驗證邏輯與 WAL/SHM 清除
 - 📋 **部署顯示名稱** - 備份還原頁面瀏覽器分頁與左上角名稱依部署設定顯示
 - 🚪 **登入表單** - 排除全域 spinner 避免還原後登入卡住
 
@@ -1754,6 +1755,32 @@ invoice-bonus-system/
 - ✅ 完全向後兼容，不影響現有功能
 - ✅ 原有的 4 個預設角色繼續正常工作
 - ✅ 使用者資料不受影響
+
+---
+
+### 2026-02-07 - v1.10.0 發票作廢與折讓功能 📋
+
+#### 新增功能
+
+**發票作廢與整筆折讓**
+- ✅ **作廢**：將發票標記為作廢，不計入已開立總額與應收
+- ✅ **作廢重開**：原發票作廢後建立新發票，保留關聯軌跡
+- ✅ **整筆折讓**：將發票標記為整筆折讓，保留原金額供查詢但不計入總額
+- ✅ 作廢/折讓時自動清除預計收款日
+- ✅ 重開連結顯示對應發票號碼（非 ID）
+
+**資料庫**
+- ✅ `invoices` 新增：status、voided_at、void_reason、replacement_invoice_id、original_invoice_id
+- ✅ `v_project_summary` 僅計有效發票，已開立/應收計算正確
+- ✅ 遷移腳本：`npm run migrate:invoice-status` 或 `node migrations/migrate_invoice_status.js`
+
+**部署**
+- ✅ deploy.sh 納入 migrate:invoice-status，更新部署自動執行
+
+#### 技術文件
+
+- `發票作廢與折讓功能設計.md` - 設計文件
+- `發票作廢與折讓功能說明.md` - 功能說明與部署
 
 ---
 

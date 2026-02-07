@@ -13,6 +13,8 @@
 </div>
 
 ${locals.isReadOnly ? '<div class="alert alert-info mb-4"><i class="bi bi-info-circle"></i> 您目前為唯讀模式，無法進行編輯操作</div>' : ''}
+${typeof success !== 'undefined' && success ? '<div class="alert alert-success alert-dismissible fade show mb-4" role="alert"><i class="bi bi-check-circle"></i> ' + success + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>' : ''}
+${typeof error !== 'undefined' && error ? '<div class="alert alert-danger alert-dismissible fade show mb-4" role="alert"><i class="bi bi-exclamation-triangle"></i> ' + error + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>' : ''}
 
 <div class="row g-4 mb-4">
   <div class="col-md-8">
@@ -287,6 +289,7 @@ function resetExpectedInvoice() {
       <table class="table table-hover mb-0">
         <thead class="table-light">
           <tr>
+            <th>狀態</th>
             <th>發票日期</th>
             <th>發票號碼</th>
             <th>預計收款日</th>
@@ -296,24 +299,135 @@ function resetExpectedInvoice() {
           </tr>
         </thead>
         <tbody>
-          ${invoices.length ? invoices.map(inv => `
-            <tr>
+          ${invoices.length ? invoices.map(inv => {
+            const isValid = !inv.status || inv.status === '有效';
+            const statusBadge = inv.status === '作廢' ? '<span class="badge bg-secondary">作廢</span>' : inv.status === '整筆折讓' ? '<span class="badge bg-warning text-dark">整筆折讓</span>' : '<span class="badge bg-success">有效</span>';
+            const replacementInv = inv.replacement_invoice_id ? invoices.find(i => i.id === inv.replacement_invoice_id) : null;
+            const replacementLink = replacementInv ? ' <a href="#inv' + replacementInv.id + '" class="small">→ 重開 ' + (replacementInv.invoice_number || '#' + replacementInv.id) + '</a>' : '';
+            const rowClass = isValid ? '' : 'table-secondary';
+            return `
+            <tr class="${rowClass}" id="inv${inv.id}">
+              <td>${statusBadge}${replacementLink}</td>
               <td>${inv.invoice_date || '-'}</td>
               <td><code>${inv.invoice_number || '-'}</code></td>
               <td>${inv.expected_payment_date || '-'}</td>
               <td class="text-end">$${(inv.amount_with_tax || 0).toLocaleString()}</td>
               <td><span class="${typeof inv.paymentStatus !== 'undefined' ? inv.paymentStatus.class : 'text-muted'}">${typeof inv.paymentStatus !== 'undefined' ? inv.paymentStatus.text : '-'}</span></td>
               <td class="text-end">
-                ${locals.canEdit ? '<button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editInvoiceModal' + inv.id + '"><i class="bi bi-pencil"></i></button>' : ''}
+                ${locals.canEdit && isValid ? '<button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editInvoiceModal' + inv.id + '"><i class="bi bi-pencil"></i></button>' : ''}
+                ${locals.canEdit && isValid ? '<div class="btn-group dropstart"><button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">更多</button><ul class="dropdown-menu"><li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#voidModal' + inv.id + '"><i class="bi bi-x-circle me-1"></i>作廢</a></li><li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#voidReissueModal' + inv.id + '"><i class="bi bi-arrow-repeat me-1"></i>作廢重開</a></li><li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#allowanceModal' + inv.id + '"><i class="bi bi-dash-circle me-1"></i>整筆折讓</a></li></ul></div>' : ''}
                 ${locals.canEdit ? '<form action="/invoices/' + inv.id + '/delete" method="POST" style="display:inline" onsubmit="return confirm(\'確定刪除？\')"><button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>' : ''}
               </td>
             </tr>
-          `).join('') : '<tr><td colspan="6" class="text-center text-muted py-3">尚無發票</td></tr>'}
+          `}).join('') : '<tr><td colspan="7" class="text-center text-muted py-3">尚無發票</td></tr>'}
         </tbody>
       </table>
     </div>
   </div>
 </div>
+
+${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
+<!-- 作廢發票 Modal -->
+<div class="modal fade" id="voidModal${inv.id}" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="/invoices/${inv.id}/void" method="POST">
+        <div class="modal-header">
+          <h5 class="modal-title">作廢發票</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted">發票號碼：<code>${inv.invoice_number || '-'}</code>，金額：$${(inv.amount_with_tax || 0).toLocaleString()}</p>
+          <div class="mb-3">
+            <label class="form-label">作廢日期</label>
+            <input type="date" name="voided_at" class="form-control" value="${new Date().toISOString().slice(0, 10)}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">作廢原因（選填）</label>
+            <input type="text" name="void_reason" class="form-control" placeholder="例如：開立錯誤">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-warning">確認作廢</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 作廢重開 Modal -->
+<div class="modal fade" id="voidReissueModal${inv.id}" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="/invoices/${inv.id}/void-and-reissue" method="POST">
+        <div class="modal-header">
+          <h5 class="modal-title">作廢並重開</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted">原發票：<code>${inv.invoice_number || '-'}</code>，金額：$${(inv.amount_with_tax || 0).toLocaleString()}</p>
+          <div class="mb-3">
+            <label class="form-label">作廢原因（選填）</label>
+            <input type="text" name="void_reason" class="form-control" placeholder="例如：開立錯誤需重開">
+          </div>
+          <hr>
+          <h6>新發票資料</h6>
+          <div class="mb-3">
+            <label class="form-label">發票日期</label>
+            <input type="date" name="invoice_date" class="form-control" value="${inv.invoice_date || ''}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">發票號碼</label>
+            <input type="text" name="invoice_number" class="form-control" placeholder="XX12345678" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">預計收款日</label>
+            <input type="date" name="expected_payment_date" class="form-control" value="${inv.expected_payment_date || ''}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">金額(含稅)</label>
+            <input type="number" name="amount_with_tax" class="form-control" value="${inv.amount_with_tax || 0}" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">作廢並建立新發票</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 整筆折讓 Modal -->
+<div class="modal fade" id="allowanceModal${inv.id}" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="/invoices/${inv.id}/allowance" method="POST">
+        <div class="modal-header">
+          <h5 class="modal-title">整筆折讓</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted">發票號碼：<code>${inv.invoice_number || '-'}</code>，金額：$${(inv.amount_with_tax || 0).toLocaleString()} 將設為整筆折讓，不計入已開立總額。</p>
+          <div class="mb-3">
+            <label class="form-label">折讓日期</label>
+            <input type="date" name="voided_at" class="form-control" value="${new Date().toISOString().slice(0, 10)}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">折讓原因（選填）</label>
+            <input type="text" name="void_reason" class="form-control" placeholder="例如：銷貨折讓">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-warning">確認整筆折讓</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+`).join('')}
 
 <!-- 收款明細 -->
 <div class="card mb-4">
@@ -493,12 +607,12 @@ ${locals.user && (locals.user.role === 'admin' || locals.user.role === 'user') ?
             <label class="form-label">對應發票</label>
             <select name="invoice_id" class="form-select">
               <option value="">-- 選擇發票 --</option>
-              ${invoices.map(i => {
+              ${(typeof validInvoices !== 'undefined' ? validInvoices : invoices).map(i => {
                 const isUsed = typeof usedInvoiceIds !== 'undefined' && usedInvoiceIds.includes(i.id);
                 return isUsed ? '' : `<option value="${i.id}">${i.invoice_number} ($${i.amount_with_tax?.toLocaleString()})</option>`;
               }).filter(opt => opt !== '').join('')}
             </select>
-            ${typeof usedInvoiceIds !== 'undefined' && usedInvoiceIds.length > 0 && invoices.filter(i => !usedInvoiceIds.includes(i.id)).length === 0 ? '<small class="text-muted d-block mt-1">所有發票已被選取</small>' : ''}
+            ${typeof usedInvoiceIds !== 'undefined' && (typeof validInvoices !== 'undefined' ? validInvoices : invoices).filter(i => !usedInvoiceIds.includes(i.id)).length === 0 ? '<small class="text-muted d-block mt-1">所有有效發票已被選取</small>' : ''}
           </div>
           <div class="mb-3">
             <label class="form-label">銀行匯入金額</label>
@@ -723,10 +837,12 @@ ${payments.map(pay => `
               <option value="">-- 選擇發票 --</option>
               ${invoices.map(i => {
                 const isCurrentPayment = i.id == pay.invoice_id;
+                const isValid = !i.status || i.status === '有效';
                 const isUsedByOther = typeof usedInvoiceIds !== 'undefined' && usedInvoiceIds.includes(i.id) && !isCurrentPayment;
-                // 如果是當前收款選取的發票，或未被其他收款選取，則顯示
-                if (isCurrentPayment || !isUsedByOther) {
-                  return `<option value="${i.id}" ${isCurrentPayment ? 'selected' : ''}>${i.invoice_number} ($${i.amount_with_tax?.toLocaleString()})</option>`;
+                // 顯示：當前選取的發票（含作廢）或 有效且未被其他收款選取
+                if (isCurrentPayment || (isValid && !isUsedByOther)) {
+                  const suffix = isCurrentPayment && !isValid ? ' (已作廢/折讓)' : '';
+                  return `<option value="${i.id}" ${isCurrentPayment ? 'selected' : ''}>${i.invoice_number} ($${i.amount_with_tax?.toLocaleString()})${suffix}</option>`;
                 }
                 return '';
               }).filter(opt => opt !== '').join('')}

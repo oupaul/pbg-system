@@ -21,6 +21,7 @@
     "migrate:costs": "node migrations/migrate_costs.js",
     "migrate:update-total-received": "node migrations/migrate_update_total_received_with_fee.js",
     "migrate:invoice-expected-payment-date": "node migrations/migrate_invoice_expected_payment_date.js",
+    "migrate:invoice-status": "node migrations/migrate_invoice_status.js",
     "seed": "node migrations/seed.js",
     "test:expected-invoice": "node test_expected_invoice_update.js",
     "check:expected-invoice": "node check_expected_invoice_field.js",
