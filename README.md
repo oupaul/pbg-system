@@ -10,6 +10,7 @@
 ## 🚀 最新更新（v1.13.0 - 2026-02-07）
 
 - 📊 **專案毛利分析** - 方案 A：以專案未稅價格為收入，毛利 = 收入 − 成本，支援專案明細、依業務、依類型彙總
+- 🧹 **介面調整** - 移除導覽列右側重複的搜尋框，改由左側「搜尋」連結進入搜尋頁
 
 [查看完整更新日誌](#更新日誌)
 
@@ -1790,6 +1791,11 @@ invoice-bonus-system/
 - ✅ 年度篩選、快速連結至專案詳情與專案列表
 - ✅ 權限：僅 admin、user 可見
 - ✅ 相關檔案：`src/services/GrossProfitAnalysisService.js`、`src/routes/grossProfit.js`、`src/views/gross-profit/index.ejs`
+
+#### 介面調整
+
+- ✅ 移除導覽列右側重複的搜尋輸入框，改由左側「搜尋」連結進入搜尋頁面
+- ✅ 修改檔案：`src/views/layout.ejs`
 
 #### 技術文件
 
