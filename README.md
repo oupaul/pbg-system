@@ -1,20 +1,18 @@
 # 專案開立發票業績認列獎金計算總表系統
 
-[![版本](https://img.shields.io/badge/版本-v1.11.0-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
+[![版本](https://img.shields.io/badge/版本-v1.12.0-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![資料庫](https://img.shields.io/badge/資料庫-better--sqlite3-orange.svg)](https://github.com/WiseLibs/better-sqlite3)
 [![授權](https://img.shields.io/badge/授權-MIT-lightgrey.svg)](LICENSE)
 
 基於 Node.js + SQLite 的專案管理與獎金計算系統，用於管理專案、發票、收款及業務獎金。
 
-## 🚀 最新更新（v1.11.0 - 2026-02-07）
+## 🚀 最新更新（v1.12.0 - 2026-02-07）
 
-- 📊 **應收帳款帳齡分析** - 儀表板顯示未收款依預計收款日分佈（未到期、1-30天、31-60天、61-90天、90天以上）
-- 🔍 **全域快速搜尋** - 導覽列搜尋專案、客戶、發票，支援關鍵字跨欄位查詢
-- 📋 **發票作廢與折讓** - 支援發票作廢、作廢重開、整筆折讓，保留軌跡
-- 🔧 **備份還原修復** - uninstall.sh WAL checkpoint 順序、restore.sh 驗證邏輯與 WAL/SHM 清除
-- 📋 **部署顯示名稱** - 備份還原頁面瀏覽器分頁與左上角名稱依部署設定顯示
-- 🚪 **登入表單** - 排除全域 spinner 避免還原後登入卡住
+- 📊 **業務績效儀表板** - 依業務彙總專案數、金額、已開發票、收款、獎金等，支援年度篩選
+- 📄 **PDF 匯出** - 專案總表、獎金報表、應收帳齡分析支援 PDF 格式匯出
+- 📗 **應收帳齡 Excel 匯出** - 帳齡分析新增 Excel 格式匯出
+- 📐 **PDF 版面優化** - 欄寬、列高、間距調整，改善閱讀體驗
 
 [查看完整更新日誌](#更新日誌)
 
@@ -1132,6 +1130,13 @@ sudo ./uninstall.sh
 - 業績統計
 - 獎金彙總
 
+### 業務績效儀表板 🆕
+- 依業務彙總專案數、專案金額、已開發票、未開發票、已收款、未收款
+- 獎金彙總（總獎金、已發放、待發放）
+- 年度篩選，支援全部年度或特定年度
+- 業務員角色僅能檢視自己的績效
+- 快速連結至專案列表與獎金明細
+
 ### 客戶管理
 - 客戶資料維護
 - 統一編號記錄
@@ -1150,10 +1155,17 @@ sudo ./uninstall.sh
 
 ### Excel 匯入/匯出
 - 支援匯入現有 Excel 總表
-- 匯出專案總表
-- 匯出獎金報表
+- 匯出專案總表（Excel、PDF）
+- 匯出獎金報表（Excel、PDF）
+- **應收帳款帳齡分析** - 支援 Excel、PDF 匯出（全部或指定年度）
 - 支援合併儲存格處理
 - 自動資料驗證與錯誤提示
+
+### PDF 匯出 🆕
+- 專案總表 PDF（橫向 A4，含專案、客戶、金額、收款等）
+- 獎金報表 PDF（含業務、專案、獎金類型、金額、發放狀態）
+- 應收帳款帳齡分析 PDF（含帳齡區間、專案、發票、未收金額）
+- 選用中文字型可置於 `fonts/` 目錄以正確顯示中文
 
 ### 使用者管理
 - 使用者帳號建立、編輯、刪除
@@ -1757,6 +1769,38 @@ invoice-bonus-system/
 - ✅ 完全向後兼容，不影響現有功能
 - ✅ 原有的 4 個預設角色繼續正常工作
 - ✅ 使用者資料不受影響
+
+---
+
+### 2026-02-07 - v1.12.0 業務績效儀表板與 PDF 匯出 📊
+
+#### 業務績效儀表板
+
+- ✅ 新增「業務績效」頁面，依業務人員彙總績效
+- ✅ 顯示：專案數、專案金額、已開發票、未開發票、已收款、未收款、總獎金、已發放、待發放
+- ✅ 支援年度篩選（全部或指定年度）
+- ✅ 業務員角色僅能檢視自己的績效
+- ✅ 導覽列新增連結（admin/user/salesperson 可見）
+- ✅ 相關檔案：`src/services/SalesPerformanceService.js`、`src/routes/salesPerformance.js`、`src/views/sales-performance/index.ejs`
+
+#### PDF 匯出
+
+- ✅ 專案總表 PDF：`/import-export/export/pdf/projects/:year`
+- ✅ 獎金報表 PDF：`/import-export/export/pdf/bonuses/:year`
+- ✅ 應收帳款帳齡分析 PDF：`/import-export/export/pdf/aging?year=`
+- ✅ 欄寬、列高（25pt）、間距優化，改善版面
+- ✅ 選用中文字型：可將 NotoSansTC-Regular.ttf 置於 `fonts/` 目錄
+- ✅ 相關檔案：`src/services/PdfExportService.js`、`src/routes/importExport.js`、`package.json`（pdfkit）
+
+#### 應收帳齡 Excel 匯出
+
+- ✅ 帳齡分析新增 Excel 格式：`/import-export/export/aging?year=`
+- ✅ 支援全部年度或指定年度篩選
+- ✅ 相關檔案：`src/services/ExcelExportService.js`、`src/views/import-export/index.ejs`
+
+#### 技術文件
+
+- `業務績效儀表板與PDF匯出功能說明.md` - 功能說明
 
 ---
 

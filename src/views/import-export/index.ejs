@@ -86,8 +86,11 @@ ${result ? `
           <p class="small text-muted">包含專案、發票、收款、獎金等完整資料</p>
           <div class="d-flex gap-2 flex-wrap">
             ${years.map(y => `
-              <a href="/import-export/export/projects/${y}" class="btn btn-outline-success">
+              <a href="/import-export/export/projects/${y}" class="btn btn-outline-success" title="Excel">
                 <i class="bi bi-file-earmark-excel"></i> ${y}年
+              </a>
+              <a href="/import-export/export/pdf/projects/${y}" class="btn btn-outline-danger" title="PDF">
+                <i class="bi bi-file-earmark-pdf"></i> ${y}年
               </a>
             `).join('') || '<span class="text-muted">尚無資料</span>'}
           </div>
@@ -95,15 +98,45 @@ ${result ? `
         
         <hr>
         
-        <div>
+        <div class="mb-4">
           <h6>獎金報表</h6>
           <p class="small text-muted">依業務人員彙整的獎金明細</p>
           <div class="d-flex gap-2 flex-wrap">
             ${years.map(y => `
-              <a href="/import-export/export/bonuses/${y}" class="btn btn-outline-info">
+              <a href="/import-export/export/bonuses/${y}" class="btn btn-outline-info" title="Excel">
                 <i class="bi bi-file-earmark-excel"></i> ${y}年
               </a>
+              <a href="/import-export/export/pdf/bonuses/${y}" class="btn btn-outline-danger" title="PDF">
+                <i class="bi bi-file-earmark-pdf"></i> ${y}年
+              </a>
             `).join('') || '<span class="text-muted">尚無資料</span>'}
+          </div>
+        </div>
+
+        <hr>
+
+        <div>
+          <h6>應收帳款帳齡分析</h6>
+          <p class="small text-muted">依發票預計收款日彙總未收款帳齡分布</p>
+          <div class="d-flex gap-2 flex-wrap align-items-center">
+            <span class="small text-muted me-1">Excel：</span>
+            <a href="/import-export/export/aging" class="btn btn-outline-success btn-sm" title="Excel 全部">
+              <i class="bi bi-file-earmark-excel"></i> 全部
+            </a>
+            ${years.map(y => `
+              <a href="/import-export/export/aging?year=${y}" class="btn btn-outline-success btn-sm" title="Excel ${y}年">
+                <i class="bi bi-file-earmark-excel"></i> ${y}年
+              </a>
+            `).join('') || ''}
+            <span class="small text-muted ms-2 me-1">PDF：</span>
+            <a href="/import-export/export/pdf/aging" class="btn btn-outline-danger btn-sm" title="PDF 全部">
+              <i class="bi bi-file-earmark-pdf"></i> 全部
+            </a>
+            ${years.map(y => `
+              <a href="/import-export/export/pdf/aging?year=${y}" class="btn btn-outline-danger btn-sm" title="PDF ${y}年">
+                <i class="bi bi-file-earmark-pdf"></i> ${y}年
+              </a>
+            `).join('') || ''}
           </div>
         </div>
       </div>

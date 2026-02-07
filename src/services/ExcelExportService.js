@@ -1,6 +1,7 @@
 const ExcelJS = require('exceljs');
 const db = require('../models/db');
 const dayjs = require('dayjs');
+const ReceivablesAgingService = require('./ReceivablesAgingService');
 
 // 格式化為民國年
 function formatROCDate(dateStr) {
@@ -252,6 +253,53 @@ class ExcelExportService {
     columnWidths.forEach((width, index) => {
       worksheet.getColumn(index + 1).width = width;
     });
+
+    return workbook;
+  }
+
+  // 匯出應收帳款帳齡分析
+  exportReceivablesAging(year = null) {
+    const aging = ReceivablesAgingService.getAgingReport(year);
+
+    const workbook = new ExcelJS.Workbook();
+    const sheetName = year ? `帳齡分析-${year}` : '帳齡分析-全部';
+    const worksheet = workbook.addWorksheet(sheetName);
+
+    const bucketLabels = [
+      { key: 'notYetDue', label: '未到期' },
+      { key: 'days1_30', label: '1-30 天' },
+      { key: 'days31_60', label: '31-60 天' },
+      { key: 'days61_90', label: '61-90 天' },
+      { key: 'over90', label: '90 天以上' },
+      { key: 'noDate', label: '未設預計日' }
+    ];
+
+    const allItems = bucketLabels.flatMap(({ key }) => {
+      const b = aging.buckets[key];
+      return (b?.items || []).map(item => ({ ...item, bucketLabel: aging.buckets[key].label }));
+    });
+
+    worksheet.addRow([year ? `應收帳款帳齡分析 - ${year} 年度` : '應收帳款帳齡分析 - 全部']);
+    worksheet.addRow([`總未收款：$${formatCurrency(aging.total)} (${aging.totalCount} 筆)`]);
+    worksheet.addRow([]);
+
+    const headers = ['帳齡', '專案編號', '專案名稱', '發票號碼', '業務', '未收金額', '預計收款日'];
+    worksheet.addRow(headers);
+
+    for (const item of allItems) {
+      worksheet.addRow([
+        item.bucketLabel || '',
+        item.project_code || '',
+        item.project_name || '',
+        item.invoice_number || '-',
+        item.salesperson_name || '-',
+        formatCurrency(item.amount),
+        item.expected_payment_date ? formatROCDate(item.expected_payment_date) : ''
+      ]);
+    }
+
+    const columnWidths = [12, 18, 35, 18, 15, 14, 14];
+    columnWidths.forEach((w, i) => { worksheet.getColumn(i + 1).width = w; });
 
     return workbook;
   }

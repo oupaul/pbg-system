@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const ExcelImportService = require('../services/ExcelImportService');
 const ExcelExportService = require('../services/ExcelExportService');
+const PdfExportService = require('../services/PdfExportService');
 const Project = require('../models/Project');
 
 module.exports = function(upload) {
@@ -279,6 +280,75 @@ module.exports = function(upload) {
       res.send(nodeBuffer);
     } catch (err) {
       console.error('匯出獎金報表錯誤:', err);
+      res.redirect('/import-export?error=' + encodeURIComponent(err.message));
+    }
+  });
+
+  // PDF 匯出：專案總表
+  router.get('/export/pdf/projects/:year', async (req, res) => {
+    try {
+      const year = parseInt(req.params.year);
+      const buffer = await PdfExportService.exportProjectSummary(year);
+      const filename = `專案總表_${year}.pdf`;
+      const encodedFilename = encodeURIComponent(filename).replace(/'/g, '%27');
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFilename}`);
+      res.send(buffer);
+    } catch (err) {
+      console.error('PDF 匯出專案總表錯誤:', err);
+      res.redirect('/import-export?error=' + encodeURIComponent(err.message));
+    }
+  });
+
+  // PDF 匯出：獎金報表
+  router.get('/export/pdf/bonuses/:year', async (req, res) => {
+    try {
+      const year = parseInt(req.params.year);
+      const buffer = await PdfExportService.exportBonusReport(year);
+      const filename = `獎金報表_${year}.pdf`;
+      const encodedFilename = encodeURIComponent(filename).replace(/'/g, '%27');
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFilename}`);
+      res.send(buffer);
+    } catch (err) {
+      console.error('PDF 匯出獎金報表錯誤:', err);
+      res.redirect('/import-export?error=' + encodeURIComponent(err.message));
+    }
+  });
+
+  // 匯出帳齡分析 Excel
+  router.get('/export/aging', async (req, res) => {
+    try {
+      const yearParam = req.query.year;
+      const year = yearParam && yearParam !== 'all' ? parseInt(yearParam) : null;
+      const workbook = ExcelExportService.exportReceivablesAging(year);
+      const buffer = await ExcelExportService.writeToBuffer(workbook);
+      const filename = year ? `應收帳款帳齡分析_${year}.xlsx` : '應收帳款帳齡分析_全部.xlsx';
+      const encodedFilename = encodeURIComponent(filename).replace(/'/g, '%27');
+      const nodeBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFilename}`);
+      res.setHeader('Content-Length', nodeBuffer.length);
+      res.send(nodeBuffer);
+    } catch (err) {
+      console.error('匯出帳齡分析 Excel 錯誤:', err);
+      res.redirect('/import-export?error=' + encodeURIComponent(err.message));
+    }
+  });
+
+  // PDF 匯出：帳齡分析（query: ?year=2024 或省略為全部）
+  router.get('/export/pdf/aging', async (req, res) => {
+    try {
+      const yearParam = req.query.year;
+      const year = yearParam && yearParam !== 'all' ? parseInt(yearParam) : null;
+      const buffer = await PdfExportService.exportReceivablesAging(year);
+      const filename = year ? `應收帳款帳齡分析_${year}.pdf` : '應收帳款帳齡分析_全部.pdf';
+      const encodedFilename = encodeURIComponent(filename).replace(/'/g, '%27');
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFilename}`);
+      res.send(buffer);
+    } catch (err) {
+      console.error('PDF 匯出帳齡分析錯誤:', err);
       res.redirect('/import-export?error=' + encodeURIComponent(err.message));
     }
   });

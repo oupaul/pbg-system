@@ -1,0 +1,42 @@
+<%- include('../layout', { body: `
+<div class="row mb-4">
+  <div class="col">
+    <h1 class="h3"><i class="bi bi-graph-up"></i> 業務績效儀表板</h1>
+  </div>
+  <div class="col-auto">
+    <form class="d-flex" method="get">
+      <select name="year" class="form-select" onchange="this.form.submit()">
+        <option value="all" ${selectedYear === 'all' ? 'selected' : ''}>全部年度</option>
+        ${(years || []).map(y => '<option value="' + y + '" ' + (y == selectedYear ? 'selected' : '') + '>' + y + '</option>').join('')}
+      </select>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th>業務</th>
+            <th class="text-center">專案數</th>
+            <th class="text-end">專案金額</th>
+            <th class="text-end">已開發票</th>
+            <th class="text-end">未開發票</th>
+            <th class="text-end">已收款</th>
+            <th class="text-end">未收款</th>
+            <th class="text-end">總獎金</th>
+            <th class="text-end">已發放</th>
+            <th class="text-end">待發放</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${(performance || []).length ? (performance || []).map(p => '<tr><td><strong>' + p.name + '</strong></td><td class="text-center">' + (p.project_count || 0) + '</td><td class="text-end">$' + (p.total_price || 0).toLocaleString() + '</td><td class="text-end text-success">$' + (p.total_invoiced || 0).toLocaleString() + '</td><td class="text-end">$' + (p.uninvoiced_amount || 0).toLocaleString() + '</td><td class="text-end">$' + (p.total_received || 0).toLocaleString() + '</td><td class="text-end ' + (p.total_unpaid > 0 ? 'text-danger fw-bold' : '') + '">$' + (p.total_unpaid || 0).toLocaleString() + '</td><td class="text-end">$' + (p.total_bonus || 0).toLocaleString() + '</td><td class="text-end text-success">$' + (p.paid_bonus || 0).toLocaleString() + '</td><td class="text-end text-warning">$' + (p.pending_bonus || 0).toLocaleString() + '</td><td><a href="/projects?salesperson=' + encodeURIComponent(p.name) + (selectedYear !== 'all' ? '&year=' + selectedYear : '') + '" class="btn btn-sm btn-outline-primary">專案</a> <a href="/bonuses' + (selectedYear !== 'all' ? '?year=' + selectedYear : '') + '" class="btn btn-sm btn-outline-info">獎金</a></td></tr>').join('') : '<tr><td colspan="11" class="text-center text-muted py-4">尚無資料</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+` }) %>
