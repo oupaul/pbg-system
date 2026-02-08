@@ -1143,9 +1143,11 @@ sudo ./uninstall.sh
 ### 專案毛利分析 🆕
 - 方案 A：收入 = 專案未稅價格，毛利 = 收入 − 總成本，毛利率 = 毛利 ÷ 收入 × 100%
 - 專案明細：各專案收入、成本、毛利、毛利率
+- **毛利警示閾值**：可於專案類型管理設定，針對每個專案所屬類型判斷，低於閾值時顯示警示
 - 依業務彙總：各業務專案數、總收入、總成本、總毛利
 - 依類型彙總：各專案類型的收入、成本、毛利統計
 - 年度篩選，支援全部年度或特定年度
+- **Excel、PDF 匯出**：支援依篩選年度匯出（三張工作表或專案明細表）
 - 僅 admin、user 可見
 
 ### 客戶管理
@@ -1169,6 +1171,7 @@ sudo ./uninstall.sh
 - 匯出專案總表（Excel、PDF）
 - 匯出獎金報表（Excel、PDF）
 - **應收帳款帳齡分析** - 支援 Excel、PDF 匯出（全部或指定年度）
+- **專案毛利分析** - 支援 Excel、PDF 匯出（全部或指定年度，三張工作表／專案明細表）
 - 支援合併儲存格處理
 - 自動資料驗證與錯誤提示
 
@@ -1176,6 +1179,7 @@ sudo ./uninstall.sh
 - 專案總表 PDF（橫向 A4，含專案、客戶、金額、收款等）
 - 獎金報表 PDF（含業務、專案、獎金類型、金額、發放狀態）
 - 應收帳款帳齡分析 PDF（含帳齡區間、專案、發票、未收金額）
+- 專案毛利分析 PDF（橫向 A4，含彙總與專案明細）
 - 選用中文字型可置於 `fonts/` 目錄以正確顯示中文
 
 ### 使用者管理
@@ -1832,6 +1836,32 @@ invoice-bonus-system/
 #### 技術文件
 
 - `v1.14.0功能更新說明.md` - 完整功能說明
+
+---
+
+### 2026-02-07 - 毛利分析增強（警示閾值、Excel/PDF 匯出）
+
+#### 毛利警示閾值
+
+- ✅ 專案類型管理可設定「毛利警示閾值(%)」
+- ✅ 警示針對**每個專案**：毛利率低於其所屬類型的閾值時，於專案明細顯示警示（黃底、紅字、警示 badge）
+- ✅ 相關檔案：`migrations/migrate_project_types_alert_threshold.js`、`src/routes/projectTypes.js`、`src/views/projectTypes/index.ejs`、`src/routes/grossProfit.js`、`src/views/gross-profit/index.ejs`
+
+#### 毛利分析 Excel 匯出
+
+- ✅ 路徑：`/gross-profit/export?year=2024` 或 `?year=all`
+- ✅ 三個工作表：專案明細、依業務彙總、依類型彙總
+- ✅ 相關檔案：`src/services/ExcelExportService.js`、`src/routes/grossProfit.js`、`src/views/gross-profit/index.ejs`
+
+#### 毛利分析 PDF 匯出
+
+- ✅ 路徑：`/gross-profit/export/pdf?year=2024` 或 `?year=all`
+- ✅ 橫向 A4，含彙總與專案明細表格
+- ✅ 相關檔案：`src/services/PdfExportService.js`、`src/routes/grossProfit.js`、`src/views/gross-profit/index.ejs`
+
+#### 技術文件
+
+- `專案毛利分析功能說明.md` - 更新毛利警示閾值、Excel/PDF 匯出說明
 
 ---
 

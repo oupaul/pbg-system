@@ -25,6 +25,7 @@
     "migrate:soft-delete": "node migrations/migrate_soft_delete_invoices_payments.js",
     "migrate:partial-allowance": "node migrations/migrate_invoice_partial_allowance.js",
     "migrate:project-templates": "node migrations/migrate_project_templates.js",
+    "migrate:project-types-alert": "node migrations/migrate_project_types_alert_threshold.js",
     "seed": "node migrations/seed.js",
     "test:expected-invoice": "node test_expected_invoice_update.js",
     "check:expected-invoice": "node check_expected_invoice_field.js",

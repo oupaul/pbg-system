@@ -30,7 +30,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
 
 // 新增專案類型（僅管理員）
 router.post('/create', requireAuth, requireAdmin, (req, res) => {
-  const { type_name, badge_color, display_order } = req.body;
+  const { type_name, badge_color, display_order, alert_margin_threshold } = req.body;
   
   if (!type_name || !type_name.trim()) {
     return res.redirect('/project-types?error=' + encodeURIComponent('類型名稱不能為空'));
@@ -49,10 +49,12 @@ router.post('/create', requireAuth, requireAdmin, (req, res) => {
     const order = display_order ? parseInt(display_order, 10) : ((maxOrder?.max_order || 0) + 1);
     const color = badge_color || 'info';
     
+    const alertThreshold = alert_margin_threshold !== '' && alert_margin_threshold != null
+      ? parseFloat(alert_margin_threshold) : null;
     db.prepare(`
-      INSERT INTO project_types (type_name, badge_color, display_order, is_active, updated_at)
-      VALUES (?, ?, ?, 1, datetime('now', 'localtime'))
-    `).run(trimmedName, color, order);
+      INSERT INTO project_types (type_name, badge_color, display_order, is_active, alert_margin_threshold, updated_at)
+      VALUES (?, ?, ?, 1, ?, datetime('now', 'localtime'))
+    `).run(trimmedName, color, order, alertThreshold);
     
     res.redirect('/project-types?success=' + encodeURIComponent('專案類型新增成功'));
   } catch (err) {
@@ -64,7 +66,7 @@ router.post('/create', requireAuth, requireAdmin, (req, res) => {
 // 更新專案類型（僅管理員）
 router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
   const { id } = req.params;
-  const { type_name, badge_color, display_order, is_active } = req.body;
+  const { type_name, badge_color, display_order, is_active, alert_margin_threshold } = req.body;
   
   if (!type_name || !type_name.trim()) {
     return res.redirect('/project-types?error=' + encodeURIComponent('類型名稱不能為空'));
@@ -99,11 +101,13 @@ router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
     const color = badge_color || 'info';
     const active = (is_active === '1' || is_active === 1 || is_active === 'true') ? 1 : 0;
     
+    const alertThreshold = alert_margin_threshold !== '' && alert_margin_threshold != null
+      ? parseFloat(alert_margin_threshold) : null;
     db.prepare(`
       UPDATE project_types 
-      SET type_name = ?, badge_color = ?, display_order = ?, is_active = ?, updated_at = datetime('now', 'localtime')
+      SET type_name = ?, badge_color = ?, display_order = ?, is_active = ?, alert_margin_threshold = ?, updated_at = datetime('now', 'localtime')
       WHERE id = ?
-    `).run(trimmedName, color, order, active, id);
+    `).run(trimmedName, color, order, active, alertThreshold, id);
     
     res.redirect('/project-types?success=' + encodeURIComponent('專案類型更新成功'));
   } catch (err) {

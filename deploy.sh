@@ -364,6 +364,10 @@ if [ -d "${PROJECT_DIR}/migrations" ]; then
               npm run migrate:update-total-received || warning "更新收款總額計算遷移失敗（可能已存在）"
               npm run migrate:invoice-expected-payment-date || warning "發票預計收款日欄位遷移失敗（可能已存在）"
         (npm run migrate:invoice-status 2>/dev/null || node migrations/migrate_invoice_status.js) || warning "發票作廢/折讓功能遷移失敗（可能已存在）"
+        npm run migrate:soft-delete 2>/dev/null || node migrations/migrate_soft_delete_invoices_payments.js || warning "發票/收款軟刪除遷移失敗（可能已存在）"
+        npm run migrate:partial-allowance 2>/dev/null || node migrations/migrate_invoice_partial_allowance.js || warning "發票部分折讓遷移失敗（可能已存在）"
+        npm run migrate:project-templates 2>/dev/null || node migrations/migrate_project_templates.js || warning "專案範本遷移失敗（可能已存在）"
+        npm run migrate:project-types-alert 2>/dev/null || node migrations/migrate_project_types_alert_threshold.js || warning "專案類型毛利警示閾值遷移失敗（可能已存在）"
         
         # 首次安裝時插入種子資料
         if [ "$IS_FIRST_INSTALL" = true ]; then
@@ -390,6 +394,10 @@ if [ -d "${PROJECT_DIR}/migrations" ]; then
               npm run migrate:update-total-received || warning "更新收款總額計算遷移失敗（可能已存在）"
               npm run migrate:invoice-expected-payment-date || warning "發票預計收款日欄位遷移失敗（可能已存在）"
         (npm run migrate:invoice-status 2>/dev/null || node migrations/migrate_invoice_status.js) || warning "發票作廢/折讓功能遷移失敗（可能已存在）"
+        npm run migrate:soft-delete 2>/dev/null || node migrations/migrate_soft_delete_invoices_payments.js || warning "發票/收款軟刪除遷移失敗（可能已存在）"
+        npm run migrate:partial-allowance 2>/dev/null || node migrations/migrate_invoice_partial_allowance.js || warning "發票部分折讓遷移失敗（可能已存在）"
+        npm run migrate:project-templates 2>/dev/null || node migrations/migrate_project_templates.js || warning "專案範本遷移失敗（可能已存在）"
+        npm run migrate:project-types-alert 2>/dev/null || node migrations/migrate_project_types_alert_threshold.js || warning "專案類型毛利警示閾值遷移失敗（可能已存在）"
         log "✓ 增量遷移完成"
     fi
 else

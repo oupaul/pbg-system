@@ -10,6 +10,7 @@ const PDFDocument = require('pdfkit');
 const db = require('../models/db');
 const dayjs = require('dayjs');
 const ReceivablesAgingService = require('./ReceivablesAgingService');
+const GrossProfitAnalysisService = require('./GrossProfitAnalysisService');
 
 // 嘗試載入中文字型（可選）
 function getChineseFontPath() {
@@ -272,6 +273,79 @@ const PdfExportService = {
         doc.text('尚無未收款發票', 40, y + 5);
       }
 
+      doc.end();
+    });
+  },
+
+  /**
+   * 匯出毛利分析 PDF（專案明細為主）
+   */
+  async exportGrossProfit(year) {
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
+      const chunks = [];
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      applyFont(doc);
+      const byProject = GrossProfitAnalysisService.getAnalysisByProject(year);
+      const totals = {
+        revenue: byProject.reduce((s, r) => s + (r.revenue || 0), 0),
+        cost: byProject.reduce((s, r) => s + (r.total_cost || 0), 0),
+        grossProfit: byProject.reduce((s, r) => s + (r.gross_profit || 0), 0)
+      };
+      const grossMarginPct = totals.revenue > 0
+        ? Math.round((totals.grossProfit / totals.revenue) * 1000) / 10
+        : 0;
+
+      const title = year ? `專案毛利分析 - ${year} 年度` : '專案毛利分析 - 全部';
+      doc.fontSize(14).text(title, { align: 'center' });
+      doc.moveDown(0.3);
+      doc.fontSize(10).text(`總收入：$${formatCurrency(totals.revenue)}　總成本：$${formatCurrency(totals.cost)}　總毛利：$${formatCurrency(totals.grossProfit)}　平均毛利率：${grossMarginPct}%`, { align: 'center' });
+      doc.moveDown(0.5);
+      doc.fontSize(8);
+
+      const headers = ['專案編號', '專案名稱', '年度', '類型', '業務', '收入', '成本', '毛利', '毛利率%'];
+      const colWidths = [70, 200, 40, 55, 55, 70, 70, 70, 50];
+      const cellPadding = 4;
+      const rowHeight = 28;
+      let y = doc.y;
+
+      let x = 40;
+      headers.forEach((h, i) => {
+        doc.rect(x, y, colWidths[i], rowHeight).fillAndStroke('#e9ecef', '#333');
+        doc.fillColor('#000').text(h, x + cellPadding, y + 5, { width: colWidths[i] - cellPadding * 2 });
+        x += colWidths[i];
+      });
+      y += rowHeight;
+
+      for (const r of byProject) {
+        if (y > 500) {
+          doc.addPage({ size: 'A4', layout: 'landscape', margin: 40 });
+          y = 40;
+        }
+        x = 40;
+        const rowData = [
+          (r.project_code || '').substring(0, 12),
+          (r.project_name || '').substring(0, 22),
+          r.contract_year || '',
+          (r.project_type || '').substring(0, 8),
+          (r.salesperson_name || '-').substring(0, 10),
+          formatCurrency(r.revenue),
+          formatCurrency(r.total_cost),
+          formatCurrency(r.gross_profit),
+          r.gross_margin_pct != null ? r.gross_margin_pct + '%' : ''
+        ];
+        rowData.forEach((val, i) => {
+          doc.rect(x, y, colWidths[i], rowHeight).stroke();
+          doc.text(String(val || ''), x + cellPadding, y + 4, { width: colWidths[i] - cellPadding * 2 });
+          x += colWidths[i];
+        });
+        y += rowHeight;
+      }
+
+      doc.text(`共 ${byProject.length} 筆專案`, 40, y + 10);
       doc.end();
     });
   }
