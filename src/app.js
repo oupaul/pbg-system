@@ -126,6 +126,8 @@ try {
   console.log('[啟動] ✓ index 路由載入完成');
   const projectRoutes = require('./routes/projects');
   console.log('[啟動] ✓ projects 路由載入完成');
+  const projectTemplateRoutes = require('./routes/projectTemplates');
+  console.log('[啟動] ✓ projectTemplates 路由載入完成');
   const invoiceRoutes = require('./routes/invoices');
   console.log('[啟動] ✓ invoices 路由載入完成');
   const paymentRoutes = require('./routes/payments');
@@ -169,6 +171,7 @@ try {
 
   // 保護所有其他路由（需要登入）
   app.use('/projects', requireAuth, projectRoutes);
+  app.use('/project-templates', requireAuth, projectTemplateRoutes);
   app.use('/invoices', requireAuth, invoiceRoutes);
   app.use('/payments', requireAuth, paymentRoutes);
   app.use('/costs', requireAuth, costRoutes);

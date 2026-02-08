@@ -82,6 +82,46 @@ code {
   font-weight: 500;
 }
 
+/* 發票明細：取消 overflow 裁切，讓「更多」下拉選單能顯示在最上層 */
+.invoice-table-responsive {
+  overflow: visible !important;
+}
+.invoice-table-responsive > .table {
+  margin-bottom: 0;
+}
+
+/* 發票「更多」下拉選單：確保浮於最上層 */
+.dropdown-menu-invoice {
+  min-width: 11rem;
+  padding: 0.5rem 0;
+  margin-top: 0.25rem;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  z-index: 1060 !important;
+}
+.dropdown-menu-invoice .dropdown-item {
+  padding: 0.6rem 1.25rem;
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  border-radius: 0.25rem;
+  margin: 0 0.25rem;
+}
+.dropdown-menu-invoice .dropdown-item:hover {
+  background-color: rgba(13, 110, 253, 0.1);
+}
+.dropdown-menu-invoice .dropdown-item:active {
+  background-color: rgba(13, 110, 253, 0.15);
+}
+.dropdown-menu-invoice .dropdown-item i {
+  font-size: 1.15em;
+  opacity: 0.9;
+  margin-right: 0.5rem;
+  width: 1.25em;
+  text-align: center;
+}
+
 /* 進度條 */
 .progress {
   border-radius: 0.5rem;

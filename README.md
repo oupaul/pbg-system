@@ -1,16 +1,21 @@
 # 專案開立發票業績認列獎金計算總表系統
 
-[![版本](https://img.shields.io/badge/版本-v1.13.0-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
+[![版本](https://img.shields.io/badge/版本-v1.14.0-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![資料庫](https://img.shields.io/badge/資料庫-better--sqlite3-orange.svg)](https://github.com/WiseLibs/better-sqlite3)
 [![授權](https://img.shields.io/badge/授權-MIT-lightgrey.svg)](LICENSE)
 
 基於 Node.js + SQLite 的專案管理與獎金計算系統，用於管理專案、發票、收款及業務獎金。
 
-## 🚀 最新更新（v1.13.0 - 2026-02-07）
+## 🚀 最新更新（v1.14.0 - 2026-02-06）
 
-- 📊 **專案毛利分析** - 方案 A：以專案未稅價格為收入，毛利 = 收入 − 成本，支援專案明細、依業務、依類型彙總
-- 🧹 **介面調整** - 移除導覽列右側重複的搜尋框，改由左側「搜尋」連結進入搜尋頁
+- 📊 **業務績效圖表** - 圓餅圖、長條圖呈現業績與獎金占比
+- 🔔 **收款提醒** - 依預計收款日站內提醒（即將到期／已逾期）
+- 🗑️ **發票／收款軟刪除** - 可還原，專案詳情支援「顯示已刪除」
+- 📋 **部分折讓** - 發票可設定折讓金額，認列金額 = 原金額 − 折讓
+- 📁 **專案範本** - 建立範本、從範本快速建立專案
+- 📥 **稽核紀錄匯出** - 修改記錄可匯出 CSV
+- 🎨 **發票「更多」選單** - 向下展開、浮於最上層，改善閱讀與點選
 
 [查看完整更新日誌](#更新日誌)
 
@@ -1775,6 +1780,58 @@ invoice-bonus-system/
 - ✅ 完全向後兼容，不影響現有功能
 - ✅ 原有的 4 個預設角色繼續正常工作
 - ✅ 使用者資料不受影響
+
+---
+
+### 2026-02-06 - v1.14.0 功能強化與介面改進 ✨
+
+#### 業務績效圖表
+
+- ✅ 業務績效頁新增圓餅圖（已開發票占比）、長條圖（總獎金／已發放／待發放）
+- ✅ 使用 Chart.js 4.4.1，僅有資料時顯示
+- ✅ 相關檔案：`src/views/sales-performance/index.ejs`、`src/services/SalesPerformanceService.js`
+
+#### 收款提醒（站內）
+
+- ✅ 首頁依預計收款日顯示「即將到期」「已逾期」提醒
+- ✅ 天數由系統設定 `payment_reminder_days` 控制（預設 7 天）
+- ✅ 相關檔案：`src/services/ReceivablesAgingService.js`、`src/routes/index.js`、`src/views/index.ejs`
+
+#### 發票與收款軟刪除
+
+- ✅ 發票、收款改為軟刪除（`deleted_at`），可還原
+- ✅ 專案詳情支援「顯示已刪除」與還原按鈕
+- ✅ 遷移：`npm run migrate:soft-delete`
+- ✅ 相關檔案：`migrations/migrate_soft_delete_invoices_payments.js`、`src/models/Invoice.js`、`src/models/Payment.js`、`src/routes/invoices.js`、`src/routes/payments.js`、`src/views/projects/show.ejs`
+
+#### 發票部分折讓
+
+- ✅ 發票可設定折讓金額，認列金額 = 原金額 − 折讓
+- ✅ 發票仍為有效
+- ✅ 遷移：`npm run migrate:partial-allowance`
+- ✅ 相關檔案：`migrations/migrate_invoice_partial_allowance.js`、`src/models/Invoice.js`、`src/routes/invoices.js`、`src/views/projects/show.ejs`
+
+#### 專案範本
+
+- ✅ 新增專案範本管理（建立、編輯、刪除）
+- ✅ 從範本建立專案：`/projects/new?from_template=:id`
+- ✅ 遷移：`npm run migrate:project-templates`
+- ✅ 相關檔案：`migrations/migrate_project_templates.js`、`src/models/ProjectTemplate.js`、`src/routes/projectTemplates.js`、`src/views/project-templates/`
+
+#### 稽核紀錄匯出
+
+- ✅ 修改記錄頁新增「匯出 CSV」按鈕，依篩選條件匯出
+- ✅ 相關檔案：`src/routes/auditLogs.js`、`src/views/audit-logs/index.ejs`
+
+#### 發票「更多」下拉選單改進
+
+- ✅ 選單改為向下展開，使用 `overflow: visible` 避免被裁切
+- ✅ 加大選項內距與高度，確保浮於最上層
+- ✅ 相關檔案：`src/views/projects/show.ejs`、`public/css/style.css`
+
+#### 技術文件
+
+- `v1.14.0功能更新說明.md` - 完整功能說明
 
 ---
 

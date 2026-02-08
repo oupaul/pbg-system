@@ -5,10 +5,12 @@ const AuditLogService = require('../services/AuditLogService');
 const VALID_STATUS_CONDITION = `(status IS NULL OR status = '有效')`;
 
 const Invoice = {
-  // 取得專案的所有發票
-  findByProject(projectId) {
+  // 取得專案的所有發票（預設不含軟刪除；傳入 { includeDeleted: true } 則含已刪除）
+  findByProject(projectId, opts = {}) {
+    const includeDeleted = opts.includeDeleted === true;
+    const deletedCond = includeDeleted ? '' : ' AND (deleted_at IS NULL)';
     return db.prepare(`
-      SELECT * FROM invoices WHERE project_id = ? ORDER BY invoice_date
+      SELECT * FROM invoices WHERE project_id = ? ${deletedCond} ORDER BY deleted_at IS NOT NULL, invoice_date
     `).all(projectId);
   },
 
@@ -136,6 +138,14 @@ const Invoice = {
     } else {
       newData.original_invoice_id = oldRecord.original_invoice_id;
     }
+    if (data.allowance_amount !== undefined) {
+      const val = data.allowance_amount === null || data.allowance_amount === '' ? null : parseFloat(data.allowance_amount);
+      fields.push('allowance_amount = ?');
+      values.push(val);
+      newData.allowance_amount = val;
+    } else {
+      newData.allowance_amount = oldRecord.allowance_amount;
+    }
     
     // 如果沒有要更新的欄位，直接返回
     if (fields.length === 0) return false;
@@ -156,47 +166,54 @@ const Invoice = {
     return result.changes > 0;
   },
 
-  // 刪除發票
+  // 軟刪除發票（設定 deleted_at，不實際刪除）
   delete(id, userInfo = null) {
-    // 取得舊值
     const oldRecord = this.findById(id);
-    
-    const result = db.prepare(`DELETE FROM invoices WHERE id = ?`).run(id);
-    
-    if (result.changes > 0 && oldRecord) {
-      // 記錄刪除
-      AuditLogService.logDelete('invoices', id, oldRecord, userInfo);
-    }
-    
-    return result.changes > 0;
+    if (!oldRecord) return false;
+    if (oldRecord.deleted_at) return true; // 已刪除視為成功
+
+    const deletedAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    db.prepare('UPDATE invoices SET deleted_at = ?, updated_at = datetime(\'now\', \'localtime\') WHERE id = ?').run(deletedAt, id);
+    AuditLogService.logDelete('invoices', id, oldRecord, userInfo);
+    return true;
   },
 
-  // 取得專案已開發票總額（僅計有效發票）
+  // 還原軟刪除的發票
+  restore(id, userInfo = null) {
+    const record = this.findById(id);
+    if (!record || !record.deleted_at) return false;
+    db.prepare('UPDATE invoices SET deleted_at = NULL, updated_at = datetime(\'now\', \'localtime\') WHERE id = ?').run(id);
+    AuditLogService.logUpdate('invoices', id, record, { deleted_at: null }, userInfo);
+    return true;
+  },
+
+  // 取得專案已開發票總額（僅計有效且未刪除發票；部分折讓以認列金額計）
   getTotalByProject(projectId) {
     const result = db.prepare(`
-      SELECT COALESCE(SUM(amount_with_tax), 0) as total
-      FROM invoices WHERE project_id = ? AND ${VALID_STATUS_CONDITION}
+      SELECT COALESCE(SUM(amount_with_tax - COALESCE(allowance_amount, 0)), 0) as total
+      FROM invoices WHERE project_id = ? AND ${VALID_STATUS_CONDITION} AND (deleted_at IS NULL)
     `).get(projectId);
-    return result.total;
+    return result ? result.total : 0;
   },
 
-  // 取得專案有效發票列表（用於收款對應等）
+  // 取得專案有效發票列表（用於收款對應等，不含已刪除）
   findValidByProject(projectId) {
     return db.prepare(`
-      SELECT * FROM invoices WHERE project_id = ? AND ${VALID_STATUS_CONDITION} ORDER BY invoice_date
+      SELECT * FROM invoices WHERE project_id = ? AND ${VALID_STATUS_CONDITION} AND (deleted_at IS NULL) ORDER BY invoice_date
     `).all(projectId);
   },
 
-  // 取得月份發票統計（僅計有效發票）
+  // 取得月份發票統計（僅計有效且未刪除發票；部分折讓以認列金額計）
   getMonthlyStats(year, month) {
     return db.prepare(`
       SELECT 
         COUNT(*) as invoice_count,
-        SUM(amount_with_tax) as total_amount
+        SUM(amount_with_tax - COALESCE(allowance_amount, 0)) as total_amount
       FROM invoices
       WHERE strftime('%Y', invoice_date) = ? 
         AND strftime('%m', invoice_date) = ?
         AND ${VALID_STATUS_CONDITION}
+        AND (deleted_at IS NULL)
     `).get(String(year), String(month).padStart(2, '0'));
   },
 
@@ -260,6 +277,26 @@ const Invoice = {
       voided_at: voided_at || new Date().toISOString().slice(0, 19).replace('T', ' '),
       void_reason: void_reason || null,
       expected_payment_date: null, // 整筆折讓後不再期待收款，清除預計收款日
+      userInfo
+    });
+    return this.findById(id);
+  },
+
+  // 部分折讓：設定折讓金額，發票仍為有效，認列金額 = amount_with_tax - allowance_amount
+  setPartialAllowance(id, { allowance_amount, voided_at, void_reason } = {}, userInfo = null) {
+    const old = this.findById(id);
+    if (!old) return null;
+    if (old.status === '作廢' || old.status === '整筆折讓') {
+      throw new Error(`發票已是「${old.status}」狀態，無法設定部分折讓`);
+    }
+    const amount = parseFloat(allowance_amount);
+    if (isNaN(amount) || amount < 0) throw new Error('折讓金額必須為不小於 0 的數字');
+    const origAmount = parseFloat(old.amount_with_tax) || 0;
+    if (amount > origAmount) throw new Error('折讓金額不可大於發票金額');
+    this.update(id, {
+      allowance_amount: amount,
+      voided_at: voided_at || new Date().toISOString().slice(0, 19).replace('T', ' '),
+      void_reason: void_reason || null,
       userInfo
     });
     return this.findById(id);

@@ -347,5 +347,52 @@ router.get('/statistics', (req, res) => {
   });
 });
 
+// 匯出稽核紀錄為 CSV（依目前篩選條件，最多 10000 筆）
+router.get('/export', (req, res) => {
+  const filters = {
+    tableName: req.query.table_name || null,
+    recordId: req.query.record_id ? parseInt(req.query.record_id) : null,
+    action: req.query.action || null,
+    startDate: req.query.start_date || null,
+    endDate: req.query.end_date || null,
+    limit: 10000,
+    offset: 0
+  };
+
+  const logs = AuditLogService.getLogs(filters);
+
+  const csvEscape = (val) => {
+    if (val === null || val === undefined) return '';
+    const s = String(val);
+    if (s.includes('"') || s.includes(',') || s.includes('\n') || s.includes('\r')) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  };
+
+  const actionLabel = (a) => ({ create: '新增', update: '更新', delete: '刪除' }[a] || a);
+  const tableLabel = (t) => (TABLE_LABELS[t] || t);
+
+  const header = ['時間', '操作', '資料表', '記錄ID', '使用者', '舊值', '新值'];
+  const rows = logs.map(log => [
+    log.created_at || '',
+    actionLabel(log.action) || log.action,
+    tableLabel(log.table_name) || log.table_name,
+    log.record_id != null ? log.record_id : '',
+    log.user_info || '',
+    log.old_value || '',
+    log.new_value || ''
+  ]);
+
+  const bom = '\uFEFF';
+  const csv = bom + header.map(csvEscape).join(',') + '\n' +
+    rows.map(row => row.map(csvEscape).join(',')).join('\n');
+
+  const filename = 'audit-logs-' + dayjs().format('YYYY-MM-DD-HHmm') + '.csv';
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
+  res.send(csv);
+});
+
 module.exports = router;
 

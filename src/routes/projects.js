@@ -188,10 +188,33 @@ router.get('/new', requireEditPermission, (req, res) => {
   const salespeople = Salesperson.findAll();
   const customers = Customer.findAll();
   const projectTypes = getActiveProjectTypes();
+  let project = null;
+  if (req.query.from_template) {
+    const ProjectTemplate = require('../models/ProjectTemplate');
+    const template = ProjectTemplate.findById(req.query.from_template);
+    if (template) {
+      project = {
+        project_code: '',
+        contract_year: new Date().getFullYear(),
+        contract_month: new Date().getMonth() + 1,
+        status: '未結案',
+        project_type: template.project_type,
+        salesperson_id: template.salesperson_id,
+        customer_id: template.customer_id,
+        project_name: template.project_name,
+        price_with_tax: template.price_with_tax,
+        price_without_tax: template.price_without_tax,
+        sales_discount: template.sales_discount,
+        is_new_customer: template.is_new_customer,
+        expected_invoice_year_month: template.expected_invoice_year_month,
+        notes: template.notes
+      };
+    }
+  }
 
   res.render('projects/form', {
     title: '新增專案',
-    project: null,
+    project,
     salespeople,
     customers,
     projectTypes,
@@ -301,18 +324,20 @@ router.get('/:id', (req, res) => {
     return res.status(404).render('error', { message: '找不到專案或無權限查看', error: {} });
   }
 
-  const invoices = Invoice.findByProject(project.id);
-  const payments = Payment.findByProject(project.id);
+  const showDeleted = req.query.show_deleted === '1' || req.query.show_deleted === 'true';
+  const invoices = Invoice.findByProject(project.id, { includeDeleted: showDeleted });
+  const payments = Payment.findByProject(project.id, { includeDeleted: showDeleted });
   const bonuses = Bonus.findByProject(project.id);
   const Cost = require('../models/Cost');
   const costs = Cost.findByProject(project.id);
 
-  // 計算每筆發票的收款狀態（與收款明細比對）
+  // 計算每筆發票的收款狀態（與收款明細比對，僅用未刪除的收款）
+  const paymentsForStatus = Payment.findByProject(project.id); // 未刪除
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   const diffDays = (d1, d2) => Math.round((new Date(d1) - new Date(d2)) / (1000 * 60 * 60 * 24));
 
   const invoicesWithStatus = invoices.map(inv => {
-    const invPayments = payments.filter(p => p.invoice_id === inv.id);
+    const invPayments = paymentsForStatus.filter(p => p.invoice_id === inv.id);
     const expectedDate = inv.expected_payment_date || null;
     let paymentStatus = { text: '-', class: 'text-muted' };
 
@@ -354,16 +379,16 @@ router.get('/:id', (req, res) => {
     return { ...inv, paymentStatus };
   });
 
-  // 找出已被選取的發票 ID（用於新增收款時排除）
-  const usedInvoiceIds = new Set(payments.filter(p => p.invoice_id).map(p => p.invoice_id));
+  // 找出已被選取的發票 ID（用於新增收款時排除，僅計未刪除收款）
+  const usedInvoiceIds = new Set(paymentsForStatus.filter(p => p.invoice_id).map(p => p.invoice_id));
 
   // 有效發票（供收款對應選擇，僅 有效 狀態）
   const validInvoices = Invoice.findValidByProject ? Invoice.findValidByProject(project.id) : invoices.filter(i => !i.status || i.status === '有效');
 
   // 計算彙總（僅計有效發票）
   const totalInvoiced = Invoice.getTotalByProject(project.id);
-  // 計算實際收款金額（考慮匯費差異）- 使用 Payment.calculateActualReceived 方法保持一致性
-  const totalReceived = payments.reduce((sum, p) => sum + Payment.calculateActualReceived(p), 0);
+  // 計算實際收款金額（考慮匯費差異，僅計未刪除收款）
+  const totalReceived = paymentsForStatus.reduce((sum, p) => sum + Payment.calculateActualReceived(p), 0);
   const totalBonus = bonuses.reduce((sum, b) => sum + (b.bonus_amount || 0), 0);
   const totalCost = Cost.getTotalByProject(project.id);
   const grossProfit = (project.price_without_tax || 0) - totalCost;
@@ -390,6 +415,7 @@ router.get('/:id', (req, res) => {
     bonuses,
     typeColorMap,
     usedInvoiceIds: Array.from(usedInvoiceIds), // 已使用的發票 ID 列表
+    showDeleted, // 是否顯示已刪除的發票/收款
     success: req.query.success ? decodeURIComponent(req.query.success) : null,
     error: req.query.error ? decodeURIComponent(req.query.error) : null,
     summary: {

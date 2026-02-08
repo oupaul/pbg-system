@@ -2,14 +2,16 @@ const db = require('./db');
 const AuditLogService = require('../services/AuditLogService');
 
 const Payment = {
-  // 取得專案的所有收款
-  findByProject(projectId) {
+  // 取得專案的所有收款（預設不含軟刪除；傳入 { includeDeleted: true } 則含已刪除）
+  findByProject(projectId, opts = {}) {
+    const includeDeleted = opts.includeDeleted === true;
+    const deletedCond = includeDeleted ? '' : ' AND (p.deleted_at IS NULL)';
     return db.prepare(`
       SELECT p.*, i.invoice_number
       FROM payments p
       LEFT JOIN invoices i ON p.invoice_id = i.id
-      WHERE p.project_id = ?
-      ORDER BY p.payment_date
+      WHERE p.project_id = ? ${deletedCond}
+      ORDER BY p.deleted_at IS NOT NULL, p.payment_date
     `).all(projectId);
   },
 
@@ -96,19 +98,25 @@ const Payment = {
     return result.changes > 0;
   },
 
-  // 刪除收款
+  // 軟刪除收款（設定 deleted_at，不實際刪除）
   delete(id, userInfo = null) {
-    // 取得舊值
     const oldRecord = this.findById(id);
-    
-    const result = db.prepare(`DELETE FROM payments WHERE id = ?`).run(id);
-    
-    if (result.changes > 0 && oldRecord) {
-      // 記錄刪除
-      AuditLogService.logDelete('payments', id, oldRecord, userInfo);
-    }
-    
-    return result.changes > 0;
+    if (!oldRecord) return false;
+    if (oldRecord.deleted_at) return true;
+
+    const deletedAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    db.prepare('UPDATE payments SET deleted_at = ?, updated_at = datetime(\'now\', \'localtime\') WHERE id = ?').run(deletedAt, id);
+    AuditLogService.logDelete('payments', id, oldRecord, userInfo);
+    return true;
+  },
+
+  // 還原軟刪除的收款
+  restore(id, userInfo = null) {
+    const record = this.findById(id);
+    if (!record || !record.deleted_at) return false;
+    db.prepare('UPDATE payments SET deleted_at = NULL, updated_at = datetime(\'now\', \'localtime\') WHERE id = ?').run(id);
+    AuditLogService.logUpdate('payments', id, record, { deleted_at: null }, userInfo);
+    return true;
   },
 
   // 計算單筆收款記錄的實際收款金額（考慮匯費差異）

@@ -298,6 +298,17 @@ router.get('/', (req, res) => {
   if (req.user && (req.user.role === 'admin' || req.user.role === 'user')) {
     receivablesAging = ReceivablesAgingService.getAgingReport(selectedYear);
   }
+
+  // 收款提醒：預計收款日即將到期或已逾期（admin/user 可見）
+  let paymentReminder = { upcoming: [], overdue: [] };
+  if (req.user && (req.user.role === 'admin' || req.user.role === 'user')) {
+    let paymentReminderDays = 7;
+    try {
+      const reminderSetting = db.prepare('SELECT setting_value FROM system_settings WHERE setting_key = ?').get('payment_reminder_days');
+      if (reminderSetting) paymentReminderDays = parseInt(reminderSetting.setting_value, 10) || 7;
+    } catch (e) { /* use default */ }
+    paymentReminder = ReceivablesAgingService.getPaymentReminder(paymentReminderDays);
+  }
   
   res.render('index', {
     title: '首頁',
@@ -316,7 +327,8 @@ router.get('/', (req, res) => {
     projectTypeStats, // 專案類型統計（動態）
     currentYearMonth,
     daysUntilEndOfMonth,
-    receivablesAging
+    receivablesAging,
+    paymentReminder
   });
 });
 

@@ -22,7 +22,7 @@ const ReceivablesAgingService = {
         FROM invoices i
         JOIN projects p ON i.project_id = p.id
         LEFT JOIN salespeople sp ON p.salesperson_id = sp.id
-        WHERE (i.status IS NULL OR i.status = '有效') AND p.contract_year = ?
+        WHERE (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) AND p.contract_year = ?
         ORDER BY i.expected_payment_date, i.invoice_date
       `).all(year);
     } else {
@@ -31,7 +31,7 @@ const ReceivablesAgingService = {
         FROM invoices i
         JOIN projects p ON i.project_id = p.id
         LEFT JOIN salespeople sp ON p.salesperson_id = sp.id
-        WHERE (i.status IS NULL OR i.status = '有效')
+        WHERE (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL)
         ORDER BY i.expected_payment_date, i.invoice_date
       `).all();
     }
@@ -50,9 +50,9 @@ const ReceivablesAgingService = {
     for (const inv of invoices) {
       const amount = inv.amount_with_tax || 0;
 
-      // 計算該發票已收款金額
+      // 計算該發票已收款金額（不含已刪除收款）
       const payments = db.prepare(`
-        SELECT * FROM payments WHERE invoice_id = ?
+        SELECT * FROM payments WHERE invoice_id = ? AND (deleted_at IS NULL)
       `).all(inv.id);
 
       const paid = payments.reduce((sum, p) => sum + Payment.calculateActualReceived(p), 0);
@@ -114,6 +114,59 @@ const ReceivablesAgingService = {
       total: totalUnpaid,
       totalCount: Object.values(buckets).reduce((s, b) => s + b.count, 0)
     };
+  },
+
+  /**
+   * 取得收款提醒：即將到期（N 天內）與已逾期的未收款發票
+   * @param {number} reminderDays - 提前幾天提醒（預設 7）
+   * @returns {Object} { upcoming: [], overdue: [] }
+   */
+  getPaymentReminder(reminderDays = 7) {
+    const today = new Date().toISOString().slice(0, 10);
+    const todayDate = new Date(today);
+    const futureDate = new Date(todayDate);
+    futureDate.setDate(futureDate.getDate() + reminderDays);
+    const futureStr = futureDate.toISOString().slice(0, 10);
+
+    const invoices = db.prepare(`
+      SELECT i.*, p.project_code, p.project_name, p.id as project_id, sp.name as salesperson_name
+      FROM invoices i
+      JOIN projects p ON i.project_id = p.id
+      LEFT JOIN salespeople sp ON p.salesperson_id = sp.id
+      WHERE (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) AND i.expected_payment_date IS NOT NULL
+      ORDER BY i.expected_payment_date
+    `).all();
+
+    const upcoming = [];
+    const overdue = [];
+
+    for (const inv of invoices) {
+      const amount = (inv.amount_with_tax || 0) - (inv.allowance_amount || 0);
+      const payments = db.prepare('SELECT * FROM payments WHERE invoice_id = ? AND (deleted_at IS NULL)').all(inv.id);
+      const paid = payments.reduce((sum, p) => sum + Payment.calculateActualReceived(p), 0);
+      const unpaid = Math.max(0, amount - paid);
+      if (unpaid <= 0) continue;
+
+      const due = inv.expected_payment_date;
+      const item = {
+        project_id: inv.project_id,
+        project_code: inv.project_code,
+        project_name: inv.project_name,
+        salesperson_name: inv.salesperson_name || '-',
+        invoice_id: inv.id,
+        invoice_number: inv.invoice_number,
+        unpaid,
+        expected_payment_date: due
+      };
+
+      if (due < today) {
+        overdue.push(item);
+      } else if (due <= futureStr) {
+        upcoming.push(item);
+      }
+    }
+
+    return { upcoming, overdue };
   }
 };
 

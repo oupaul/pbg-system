@@ -55,7 +55,7 @@ router.post('/:id', (req, res) => {
   }
 });
 
-// 刪除發票
+// 刪除發票（軟刪除）
 router.post('/:id/delete', (req, res) => {
   try {
     const invoice = Invoice.findById(req.params.id);
@@ -66,7 +66,23 @@ router.post('/:id/delete', (req, res) => {
     const projectId = invoice.project_id;
     Invoice.delete(req.params.id, getUserInfo(req));
 
-    res.redirect(`/projects/${projectId}`);
+    res.redirect(`/projects/${projectId}?success=` + encodeURIComponent('發票已刪除，可於下方「顯示已刪除」還原'));
+  } catch (err) {
+    console.error(err);
+    res.redirect('back');
+  }
+});
+
+// 還原發票
+router.post('/:id/restore', (req, res) => {
+  try {
+    const invoice = Invoice.findById(req.params.id);
+    if (!invoice) {
+      return res.redirect('/projects?error=' + encodeURIComponent('找不到發票'));
+    }
+    const projectId = invoice.project_id;
+    Invoice.restore(req.params.id, getUserInfo(req));
+    res.redirect(`/projects/${projectId}?show_deleted=1&success=` + encodeURIComponent('發票已還原'));
   } catch (err) {
     console.error(err);
     res.redirect('back');
@@ -135,6 +151,27 @@ router.post('/:id/allowance', (req, res) => {
       void_reason: (req.body.void_reason || '').trim() || undefined
     }, getUserInfo(req));
     res.redirect(`/projects/${projectId}?success=` + encodeURIComponent('發票已設為整筆折讓'));
+  } catch (err) {
+    console.error(err);
+    res.redirect(`/projects/${projectId || ''}?error=` + encodeURIComponent(err.message));
+  }
+});
+
+// 部分折讓
+router.post('/:id/partial-allowance', (req, res) => {
+  let projectId;
+  try {
+    const invoice = Invoice.findById(req.params.id);
+    if (!invoice) {
+      return res.redirect('/projects?error=' + encodeURIComponent('找不到發票'));
+    }
+    projectId = invoice.project_id;
+    Invoice.setPartialAllowance(req.params.id, {
+      allowance_amount: req.body.allowance_amount,
+      voided_at: req.body.voided_at || undefined,
+      void_reason: (req.body.void_reason || '').trim() || undefined
+    }, getUserInfo(req));
+    res.redirect(`/projects/${projectId}?success=` + encodeURIComponent('發票已設定部分折讓'));
   } catch (err) {
     console.error(err);
     res.redirect(`/projects/${projectId || ''}?error=` + encodeURIComponent(err.message));

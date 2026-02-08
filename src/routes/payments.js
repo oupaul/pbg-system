@@ -58,7 +58,7 @@ router.post('/:id', (req, res) => {
   }
 });
 
-// 刪除收款
+// 刪除收款（軟刪除）
 router.post('/:id/delete', (req, res) => {
   try {
     const payment = Payment.findById(req.params.id);
@@ -69,7 +69,23 @@ router.post('/:id/delete', (req, res) => {
     const projectId = payment.project_id;
     Payment.delete(req.params.id, getUserInfo(req));
 
-    res.redirect(`/projects/${projectId}`);
+    res.redirect(`/projects/${projectId}?success=` + encodeURIComponent('收款已刪除，可於下方「顯示已刪除」還原'));
+  } catch (err) {
+    console.error(err);
+    res.redirect('back');
+  }
+});
+
+// 還原收款
+router.post('/:id/restore', (req, res) => {
+  try {
+    const payment = Payment.findById(req.params.id);
+    if (!payment) {
+      return res.redirect('/projects?error=' + encodeURIComponent('找不到收款記錄'));
+    }
+    const projectId = payment.project_id;
+    Payment.restore(req.params.id, getUserInfo(req));
+    res.redirect(`/projects/${projectId}?show_deleted=1&success=` + encodeURIComponent('收款已還原'));
   } catch (err) {
     console.error(err);
     res.redirect('back');

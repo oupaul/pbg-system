@@ -36,11 +36,11 @@ const SalesPerformanceService = {
 
     // 取得獎金彙總
     const bonusSql = year
-      ? `SELECT salesperson_id, SUM(bonus_amount) as total_bonus, 
-         SUM(CASE WHEN status = '已發放' THEN bonus_amount ELSE 0 END) as paid_bonus,
-         SUM(CASE WHEN status = '待發放' THEN bonus_amount ELSE 0 END) as pending_bonus
+      ? `SELECT bc.salesperson_id, SUM(bc.bonus_amount) as total_bonus, 
+         SUM(CASE WHEN bc.status = '已發放' THEN bc.bonus_amount ELSE 0 END) as paid_bonus,
+         SUM(CASE WHEN bc.status = '待發放' THEN bc.bonus_amount ELSE 0 END) as pending_bonus
          FROM bonus_calculations bc JOIN projects p ON bc.project_id = p.id 
-         WHERE p.contract_year = ? GROUP BY salesperson_id`
+         WHERE p.contract_year = ? GROUP BY bc.salesperson_id`
       : `SELECT salesperson_id, SUM(bonus_amount) as total_bonus,
          SUM(CASE WHEN status = '已發放' THEN bonus_amount ELSE 0 END) as paid_bonus,
          SUM(CASE WHEN status = '待發放' THEN bonus_amount ELSE 0 END) as pending_bonus
