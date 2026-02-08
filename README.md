@@ -1865,6 +1865,22 @@ invoice-bonus-system/
 
 ---
 
+### 手機版表格橫向捲動調整 📱
+
+#### 收款提醒（首頁）
+
+- ✅ 手機版即將到期／已逾期專案表格可左右捲動，不超出版面
+- ✅ flex 容器設定 `min-width: 0`，表格區塊使用 `overflow-x: auto`、`-webkit-overflow-scrolling: touch`
+- ✅ 相關檔案：`src/views/index.ejs`、`public/css/style.css`（`.payment-reminder-content`、`.payment-reminder-table-responsive`）
+
+#### 專案詳情發票明細
+
+- ✅ 手機版發票明細表格可左右捲動，不超出版面
+- ✅ 768px 以下啟用 `overflow-x: auto`，表格設定 `min-width: 36rem`；桌面版維持 `overflow: visible` 以顯示「更多」下拉選單
+- ✅ 相關檔案：`public/css/style.css`（`.invoice-table-responsive` 媒體查詢）
+
+---
+
 ### 2026-02-07 - v1.13.0 專案毛利分析 📊
 
 #### 專案毛利分析（方案 A）

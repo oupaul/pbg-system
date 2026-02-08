@@ -134,7 +134,7 @@ ${typeof paymentReminder !== 'undefined' && paymentReminder && (paymentReminder.
     <div class="flex-shrink-0">
       <i class="bi bi-currency-dollar fs-3 me-3"></i>
     </div>
-    <div class="flex-grow-1">
+    <div class="flex-grow-1 payment-reminder-content">
       <h5 class="alert-heading mb-2">
         <i class="bi bi-bell-fill"></i> 收款提醒（依預計收款日）
       </h5>
@@ -144,7 +144,7 @@ ${typeof paymentReminder !== 'undefined' && paymentReminder && (paymentReminder.
         ${paymentReminder.overdue.length > 0 ? '<span class="badge bg-danger ms-2">' + paymentReminder.overdue.length + ' 筆已逾期</span>' : ''}
       </p>
       <hr>
-      <div class="table-responsive">
+      <div class="table-responsive payment-reminder-table-responsive">
         <table class="table table-sm table-hover mb-0">
           <thead class="table-light">
             <tr>

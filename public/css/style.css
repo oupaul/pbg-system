@@ -82,12 +82,24 @@ code {
   font-weight: 500;
 }
 
-/* 發票明細：取消 overflow 裁切，讓「更多」下拉選單能顯示在最上層 */
-.invoice-table-responsive {
-  overflow: visible !important;
-}
+/* 發票明細：桌面版取消 overflow 裁切，讓「更多」下拉選單能顯示在最上層 */
 .invoice-table-responsive > .table {
   margin-bottom: 0;
+}
+/* 手機版：發票明細可左右捲動（下拉選單已用 data-bs-boundary="viewport" + fixed 不受裁切） */
+@media (max-width: 768px) {
+  .invoice-table-responsive {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .invoice-table-responsive > .table {
+    min-width: 36rem;
+  }
+}
+@media (min-width: 769px) {
+  .invoice-table-responsive {
+    overflow: visible !important;
+  }
 }
 
 /* 發票「更多」下拉選單：確保浮於最上層 */
@@ -125,6 +137,20 @@ code {
 /* 進度條 */
 .progress {
   border-radius: 0.5rem;
+}
+
+/* 收款提醒：手機版可左右捲動表格 */
+.payment-reminder-content {
+  min-width: 0; /* 讓 flex 子元素可縮小，內層 table-responsive 才能出現橫向捲動 */
+}
+.payment-reminder-table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-left: -1px;
+  margin-right: -1px;
+}
+.payment-reminder-table-responsive .table {
+  min-width: 32rem; /* 保證表格有最小寬度，窄螢幕時出現橫向捲動 */
 }
 
 /* 響應式調整 */
