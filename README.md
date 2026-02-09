@@ -1150,6 +1150,14 @@ sudo ./uninstall.sh
 - **Excel、PDF 匯出**：支援依篩選年度匯出（三張工作表或專案明細表）
 - 僅 admin、user 可見
 
+### 專案附件管理 🆕
+- **上傳附件**：專案詳情頁「專案資訊」區塊的「合約」欄位可上傳檔案（上限 10MB）
+- **PDF 預覽**：PDF 檔案點擊後在新分頁直接預覽，其他檔案下載
+- **軟刪除與還原**：刪除附件改為軟刪除（設定 `deleted_at`），可於「顯示已刪除」中還原
+- **定期清理**：系統設定可調整「軟刪除後保留天數」，定期清理腳本會永久刪除超過保留期的附件
+- **操作記錄**：上傳、刪除、還原附件都會記錄在修改記錄中
+- **權限控制**：上傳/刪除/還原需編輯權限，下載需檢視權限
+
 ### 客戶管理
 - 客戶資料維護
 - 統一編號記錄
@@ -1878,6 +1886,42 @@ invoice-bonus-system/
 - ✅ 手機版發票明細表格可左右捲動，不超出版面
 - ✅ 768px 以下啟用 `overflow-x: auto`，表格設定 `min-width: 36rem`；桌面版維持 `overflow: visible` 以顯示「更多」下拉選單
 - ✅ 相關檔案：`public/css/style.css`（`.invoice-table-responsive` 媒體查詢）
+
+---
+
+### 專案附件管理功能 📎
+
+#### 附件上傳與管理
+
+- ✅ 專案詳情頁「專案資訊」區塊新增「合約」欄位，可上傳附件（上限 10MB）
+- ✅ 支援所有檔案類型，中文檔名正確顯示
+- ✅ PDF 檔案點擊後在新分頁預覽，其他檔案下載
+- ✅ 附件列表顯示檔名、大小、上傳時間，可下載、刪除
+
+#### 軟刪除與還原
+
+- ✅ 刪除附件改為軟刪除（設定 `deleted_at`），檔案與記錄保留
+- ✅ 專案詳情頁「顯示已刪除」可查看已刪除附件並還原
+- ✅ 已刪除附件不可下載，顯示「已刪除」標記
+
+#### 定期清理機制
+
+- ✅ 系統設定新增「專案附件清理設定」：可調整「軟刪除後保留天數」（預設 30 天）
+- ✅ 清理腳本 `scripts/cleanup-deleted-attachments.js`：永久刪除超過保留期的附件檔案與記錄
+- ✅ 建議以 cron 每日執行：`0 2 * * * cd /opt/專案目錄 && npm run cleanup:attachments`
+
+#### 操作記錄
+
+- ✅ 上傳、刪除、還原附件都會記錄在「修改記錄」中
+- ✅ 記錄包含操作者、時間、附件資訊
+
+#### 相關檔案
+
+- ✅ 遷移：`migrations/migrate_project_attachments.js`、`migrations/migrate_project_attachments_soft_delete.js`、`migrations/migrate_attachment_cleanup_setting.js`
+- ✅ 路由：`src/routes/projects.js`（`/:id/attachments`、`/:id/attachments/:attachmentId/download`、`/:id/attachments/:attachmentId/delete`、`/:id/attachments/:attachmentId/restore`）
+- ✅ 視圖：`src/views/projects/show.ejs`（專案資訊「合約」欄位）
+- ✅ 清理腳本：`scripts/cleanup-deleted-attachments.js`
+- ✅ 系統設定：`src/views/settings/index.ejs`（專案附件清理設定）
 
 ---
 
@@ -3571,6 +3615,9 @@ npm start
 - `npm run migrate:project-customer` - 專案客戶唯一約束遷移
 - `npm run migrate:project-name` - 專案名稱唯一約束遷移
 - `npm run migrate:expected-invoice` - 業務預計開立發票年月欄位遷移
+- `npm run migrate:project-attachments` - 專案附件表遷移
+- `npm run migrate:project-attachments-soft-delete` - 專案附件軟刪除欄位遷移
+- `npm run migrate:attachment-cleanup-setting` - 附件清理設定遷移
 - `npm run seed` - 插入種子資料（獎金級距）
 
 ### 環境變數

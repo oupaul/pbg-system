@@ -68,4 +68,32 @@ node scripts/upgrade_passwords.js
 1. 通知所有用戶使用臨時密碼登入
 2. 要求用戶登入後立即修改密碼
 
+## cleanup-deleted-attachments.js
+
+定期清理「已軟刪除」的專案附件：永久刪除磁碟檔案並移除資料庫記錄。保留天數由系統設定 `attachment_cleanup_retention_days` 控制（預設 30 天，0 = 不自動清理）。
+
+### 使用方法
+
+```bash
+npm run cleanup:attachments
+```
+
+或直接執行：
+
+```bash
+node scripts/cleanup-deleted-attachments.js
+```
+
+### 建議排程（cron）
+
+每日凌晨 2 點執行（請將專案目錄改為實際路徑）：
+
+```bash
+0 2 * * * cd /opt/invoice-bonus-system && npm run cleanup:attachments
+```
+
+### 設定
+
+於「系統設定」→「專案附件清理設定」可調整「軟刪除後保留天數」。若尚未執行遷移 `migrate:attachment-cleanup-setting`，腳本會自動插入預設值 30。
+
 

@@ -9,11 +9,13 @@
   const notificationEnabledSetting = localSettings.find(s => s.setting_key === 'invoice_notification_enabled');
   const idleTimeoutSetting = localSettings.find(s => s.setting_key === 'idle_timeout_minutes');
   const idleWarningSetting = localSettings.find(s => s.setting_key === 'idle_warning_minutes');
+  const attachmentCleanupSetting = localSettings.find(s => s.setting_key === 'attachment_cleanup_retention_days');
   
   const notificationDaysValue = notificationDaysSetting ? notificationDaysSetting.setting_value : '6';
   const notificationEnabledValue = notificationEnabledSetting ? notificationEnabledSetting.setting_value : 'true';
   const idleTimeoutValue = idleTimeoutSetting ? idleTimeoutSetting.setting_value : '30';
   const idleWarningValue = idleWarningSetting ? idleWarningSetting.setting_value : '2';
+  const attachmentCleanupValue = attachmentCleanupSetting ? attachmentCleanupSetting.setting_value : '30';
   
   const isNotificationEnabled = notificationEnabledValue === 'true';
   const notificationDaysDesc = notificationDaysSetting ? notificationDaysSetting.description : '當月剩餘天數少於或等於此值時開始顯示通知';
@@ -149,6 +151,34 @@
   bodyHtml += '          <a href="/" class="btn btn-secondary"><i class="bi bi-x-circle"></i> 取消</a>';
   bodyHtml += '        </div>';
   bodyHtml += '      </div>';
+  bodyHtml += '    </form>';
+  bodyHtml += '  </div>';
+  bodyHtml += '</div>';
+  
+  // 專案附件清理設定卡片
+  bodyHtml += '<div class="card mt-4">';
+  bodyHtml += '  <div class="card-header bg-secondary text-white">';
+  bodyHtml += '    <h5 class="mb-0"><i class="bi bi-paperclip"></i> 專案附件清理設定</h5>';
+  bodyHtml += '  </div>';
+  bodyHtml += '  <div class="card-body">';
+  bodyHtml += '    <form method="POST" action="/settings/bulk-update">';
+  bodyHtml += '      <div class="row g-3">';
+  bodyHtml += '        <div class="col-md-6">';
+  bodyHtml += '          <label for="attachment_cleanup_retention_days" class="form-label">';
+  bodyHtml += '            <i class="bi bi-calendar-x"></i> <strong>軟刪除後保留天數</strong>';
+  bodyHtml += '          </label>';
+  bodyHtml += '          <div class="input-group">';
+  bodyHtml += '            <input type="number" class="form-control" id="attachment_cleanup_retention_days" name="attachment_cleanup_retention_days" value="' + attachmentCleanupValue + '" min="0" max="365">';
+  bodyHtml += '            <span class="input-group-text">天</span>';
+  bodyHtml += '          </div>';
+  bodyHtml += '          <div class="form-text">專案附件「刪除」後改為軟刪除，超過此天數將由定期清理腳本永久刪除檔案與記錄。<strong>0 = 不自動清理</strong>（僅能手動執行清理腳本）。</div>';
+  bodyHtml += '          <div class="alert alert-info mt-2 mb-0">';
+  bodyHtml += '            <small><i class="bi bi-info-circle"></i> 建議以 cron 每日執行：<code>0 2 * * * cd /opt/您的專案目錄 && npm run cleanup:attachments</code></small>';
+  bodyHtml += '          </div>';
+  bodyHtml += '        </div>';
+  bodyHtml += '      </div>';
+  bodyHtml += '      <hr class="my-4">';
+  bodyHtml += '      <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> 儲存設定</button>';
   bodyHtml += '    </form>';
   bodyHtml += '  </div>';
   bodyHtml += '</div>';

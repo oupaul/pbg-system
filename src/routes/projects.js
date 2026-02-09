@@ -1,5 +1,9 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
+const multer = require('multer');
 const db = require('../models/db');
 const Project = require('../models/Project');
 const Invoice = require('../models/Invoice');
@@ -9,6 +13,49 @@ const Salesperson = require('../models/Salesperson');
 const Customer = require('../models/Customer');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireEditPermission } = require('../middleware/auth');
+const AuditLogService = require('../services/AuditLogService');
+
+// 專案附件上傳：儲存至 uploads/attachments，檔名唯一
+const attachmentsDir = path.join(__dirname, '..', '..', 'uploads', 'attachments');
+if (!fs.existsSync(attachmentsDir)) {
+  fs.mkdirSync(attachmentsDir, { recursive: true });
+}
+const uploadAttachment = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, attachmentsDir),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname) || '';
+      const name = `project_${req.params.id}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}${ext}`;
+      cb(null, name);
+    }
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
+
+/** 修正上傳檔名編碼：瀏覽器常以 UTF-8 傳送中文，若被解為 Latin-1 會變亂碼 */
+function fixFilenameEncoding(name) {
+  if (!name || typeof name !== 'string') return name;
+  try {
+    const decoded = Buffer.from(name, 'latin1').toString('utf8');
+    return decoded;
+  } catch (e) {
+    return name;
+  }
+}
+
+function getAttachmentsByProject(projectId, options = {}) {
+  try {
+    const table = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='project_attachments'").get();
+    if (!table) return [];
+    const includeDeleted = options.includeDeleted === true;
+    const sql = includeDeleted
+      ? 'SELECT * FROM project_attachments WHERE project_id = ? ORDER BY deleted_at IS NULL DESC, created_at DESC'
+      : 'SELECT * FROM project_attachments WHERE project_id = ? AND deleted_at IS NULL ORDER BY created_at DESC';
+    return db.prepare(sql).all(projectId);
+  } catch (e) {
+    return [];
+  }
+}
 
 // 輔助函數：獲取所有啟用的專案類型
 function getActiveProjectTypes() {
@@ -316,6 +363,87 @@ router.post('/', requireEditPermission, (req, res) => {
   }
 });
 
+// 專案附件下載/預覽（需有專案檢視權限；已軟刪除者不可下載）
+router.get('/:id/attachments/:attachmentId/download', (req, res) => {
+  const project = Project.findById(req.params.id, req.user);
+  if (!project) return res.status(404).send('找不到專案或無權限');
+  try {
+    const row = db.prepare('SELECT * FROM project_attachments WHERE id = ? AND project_id = ?').get(req.params.attachmentId, req.params.id);
+    if (!row) return res.status(404).send('找不到附件');
+    if (row.deleted_at) return res.status(410).send('此附件已刪除');
+    const filePath = path.join(attachmentsDir, row.stored_filename);
+    if (!fs.existsSync(filePath)) return res.status(404).send('檔案不存在');
+    const name = encodeURIComponent(row.original_filename).replace(/'/g, '%27');
+    const mimeType = row.mime_type || 'application/octet-stream';
+    const isPDF = mimeType === 'application/pdf';
+    res.setHeader('Content-Type', mimeType);
+    // PDF 使用 inline 預覽，其他檔案使用 attachment 下載
+    res.setHeader('Content-Disposition', `${isPDF ? 'inline' : 'attachment'}; filename*=UTF-8''${name}`);
+    res.sendFile(path.resolve(filePath));
+  } catch (err) {
+    console.error('附件下載錯誤:', err);
+    res.status(500).send('下載失敗');
+  }
+});
+
+// 專案附件軟刪除（需編輯權限）
+router.post('/:id/attachments/:attachmentId/delete', requireEditPermission, (req, res) => {
+  try {
+    const row = db.prepare('SELECT * FROM project_attachments WHERE id = ? AND project_id = ?').get(req.params.attachmentId, req.params.id);
+    if (!row) return res.redirect(`/projects/${req.params.id}?error=` + encodeURIComponent('找不到附件'));
+    const oldData = { ...row };
+    db.prepare("UPDATE project_attachments SET deleted_at = datetime('now', 'localtime') WHERE id = ?").run(req.params.attachmentId);
+    const newData = { ...oldData, deleted_at: new Date().toISOString().slice(0, 19).replace('T', ' ') };
+    AuditLogService.logUpdate('project_attachments', req.params.attachmentId, oldData, newData, getUserInfo(req));
+    res.redirect(`/projects/${req.params.id}?success=` + encodeURIComponent('附件已刪除（可於「顯示已刪除」中還原）'));
+  } catch (err) {
+    console.error('附件刪除錯誤:', err);
+    res.redirect(`/projects/${req.params.id}?error=` + encodeURIComponent(err.message));
+  }
+});
+
+// 專案附件還原（需編輯權限）
+router.post('/:id/attachments/:attachmentId/restore', requireEditPermission, (req, res) => {
+  try {
+    const row = db.prepare('SELECT * FROM project_attachments WHERE id = ? AND project_id = ?').get(req.params.attachmentId, req.params.id);
+    if (!row) return res.redirect(`/projects/${req.params.id}?error=` + encodeURIComponent('找不到附件'));
+    if (!row.deleted_at) return res.redirect(`/projects/${req.params.id}?success=` + encodeURIComponent('附件未刪除'));
+    const oldData = { ...row };
+    db.prepare('UPDATE project_attachments SET deleted_at = NULL WHERE id = ?').run(req.params.attachmentId);
+    const newData = { ...oldData, deleted_at: null };
+    AuditLogService.logUpdate('project_attachments', req.params.attachmentId, oldData, newData, getUserInfo(req));
+    res.redirect(`/projects/${req.params.id}?show_deleted=1&success=` + encodeURIComponent('附件已還原'));
+  } catch (err) {
+    console.error('附件還原錯誤:', err);
+    res.redirect(`/projects/${req.params.id}?error=` + encodeURIComponent(err.message));
+  }
+});
+
+// 專案附件上傳（需編輯權限）
+router.post('/:id/attachments', requireEditPermission, uploadAttachment.single('file'), (req, res) => {
+  if (!req.file) return res.redirect(`/projects/${req.params.id}?error=` + encodeURIComponent('請選擇檔案'));
+  try {
+    const displayName = fixFilenameEncoding(req.file.originalname || req.file.filename);
+    const result = db.prepare(`
+      INSERT INTO project_attachments (project_id, original_filename, stored_filename, mime_type, file_size)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(req.params.id, displayName, req.file.filename, req.file.mimetype || null, req.file.size || 0);
+    const newData = {
+      project_id: req.params.id,
+      original_filename: displayName,
+      stored_filename: req.file.filename,
+      mime_type: req.file.mimetype || null,
+      file_size: req.file.size || 0
+    };
+    AuditLogService.logCreate('project_attachments', result.lastInsertRowid, newData, getUserInfo(req));
+    res.redirect(`/projects/${req.params.id}?success=` + encodeURIComponent('附件已上傳'));
+  } catch (err) {
+    console.error('附件上傳錯誤:', err);
+    if (req.file && req.file.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    res.redirect(`/projects/${req.params.id}?error=` + encodeURIComponent(err.message));
+  }
+});
+
 // 專案詳情
 router.get('/:id', (req, res) => {
   // 傳遞用戶資訊以進行權限檢查
@@ -405,6 +533,8 @@ router.get('/:id', (req, res) => {
     typeColorMap = {};
   }
 
+  const attachments = getAttachmentsByProject(project.id, { includeDeleted: showDeleted });
+
   res.render('projects/show', {
     title: project.project_name,
     project,
@@ -412,6 +542,7 @@ router.get('/:id', (req, res) => {
     validInvoices, // 有效發票（收款對應用）
     payments,
     costs,
+    attachments,
     bonuses,
     typeColorMap,
     usedInvoiceIds: Array.from(usedInvoiceIds), // 已使用的發票 ID 列表

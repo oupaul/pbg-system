@@ -24,17 +24,45 @@ ${typeof error !== 'undefined' && error ? '<div class="alert alert-danger alert-
       </div>
       <div class="card-body">
         <div class="row g-3">
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label class="text-muted small">專案編號</label>
             <div><code class="fs-5">${project.project_code}</code></div>
           </div>
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label class="text-muted small">專案類型</label>
             <div><span class="badge bg-${typeof typeColorMap !== 'undefined' && typeColorMap[project.project_type] ? typeColorMap[project.project_type] : (project.project_type === '食驗室' ? 'primary' : project.project_type === '純廣' ? 'success' : 'info')} fs-6">${project.project_type}</span></div>
           </div>
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label class="text-muted small">狀態</label>
             <div><span class="badge bg-${project.status === '已結案' ? 'secondary' : project.status === '取消' ? 'danger' : 'warning'} fs-6">${project.status}</span></div>
+          </div>
+          <div class="col-md-3">
+            <label class="text-muted small">合約</label>
+            <div>
+              ${locals.canEdit ? `
+              <form action="/projects/${project.id}/attachments" method="POST" enctype="multipart/form-data" class="d-flex align-items-center gap-1 mb-2">
+                <input type="file" name="file" class="form-control form-control-sm" style="max-width:8rem" accept="*/*" required>
+                <button type="submit" class="btn btn-sm btn-outline-primary" title="上傳"><i class="bi bi-upload"></i></button>
+              </form>
+              ` : ''}
+              ${typeof attachments !== 'undefined' && attachments.length ? `
+              <ul class="list-unstyled mb-0 small">
+                ${attachments.map(a => {
+                  const isDeleted = !!a.deleted_at;
+                  const fullName = (a.original_filename || '').replace(/</g, '&lt;');
+                  const displayName = fullName.length > 18 ? fullName.substring(0, 18) + '…' : fullName;
+                  const isPDF = (a.mime_type === 'application/pdf') || (fullName.toLowerCase().endsWith('.pdf'));
+                  const linkTarget = isPDF ? ' target="_blank"' : '';
+                  const link = isDeleted ? '<span class="text-muted">' + displayName + '</span>' : '<a href="/projects/' + project.id + '/attachments/' + a.id + '/download" class="text-decoration-none"' + linkTarget + ' title="' + fullName + '">' + displayName + '</a>';
+                  const badge = isDeleted ? ' <span class="badge bg-secondary">已刪</span>' : '';
+                  const actions = isDeleted
+                    ? (locals.canEdit ? ' <form action="/projects/' + project.id + '/attachments/' + a.id + '/restore" method="POST" style="display:inline"><button type="submit" class="btn btn-sm btn-link p-0 text-success" title="還原"><i class="bi bi-arrow-counterclockwise"></i></button></form>' : '')
+                    : (locals.canEdit ? ' <form action="/projects/' + project.id + '/attachments/' + a.id + '/delete" method="POST" style="display:inline" onsubmit="return confirm(\'確定刪除？\')"><button type="submit" class="btn btn-sm btn-link p-0 text-danger" title="刪除"><i class="bi bi-trash"></i></button></form>' : '');
+                  return '<li class="d-flex align-items-center gap-1 flex-wrap">' + link + badge + actions + '</li>';
+                }).join('')}
+              </ul>
+              ` : '<span class="text-muted">尚無</span>'}
+            </div>
           </div>
           <div class="col-md-4">
             <label class="text-muted small">簽約年度/月份</label>
