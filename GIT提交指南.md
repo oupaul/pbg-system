@@ -1,5 +1,71 @@
 # Git 提交與推送指南
 
+## 保護穩定版：分支策略（建議）
+
+目前 `main` 為穩定版本（如 v1.9.4）。若要避免日後開發覆蓋穩定版，可採用以下方式。
+
+### 方式一：開發分支（推薦）
+
+| 分支 | 用途 |
+|------|------|
+| `main` | 僅放**已測試、可上線**的穩定版，不直接開發 |
+| `develop` 或 `dev` | 日常開發、新功能、修復，完成後再合併回 main |
+
+**日常流程：**
+```bash
+# 1. 從 main 建立開發分支（僅在要開始新一輪開發時做一次）
+git checkout main
+git pull origin main
+git checkout -b develop
+git push -u origin develop
+
+# 2. 之後都在 develop 上開發、提交、推送
+git checkout develop
+# ... 修改程式 ...
+git add -A
+git commit -m "feat: 新功能說明"
+git push origin develop
+
+# 3. 測試沒問題後，再合併到 main 並打標籤（發布穩定版）
+git checkout main
+git pull origin main
+git merge develop
+git tag -a v1.9.5 -m "v1.9.5  release"
+git push origin main
+git push origin v1.9.5
+```
+
+這樣 **main 只會在您主動合併時變動**，不會被日常提交覆蓋。
+
+### 方式二：用標籤固定穩定版（最簡單）
+
+不強制改分支，但每次覺得「這版是穩定版」時就打標籤，之後可隨時回到該版本：
+
+```bash
+# 為目前 main 打上穩定版標籤（例如 v1.9.4 已推送後可補打）
+git tag -a v1.9.4-stable -m "穩定版 v1.9.4"
+git push origin v1.9.4-stable
+
+# 日後若 main 被改壞，可依標籤還原或開新分支
+git checkout -b recovery v1.9.4-stable
+```
+
+### 方式三：雙遠端或備份倉庫
+
+- 再建一個「僅放穩定版」的遠端或私有倉庫，例如 `stable`，只在發布時 push 過去。
+- 或定期從 GitHub 下載 `main` 的 zip 備份，作為穩定版快照。
+
+### 建議組合
+
+- **main**：穩定版，只接受從 `develop` 合併或經過確認的 hotfix。
+- **develop**：日常開發。
+- **標籤**：每次發布穩定版時打 `v1.9.4`、`v1.9.5`，方便日後還原或比對。
+
+若您決定採用「開發分支」，可先執行一次：  
+`git checkout -b develop && git push -u origin develop`，之後新功能都在 `develop` 上開發即可。
+
+---
+
 ## 本次更新內容
 
 ### 修改的檔案
@@ -46,11 +112,6 @@ git commit -m "feat: 修復未收款篩選功能並新增排序功能 (v1.8.9)
 ```
 
 ### 4. 推送到 GitHub
-```bash
-git push origin master
-```
-
-或者如果主分支是 `main`：
 ```bash
 git push origin main
 ```

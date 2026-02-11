@@ -108,7 +108,7 @@ ${typeof error !== 'undefined' && error ? '<div class="alert alert-danger alert-
         ${typeof summary.totalCost !== 'undefined' ? `
         <div class="d-flex justify-content-between mb-2">
           <span>總成本</span>
-          <span class="text-danger">-$${(summary.totalCost || 0).toLocaleString()}</span>
+          <span class="text-danger">$${(summary.totalCost || 0).toLocaleString()}</span>
         </div>
         ` : ''}
         ${typeof summary.grossProfit !== 'undefined' ? `
