@@ -49,9 +49,13 @@
           <li class="nav-item">
             <a class="nav-link" href="/sales-performance"><i class="bi bi-graph-up"></i> 業務績效</a>
           </li>
+          <% } %>
+          <% if (typeof user !== 'undefined' && user) { %>
           <li class="nav-item">
             <a class="nav-link" href="/gross-profit"><i class="bi bi-pie-chart"></i> 毛利分析</a>
           </li>
+          <% } %>
+          <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user')) { %>
           <li class="nav-item">
             <a class="nav-link" href="/salespeople"><i class="bi bi-people"></i> 業務管理</a>
           </li>
@@ -71,6 +75,9 @@
           <% if (typeof user !== 'undefined' && user && user.role === 'admin') { %>
           <li class="nav-item">
             <a class="nav-link" href="/project-types"><i class="bi bi-tags"></i> 類型管理</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/report-groups"><i class="bi bi-collection"></i> 報表群組</a>
           </li>
           <li class="nav-item">
             <a class="nav-link" href="/roles"><i class="bi bi-shield-check"></i> 角色管理</a>

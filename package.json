@@ -29,6 +29,7 @@
     "migrate:project-attachments": "node migrations/migrate_project_attachments.js",
     "migrate:project-attachments-soft-delete": "node migrations/migrate_project_attachments_soft_delete.js",
     "migrate:attachment-cleanup-setting": "node migrations/migrate_attachment_cleanup_setting.js",
+    "migrate:report-groups": "node migrations/migrate_report_groups.js",
     "cleanup:attachments": "node scripts/cleanup-deleted-attachments.js",
     "seed": "node migrations/seed.js",
     "test:expected-invoice": "node test_expected_invoice_update.js",

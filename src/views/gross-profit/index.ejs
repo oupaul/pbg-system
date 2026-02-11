@@ -64,6 +64,9 @@
   <li class="nav-item">
     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#byType">依類型彙總</button>
   </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#byGroup">依群組彙總</button>
+  </li>
 </ul>
 
 <div class="tab-content">
@@ -74,19 +77,20 @@
           <i class="bi bi-info-circle"></i> 警示依「每個專案」的毛利率與其所屬類型的閾值比較。可於 <a href="/project-types">專案類型管理</a> 為各類型設定「毛利警示閾值(%)」
         </div>
         <div class="table-responsive">
-          <table class="table table-hover mb-0">
+          <table class="table table-hover mb-0" id="byProjectTable">
             <thead class="table-dark">
               <tr>
-                <th>專案編號</th>
-                <th>專案名稱</th>
-                <th>年度</th>
-                <th>類型</th>
-                <th>狀態</th>
-                <th>業務</th>
-                <th class="text-end">收入（未稅）</th>
-                <th class="text-end">成本</th>
-                <th class="text-end">毛利</th>
-                <th class="text-end">毛利率</th>
+                <th class="gross-profit-sortable" data-sort="project_code" data-type="text" role="button" tabindex="0" title="按此排序">專案編號 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
+                <th class="gross-profit-sortable" data-sort="project_name" data-type="text" role="button" tabindex="0" title="按此排序">專案名稱 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
+                <th class="gross-profit-sortable" data-sort="contract_year" data-type="number" role="button" tabindex="0" title="按此排序">年度 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
+                <th class="gross-profit-sortable" data-sort="project_type" data-type="text" role="button" tabindex="0" title="按此排序">類型 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
+                <th class="gross-profit-sortable" data-sort="status" data-type="text" role="button" tabindex="0" title="按此排序">狀態 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
+                <th class="gross-profit-sortable" data-sort="report_group_name" data-type="text" role="button" tabindex="0" title="按此排序">報表群組 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
+                <th class="gross-profit-sortable" data-sort="salesperson_name" data-type="text" role="button" tabindex="0" title="按此排序">業務 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
+                <th class="text-end gross-profit-sortable" data-sort="revenue" data-type="number" role="button" tabindex="0" title="按此排序">收入（未稅） <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
+                <th class="text-end gross-profit-sortable" data-sort="total_cost" data-type="number" role="button" tabindex="0" title="按此排序">成本 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
+                <th class="text-end gross-profit-sortable" data-sort="gross_profit" data-type="number" role="button" tabindex="0" title="按此排序">毛利 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
+                <th class="text-end gross-profit-sortable" data-sort="gross_margin_pct" data-type="number" role="button" tabindex="0" title="按此排序">毛利率 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
                 <th></th>
               </tr>
             </thead>
@@ -101,11 +105,66 @@
                 const rowClass = isBelowThreshold ? 'table-warning' : '';
                 const status = r.status || '未結案';
                 const statusBadge = status === '已結案' ? '<span class="badge bg-secondary">已結案</span>' : status === '取消' ? '<span class="badge bg-danger">取消</span>' : '<span class="badge bg-warning text-dark">未結案</span>';
-                return '<tr class="' + rowClass + '"><td><a href="/projects/' + r.id + '"><code>' + (r.project_code || '') + '</code></a></td><td>' + (r.project_name || '').substring(0, 25) + '</td><td>' + (r.contract_year || '') + '</td><td><span class="badge bg-secondary">' + (r.project_type || '') + '</span></td><td>' + statusBadge + '</td><td>' + (r.salesperson_name || '-') + '</td><td class="text-end">$' + (r.revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">$' + (r.total_cost || 0).toLocaleString() + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger fw-bold') + '">$' + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">' + marginCell + '</td><td><a href="/projects/' + r.id + '" class="btn btn-sm btn-outline-primary">詳情</a></td></tr>';
-              }).join('') : '<tr><td colspan="11" class="text-center text-muted py-4">尚無資料</td></tr>'}
+                const groupDisplay = (r.report_group_name && r.report_group_name.trim()) ? '<span class="badge bg-info">' + (r.report_group_name || '').replace(/</g, '&lt;') + '</span>' : '<span class="text-muted">—</span>';
+                const dataAttrs = ' data-project_code="' + (r.project_code || '').replace(/"/g, '&quot;') + '" data-project_name="' + (r.project_name || '').replace(/"/g, '&quot;') + '" data-contract_year="' + (r.contract_year || '') + '" data-project_type="' + (r.project_type || '').replace(/"/g, '&quot;') + '" data-status="' + (r.status || '').replace(/"/g, '&quot;') + '" data-report_group_name="' + (r.report_group_name || '').replace(/"/g, '&quot;') + '" data-salesperson_name="' + (r.salesperson_name || '-').replace(/"/g, '&quot;') + '" data-revenue="' + (parseFloat(r.revenue) || 0) + '" data-total_cost="' + (parseFloat(r.total_cost) || 0) + '" data-gross_profit="' + (parseFloat(r.gross_profit) || 0) + '" data-gross_margin_pct="' + (parseFloat(r.gross_margin_pct) || 0) + '"';
+                return '<tr class="' + rowClass + '"' + dataAttrs + '><td><a href="/projects/' + r.id + '"><code>' + (r.project_code || '') + '</code></a></td><td>' + (r.project_name || '').substring(0, 25) + '</td><td>' + (r.contract_year || '') + '</td><td><span class="badge bg-secondary">' + (r.project_type || '') + '</span></td><td>' + statusBadge + '</td><td>' + groupDisplay + '</td><td>' + (r.salesperson_name || '-') + '</td><td class="text-end">$' + (r.revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">$' + (r.total_cost || 0).toLocaleString() + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger fw-bold') + '">$' + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">' + marginCell + '</td><td><a href="/projects/' + r.id + '" class="btn btn-sm btn-outline-primary">詳情</a></td></tr>';
+              }).join('') : '<tr><td colspan="12" class="text-center text-muted py-4">尚無資料</td></tr>'}
             </tbody>
           </table>
         </div>
+        <script>
+        (function() {
+          var table = document.getElementById('byProjectTable');
+          if (!table) return;
+          var tbody = table.querySelector('tbody');
+          var rows = tbody && tbody.querySelectorAll('tr[data-project_code]');
+          if (!rows || rows.length === 0) return;
+          var currentSort = 'gross_profit';
+          var currentDir = 'desc';
+          function getVal(tr, key) {
+            var v = tr.getAttribute('data-' + key);
+            if (v === null || v === '') return '';
+            return v;
+          }
+          function updateHeaderIcons() {
+            table.querySelectorAll('.gross-profit-sortable').forEach(function(th) {
+              var ico = th.querySelector('.sort-icon');
+              if (!ico) return;
+              var sortKey = th.getAttribute('data-sort');
+              ico.className = 'sort-icon ms-1 ' + (sortKey === currentSort ? (currentDir === 'asc' ? 'bi bi-arrow-up' : 'bi bi-arrow-down') : 'bi bi-arrow-down-up opacity-50');
+            });
+          }
+          function sortTable() {
+            var key = currentSort;
+            var type = table.querySelector('.gross-profit-sortable[data-sort="' + key + '"]').getAttribute('data-type');
+            var dir = currentDir === 'asc' ? 1 : -1;
+            var arr = Array.from(rows);
+            arr.sort(function(a, b) {
+              var va = getVal(a, key);
+              var vb = getVal(b, key);
+              if (type === 'number') {
+                var na = parseFloat(va) || 0;
+                var nb = parseFloat(vb) || 0;
+                return (na - nb) * dir;
+              }
+              return (String(va).localeCompare(String(vb), 'zh-TW')) * dir;
+            });
+            arr.forEach(function(tr) { tbody.appendChild(tr); });
+            updateHeaderIcons();
+          }
+          table.querySelectorAll('.gross-profit-sortable').forEach(function(th) {
+            th.style.cursor = 'pointer';
+            th.addEventListener('click', function() {
+              var key = th.getAttribute('data-sort');
+              if (key === currentSort) currentDir = currentDir === 'asc' ? 'desc' : 'asc';
+              else { currentSort = key; currentDir = 'asc'; }
+              sortTable();
+            });
+            th.addEventListener('keydown', function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); th.click(); } });
+          });
+          updateHeaderIcons();
+        })();
+        </script>
       </div>
     </div>
   </div>
@@ -152,6 +211,33 @@
             </thead>
             <tbody>
               ${(byType || []).length ? (byType || []).map(r => '<tr><td><span class="badge bg-info">' + (r.project_type || '') + '</span></td><td class="text-center">' + (r.project_count || 0) + '</td><td class="text-end">$' + (r.total_revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">$' + (r.total_cost || 0).toLocaleString() + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger') + '">$' + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">' + (r.gross_margin_pct || 0) + '%</td></tr>').join('') : '<tr><td colspan="6" class="text-center text-muted py-4">尚無資料</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="byGroup">
+    <div class="card">
+      <div class="card-body p-0">
+        <div class="p-3 bg-light border-bottom small text-muted">
+          <i class="bi bi-info-circle"></i> 同群組專案合併計算收入、成本、毛利與毛利率。可於 <a href="/report-groups">報表群組管理</a> 建立群組，並在專案編輯時選擇「報表群組」。
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-dark">
+              <tr>
+                <th>報表群組</th>
+                <th class="text-center">專案數</th>
+                <th class="text-end">總收入</th>
+                <th class="text-end">總成本</th>
+                <th class="text-end">總毛利</th>
+                <th class="text-end">毛利率</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(byGroup || []).length ? (byGroup || []).map(r => '<tr><td><strong>' + (r.report_group_name || '未分群').replace(/</g, '&lt;') + '</strong></td><td class="text-center">' + (r.project_count || 0) + '</td><td class="text-end">$' + (r.total_revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">$' + (r.total_cost || 0).toLocaleString() + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger') + '">$' + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">' + (r.gross_margin_pct || 0) + '%</td></tr>').join('') : '<tr><td colspan="6" class="text-center text-muted py-4">尚無資料</td></tr>'}
             </tbody>
           </table>
         </div>

@@ -12,7 +12,7 @@
   <div class="card-body">
     <form action="${action}" method="POST">
       <div class="row g-3">
-        <div class="col-md-3">
+        <div class="col-md-2">
           <label class="form-label">專案編號 <span class="text-danger">*</span></label>
           <input type="text" name="project_code" class="form-control" value="${project ? (project.project_code || '') : ''}" required>
         </div>
@@ -34,7 +34,7 @@
             <option value="取消" ${project && project.status === '取消' ? 'selected' : ''}>取消</option>
           </select>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
           <label class="form-label">專案類型 <span class="text-danger">*</span></label>
           <select name="project_type" class="form-select" required>
             <option value="">-- 選擇類型 --</option>
@@ -43,6 +43,18 @@
               return '<option value="' + type.type_name + '" ' + selected + '>' + type.type_name + '</option>';
             }).join('') : '<option value="食驗室">食驗室</option><option value="純廣">純廣</option><option value="專案">專案</option>'}
           </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">報表群組</label>
+          <select name="report_group_id" class="form-select">
+            <option value="">-- 未分群 --</option>
+            ${typeof reportGroups !== 'undefined' && reportGroups ? reportGroups.map(g => {
+              const selected = project && project.report_group_id == g.id ? 'selected' : '';
+              const name = (g.name || '').replace(/"/g, '&quot;');
+              return '<option value="' + g.id + '" ' + selected + '>' + name + '</option>';
+            }).join('') : ''}
+          </select>
+          <small class="form-text text-muted">用於毛利分析「依群組彙總」合併計算</small>
         </div>
         
         <div class="col-12">

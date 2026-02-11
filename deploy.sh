@@ -371,6 +371,7 @@ if [ -d "${PROJECT_DIR}/migrations" ]; then
         npm run migrate:project-attachments 2>/dev/null || node migrations/migrate_project_attachments.js || warning "專案附件表遷移失敗（可能已存在）"
         npm run migrate:project-attachments-soft-delete 2>/dev/null || node migrations/migrate_project_attachments_soft_delete.js || warning "專案附件軟刪除欄位遷移失敗（可能已存在）"
         npm run migrate:attachment-cleanup-setting 2>/dev/null || node migrations/migrate_attachment_cleanup_setting.js || warning "附件清理設定遷移失敗（可能已存在）"
+        npm run migrate:report-groups 2>/dev/null || node migrations/migrate_report_groups.js || warning "報表群組遷移失敗（可能已存在）"
         
         # 首次安裝時插入種子資料
         if [ "$IS_FIRST_INSTALL" = true ]; then
@@ -404,6 +405,7 @@ if [ -d "${PROJECT_DIR}/migrations" ]; then
         npm run migrate:project-attachments 2>/dev/null || node migrations/migrate_project_attachments.js || warning "專案附件表遷移失敗（可能已存在）"
         npm run migrate:project-attachments-soft-delete 2>/dev/null || node migrations/migrate_project_attachments_soft_delete.js || warning "專案附件軟刪除欄位遷移失敗（可能已存在）"
         npm run migrate:attachment-cleanup-setting 2>/dev/null || node migrations/migrate_attachment_cleanup_setting.js || warning "附件清理設定遷移失敗（可能已存在）"
+        npm run migrate:report-groups 2>/dev/null || node migrations/migrate_report_groups.js || warning "報表群組遷移失敗（可能已存在）"
         log "✓ 增量遷移完成"
     fi
 else

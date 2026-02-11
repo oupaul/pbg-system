@@ -1,0 +1,96 @@
+<%
+  const localGroups = typeof groups !== 'undefined' ? groups : [];
+  const localError = typeof error !== 'undefined' ? error : '';
+  const localSuccess = typeof success !== 'undefined' ? success : '';
+  let bodyHtml = '<div class="d-flex justify-content-between align-items-center mb-4">';
+  bodyHtml += '  <h2><i class="bi bi-collection"></i> 報表群組管理</h2>';
+  bodyHtml += '  <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">';
+  bodyHtml += '    <i class="bi bi-plus-circle"></i> 新增群組';
+  bodyHtml += '  </button>';
+  bodyHtml += '</div>';
+
+  if (localError) {
+    bodyHtml += '<div class="alert alert-danger alert-dismissible fade show" role="alert">';
+    bodyHtml += '  <i class="bi bi-exclamation-circle"></i> ' + localError;
+    bodyHtml += '  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+    bodyHtml += '</div>';
+  }
+  if (localSuccess) {
+    bodyHtml += '<div class="alert alert-success alert-dismissible fade show" role="alert">';
+    bodyHtml += '  <i class="bi bi-check-circle"></i> ' + localSuccess;
+    bodyHtml += '  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+    bodyHtml += '</div>';
+  }
+
+  bodyHtml += '<div class="card">';
+  bodyHtml += '  <div class="card-header bg-primary text-white">';
+  bodyHtml += '    <h5 class="mb-0"><i class="bi bi-list-ul"></i> 報表群組列表</h5>';
+  bodyHtml += '  </div>';
+  bodyHtml += '  <div class="card-body">';
+  bodyHtml += '    <p class="text-muted small">專案可歸屬至報表群組，毛利分析「依群組彙總」會將同群組專案合併計算收入、成本、毛利與毛利率。</p>';
+  if (localGroups.length === 0) {
+    bodyHtml += '    <div class="alert alert-info">目前尚無報表群組，請點擊「新增群組」按鈕新增。</div>';
+  } else {
+    bodyHtml += '    <div class="table-responsive">';
+    bodyHtml += '      <table class="table table-hover">';
+    bodyHtml += '        <thead class="table-light"><tr><th style="width:80px">排序</th><th>群組名稱</th><th style="width:200px">操作</th></tr></thead>';
+    bodyHtml += '        <tbody>';
+    localGroups.forEach(g => {
+      bodyHtml += '          <tr>';
+      bodyHtml += '            <td>' + (g.display_order ?? 0) + '</td>';
+      bodyHtml += '            <td><strong>' + (g.name || '').replace(/</g, '&lt;') + '</strong></td>';
+      bodyHtml += '            <td>';
+      bodyHtml += '              <button type="button" class="btn btn-sm btn-outline-primary" onclick="editGroup(' + g.id + ', \'' + (g.name || '').replace(/'/g, "\\'") + '\', ' + (g.display_order ?? 0) + ')"><i class="bi bi-pencil"></i> 編輯</button> ';
+      bodyHtml += '              <form action="/report-groups/delete/' + g.id + '" method="POST" style="display:inline" onsubmit="return confirm(\'確定要刪除此報表群組？\')">';
+      bodyHtml += '                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> 刪除</button>';
+      bodyHtml += '              </form>';
+      bodyHtml += '            </td>';
+      bodyHtml += '          </tr>';
+    });
+    bodyHtml += '        </tbody></table></div>';
+  }
+  bodyHtml += '  </div></div>';
+
+  bodyHtml += '<div class="modal fade" id="addModal" tabindex="-1">';
+  bodyHtml += '  <div class="modal-dialog"><div class="modal-content">';
+  bodyHtml += '    <div class="modal-header"><h5 class="modal-title"><i class="bi bi-plus-circle"></i> 新增報表群組</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>';
+  bodyHtml += '    <form method="POST" action="/report-groups/create">';
+  bodyHtml += '      <div class="modal-body">';
+  bodyHtml += '        <div class="mb-3"><label class="form-label">群組名稱 <span class="text-danger">*</span></label>';
+  bodyHtml += '          <input type="text" name="name" class="form-control" required maxlength="100" placeholder="例：某客戶系列、同案分批">';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="mb-3"><label class="form-label">顯示順序</label>';
+  bodyHtml += '          <input type="number" name="display_order" class="form-control" min="0" value="0">';
+  bodyHtml += '          <small class="form-text text-muted">數字越小越靠前</small>';
+  bodyHtml += '        </div>';
+  bodyHtml += '      </div>';
+  bodyHtml += '      <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button type="submit" class="btn btn-primary">新增</button></div>';
+  bodyHtml += '    </form>';
+  bodyHtml += '  </div></div></div>';
+
+  bodyHtml += '<div class="modal fade" id="editModal" tabindex="-1">';
+  bodyHtml += '  <div class="modal-dialog"><div class="modal-content">';
+  bodyHtml += '    <div class="modal-header"><h5 class="modal-title"><i class="bi bi-pencil"></i> 編輯報表群組</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>';
+  bodyHtml += '    <form method="POST" action="/report-groups/update/" id="editForm">';
+  bodyHtml += '      <div class="modal-body">';
+  bodyHtml += '        <div class="mb-3"><label class="form-label">群組名稱 <span class="text-danger">*</span></label>';
+  bodyHtml += '          <input type="text" name="name" id="editName" class="form-control" required maxlength="100">';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="mb-3"><label class="form-label">顯示順序</label>';
+  bodyHtml += '          <input type="number" name="display_order" id="editOrder" class="form-control" min="0" value="0">';
+  bodyHtml += '        </div>';
+  bodyHtml += '      </div>';
+  bodyHtml += '      <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button type="submit" class="btn btn-primary">儲存</button></div>';
+  bodyHtml += '    </form>';
+  bodyHtml += '  </div></div></div>';
+
+  bodyHtml += '<script>';
+  bodyHtml += 'function editGroup(id, name, order) {';
+  bodyHtml += '  document.getElementById("editForm").action = "/report-groups/update/" + id;';
+  bodyHtml += '  document.getElementById("editName").value = name;';
+  bodyHtml += '  document.getElementById("editOrder").value = order;';
+  bodyHtml += '  new bootstrap.Modal(document.getElementById("editModal")).show();';
+  bodyHtml += '}';
+  bodyHtml += '</script>';
+%>
+<%- include('../layout', { title: '報表群組管理', body: bodyHtml }) %>

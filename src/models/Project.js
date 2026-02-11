@@ -120,6 +120,12 @@ const Project = {
       }
     }
     
+    // 視圖 v_project_summary 可能未含 report_group_id，從 projects 表補上（供編輯表單報表群組選單）
+    try {
+      const base = db.prepare(`SELECT report_group_id FROM projects WHERE id = ?`).get(id);
+      if (base !== undefined) project.report_group_id = base.report_group_id;
+    } catch (_) { /* 若 projects 尚無 report_group_id 欄位則略過 */ }
+    
     return project;
   },
 
@@ -178,13 +184,15 @@ const Project = {
     const isNewCustomer = data.is_new_customer ? 1 : 0;
     const expectedInvoiceYearMonth = data.expected_invoice_year_month || null;
     const notes = data.notes || null;
+    const reportGroupId = data.report_group_id !== undefined && data.report_group_id !== null && data.report_group_id !== ''
+      ? parseInt(data.report_group_id) : null;
     
     const stmt = db.prepare(`
       INSERT INTO projects (
         project_code, contract_year, contract_month, status, project_type,
         salesperson_id, customer_id, project_name, price_with_tax, price_without_tax,
-        sales_discount, is_new_customer, expected_invoice_year_month, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        sales_discount, is_new_customer, expected_invoice_year_month, notes, report_group_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     try {
@@ -202,7 +210,8 @@ const Project = {
         salesDiscount,
         isNewCustomer,
         expectedInvoiceYearMonth,
-        notes
+        notes,
+        reportGroupId
       );
       
       const projectId = result.lastInsertRowid;
@@ -271,7 +280,7 @@ const Project = {
     const allowedFields = [
       'project_code', 'contract_year', 'contract_month', 'status', 'project_type',
       'salesperson_id', 'customer_id', 'project_name', 'price_with_tax', 
-      'price_without_tax', 'sales_discount', 'is_new_customer', 'expected_invoice_year_month', 'notes'
+      'price_without_tax', 'sales_discount', 'is_new_customer', 'expected_invoice_year_month', 'notes', 'report_group_id'
     ];
 
     const newData = {};
@@ -288,7 +297,7 @@ const Project = {
         let value = data[field];
         if (value === '') {
           value = null;
-        } else if (field === 'salesperson_id' || field === 'customer_id') {
+        } else if (field === 'salesperson_id' || field === 'customer_id' || field === 'report_group_id') {
           // 外鍵欄位：空字串或 'null' 轉為 null，否則轉為整數
           value = (value === '' || value === 'null' || value === null) ? null : parseInt(value);
         } else if (field === 'contract_year' || field === 'contract_month') {

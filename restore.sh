@@ -863,6 +863,7 @@ if [ -d "${PROJECT_DIR}/migrations" ]; then
     npm run migrate:user-roles 2>/dev/null || warning "使用者角色遷移失敗（可能已存在）"
     npm run migrate:system-settings 2>/dev/null || warning "系統設定表遷移失敗（可能已存在）"
     npm run migrate:project-types 2>/dev/null || warning "專案類型表遷移失敗（可能已存在）"
+    npm run migrate:report-groups 2>/dev/null || warning "報表群組遷移失敗（可能已存在）"
           npm run migrate:remove-project-type-check 2>/dev/null || warning "移除專案類型 CHECK 約束遷移失敗（可能已存在）"
           npm run migrate:sales-discount 2>/dev/null || warning "銷貨折讓欄位遷移失敗（可能已存在）"
           npm run migrate:costs 2>/dev/null || warning "成本明細表遷移失敗（可能已存在）"

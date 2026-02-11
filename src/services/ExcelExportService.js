@@ -305,11 +305,12 @@ class ExcelExportService {
     return workbook;
   }
 
-  // 匯出毛利分析報表（專案明細、依業務彙總、依類型彙總）
-  exportGrossProfit(year = null) {
-    const byProject = GrossProfitAnalysisService.getAnalysisByProject(year);
-    const bySalesperson = GrossProfitAnalysisService.getAnalysisBySalesperson(year);
-    const byType = GrossProfitAnalysisService.getAnalysisByType(year);
+  // 匯出毛利分析報表（專案明細、依業務彙總、依類型彙總、依群組彙總）
+  exportGrossProfit(year = null, user = null) {
+    const byProject = GrossProfitAnalysisService.getAnalysisByProject(year, user);
+    const bySalesperson = GrossProfitAnalysisService.getAnalysisBySalesperson(year, user);
+    const byType = GrossProfitAnalysisService.getAnalysisByType(year, user);
+    const byGroup = GrossProfitAnalysisService.getAnalysisByReportGroup(year, user);
 
     const workbook = new ExcelJS.Workbook();
     const sheetNameSuffix = year ? `-${year}` : '-全部';
@@ -318,13 +319,15 @@ class ExcelExportService {
     const wsProject = workbook.addWorksheet(`專案明細${sheetNameSuffix}`);
     wsProject.addRow(['專案毛利分析 - 專案明細', year ? `${year} 年度` : '全部年度']);
     wsProject.addRow([]);
-    wsProject.addRow(['專案編號', '專案名稱', '年度', '類型', '業務', '收入（未稅）', '成本', '毛利', '毛利率%']);
+    wsProject.addRow(['專案編號', '專案名稱', '年度', '類型', '狀態', '報表群組', '業務', '收入（未稅）', '成本', '毛利', '毛利率%']);
     for (const r of byProject) {
       wsProject.addRow([
         r.project_code || '',
         r.project_name || '',
         r.contract_year || '',
         r.project_type || '',
+        r.status || '',
+        r.report_group_name && r.report_group_name.trim() ? r.report_group_name : '未分群',
         r.salesperson_name || '-',
         formatCurrency(r.revenue),
         formatCurrency(r.total_cost),
@@ -332,7 +335,7 @@ class ExcelExportService {
         r.gross_margin_pct != null ? r.gross_margin_pct : ''
       ]);
     }
-    [14, 35, 8, 10, 12, 14, 14, 14, 10].forEach((w, i) => { wsProject.getColumn(i + 1).width = w; });
+    [14, 32, 8, 10, 8, 14, 12, 14, 14, 14, 10].forEach((w, i) => { wsProject.getColumn(i + 1).width = w; });
 
     // Sheet 2: 依業務彙總
     const wsSalesperson = workbook.addWorksheet(`依業務彙總${sheetNameSuffix}`);
@@ -367,6 +370,23 @@ class ExcelExportService {
       ]);
     }
     [15, 10, 14, 14, 14, 10].forEach((w, i) => { wsType.getColumn(i + 1).width = w; });
+
+    // Sheet 4: 依群組彙總
+    const wsGroup = workbook.addWorksheet(`依群組彙總${sheetNameSuffix}`);
+    wsGroup.addRow(['專案毛利分析 - 依群組彙總', year ? `${year} 年度` : '全部年度']);
+    wsGroup.addRow([]);
+    wsGroup.addRow(['報表群組', '專案數', '總收入', '總成本', '總毛利', '毛利率%']);
+    for (const r of byGroup) {
+      wsGroup.addRow([
+        r.report_group_name || '未分群',
+        r.project_count || 0,
+        formatCurrency(r.total_revenue),
+        formatCurrency(r.total_cost),
+        formatCurrency(r.gross_profit),
+        r.gross_margin_pct != null ? r.gross_margin_pct : ''
+      ]);
+    }
+    [20, 10, 14, 14, 14, 10].forEach((w, i) => { wsGroup.getColumn(i + 1).width = w; });
 
     return workbook;
   }

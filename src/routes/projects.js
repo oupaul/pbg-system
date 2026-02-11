@@ -83,6 +83,17 @@ function getProjectTypeColor(typeName) {
   }
 }
 
+// 輔助函數：獲取所有報表群組（供專案表單下拉選單）
+function getReportGroups() {
+  try {
+    return db.prepare(`
+      SELECT * FROM report_groups ORDER BY display_order ASC, name ASC
+    `).all();
+  } catch (err) {
+    return [];
+  }
+}
+
 // 專案列表
 router.get('/', (req, res) => {
   // Debug: 檢查用戶資訊
@@ -259,12 +270,14 @@ router.get('/new', requireEditPermission, (req, res) => {
     }
   }
 
+  const reportGroups = getReportGroups();
   res.render('projects/form', {
     title: '新增專案',
     project,
     salespeople,
     customers,
     projectTypes,
+    reportGroups,
     action: '/projects',
     method: 'POST'
   });
@@ -340,6 +353,7 @@ router.post('/', requireEditPermission, (req, res) => {
       sales_discount: parseFloat(req.body.sales_discount) || 0,
       is_new_customer: req.body.is_new_customer === '1',
       notes: req.body.notes ? req.body.notes.trim() : null,
+      report_group_id: req.body.report_group_id || null,
       userInfo: getUserInfo(req)
     });
 
@@ -571,6 +585,7 @@ router.get('/:id/edit', requireEditPermission, (req, res) => {
   const salespeople = Salesperson.findAll(true);
   const customers = Customer.findAll();
   const projectTypes = getActiveProjectTypes();
+  const reportGroups = getReportGroups();
 
   res.render('projects/form', {
     title: '編輯專案',
@@ -578,6 +593,7 @@ router.get('/:id/edit', requireEditPermission, (req, res) => {
     salespeople,
     customers,
     projectTypes,
+    reportGroups,
     action: `/projects/${project.id}`,
     method: 'POST'
   });
@@ -639,6 +655,7 @@ router.post('/:id', requireEditPermission, (req, res) => {
       sales_discount: req.body.sales_discount ? parseFloat(req.body.sales_discount) : 0,
       is_new_customer: req.body.is_new_customer === '1' ? 1 : 0,
       notes: req.body.notes || null,
+      report_group_id: req.body.report_group_id && req.body.report_group_id !== '' ? parseInt(req.body.report_group_id) : null,
       userInfo: getUserInfo(req) // 添加用戶資訊用於審計日誌
     });
 
