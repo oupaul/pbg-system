@@ -13,9 +13,12 @@ router.get('/export', async (req, res) => {
   try {
     const yearParam = req.query.year;
     const year = yearParam && yearParam !== 'all' ? parseInt(yearParam) : null;
-    const workbook = ExcelExportService.exportGrossProfit(year, req.user);
+    const statusParam = req.query.status;
+    const status = (statusParam === '未結案' || statusParam === '已結案') ? statusParam : null;
+    const workbook = ExcelExportService.exportGrossProfit(year, req.user, status);
     const buffer = await ExcelExportService.writeToBuffer(workbook);
-    const filename = year ? `毛利分析_${year}.xlsx` : '毛利分析_全部.xlsx';
+    let filename = year ? `毛利分析_${year}.xlsx` : '毛利分析_全部.xlsx';
+    if (status) filename = filename.replace('.xlsx', `_${status}.xlsx`);
     const encodedFilename = encodeURIComponent(filename).replace(/'/g, '%27');
     const nodeBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -32,8 +35,11 @@ router.get('/export/pdf', async (req, res) => {
   try {
     const yearParam = req.query.year;
     const year = yearParam && yearParam !== 'all' ? parseInt(yearParam) : null;
-    const buffer = await PdfExportService.exportGrossProfit(year, req.user);
-    const filename = year ? `毛利分析_${year}.pdf` : '毛利分析_全部.pdf';
+    const statusParam = req.query.status;
+    const status = (statusParam === '未結案' || statusParam === '已結案') ? statusParam : null;
+    const buffer = await PdfExportService.exportGrossProfit(year, req.user, status);
+    let filename = year ? `毛利分析_${year}.pdf` : '毛利分析_全部.pdf';
+    if (status) filename = filename.replace('.pdf', `_${status}.pdf`);
     const encodedFilename = encodeURIComponent(filename).replace(/'/g, '%27');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFilename}`);
@@ -47,11 +53,13 @@ router.get('/export/pdf', async (req, res) => {
 router.get('/', (req, res) => {
   const years = Project.getYears();
   const selectedYear = req.query.year && req.query.year !== 'all' ? parseInt(req.query.year) : null;
+  const statusParam = req.query.status;
+  const selectedStatus = (statusParam === '未結案' || statusParam === '已結案') ? statusParam : null;
 
-  const byProject = GrossProfitAnalysisService.getAnalysisByProject(selectedYear, req.user);
-  const bySalesperson = GrossProfitAnalysisService.getAnalysisBySalesperson(selectedYear, req.user);
-  const byType = GrossProfitAnalysisService.getAnalysisByType(selectedYear, req.user);
-  const byGroup = GrossProfitAnalysisService.getAnalysisByReportGroup(selectedYear, req.user);
+  const byProject = GrossProfitAnalysisService.getAnalysisByProject(selectedYear, req.user, selectedStatus);
+  const bySalesperson = GrossProfitAnalysisService.getAnalysisBySalesperson(selectedYear, req.user, selectedStatus);
+  const byType = GrossProfitAnalysisService.getAnalysisByType(selectedYear, req.user, selectedStatus);
+  const byGroup = GrossProfitAnalysisService.getAnalysisByReportGroup(selectedYear, req.user, selectedStatus);
 
   // 讀取各專案類型的毛利警示閾值（毛利率低於此值時顯示警示）
   let alertThresholdByType = {};
@@ -84,6 +92,7 @@ router.get('/', (req, res) => {
     totals,
     years,
     selectedYear: selectedYear ? selectedYear : 'all',
+    selectedStatus: selectedStatus || 'all',
     alertThresholdByType
   });
 });

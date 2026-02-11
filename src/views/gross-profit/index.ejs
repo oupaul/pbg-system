@@ -4,19 +4,28 @@
     <h1 class="h3"><i class="bi bi-pie-chart"></i> 專案毛利分析</h1>
   </div>
   <div class="col-auto d-flex align-items-center gap-2">
-    <form class="d-flex align-items-center gap-2" method="get">
-      <select name="year" class="form-select" onchange="this.form.submit()" style="width:auto">
+    <form class="d-flex align-items-center gap-2" method="get" id="grossProfitFilterForm">
+      <label class="form-label mb-0 align-self-center">年度</label>
+      <select name="year" class="form-select" style="width:auto">
         <option value="all" ${selectedYear === 'all' ? 'selected' : ''}>全部年度</option>
         ${(years || []).map(y => '<option value="' + y + '" ' + (y == selectedYear ? 'selected' : '') + '>' + y + '</option>').join('')}
       </select>
-      <a href="/gross-profit/export?year=${selectedYear}" class="btn btn-outline-success" title="匯出Excel"><i class="bi bi-file-earmark-excel"></i> Excel</a>
-      <a href="/gross-profit/export/pdf?year=${selectedYear}" class="btn btn-outline-danger" title="匯出PDF"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
+      <label class="form-label mb-0 align-self-center ms-2">狀態</label>
+      <select name="status" class="form-select" style="width:auto">
+        <option value="all" ${selectedStatus === 'all' ? 'selected' : ''}>全部</option>
+        <option value="未結案" ${selectedStatus === '未結案' ? 'selected' : ''}>未結案</option>
+        <option value="已結案" ${selectedStatus === '已結案' ? 'selected' : ''}>已結案</option>
+      </select>
+      <button type="submit" class="btn btn-outline-primary">套用</button>
+      <a href="/gross-profit" class="btn btn-outline-secondary" title="重設篩選">重設</a>
+      <a href="/gross-profit/export?year=${selectedYear}${selectedStatus !== 'all' ? '&status=' + encodeURIComponent(selectedStatus) : ''}" class="btn btn-outline-success" title="匯出Excel"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+      <a href="/gross-profit/export/pdf?year=${selectedYear}${selectedStatus !== 'all' ? '&status=' + encodeURIComponent(selectedStatus) : ''}" class="btn btn-outline-danger" title="匯出PDF"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
     </form>
   </div>
 </div>
 
 <p class="text-muted small mb-3">方案 A：收入 = 專案未稅價格，毛利 = 收入 − 總成本，毛利率 = 毛利 ÷ 收入 × 100%</p>
-<p class="text-muted small mb-3">選擇特定年度時：顯示「該年度簽約」的專案 ＋ 「之前年度」簽約且尚未結案的專案。已結案專案僅在選擇其簽約年度（或全部年度）時顯示。</p>
+<p class="text-muted small mb-3">選擇特定年度時：顯示「該年度簽約」的專案 ＋ 「之前年度」簽約且尚未結案的專案。已結案專案僅在選擇其簽約年度（或全部年度）時顯示。可依狀態篩選：<strong>全部</strong>、<strong>未結案</strong>、<strong>已結案</strong>。</p>
 
 <!-- 彙總卡片 -->
 <div class="row g-3 mb-4">

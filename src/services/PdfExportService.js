@@ -280,7 +280,7 @@ const PdfExportService = {
   /**
    * 匯出毛利分析 PDF（專案明細為主）
    */
-  async exportGrossProfit(year, user = null) {
+  async exportGrossProfit(year, user = null, statusFilter = null) {
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
       const chunks = [];
@@ -289,7 +289,7 @@ const PdfExportService = {
       doc.on('error', reject);
 
       applyFont(doc);
-      const byProject = GrossProfitAnalysisService.getAnalysisByProject(year, user);
+      const byProject = GrossProfitAnalysisService.getAnalysisByProject(year, user, statusFilter);
       const totals = {
         revenue: byProject.reduce((s, r) => s + (r.revenue || 0), 0),
         cost: byProject.reduce((s, r) => s + (r.total_cost || 0), 0),
@@ -299,26 +299,68 @@ const PdfExportService = {
         ? Math.round((totals.grossProfit / totals.revenue) * 1000) / 10
         : 0;
 
-      const title = year ? `專案毛利分析 - ${year} 年度` : '專案毛利分析 - 全部';
+      const statusSuffix = statusFilter === '未結案' ? '（未結案）' : statusFilter === '已結案' ? '（已結案）' : '';
+      const title = (year ? `專案毛利分析 - ${year} 年度` : '專案毛利分析 - 全部') + statusSuffix;
       doc.fontSize(14).text(title, { align: 'center' });
       doc.moveDown(0.3);
       doc.fontSize(10).text(`總收入：$${formatCurrency(totals.revenue)}　總成本：$${formatCurrency(totals.cost)}　總毛利：$${formatCurrency(totals.grossProfit)}　平均毛利率：${grossMarginPct}%`, { align: 'center' });
       doc.moveDown(0.5);
       doc.fontSize(8);
 
-      const headers = ['專案編號', '專案名稱', '年度', '類型', '狀態', '報表群組', '業務', '收入', '成本', '毛利', '毛利率%'];
-      const colWidths = [60, 170, 32, 45, 45, 55, 50, 60, 60, 60, 55];
       const cellPadding = 4;
-      const rowHeight = 28;
+      const groupRowHeight = 28;
+      const projectRowHeight = 40;  // 專案明細列高加高，以容納專案名稱換行
       let y = doc.y;
 
+      // 依群組彙總表（放在專案明細上面）
+      const byGroup = GrossProfitAnalysisService.getAnalysisByReportGroup(year, user, statusFilter);
+      if (byGroup && byGroup.length > 0) {
+        doc.fontSize(10).text('依群組彙總', 40, y);
+        y += 22;
+        const groupHeaders = ['報表群組', '專案數', '總收入', '總成本', '總毛利', '毛利率%'];
+        const groupColWidths = [130, 50, 95, 95, 95, 62];
+        let gx = 40;
+        groupHeaders.forEach((h, i) => {
+          doc.rect(gx, y, groupColWidths[i], groupRowHeight).fillAndStroke('#e9ecef', '#333');
+          doc.fillColor('#000').text(h, gx + cellPadding, y + 5, { width: groupColWidths[i] - cellPadding * 2 });
+          gx += groupColWidths[i];
+        });
+        y += groupRowHeight;
+        for (const r of byGroup) {
+          if (y > 500) {
+            doc.addPage({ size: 'A4', layout: 'landscape', margin: 40 });
+            y = 40;
+          }
+          gx = 40;
+          const rowData = [
+            (r.report_group_name || '未分群').substring(0, 22),
+            r.project_count || 0,
+            formatCurrency(r.total_revenue),
+            formatCurrency(r.total_cost),
+            formatCurrency(r.gross_profit),
+            (r.gross_margin_pct != null ? r.gross_margin_pct + '%' : '')
+          ];
+          rowData.forEach((val, i) => {
+            doc.rect(gx, y, groupColWidths[i], groupRowHeight).stroke();
+            doc.text(String(val || ''), gx + cellPadding, y + 4, { width: groupColWidths[i] - cellPadding * 2 });
+            gx += groupColWidths[i];
+          });
+          y += groupRowHeight;
+        }
+        doc.moveDown(1);
+        y = doc.y;
+      }
+
+      // 專案明細表（A4 橫向約 762pt 可用，欄寬以數值完整顯示為優先）
+      const headers = ['專案編號', '專案名稱', '年度', '類型', '狀態', '報表群組', '業務', '收入', '成本', '毛利', '毛利率%'];
+      const colWidths = [68, 150, 32, 52, 46, 58, 50, 78, 78, 78, 62];
       let x = 40;
       headers.forEach((h, i) => {
-        doc.rect(x, y, colWidths[i], rowHeight).fillAndStroke('#e9ecef', '#333');
+        doc.rect(x, y, colWidths[i], projectRowHeight).fillAndStroke('#e9ecef', '#333');
         doc.fillColor('#000').text(h, x + cellPadding, y + 5, { width: colWidths[i] - cellPadding * 2 });
         x += colWidths[i];
       });
-      y += rowHeight;
+      y += projectRowHeight;
 
       for (const r of byProject) {
         if (y > 500) {
@@ -327,70 +369,27 @@ const PdfExportService = {
         }
         x = 40;
         const rowData = [
-          (r.project_code || '').substring(0, 10),
-          (r.project_name || '').substring(0, 18),
+          (r.project_code || '').substring(0, 12),
+          (r.project_name || '').substring(0, 22),
           r.contract_year || '',
-          (r.project_type || '').substring(0, 6),
+          (r.project_type || '').substring(0, 8),
           (r.status || '').substring(0, 6),
-          (r.report_group_name && r.report_group_name.trim() ? r.report_group_name : '未分群').substring(0, 10),
-          (r.salesperson_name || '-').substring(0, 8),
+          (r.report_group_name && r.report_group_name.trim() ? r.report_group_name : '未分群').substring(0, 12),
+          (r.salesperson_name || '-').substring(0, 10),
           formatCurrency(r.revenue),
           formatCurrency(r.total_cost),
           formatCurrency(r.gross_profit),
           r.gross_margin_pct != null ? r.gross_margin_pct + '%' : ''
         ];
         rowData.forEach((val, i) => {
-          doc.rect(x, y, colWidths[i], rowHeight).stroke();
+          doc.rect(x, y, colWidths[i], projectRowHeight).stroke();
           doc.text(String(val || ''), x + cellPadding, y + 4, { width: colWidths[i] - cellPadding * 2 });
           x += colWidths[i];
         });
-        y += rowHeight;
+        y += projectRowHeight;
       }
 
       doc.text(`共 ${byProject.length} 筆專案`, 40, y + 10);
-      y += 36;
-
-      // 依群組彙總表
-      const byGroup = GrossProfitAnalysisService.getAnalysisByReportGroup(year, user);
-      if (byGroup && byGroup.length > 0) {
-        if (y > 450) {
-          doc.addPage({ size: 'A4', layout: 'landscape', margin: 40 });
-          y = 40;
-        }
-        doc.moveDown(1);
-        doc.fontSize(10).text('依群組彙總', 40, y);
-        y += 22;
-        const groupHeaders = ['報表群組', '專案數', '總收入', '總成本', '總毛利', '毛利率%'];
-        const groupColWidths = [120, 50, 80, 80, 80, 55];
-        let gx = 40;
-        groupHeaders.forEach((h, i) => {
-          doc.rect(gx, y, groupColWidths[i], rowHeight).fillAndStroke('#e9ecef', '#333');
-          doc.fillColor('#000').text(h, gx + cellPadding, y + 5, { width: groupColWidths[i] - cellPadding * 2 });
-          gx += groupColWidths[i];
-        });
-        y += rowHeight;
-        for (const r of byGroup) {
-          if (y > 500) {
-            doc.addPage({ size: 'A4', layout: 'landscape', margin: 40 });
-            y = 40;
-          }
-          gx = 40;
-          const rowData = [
-            (r.report_group_name || '未分群').substring(0, 18),
-            r.project_count || 0,
-            formatCurrency(r.total_revenue),
-            formatCurrency(r.total_cost),
-            formatCurrency(r.gross_profit),
-            (r.gross_margin_pct != null ? r.gross_margin_pct + '%' : '')
-          ];
-          rowData.forEach((val, i) => {
-            doc.rect(gx, y, groupColWidths[i], rowHeight).stroke();
-            doc.text(String(val || ''), gx + cellPadding, y + 4, { width: groupColWidths[i] - cellPadding * 2 });
-            gx += groupColWidths[i];
-          });
-          y += rowHeight;
-        }
-      }
       doc.end();
     });
   }

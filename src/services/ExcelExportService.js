@@ -306,18 +306,20 @@ class ExcelExportService {
   }
 
   // 匯出毛利分析報表（專案明細、依業務彙總、依類型彙總、依群組彙總）
-  exportGrossProfit(year = null, user = null) {
-    const byProject = GrossProfitAnalysisService.getAnalysisByProject(year, user);
-    const bySalesperson = GrossProfitAnalysisService.getAnalysisBySalesperson(year, user);
-    const byType = GrossProfitAnalysisService.getAnalysisByType(year, user);
-    const byGroup = GrossProfitAnalysisService.getAnalysisByReportGroup(year, user);
+  exportGrossProfit(year = null, user = null, statusFilter = null) {
+    const byProject = GrossProfitAnalysisService.getAnalysisByProject(year, user, statusFilter);
+    const bySalesperson = GrossProfitAnalysisService.getAnalysisBySalesperson(year, user, statusFilter);
+    const byType = GrossProfitAnalysisService.getAnalysisByType(year, user, statusFilter);
+    const byGroup = GrossProfitAnalysisService.getAnalysisByReportGroup(year, user, statusFilter);
 
     const workbook = new ExcelJS.Workbook();
+    const yearLabel = year ? `${year} 年度` : '全部年度';
+    const statusLabel = statusFilter === '未結案' ? '（未結案）' : statusFilter === '已結案' ? '（已結案）' : '';
     const sheetNameSuffix = year ? `-${year}` : '-全部';
 
     // Sheet 1: 專案明細
     const wsProject = workbook.addWorksheet(`專案明細${sheetNameSuffix}`);
-    wsProject.addRow(['專案毛利分析 - 專案明細', year ? `${year} 年度` : '全部年度']);
+    wsProject.addRow(['專案毛利分析 - 專案明細', yearLabel + statusLabel]);
     wsProject.addRow([]);
     wsProject.addRow(['專案編號', '專案名稱', '年度', '類型', '狀態', '報表群組', '業務', '收入（未稅）', '成本', '毛利', '毛利率%']);
     for (const r of byProject) {
@@ -339,7 +341,7 @@ class ExcelExportService {
 
     // Sheet 2: 依業務彙總
     const wsSalesperson = workbook.addWorksheet(`依業務彙總${sheetNameSuffix}`);
-    wsSalesperson.addRow(['專案毛利分析 - 依業務彙總', year ? `${year} 年度` : '全部年度']);
+    wsSalesperson.addRow(['專案毛利分析 - 依業務彙總', yearLabel + statusLabel]);
     wsSalesperson.addRow([]);
     wsSalesperson.addRow(['業務', '專案數', '總收入', '總成本', '總毛利', '毛利率%']);
     for (const r of bySalesperson) {
@@ -356,7 +358,7 @@ class ExcelExportService {
 
     // Sheet 3: 依類型彙總
     const wsType = workbook.addWorksheet(`依類型彙總${sheetNameSuffix}`);
-    wsType.addRow(['專案毛利分析 - 依類型彙總', year ? `${year} 年度` : '全部年度']);
+    wsType.addRow(['專案毛利分析 - 依類型彙總', yearLabel + statusLabel]);
     wsType.addRow([]);
     wsType.addRow(['專案類型', '專案數', '總收入', '總成本', '總毛利', '毛利率%']);
     for (const r of byType) {
@@ -373,7 +375,7 @@ class ExcelExportService {
 
     // Sheet 4: 依群組彙總
     const wsGroup = workbook.addWorksheet(`依群組彙總${sheetNameSuffix}`);
-    wsGroup.addRow(['專案毛利分析 - 依群組彙總', year ? `${year} 年度` : '全部年度']);
+    wsGroup.addRow(['專案毛利分析 - 依群組彙總', yearLabel + statusLabel]);
     wsGroup.addRow([]);
     wsGroup.addRow(['報表群組', '專案數', '總收入', '總成本', '總毛利', '毛利率%']);
     for (const r of byGroup) {
