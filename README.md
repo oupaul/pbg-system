@@ -1004,6 +1004,7 @@ sudo ./restore.sh backup_20241205_143022.tar.gz
 
 還原腳本會：
 - ✅ 在還原前自動備份現有資料
+- ✅ **多實例支援**：若同時部署多個不同 port 的實例，會列出所有相關的 systemd 服務供選擇
 - ✅ 停止服務
 - ✅ 還原資料庫
 - ✅ **自動偵測並修復舊備份** 🌟
@@ -1868,6 +1869,15 @@ invoice-bonus-system/
 #### 技術文件
 
 - `專案毛利分析功能說明.md` - 更新狀態篩選、重設按鈕、PDF 版面說明
+
+---
+
+### 還原腳本多實例服務偵測修復
+
+- ✅ 修復 `restore.sh` 在多實例部署（不同 port）時只顯示一個服務的問題
+- ✅ 新增掃描 `/etc/systemd/system/*.service`，找出 ExecStart 含 `app.js` 的服務，不論服務名稱為何皆可正確列出
+- ✅ 與 `uninstall.sh` 邏輯一致，支援多個 `invoice-bonus`、`project-system` 等實例同時部署
+- ✅ 相關檔案：`restore.sh` 的 `list_services` 函數
 
 ---
 

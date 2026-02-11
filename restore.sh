@@ -78,14 +78,14 @@ list_install_dirs() {
     done
 }
 
-# 列出相關的 systemd 服務
+# 列出相關的 systemd 服務（支援多實例部署：不同 port 的服務可能有不同名稱）
 list_services() {
     local services=()
     local index=1
     
     echo "" >&2
     echo "可用的 systemd 服務：" >&2
-    # 掃描所有包含 invoice-bonus 或類似名稱的服務（排除 backup 和 timer）
+    # 1. 掃描 systemctl 列表：包含 invoice-bonus、project-system 等名稱的服務（排除 backup 和 timer）
     while IFS= read -r service; do
         if [ -n "$service" ]; then
             services+=("$service")
@@ -95,6 +95,34 @@ list_services() {
             ((index++))
         fi
     done < <(systemctl list-unit-files --type=service 2>/dev/null | grep -E "(invoice-bonus|invoice.*bonus|project-system|fund-weekly)" | grep -v -E "(backup|timer)" | awk '{print $1}' | sort)
+    
+    # 2. 掃描 /etc/systemd/system/*.service：ExecStart 含 app.js 的服務（多實例可能用不同名稱，如 xxx-3001.service）
+    while IFS= read -r service_file; do
+        if [ -f "$service_file" ]; then
+            local service_name=$(basename "$service_file" .service)
+            # 排除 backup 相關
+            if [[ "$service_name" == *backup* ]]; then
+                continue
+            fi
+            # 檢查是否已在列表中（比對時皆去掉 .service 後綴）
+            local found=0
+            for existing_service in "${services[@]}"; do
+                local existing_base="${existing_service%.service}"
+                if [ "$existing_base" = "$service_name" ]; then
+                    found=1
+                    break
+                fi
+            done
+            # 若 ExecStart 含 app.js 且未在列表中，加入
+            if [ $found -eq 0 ] && grep -q "app.js" "$service_file" 2>/dev/null; then
+                services+=("$service_name")
+                local status=$(systemctl is-active "$service_name" 2>/dev/null || echo "unknown")
+                local enabled=$(systemctl is-enabled "$service_name" 2>/dev/null || echo "unknown")
+                printf "  [%2d] %s (狀態: %s, 啟用: %s)\n" "$index" "$service_name" "$status" "$enabled" >&2
+                ((index++))
+            fi
+        fi
+    done < <(find /etc/systemd/system -maxdepth 1 -name "*.service" 2>/dev/null | sort)
     
     if [ ${#services[@]} -eq 0 ]; then
         echo "  未找到相關服務" >&2
