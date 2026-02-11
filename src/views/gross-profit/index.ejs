@@ -16,6 +16,7 @@
 </div>
 
 <p class="text-muted small mb-3">方案 A：收入 = 專案未稅價格，毛利 = 收入 − 總成本，毛利率 = 毛利 ÷ 收入 × 100%</p>
+<p class="text-muted small mb-3">選擇特定年度時：顯示「該年度簽約」的專案 ＋ 「之前年度」簽約且尚未結案的專案。已結案專案僅在選擇其簽約年度（或全部年度）時顯示。</p>
 
 <!-- 彙總卡片 -->
 <div class="row g-3 mb-4">
@@ -80,6 +81,7 @@
                 <th>專案名稱</th>
                 <th>年度</th>
                 <th>類型</th>
+                <th>狀態</th>
                 <th>業務</th>
                 <th class="text-end">收入（未稅）</th>
                 <th class="text-end">成本</th>
@@ -97,8 +99,10 @@
                   ? '<span class="text-danger fw-bold">' + (r.gross_margin_pct || 0) + '%</span> <span class="badge bg-danger ms-1" title="低於該類型警示閾值 ' + threshold + '%">警示</span>'
                   : (r.gross_margin_pct || 0) + '%';
                 const rowClass = isBelowThreshold ? 'table-warning' : '';
-                return '<tr class="' + rowClass + '"><td><a href="/projects/' + r.id + '"><code>' + (r.project_code || '') + '</code></a></td><td>' + (r.project_name || '').substring(0, 25) + '</td><td>' + (r.contract_year || '') + '</td><td><span class="badge bg-secondary">' + (r.project_type || '') + '</span></td><td>' + (r.salesperson_name || '-') + '</td><td class="text-end">$' + (r.revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">$' + (r.total_cost || 0).toLocaleString() + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger fw-bold') + '">$' + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">' + marginCell + '</td><td><a href="/projects/' + r.id + '" class="btn btn-sm btn-outline-primary">詳情</a></td></tr>';
-              }).join('') : '<tr><td colspan="10" class="text-center text-muted py-4">尚無資料</td></tr>'}
+                const status = r.status || '未結案';
+                const statusBadge = status === '已結案' ? '<span class="badge bg-secondary">已結案</span>' : status === '取消' ? '<span class="badge bg-danger">取消</span>' : '<span class="badge bg-warning text-dark">未結案</span>';
+                return '<tr class="' + rowClass + '"><td><a href="/projects/' + r.id + '"><code>' + (r.project_code || '') + '</code></a></td><td>' + (r.project_name || '').substring(0, 25) + '</td><td>' + (r.contract_year || '') + '</td><td><span class="badge bg-secondary">' + (r.project_type || '') + '</span></td><td>' + statusBadge + '</td><td>' + (r.salesperson_name || '-') + '</td><td class="text-end">$' + (r.revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">$' + (r.total_cost || 0).toLocaleString() + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger fw-bold') + '">$' + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">' + marginCell + '</td><td><a href="/projects/' + r.id + '" class="btn btn-sm btn-outline-primary">詳情</a></td></tr>';
+              }).join('') : '<tr><td colspan="11" class="text-center text-muted py-4">尚無資料</td></tr>'}
             </tbody>
           </table>
         </div>
