@@ -321,23 +321,22 @@ class ExcelExportService {
     const wsProject = workbook.addWorksheet(`專案明細${sheetNameSuffix}`);
     wsProject.addRow(['專案毛利分析 - 專案明細', yearLabel + statusLabel]);
     wsProject.addRow([]);
-    wsProject.addRow(['專案編號', '專案名稱', '年度', '類型', '狀態', '報表群組', '業務', '收入（未稅）', '成本', '毛利', '毛利率%']);
+    wsProject.addRow(['專案編號', '客戶', '專案名稱', '類型', '毛利率%', '毛利', '收入（未稅）', '成本', '簽約年度', '狀態']);
     for (const r of byProject) {
       wsProject.addRow([
         r.project_code || '',
+        r.customer_name || '',
         r.project_name || '',
-        r.contract_year || '',
         r.project_type || '',
-        r.status || '',
-        r.report_group_name && r.report_group_name.trim() ? r.report_group_name : '未分群',
-        r.salesperson_name || '-',
+        r.gross_margin_pct != null ? r.gross_margin_pct : '',
+        formatCurrency(r.gross_profit),
         formatCurrency(r.revenue),
         formatCurrency(r.total_cost),
-        formatCurrency(r.gross_profit),
-        r.gross_margin_pct != null ? r.gross_margin_pct : ''
+        r.contract_year || '',
+        r.status || ''
       ]);
     }
-    [14, 32, 8, 10, 8, 14, 12, 14, 14, 14, 10].forEach((w, i) => { wsProject.getColumn(i + 1).width = w; });
+    [14, 32, 32, 10, 10, 14, 14, 14, 10, 8].forEach((w, i) => { wsProject.getColumn(i + 1).width = w; });
 
     // Sheet 2: 依業務彙總
     const wsSalesperson = workbook.addWorksheet(`依業務彙總${sheetNameSuffix}`);

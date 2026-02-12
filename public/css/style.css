@@ -374,3 +374,19 @@ tr[style*="cursor:pointer"]:hover td {
     font-size: 0.875rem;
   }
 }
+
+/* 專案毛利分析：手機版工具列不超出版面 */
+@media (max-width: 768px) {
+  .gross-profit-toolbar .col-md-auto {
+    width: 100%;
+  }
+  .gross-profit-toolbar form {
+    width: 100%;
+    max-width: 100%;
+  }
+  .gross-profit-toolbar .gross-profit-select {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+  }
+}

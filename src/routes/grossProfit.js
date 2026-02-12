@@ -63,15 +63,18 @@ router.get('/', (req, res) => {
 
   // 讀取各專案類型的毛利警示閾值（毛利率低於此值時顯示警示）
   let alertThresholdByType = {};
+  // 讀取專案類型顏色（與專案管理顯示一致）
+  let typeColorMap = {};
   try {
-    const types = db.prepare('SELECT type_name, alert_margin_threshold FROM project_types').all();
+    const types = db.prepare('SELECT type_name, alert_margin_threshold, badge_color FROM project_types').all();
     types.forEach(t => {
       if (t.alert_margin_threshold != null && !isNaN(t.alert_margin_threshold)) {
         alertThresholdByType[t.type_name] = parseFloat(t.alert_margin_threshold);
       }
+      if (t.badge_color) typeColorMap[t.type_name] = t.badge_color;
     });
   } catch (e) {
-    // project_types 可能尚未有 alert_margin_threshold 欄位
+    // project_types 可能尚未有 alert_margin_threshold 或 badge_color 欄位
   }
 
   const totals = {
@@ -93,7 +96,8 @@ router.get('/', (req, res) => {
     years,
     selectedYear: selectedYear ? selectedYear : 'all',
     selectedStatus: selectedStatus || 'all',
-    alertThresholdByType
+    alertThresholdByType,
+    typeColorMap
   });
 });
 

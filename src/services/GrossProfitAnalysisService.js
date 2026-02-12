@@ -49,6 +49,7 @@ const GrossProfitAnalysisService = {
       SELECT 
         p.id,
         p.project_code,
+        COALESCE(cust.company_name, '') as customer_name,
         p.project_name,
         p.contract_year,
         p.project_type,
@@ -62,6 +63,7 @@ const GrossProfitAnalysisService = {
           THEN ROUND((p.price_without_tax - COALESCE(c.total_cost, 0)) / p.price_without_tax * 100, 1) 
           ELSE 0 END as gross_margin_pct
       FROM projects p
+      LEFT JOIN customers cust ON p.customer_id = cust.id
       LEFT JOIN salespeople s ON p.salesperson_id = s.id
       LEFT JOIN report_groups rg ON p.report_group_id = rg.id
       LEFT JOIN (
@@ -74,7 +76,7 @@ const GrossProfitAnalysisService = {
     try {
       return db.prepare(sql).all(...params);
     } catch (err) {
-      if (err.message && (err.message.includes('no such table') || err.message.includes('report_groups'))) {
+      if (err.message && (err.message.includes('no such table') || err.message.includes('report_groups') || err.message.includes('customers'))) {
         const fallbackParams = year ? [year, year] : [];
         if (user && user.role === 'salesperson' && user.salesperson_id) {
           fallbackParams.push(user.salesperson_id);
@@ -87,7 +89,7 @@ const GrossProfitAnalysisService = {
         const fallbackWhereClause = fallbackWhere.length > 0 ? 'WHERE ' + fallbackWhere.join(' AND ') : '';
         return db.prepare(`
           SELECT 
-            p.id, p.project_code, p.project_name, p.contract_year, p.project_type, p.status,
+            p.id, p.project_code, COALESCE(cust.company_name, '') as customer_name, p.project_name, p.contract_year, p.project_type, p.status,
             '' as report_group_name,
             s.name as salesperson_name,
             p.price_without_tax as revenue,
@@ -95,6 +97,7 @@ const GrossProfitAnalysisService = {
             (p.price_without_tax - COALESCE(c.total_cost, 0)) as gross_profit,
             CASE WHEN p.price_without_tax > 0 THEN ROUND((p.price_without_tax - COALESCE(c.total_cost, 0)) / p.price_without_tax * 100, 1) ELSE 0 END as gross_margin_pct
           FROM projects p
+          LEFT JOIN customers cust ON p.customer_id = cust.id
           LEFT JOIN salespeople s ON p.salesperson_id = s.id
           LEFT JOIN (SELECT project_id, SUM(amount) as total_cost FROM costs GROUP BY project_id) c ON p.id = c.project_id
           ${fallbackWhereClause}

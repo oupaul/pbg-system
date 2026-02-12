@@ -1,25 +1,25 @@
 <%- include('../layout', { body: `
-<div class="row mb-4">
-  <div class="col">
+<div class="row mb-4 gross-profit-toolbar">
+  <div class="col-12 col-md">
     <h1 class="h3"><i class="bi bi-pie-chart"></i> 專案毛利分析</h1>
   </div>
-  <div class="col-auto d-flex align-items-center gap-2">
-    <form class="d-flex align-items-center gap-2" method="get" id="grossProfitFilterForm">
+  <div class="col-12 col-md-auto">
+    <form class="d-flex flex-wrap align-items-center gap-2" method="get" id="grossProfitFilterForm">
       <label class="form-label mb-0 align-self-center">年度</label>
-      <select name="year" class="form-select" style="width:auto">
+      <select name="year" class="form-select gross-profit-select">
         <option value="all" ${selectedYear === 'all' ? 'selected' : ''}>全部年度</option>
         ${(years || []).map(y => '<option value="' + y + '" ' + (y == selectedYear ? 'selected' : '') + '>' + y + '</option>').join('')}
       </select>
-      <label class="form-label mb-0 align-self-center ms-2">狀態</label>
-      <select name="status" class="form-select" style="width:auto">
+      <label class="form-label mb-0 align-self-center">狀態</label>
+      <select name="status" class="form-select gross-profit-select">
         <option value="all" ${selectedStatus === 'all' ? 'selected' : ''}>全部</option>
         <option value="未結案" ${selectedStatus === '未結案' ? 'selected' : ''}>未結案</option>
         <option value="已結案" ${selectedStatus === '已結案' ? 'selected' : ''}>已結案</option>
       </select>
       <button type="submit" class="btn btn-outline-primary">套用</button>
       <a href="/gross-profit" class="btn btn-outline-secondary" title="重設篩選">重設</a>
-      <a href="/gross-profit/export?year=${selectedYear}${selectedStatus !== 'all' ? '&status=' + encodeURIComponent(selectedStatus) : ''}" class="btn btn-outline-success" title="匯出Excel"><i class="bi bi-file-earmark-excel"></i> Excel</a>
-      <a href="/gross-profit/export/pdf?year=${selectedYear}${selectedStatus !== 'all' ? '&status=' + encodeURIComponent(selectedStatus) : ''}" class="btn btn-outline-danger" title="匯出PDF"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
+      <a href="/gross-profit/export?year=${selectedYear}${selectedStatus !== 'all' ? '&status=' + encodeURIComponent(selectedStatus) : ''}" class="btn btn-outline-success" title="匯出Excel"><i class="bi bi-file-earmark-excel"></i><span class="d-none d-md-inline ms-1">Excel</span></a>
+      <a href="/gross-profit/export/pdf?year=${selectedYear}${selectedStatus !== 'all' ? '&status=' + encodeURIComponent(selectedStatus) : ''}" class="btn btn-outline-danger" title="匯出PDF"><i class="bi bi-file-earmark-pdf"></i><span class="d-none d-md-inline ms-1">PDF</span></a>
     </form>
   </div>
 </div>
@@ -90,16 +90,15 @@
             <thead class="table-dark">
               <tr>
                 <th class="gross-profit-sortable" data-sort="project_code" data-type="text" role="button" tabindex="0" title="按此排序">專案編號 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
+                <th class="gross-profit-sortable" data-sort="customer_name" data-type="text" role="button" tabindex="0" title="按此排序">客戶 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
                 <th class="gross-profit-sortable" data-sort="project_name" data-type="text" role="button" tabindex="0" title="按此排序">專案名稱 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
-                <th class="gross-profit-sortable" data-sort="contract_year" data-type="number" role="button" tabindex="0" title="按此排序">年度 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
                 <th class="gross-profit-sortable" data-sort="project_type" data-type="text" role="button" tabindex="0" title="按此排序">類型 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
-                <th class="gross-profit-sortable" data-sort="status" data-type="text" role="button" tabindex="0" title="按此排序">狀態 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
-                <th class="gross-profit-sortable" data-sort="report_group_name" data-type="text" role="button" tabindex="0" title="按此排序">報表群組 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
-                <th class="gross-profit-sortable" data-sort="salesperson_name" data-type="text" role="button" tabindex="0" title="按此排序">業務 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
+                <th class="text-end gross-profit-sortable" data-sort="gross_margin_pct" data-type="number" role="button" tabindex="0" title="按此排序">毛利率 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
+                <th class="text-end gross-profit-sortable" data-sort="gross_profit" data-type="number" role="button" tabindex="0" title="按此排序">毛利 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
                 <th class="text-end gross-profit-sortable" data-sort="revenue" data-type="number" role="button" tabindex="0" title="按此排序">收入（未稅） <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
                 <th class="text-end gross-profit-sortable" data-sort="total_cost" data-type="number" role="button" tabindex="0" title="按此排序">成本 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
-                <th class="text-end gross-profit-sortable" data-sort="gross_profit" data-type="number" role="button" tabindex="0" title="按此排序">毛利 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
-                <th class="text-end gross-profit-sortable" data-sort="gross_margin_pct" data-type="number" role="button" tabindex="0" title="按此排序">毛利率 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
+                <th class="gross-profit-sortable" data-sort="contract_year" data-type="number" role="button" tabindex="0" title="按此排序">簽約年度 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
+                <th class="gross-profit-sortable" data-sort="status" data-type="text" role="button" tabindex="0" title="按此排序">狀態 <i class="bi bi-arrow-down-up sort-icon ms-1 opacity-50"></i></th>
                 <th></th>
               </tr>
             </thead>
@@ -114,10 +113,11 @@
                 const rowClass = isBelowThreshold ? 'table-warning' : '';
                 const status = r.status || '未結案';
                 const statusBadge = status === '已結案' ? '<span class="badge bg-secondary">已結案</span>' : status === '取消' ? '<span class="badge bg-danger">取消</span>' : '<span class="badge bg-warning text-dark">未結案</span>';
-                const groupDisplay = (r.report_group_name && r.report_group_name.trim()) ? '<span class="badge bg-info">' + (r.report_group_name || '').replace(/</g, '&lt;') + '</span>' : '<span class="text-muted">—</span>';
-                const dataAttrs = ' data-project_code="' + (r.project_code || '').replace(/"/g, '&quot;') + '" data-project_name="' + (r.project_name || '').replace(/"/g, '&quot;') + '" data-contract_year="' + (r.contract_year || '') + '" data-project_type="' + (r.project_type || '').replace(/"/g, '&quot;') + '" data-status="' + (r.status || '').replace(/"/g, '&quot;') + '" data-report_group_name="' + (r.report_group_name || '').replace(/"/g, '&quot;') + '" data-salesperson_name="' + (r.salesperson_name || '-').replace(/"/g, '&quot;') + '" data-revenue="' + (parseFloat(r.revenue) || 0) + '" data-total_cost="' + (parseFloat(r.total_cost) || 0) + '" data-gross_profit="' + (parseFloat(r.gross_profit) || 0) + '" data-gross_margin_pct="' + (parseFloat(r.gross_margin_pct) || 0) + '"';
-                return '<tr class="' + rowClass + '"' + dataAttrs + '><td><a href="/projects/' + r.id + '"><code>' + (r.project_code || '') + '</code></a></td><td>' + (r.project_name || '').substring(0, 25) + '</td><td>' + (r.contract_year || '') + '</td><td><span class="badge bg-secondary">' + (r.project_type || '') + '</span></td><td>' + statusBadge + '</td><td>' + groupDisplay + '</td><td>' + (r.salesperson_name || '-') + '</td><td class="text-end">$' + (r.revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">$' + (r.total_cost || 0).toLocaleString() + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger fw-bold') + '">$' + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">' + marginCell + '</td><td><a href="/projects/' + r.id + '" class="btn btn-sm btn-outline-primary">詳情</a></td></tr>';
-              }).join('') : '<tr><td colspan="12" class="text-center text-muted py-4">尚無資料</td></tr>'}
+                const typeColor = (typeof typeColorMap !== 'undefined' && r.project_type && typeColorMap[r.project_type]) ? typeColorMap[r.project_type] : 'info';
+                const typeBadge = '<span class="badge bg-' + typeColor + '">' + (r.project_type || '').replace(/</g, '&lt;') + '</span>';
+                const dataAttrs = ' data-project_code="' + (r.project_code || '').replace(/"/g, '&quot;') + '" data-customer_name="' + (r.customer_name || '').replace(/"/g, '&quot;') + '" data-project_name="' + (r.project_name || '').replace(/"/g, '&quot;') + '" data-contract_year="' + (r.contract_year || '') + '" data-project_type="' + (r.project_type || '').replace(/"/g, '&quot;') + '" data-status="' + (r.status || '').replace(/"/g, '&quot;') + '" data-revenue="' + (parseFloat(r.revenue) || 0) + '" data-total_cost="' + (parseFloat(r.total_cost) || 0) + '" data-gross_profit="' + (parseFloat(r.gross_profit) || 0) + '" data-gross_margin_pct="' + (parseFloat(r.gross_margin_pct) || 0) + '"';
+                return '<tr class="' + rowClass + '"' + dataAttrs + '><td><a href="/projects/' + r.id + '"><code>' + (r.project_code || '') + '</code></a></td><td>' + (r.customer_name || '').replace(/</g, '&lt;').substring(0, 18) + '</td><td>' + (r.project_name || '').replace(/</g, '&lt;').substring(0, 25) + '</td><td>' + typeBadge + '</td><td class="text-end">' + marginCell + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger fw-bold') + '">$' + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">$' + (r.revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">$' + (r.total_cost || 0).toLocaleString() + '</td><td>' + (r.contract_year || '') + '</td><td>' + statusBadge + '</td><td><a href="/projects/' + r.id + '" class="btn btn-sm btn-outline-primary">詳情</a></td></tr>';
+              }).join('') : '<tr><td colspan="11" class="text-center text-muted py-4">尚無資料</td></tr>'}
             </tbody>
           </table>
         </div>
