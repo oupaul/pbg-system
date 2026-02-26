@@ -1909,6 +1909,18 @@ invoice-bonus-system/
 
 ---
 
+### 2026-02-13 - 專案管理未收款篩選金額計算修正
+
+- ✅ 修復專案管理「未收款」篩選中：已開立發票金額重複加總、未開發票出現已折讓金額
+- ✅ 新增 migration `migrate_fix_v_project_summary_invoice_filters.js` 修正 `v_project_summary` 視圖
+- ✅ **total_invoiced**：僅計有效且未刪除發票，認列金額 = amount_with_tax - allowance_amount（排除作廢、整筆折讓、軟刪除）
+- ✅ **total_received**：僅計未刪除收款，考慮匯費差異
+- ✅ **uninvoiced_amount**：price - total_invoiced - 整筆折讓金額（已折讓的不應顯示為未開發票）
+- ✅ 更新 `restore.sh`：還原時執行發票相關遷移與視圖修正
+- ✅ 相關檔案：`migrations/migrate_fix_v_project_summary_invoice_filters.js`、`restore.sh`、`deploy.sh`、`package.json`
+
+---
+
 ### 還原腳本多實例服務偵測修復
 
 - ✅ 修復 `restore.sh` 在多實例部署（不同 port）時只顯示一個服務的問題

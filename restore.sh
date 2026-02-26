@@ -896,6 +896,10 @@ if [ -d "${PROJECT_DIR}/migrations" ]; then
           npm run migrate:sales-discount 2>/dev/null || warning "銷貨折讓欄位遷移失敗（可能已存在）"
           npm run migrate:costs 2>/dev/null || warning "成本明細表遷移失敗（可能已存在）"
           npm run migrate:update-total-received 2>/dev/null || warning "更新收款總額計算遷移失敗（可能已存在）"
+    npm run migrate:invoice-status 2>/dev/null || node migrations/migrate_invoice_status.js || warning "發票作廢/折讓遷移失敗（可能已存在）"
+    npm run migrate:soft-delete 2>/dev/null || node migrations/migrate_soft_delete_invoices_payments.js || warning "發票/收款軟刪除遷移失敗（可能已存在）"
+    npm run migrate:partial-allowance 2>/dev/null || node migrations/migrate_invoice_partial_allowance.js || warning "發票部分折讓遷移失敗（可能已存在）"
+    npm run migrate:fix-v-project-summary 2>/dev/null || node migrations/migrate_fix_v_project_summary_invoice_filters.js || warning "v_project_summary 視圖修正失敗（可能已存在）"
     log "✓ 資料庫遷移完成"
 else
     warning "找不到 migrations 目錄，跳過資料庫遷移"
@@ -936,40 +940,7 @@ if command -v sqlite3 >/dev/null 2>&1; then
                 
                 # 更新視圖定義（確保包含新欄位）
                 log "更新 v_project_summary 視圖..."
-                sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" <<'EOF'
-BEGIN TRANSACTION;
-DROP VIEW IF EXISTS v_project_summary;
-CREATE VIEW v_project_summary AS
-SELECT 
-  p.id,
-  p.project_code,
-  p.contract_year,
-  p.contract_month,
-  p.status,
-  p.project_type,
-  p.project_name,
-  p.price_with_tax,
-  p.price_without_tax,
-  p.is_new_customer,
-  p.salesperson_id,
-  p.customer_id,
-  p.expected_invoice_year_month,
-  p.notes,
-  p.created_at,
-  p.updated_at,
-  s.name as salesperson_name,
-  s.status as salesperson_status,
-  c.customer_code,
-  c.tax_id,
-  c.company_name,
-  COALESCE((SELECT SUM(amount_with_tax) FROM invoices WHERE project_id = p.id), 0) as total_invoiced,
-  p.price_with_tax - COALESCE((SELECT SUM(amount_with_tax) FROM invoices WHERE project_id = p.id), 0) as uninvoiced_amount,
-  COALESCE((SELECT SUM(bank_deposit_amount) FROM payments WHERE project_id = p.id), 0) as total_received
-FROM projects p
-LEFT JOIN salespeople s ON p.salesperson_id = s.id
-LEFT JOIN customers c ON p.customer_id = c.id;
-COMMIT;
-EOF
+                npm run migrate:fix-v-project-summary 2>/dev/null || node migrations/migrate_fix_v_project_summary_invoice_filters.js || warning "視圖更新失敗，將於服務啟動後由遷移修正"
                 
                 if [ $? -eq 0 ]; then
                     log "✓ 視圖更新成功"
