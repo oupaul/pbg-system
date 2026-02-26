@@ -129,26 +129,26 @@ router.get('/', (req, res) => {
     forfeited_bonus: 0
   };
 
-  // 取得發票統計（已開立發票金額加總，僅計有效發票）
+  // 取得發票統計（已開立發票金額加總，僅計有效且未刪除發票；部分折讓以認列金額計，與 v_project_summary 一致）
   let invoiceStats;
   if (selectedYear) {
     invoiceStats = db.prepare(`
       SELECT 
-        COALESCE(SUM(i.amount_with_tax), 0) as total_invoiced,
+        COALESCE(SUM(i.amount_with_tax - COALESCE(i.allowance_amount, 0)), 0) as total_invoiced,
         COUNT(DISTINCT i.project_id) as projects_with_invoices,
         COUNT(i.id) as invoice_count
       FROM invoices i
       JOIN projects p ON i.project_id = p.id
-      WHERE p.contract_year = ? AND (i.status IS NULL OR i.status = '有效')
+      WHERE p.contract_year = ? AND (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL)
     `).get(selectedYear);
   } else {
     invoiceStats = db.prepare(`
       SELECT 
-        COALESCE(SUM(amount_with_tax), 0) as total_invoiced,
+        COALESCE(SUM(amount_with_tax - COALESCE(allowance_amount, 0)), 0) as total_invoiced,
         COUNT(DISTINCT project_id) as projects_with_invoices,
         COUNT(id) as invoice_count
       FROM invoices
-      WHERE (status IS NULL OR status = '有效')
+      WHERE (status IS NULL OR status = '有效') AND (deleted_at IS NULL)
     `).get();
   }
   
@@ -166,7 +166,7 @@ router.get('/', (req, res) => {
       SELECT pm.bank_deposit_amount, pm.payment_difference, pm.difference_type
       FROM payments pm
       JOIN projects p ON pm.project_id = p.id
-      WHERE p.contract_year = ?
+      WHERE p.contract_year = ? AND (pm.deleted_at IS NULL)
     `).all(selectedYear);
     
     const totalReceived = payments.reduce((sum, p) => {
@@ -185,7 +185,7 @@ router.get('/', (req, res) => {
       total_sales_discount: salesDiscountResult ? (salesDiscountResult.total_sales_discount || 0) : 0
     };
   } else {
-    const payments = db.prepare('SELECT bank_deposit_amount, payment_difference, difference_type FROM payments').all();
+    const payments = db.prepare('SELECT bank_deposit_amount, payment_difference, difference_type FROM payments WHERE deleted_at IS NULL').all();
     
     const totalReceived = payments.reduce((sum, p) => {
       return sum + Payment.calculateActualReceived(p);

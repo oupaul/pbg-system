@@ -201,24 +201,26 @@ router.get('/', (req, res) => {
   // 確保年度篩選預設為 'all'（全部年度）
   const displayYear = yearFilter && yearFilter !== 'all' ? yearFilter : 'all';
 
-  // 計算統計資訊（對業務員和老闆角色顯示）
+  // 計算統計資訊
+  // 1) 業務員/老闆：永遠顯示
+  // 2) 其他角色：當使用「未開立發票」「未收款」「逾期未收款」篩選時顯示加總
+  const showFilterStats = filters.uninvoiced || filters.unpaid || filters.overdue_unpaid;
+  const showStatsForRole = req.user && (req.user.role === 'salesperson' || req.user.role === 'boss');
   let salespersonStats = null;
-  if (req.user && (req.user.role === 'salesperson' || req.user.role === 'boss')) {
+  if (showStatsForRole || showFilterStats) {
     salespersonStats = {
-      totalPrice: 0,           // 專案價格金額總和
-      totalInvoiced: 0,        // 已開立發票金額總和
-      totalUninvoiced: 0,      // 未開發票金額總和
-      totalReceived: 0,        // 已收款金額總和
-      totalUnpaid: 0           // 未收款金額總和
+      totalPrice: 0,
+      totalInvoiced: 0,
+      totalUninvoiced: 0,
+      totalReceived: 0,
+      totalUnpaid: 0
     };
-    
     projects.forEach(project => {
       salespersonStats.totalPrice += project.price_with_tax || 0;
       salespersonStats.totalInvoiced += project.total_invoiced || 0;
-      salespersonStats.totalUninvoiced += project.uninvoiced_amount || 0;
+      salespersonStats.totalUninvoiced += project.uninvoiced_amount ?? ((project.price_with_tax || 0) - (project.total_invoiced || 0));
       salespersonStats.totalReceived += project.total_received || 0;
-      // 未收款金額 = 已開立發票金額 - 已收款金額 - 銷貨折讓
-      salespersonStats.totalUnpaid += (project.total_invoiced || 0) - (project.total_received || 0) - (project.sales_discount || 0);
+      salespersonStats.totalUnpaid += Math.max(0, (project.total_invoiced || 0) - (project.total_received || 0) - (project.sales_discount || 0));
     });
   }
 
@@ -232,12 +234,13 @@ router.get('/', (req, res) => {
       year: displayYear
     },
     salespeople,
-    sortLinks: sortLinks, // 傳遞預生成的排序連結
-    sortIcons: sortIcons, // 傳遞預生成的箭頭圖示
-    salespersonStats: salespersonStats, // 統計資訊（業務員和老闆）
-    userRole: req.user ? req.user.role : null, // 傳遞用戶角色
-    projectTypes: projectTypes, // 傳遞專案類型列表
-    typeColorMap: typeColorMap // 傳遞類型顏色映射
+    sortLinks: sortLinks,
+    sortIcons: sortIcons,
+    salespersonStats: salespersonStats,
+    isFilterStatsOnly: showFilterStats && !showStatsForRole, // 僅因篩選而顯示加總（非業務員/老闆）
+    userRole: req.user ? req.user.role : null,
+    projectTypes: projectTypes,
+    typeColorMap: typeColorMap
   });
 });
 

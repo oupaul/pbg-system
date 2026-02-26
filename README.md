@@ -1909,6 +1909,29 @@ invoice-bonus-system/
 
 ---
 
+### 2026-02-13 - 儀表板發票統計與專案管理篩選加總
+
+#### 儀表板發票統計修正
+
+- ✅ 儀表板「已開立發票未收款總額」與專案管理金額一致
+- ✅ 發票統計：排除軟刪除發票（`deleted_at IS NULL`）、扣除部分折讓（`amount_with_tax - allowance_amount`）
+- ✅ 收款統計：排除軟刪除收款
+- ✅ 相關檔案：`src/routes/index.js`
+
+#### 專案管理篩選加總
+
+- ✅ 「未開立發票」「未收款」「逾期未收款」篩選時自動顯示加總金額
+- ✅ 所有角色（admin、user、salesperson、boss）使用上述篩選時皆顯示「篩選結果加總」
+- ✅ 加總項目：專案價格、已開發票、未開發票、已收款、未收款、專案筆數
+- ✅ 相關檔案：`src/routes/projects.js`、`src/views/projects/index.ejs`
+
+#### 發票金額診斷工具
+
+- ✅ 新增 `scripts/diagnose_invoice_amounts.sql`：比對儀表板、v_project_summary、直接加總的差異
+- ✅ 新增 `發票金額診斷說明.md`：查詢解讀與修正建議
+
+---
+
 ### 2026-02-13 - 專案管理未收款篩選金額計算修正
 
 - ✅ 修復專案管理「未收款」篩選中：已開立發票金額重複加總、未開發票出現已折讓金額

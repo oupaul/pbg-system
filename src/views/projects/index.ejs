@@ -87,10 +87,10 @@ ${locals.isReadOnly ? '<div class="alert alert-info mb-4"><i class="bi bi-info-c
 </div>
 
 ${salespersonStats ? `
-<!-- 專案統計資訊 -->
+<!-- 專案統計資訊 / 篩選結果加總 -->
 <div class="card mb-4 border-primary">
   <div class="card-header bg-primary text-white">
-    <h5 class="mb-0"><i class="bi bi-calculator"></i> ${userRole === 'salesperson' ? '我的專案統計資訊' : '專案統計資訊'}</h5>
+    <h5 class="mb-0"><i class="bi bi-calculator"></i> ${typeof isFilterStatsOnly !== 'undefined' && isFilterStatsOnly ? '篩選結果加總' : (userRole === 'salesperson' ? '我的專案統計資訊' : '專案統計資訊')}</h5>
   </div>
   <div class="card-body">
     <div class="row g-3">
