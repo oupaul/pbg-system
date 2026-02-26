@@ -130,7 +130,6 @@ router.get('/', (req, res) => {
   };
 
   // 取得發票統計（已開立發票金額加總，僅計有效發票）
-  const validStatusCondition = "(status IS NULL OR status = '有效')";
   let invoiceStats;
   if (selectedYear) {
     invoiceStats = db.prepare(`
@@ -140,7 +139,7 @@ router.get('/', (req, res) => {
         COUNT(i.id) as invoice_count
       FROM invoices i
       JOIN projects p ON i.project_id = p.id
-      WHERE p.contract_year = ? AND ${validStatusCondition}
+      WHERE p.contract_year = ? AND (i.status IS NULL OR i.status = '有效')
     `).get(selectedYear);
   } else {
     invoiceStats = db.prepare(`
@@ -149,7 +148,7 @@ router.get('/', (req, res) => {
         COUNT(DISTINCT project_id) as projects_with_invoices,
         COUNT(id) as invoice_count
       FROM invoices
-      WHERE ${validStatusCondition}
+      WHERE (status IS NULL OR status = '有效')
     `).get();
   }
   

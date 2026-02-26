@@ -1900,6 +1900,15 @@ invoice-bonus-system/
 
 ---
 
+### 2026-02-13 - 儀表板年度選擇修復
+
+- ✅ 修復儀表板右上年度選擇切換時出現「ambiguous column name: status」錯誤
+- ✅ 原因：發票統計查詢 JOIN `invoices` 與 `projects` 時，兩表皆有 `status` 欄位，條件未指定表別名
+- ✅ 修正：有年度篩選時改為 `(i.status IS NULL OR i.status = '有效')` 明確指定發票表
+- ✅ 相關檔案：`src/routes/index.js`
+
+---
+
 ### 還原腳本多實例服務偵測修復
 
 - ✅ 修復 `restore.sh` 在多實例部署（不同 port）時只顯示一個服務的問題
