@@ -14,9 +14,10 @@ const Project = {
         // 業務員只能看到自己負責的專案
         sql += ` AND salesperson_id = ?`;
         params.push(user.salesperson_id);
+      } else if (user.role !== 'admin' && user.role !== 'user' && user.role !== 'boss') {
+        // 非管理員、一般人員、老闆：不顯示「儀表板獨立加總」業務員的專案
+        sql += ` AND (salesperson_id IS NULL OR salesperson_id NOT IN (SELECT id FROM salespeople WHERE show_separate_dashboard = 1))`;
       }
-      // boss 可以看到所有專案，不需要額外過濾
-      // admin 和 user 也可以看到所有專案
     }
 
     if (filters.year) {
@@ -363,7 +364,8 @@ const Project = {
   },
 
   // 取得專案統計
-  getStatistics(year = null) {
+  // excludeSalespersonIds: 排除的業務 ID 陣列（用於儀表板 exclude_separate 模式）
+  getStatistics(year = null, excludeSalespersonIds = null) {
     let sql = `
       SELECT 
         COUNT(*) as total_projects,
@@ -372,13 +374,18 @@ const Project = {
         COALESCE(SUM(price_with_tax), 0) as total_amount
       FROM projects
     `;
-    
+    const conditions = [];
+    const params = [];
     if (year) {
-      sql += ` WHERE contract_year = ?`;
-      var result = db.prepare(sql).get(year);
-    } else {
-      var result = db.prepare(sql).get();
+      conditions.push('contract_year = ?');
+      params.push(year);
     }
+    if (excludeSalespersonIds && excludeSalespersonIds.length > 0) {
+      conditions.push(`salesperson_id NOT IN (${excludeSalespersonIds.map(() => '?').join(',')})`);
+      params.push(...excludeSalespersonIds);
+    }
+    if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
+    var result = db.prepare(sql).get(...params);
     
     // 為了向後兼容，保留舊的欄位名稱
     result = result || {};
@@ -387,25 +394,25 @@ const Project = {
     result.project_amount = 0;
     
     // 動態統計所有專案類型的金額
+    const typeConditions = ['project_type IS NOT NULL', "project_type != ''"];
+    const typeParams = [];
+    if (year) {
+      typeConditions.push('contract_year = ?');
+      typeParams.push(year);
+    }
+    if (excludeSalespersonIds && excludeSalespersonIds.length > 0) {
+      typeConditions.push(`salesperson_id NOT IN (${excludeSalespersonIds.map(() => '?').join(',')})`);
+      typeParams.push(...excludeSalespersonIds);
+    }
     let typeStatsSql = `
       SELECT 
         project_type,
         COALESCE(SUM(price_with_tax), 0) as type_amount
       FROM projects
-      WHERE project_type IS NOT NULL AND project_type != ''
+      WHERE ${typeConditions.join(' AND ')}
+      GROUP BY project_type
     `;
-    
-    if (year) {
-      typeStatsSql += ` AND contract_year = ?`;
-    }
-    
-    typeStatsSql += ` GROUP BY project_type`;
-    
-    if (year) {
-      var typeStats = db.prepare(typeStatsSql).all(year);
-    } else {
-      var typeStats = db.prepare(typeStatsSql).all();
-    }
+    var typeStats = db.prepare(typeStatsSql).all(...typeParams);
     
     // 將類型統計存儲到 result 中
     result.typeAmounts = {};

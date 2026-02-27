@@ -900,6 +900,8 @@ if [ -d "${PROJECT_DIR}/migrations" ]; then
     npm run migrate:soft-delete 2>/dev/null || node migrations/migrate_soft_delete_invoices_payments.js || warning "發票/收款軟刪除遷移失敗（可能已存在）"
     npm run migrate:partial-allowance 2>/dev/null || node migrations/migrate_invoice_partial_allowance.js || warning "發票部分折讓遷移失敗（可能已存在）"
     npm run migrate:fix-v-project-summary 2>/dev/null || node migrations/migrate_fix_v_project_summary_invoice_filters.js || warning "v_project_summary 視圖修正失敗（可能已存在）"
+    npm run migrate:dashboard-view-mode 2>/dev/null || node migrations/migrate_dashboard_view_mode.js || warning "儀表板檢視模式遷移失敗（可能已存在）"
+    npm run migrate:project-types-show-in-dashboard 2>/dev/null || node migrations/migrate_project_types_show_in_dashboard.js || warning "專案類型儀表板顯示遷移失敗（可能已存在）"
     log "✓ 資料庫遷移完成"
 else
     warning "找不到 migrations 目錄，跳過資料庫遷移"

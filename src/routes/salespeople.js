@@ -171,6 +171,7 @@ router.post('/:id', (req, res) => {
       name: req.body.name,
       status: req.body.status,
       resigned_date: req.body.resigned_date,
+      show_separate_dashboard: req.body.show_separate_dashboard === '1',
       userInfo: getUserInfo(req)
     });
     res.redirect(`/salespeople/${req.params.id}`);

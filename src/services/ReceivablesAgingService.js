@@ -9,10 +9,15 @@ const ReceivablesAgingService = {
   /**
    * 取得應收帳款帳齡分析
    * @param {number|null} year - 專案簽約年度篩選，null 為全部
+   * @param {number[]|null} excludeSalespersonIds - 排除的業務 ID 列表（exclude_separate 時使用）
    * @returns {Object} { buckets, total, details }
    */
-  getAgingReport(year = null) {
+  getAgingReport(year = null, excludeSalespersonIds = null) {
     const today = new Date().toISOString().slice(0, 10);
+    const excludeCond = excludeSalespersonIds && excludeSalespersonIds.length > 0
+      ? ` AND p.salesperson_id NOT IN (${excludeSalespersonIds.map(() => '?').join(',')})`
+      : '';
+    const excludeParams = excludeSalespersonIds && excludeSalespersonIds.length > 0 ? excludeSalespersonIds : [];
 
     // 取得有效發票（僅 status = 有效）
     let invoices;
@@ -22,18 +27,18 @@ const ReceivablesAgingService = {
         FROM invoices i
         JOIN projects p ON i.project_id = p.id
         LEFT JOIN salespeople sp ON p.salesperson_id = sp.id
-        WHERE (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) AND p.contract_year = ?
+        WHERE (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) AND p.contract_year = ? ${excludeCond}
         ORDER BY i.expected_payment_date, i.invoice_date
-      `).all(year);
+      `).all(year, ...excludeParams);
     } else {
       invoices = db.prepare(`
         SELECT i.*, p.project_code, p.project_name, p.salesperson_id, sp.name as salesperson_name
         FROM invoices i
         JOIN projects p ON i.project_id = p.id
         LEFT JOIN salespeople sp ON p.salesperson_id = sp.id
-        WHERE (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL)
+        WHERE (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) ${excludeCond}
         ORDER BY i.expected_payment_date, i.invoice_date
-      `).all();
+      `).all(...excludeParams);
     }
 
     const buckets = {
@@ -119,23 +124,29 @@ const ReceivablesAgingService = {
   /**
    * 取得收款提醒：即將到期（N 天內）與已逾期的未收款發票
    * @param {number} reminderDays - 提前幾天提醒（預設 7）
+   * @param {number[]|null} excludeSalespersonIds - 排除的業務 ID 列表（exclude_separate 時使用）
    * @returns {Object} { upcoming: [], overdue: [] }
    */
-  getPaymentReminder(reminderDays = 7) {
+  getPaymentReminder(reminderDays = 7, excludeSalespersonIds = null) {
     const today = new Date().toISOString().slice(0, 10);
     const todayDate = new Date(today);
     const futureDate = new Date(todayDate);
     futureDate.setDate(futureDate.getDate() + reminderDays);
     const futureStr = futureDate.toISOString().slice(0, 10);
 
+    const excludeCond = excludeSalespersonIds && excludeSalespersonIds.length > 0
+      ? ` AND p.salesperson_id NOT IN (${excludeSalespersonIds.map(() => '?').join(',')})`
+      : '';
+    const excludeParams = excludeSalespersonIds && excludeSalespersonIds.length > 0 ? excludeSalespersonIds : [];
+
     const invoices = db.prepare(`
       SELECT i.*, p.project_code, p.project_name, p.id as project_id, sp.name as salesperson_name
       FROM invoices i
       JOIN projects p ON i.project_id = p.id
       LEFT JOIN salespeople sp ON p.salesperson_id = sp.id
-      WHERE (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) AND i.expected_payment_date IS NOT NULL
+      WHERE (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) AND i.expected_payment_date IS NOT NULL ${excludeCond}
       ORDER BY i.expected_payment_date
-    `).all();
+    `).all(...excludeParams);
 
     const upcoming = [];
     const overdue = [];

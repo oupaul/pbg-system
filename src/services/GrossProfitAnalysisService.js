@@ -5,6 +5,16 @@
  */
 const db = require('../models/db');
 
+// 非 admin/user/boss 時排除「儀表板獨立加總」業務員的專案
+function excludeSeparateCondition(user) {
+  if (!user || ['admin', 'user', 'boss'].includes(user.role)) return '';
+  return "(p.salesperson_id IS NULL OR p.salesperson_id NOT IN (SELECT id FROM salespeople WHERE show_separate_dashboard = 1))";
+}
+function excludeSeparateSalespersonCondition(user) {
+  if (!user || ['admin', 'user', 'boss'].includes(user.role)) return '';
+  return "(COALESCE(s.show_separate_dashboard, 0) <> 1)";
+}
+
 const GrossProfitAnalysisService = {
   /**
    * 取得專案毛利明細
@@ -41,6 +51,8 @@ const GrossProfitAnalysisService = {
     if (yearCondition) conditions.push(yearCondition);
     if (roleCondition) conditions.push(roleCondition);
     if (statusCondition) conditions.push(statusCondition);
+    const exc = excludeSeparateCondition(user);
+    if (exc) conditions.push(exc);
     if (conditions.length > 0) {
       whereClause = 'WHERE ' + conditions.join(' AND ');
     }
@@ -86,6 +98,7 @@ const GrossProfitAnalysisService = {
         if (yearCondition) fallbackWhere.push(yearCondition);
         if (roleCondition) fallbackWhere.push(roleCondition);
         if (statusCondition) fallbackWhere.push(statusCondition);
+        if (exc) fallbackWhere.push(exc);
         const fallbackWhereClause = fallbackWhere.length > 0 ? 'WHERE ' + fallbackWhere.join(' AND ') : '';
         return db.prepare(`
           SELECT 
@@ -142,6 +155,8 @@ const GrossProfitAnalysisService = {
     if (yearCondition) conditions.push(yearCondition);
     if (roleCondition) conditions.push(roleCondition);
     if (statusCondition) conditions.push(statusCondition);
+    const excSp = excludeSeparateSalespersonCondition(user);
+    if (excSp) conditions.push(excSp);
     const whereClause = 'WHERE ' + conditions.join(' AND ');
 
     const sql = `
@@ -203,6 +218,8 @@ const GrossProfitAnalysisService = {
     if (yearCondition) conditions.push(yearCondition);
     if (roleCondition) conditions.push(roleCondition);
     if (statusCondition) conditions.push(statusCondition);
+    const exc2 = excludeSeparateCondition(user);
+    if (exc2) conditions.push(exc2);
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
     const sql = `
@@ -263,6 +280,8 @@ const GrossProfitAnalysisService = {
     if (yearCondition) conditions.push(yearCondition);
     if (roleCondition) conditions.push(roleCondition);
     if (statusCondition) conditions.push(statusCondition);
+    const exc3 = excludeSeparateCondition(user);
+    if (exc3) conditions.push(exc3);
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
     const sql = `

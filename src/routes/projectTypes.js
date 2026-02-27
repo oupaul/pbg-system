@@ -30,7 +30,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
 
 // 新增專案類型（僅管理員）
 router.post('/create', requireAuth, requireAdmin, (req, res) => {
-  const { type_name, badge_color, display_order, alert_margin_threshold } = req.body;
+  const { type_name, badge_color, display_order, alert_margin_threshold, show_in_dashboard } = req.body;
   
   if (!type_name || !type_name.trim()) {
     return res.redirect('/project-types?error=' + encodeURIComponent('類型名稱不能為空'));
@@ -51,10 +51,20 @@ router.post('/create', requireAuth, requireAdmin, (req, res) => {
     
     const alertThreshold = alert_margin_threshold !== '' && alert_margin_threshold != null
       ? parseFloat(alert_margin_threshold) : null;
-    db.prepare(`
-      INSERT INTO project_types (type_name, badge_color, display_order, is_active, alert_margin_threshold, updated_at)
-      VALUES (?, ?, ?, 1, ?, datetime('now', 'localtime'))
-    `).run(trimmedName, color, order, alertThreshold);
+    const showInDashboard = (show_in_dashboard === '1' || show_in_dashboard === 1 || show_in_dashboard === 'true') ? 1 : 0;
+    try {
+      db.prepare(`
+        INSERT INTO project_types (type_name, badge_color, display_order, is_active, alert_margin_threshold, show_in_dashboard, updated_at)
+        VALUES (?, ?, ?, 1, ?, ?, datetime('now', 'localtime'))
+      `).run(trimmedName, color, order, alertThreshold, showInDashboard);
+    } catch (insErr) {
+      if (insErr.message && insErr.message.includes('show_in_dashboard')) {
+        db.prepare(`
+          INSERT INTO project_types (type_name, badge_color, display_order, is_active, alert_margin_threshold, updated_at)
+          VALUES (?, ?, ?, 1, ?, datetime('now', 'localtime'))
+        `).run(trimmedName, color, order, alertThreshold);
+      } else throw insErr;
+    }
     
     res.redirect('/project-types?success=' + encodeURIComponent('專案類型新增成功'));
   } catch (err) {
@@ -66,7 +76,7 @@ router.post('/create', requireAuth, requireAdmin, (req, res) => {
 // 更新專案類型（僅管理員）
 router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
   const { id } = req.params;
-  const { type_name, badge_color, display_order, is_active, alert_margin_threshold } = req.body;
+  const { type_name, badge_color, display_order, is_active, alert_margin_threshold, show_in_dashboard } = req.body;
   
   if (!type_name || !type_name.trim()) {
     return res.redirect('/project-types?error=' + encodeURIComponent('類型名稱不能為空'));
@@ -100,14 +110,25 @@ router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
     const order = display_order ? parseInt(display_order, 10) : existing.display_order || 0;
     const color = badge_color || 'info';
     const active = (is_active === '1' || is_active === 1 || is_active === 'true') ? 1 : 0;
+    const showInDashboard = (show_in_dashboard === '1' || show_in_dashboard === 1 || show_in_dashboard === 'true') ? 1 : 0;
     
     const alertThreshold = alert_margin_threshold !== '' && alert_margin_threshold != null
       ? parseFloat(alert_margin_threshold) : null;
-    db.prepare(`
-      UPDATE project_types 
-      SET type_name = ?, badge_color = ?, display_order = ?, is_active = ?, alert_margin_threshold = ?, updated_at = datetime('now', 'localtime')
-      WHERE id = ?
-    `).run(trimmedName, color, order, active, alertThreshold, id);
+    try {
+      db.prepare(`
+        UPDATE project_types 
+        SET type_name = ?, badge_color = ?, display_order = ?, is_active = ?, alert_margin_threshold = ?, show_in_dashboard = ?, updated_at = datetime('now', 'localtime')
+        WHERE id = ?
+      `).run(trimmedName, color, order, active, alertThreshold, showInDashboard, id);
+    } catch (updErr) {
+      if (updErr.message && updErr.message.includes('show_in_dashboard')) {
+        db.prepare(`
+          UPDATE project_types 
+          SET type_name = ?, badge_color = ?, display_order = ?, is_active = ?, alert_margin_threshold = ?, updated_at = datetime('now', 'localtime')
+          WHERE id = ?
+        `).run(trimmedName, color, order, active, alertThreshold, id);
+      } else throw updErr;
+    }
     
     res.redirect('/project-types?success=' + encodeURIComponent('專案類型更新成功'));
   } catch (err) {

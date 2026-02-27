@@ -37,12 +37,7 @@
           <li class="nav-item">
             <a class="nav-link" href="/search"><i class="bi bi-search"></i> 搜尋</a>
           </li>
-          <% if (typeof user !== 'undefined' && user && user.role === 'salesperson') { %>
-          <li class="nav-item">
-            <a class="nav-link" href="/sales-performance"><i class="bi bi-graph-up"></i> 業務績效</a>
-          </li>
-          <% } %>
-          <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user')) { %>
+          <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user' || user.role === 'boss')) { %>
           <li class="nav-item">
             <a class="nav-link" href="/bonuses"><i class="bi bi-currency-dollar"></i> 獎金管理</a>
           </li>

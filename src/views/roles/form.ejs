@@ -268,6 +268,28 @@
           </div>
         </div>
 
+        <!-- 儀表板檢視模式 -->
+        <div class="card mt-4">
+          <div class="card-header bg-light">
+            <h5 class="mb-0">儀表板檢視模式</h5>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label for="dashboard_view_mode" class="form-label">儀表板顯示方式</label>
+              <select class="form-select" id="dashboard_view_mode" name="dashboard_view_mode">
+                <option value="all_and_separate" ${role && role.dashboard_view_mode === 'all_and_separate' ? 'selected' : (!role ? 'selected' : '')}>全部 + 獨立區塊</option>
+                <option value="exclude_separate" ${role && role.dashboard_view_mode === 'exclude_separate' ? 'selected' : ''}>僅非獨立專案</option>
+                <option value="none" ${role && role.dashboard_view_mode === 'none' ? 'selected' : ''}>不顯示儀表板</option>
+              </select>
+              <div class="form-text">
+                <strong>全部 + 獨立區塊</strong>：顯示所有專案加總，並顯示「儀表板獨立加總」業務的獨立區塊。<br>
+                <strong>僅非獨立專案</strong>：只顯示非獨立業務的專案加總（排除獨立業務）。<br>
+                <strong>不顯示儀表板</strong>：首頁顯示歡迎頁，不顯示儀表板（如業務員）。
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 操作按鈕 -->
         <div class="card mt-4">
           <div class="card-body">

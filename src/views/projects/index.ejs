@@ -56,7 +56,10 @@ ${locals.isReadOnly ? '<div class="alert alert-info mb-4"><i class="bi bi-info-c
         <label class="form-label">業務</label>
         <select name="salesperson" class="form-select">
           <option value="">全部</option>
-          ${salespeople.map(s => `<option value="${s.name}" ${filters.salesperson === s.name ? 'selected' : ''}>${s.name}</option>`).join('')}
+          ${salespeople.map(s => {
+            const label = s.name + (s.status && s.status !== 'active' ? ' (離職)' : '');
+            return `<option value="${s.name}" ${filters.salesperson === s.name ? 'selected' : ''}>${label}</option>`;
+          }).join('')}
         </select>
       </div>
       <div class="col-md-2">

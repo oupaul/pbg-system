@@ -87,6 +87,8 @@ router.post('/', async (req, res) => {
     }
 
     // 收集權限設定
+    const dashboardMode = ['all_and_separate', 'exclude_separate', 'none'].includes(req.body.dashboard_view_mode)
+      ? req.body.dashboard_view_mode : 'all_and_separate';
     const permissions = {
       role_key,
       role_name,
@@ -99,6 +101,7 @@ router.post('/', async (req, res) => {
       can_backup_restore: req.body.can_backup_restore === 'on' ? 1 : 0,
       can_view_all_projects: req.body.can_view_all_projects === 'on' ? 1 : 0,
       can_view_own_projects: req.body.can_view_own_projects === 'on' ? 1 : 0,
+      dashboard_view_mode: dashboardMode,
       is_system_role: 0, // 新建角色永遠不是系統角色
       is_active: is_active === 'on' ? 1 : 0,
       display_order: parseInt(display_order) || 0
@@ -154,6 +157,8 @@ async function handleRoleUpdate(req, res) {
       }
     }
 
+    const dashboardMode = ['all_and_separate', 'exclude_separate', 'none'].includes(req.body.dashboard_view_mode)
+      ? req.body.dashboard_view_mode : 'all_and_separate';
     // 收集更新資料
     const updateData = {
       role_name,
@@ -166,6 +171,7 @@ async function handleRoleUpdate(req, res) {
       can_backup_restore: req.body.can_backup_restore === 'on' ? 1 : 0,
       can_view_all_projects: req.body.can_view_all_projects === 'on' ? 1 : 0,
       can_view_own_projects: req.body.can_view_own_projects === 'on' ? 1 : 0,
+      dashboard_view_mode: dashboardMode,
       is_active: is_active === 'on' ? 1 : 0,
       display_order: parseInt(display_order) || 0
     };

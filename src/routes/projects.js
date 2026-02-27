@@ -120,7 +120,17 @@ router.get('/', (req, res) => {
   const projects = Project.findAll(filters, req.user);
   console.log('[專案列表] 查詢到的專案數量:', projects.length);
   
-  const salespeople = Salesperson.findAll(true);
+  // 業務下拉清單：業務員只顯示自己；非 admin/user/boss 排除獨立計算業務；含離職人員
+  let salespeople;
+  if (req.user && req.user.role === 'salesperson' && req.user.salesperson_id) {
+    const sp = Salesperson.findById(req.user.salesperson_id);
+    salespeople = sp ? [sp] : [];
+  } else {
+    salespeople = Salesperson.findAll(true); // 含離職
+    if (req.user && req.user.role !== 'admin' && req.user.role !== 'user' && req.user.role !== 'boss') {
+      salespeople = salespeople.filter(s => !s.show_separate_dashboard);
+    }
+  }
   const projectTypes = getActiveProjectTypes();
   
   // 建立類型顏色映射（包括所有類型，不僅是啟用的）
@@ -201,11 +211,9 @@ router.get('/', (req, res) => {
   // 確保年度篩選預設為 'all'（全部年度）
   const displayYear = yearFilter && yearFilter !== 'all' ? yearFilter : 'all';
 
-  // 計算統計資訊
-  // 1) 業務員/老闆：永遠顯示
-  // 2) 其他角色：當使用「未開立發票」「未收款」「逾期未收款」篩選時顯示加總
+  // 計算統計資訊：所有角色皆顯示（依目前篩選結果加總）
   const showFilterStats = filters.uninvoiced || filters.unpaid || filters.overdue_unpaid;
-  const showStatsForRole = req.user && (req.user.role === 'salesperson' || req.user.role === 'boss');
+  const showStatsForRole = !!req.user; // 登入者皆顯示
   let salespersonStats = null;
   if (showStatsForRole || showFilterStats) {
     salespersonStats = {

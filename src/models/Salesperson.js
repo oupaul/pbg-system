@@ -81,6 +81,14 @@ const Salesperson = {
     } else {
       newData.resigned_date = oldRecord.resigned_date;
     }
+    if (data.show_separate_dashboard !== undefined) {
+      const val = data.show_separate_dashboard ? 1 : 0;
+      fields.push('show_separate_dashboard = ?');
+      values.push(val);
+      newData.show_separate_dashboard = val;
+    } else if (oldRecord.show_separate_dashboard !== undefined) {
+      newData.show_separate_dashboard = oldRecord.show_separate_dashboard;
+    }
     
     // 如果沒有要更新的欄位，直接返回
     if (fields.length === 0) return false;
