@@ -1,14 +1,15 @@
 # 專案開立發票業績認列獎金計算總表系統
 
-[![版本](https://img.shields.io/badge/版本-v1.14.0-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
+[![版本](https://img.shields.io/badge/版本-v1.15.0-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![資料庫](https://img.shields.io/badge/資料庫-better--sqlite3-orange.svg)](https://github.com/WiseLibs/better-sqlite3)
 [![授權](https://img.shields.io/badge/授權-MIT-lightgrey.svg)](LICENSE)
 
 基於 Node.js + SQLite 的專案管理與獎金計算系統，用於管理專案、發票、收款及業務獎金。
 
-## 🚀 最新更新（v1.14.0 - 2026-02-06）
+## 🚀 最新更新（v1.15.0 - 2026-02-12）
 
+- 💰 **一筆發票分多次收款** - 同一張發票可對應多筆收款，支援分批付款情境
 - 📊 **業務績效圖表** - 圓餅圖、長條圖呈現業績與獎金占比
 - 🔔 **收款提醒** - 依預計收款日站內提醒（即將到期／已逾期）
 - 🗑️ **發票／收款軟刪除** - 可還原，專案詳情支援「顯示已刪除」
@@ -1117,6 +1118,7 @@ sudo ./uninstall.sh
 - 收款記錄登錄
 - 匯費/違約金記錄
 - **應收帳款追蹤**：自動扣除銷貨折讓金額，顯示實際應收帳款
+- **一筆發票分多次收款** 🆕：同一張發票可對應多筆收款，支援分批付款
 
 ### 獎金計算
 - 依專案類型自動計算獎金基礎
@@ -1941,6 +1943,24 @@ invoice-bonus-system/
 - ✅ **uninvoiced_amount**：price - total_invoiced - 整筆折讓金額（已折讓的不應顯示為未開發票）
 - ✅ 更新 `restore.sh`：還原時執行發票相關遷移與視圖修正
 - ✅ 相關檔案：`migrations/migrate_fix_v_project_summary_invoice_filters.js`、`restore.sh`、`deploy.sh`、`package.json`
+
+---
+
+### 2026-02-12 - v1.15.0 一筆發票分多次收款 💰
+
+#### 新增功能
+
+**一筆發票分多次收款**
+- ✅ 同一張發票可對應多筆收款記錄，支援客戶分批付款情境
+- ✅ 新增收款時可重複選擇同一發票，下拉顯示「總額、未收、已收齊」狀態
+- ✅ 編輯收款時含已作廢發票選項（標示「已作廢/折讓」），確保可正確顯示
+- ✅ 未收款金額 = 發票認列金額 − 該發票所有收款的加總
+- ✅ 無需資料庫遷移，payments.invoice_id 一對多關係已存在
+- ✅ 相關檔案：`src/routes/projects.js`（invoiceUnpaidSummary）、`src/views/projects/show.ejs`（新增/編輯收款 Modal）
+
+#### 技術文件
+
+- `一筆發票分多次收款功能說明.md` - 功能說明與技術實作
 
 ---
 

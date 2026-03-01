@@ -532,11 +532,25 @@ router.get('/:id', (req, res) => {
     return { ...inv, paymentStatus };
   });
 
-  // 找出已被選取的發票 ID（用於新增收款時排除，僅計未刪除收款）
-  const usedInvoiceIds = new Set(paymentsForStatus.filter(p => p.invoice_id).map(p => p.invoice_id));
-
   // 有效發票（供收款對應選擇，僅 有效 狀態）
   const validInvoices = Invoice.findValidByProject ? Invoice.findValidByProject(project.id) : invoices.filter(i => !i.status || i.status === '有效');
+
+  // 每筆發票的已收款/未收款摘要（支援一筆發票分多次收款）
+  const invoiceIdsInPayments = new Set(paymentsForStatus.filter(p => p.invoice_id).map(p => p.invoice_id));
+  const allInvsForSummary = [...validInvoices];
+  invoices.forEach(inv => {
+    if (!allInvsForSummary.some(i => i.id === inv.id) && invoiceIdsInPayments.has(inv.id)) {
+      allInvsForSummary.push(inv); // 含已作廢但曾有收款的發票（供編輯時顯示）
+    }
+  });
+  const invoiceUnpaidSummary = allInvsForSummary.map(inv => {
+    const invPayments = paymentsForStatus.filter(p => p.invoice_id === inv.id);
+    const paid = invPayments.reduce((s, p) => s + Payment.calculateActualReceived(p), 0);
+    const invAmount = (inv.amount_with_tax || 0) - (inv.allowance_amount || 0);
+    const unpaid = Math.max(0, invAmount - paid);
+    const isValid = !inv.status || inv.status === '有效';
+    return { invoice_id: inv.id, invoice_number: inv.invoice_number, amount: invAmount, paid, unpaid, isValid };
+  });
 
   // 計算彙總（僅計有效發票）
   const totalInvoiced = Invoice.getTotalByProject(project.id);
@@ -565,12 +579,12 @@ router.get('/:id', (req, res) => {
     project,
     invoices: invoicesWithStatus,
     validInvoices, // 有效發票（收款對應用）
+    invoiceUnpaidSummary, // 每筆發票已收/未收摘要（支援分次收款）
     payments,
     costs,
     attachments,
     bonuses,
     typeColorMap,
-    usedInvoiceIds: Array.from(usedInvoiceIds), // 已使用的發票 ID 列表
     showDeleted, // 是否顯示已刪除的發票/收款
     success: req.query.success ? decodeURIComponent(req.query.success) : null,
     error: req.query.error ? decodeURIComponent(req.query.error) : null,

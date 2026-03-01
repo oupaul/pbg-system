@@ -676,12 +676,12 @@ ${locals.user && (locals.user.role === 'admin' || locals.user.role === 'user') ?
             <label class="form-label">對應發票</label>
             <select name="invoice_id" class="form-select">
               <option value="">-- 選擇發票 --</option>
-              ${(typeof validInvoices !== 'undefined' ? validInvoices : invoices).map(i => {
-                const isUsed = typeof usedInvoiceIds !== 'undefined' && usedInvoiceIds.includes(i.id);
-                return isUsed ? '' : `<option value="${i.id}">${i.invoice_number} ($${i.amount_with_tax?.toLocaleString()})</option>`;
-              }).filter(opt => opt !== '').join('')}
+              ${(typeof invoiceUnpaidSummary !== 'undefined' ? invoiceUnpaidSummary : []).filter(s => s.isValid !== false).map(s => {
+                const unpaidLabel = s.unpaid > 0 ? `，未收 $${s.unpaid.toLocaleString()}` : '，已收齊';
+                return `<option value="${s.invoice_id}">${s.invoice_number} (總額 $${s.amount.toLocaleString()}${unpaidLabel})</option>`;
+              }).join('')}
             </select>
-            ${typeof usedInvoiceIds !== 'undefined' && (typeof validInvoices !== 'undefined' ? validInvoices : invoices).filter(i => !usedInvoiceIds.includes(i.id)).length === 0 ? '<small class="text-muted d-block mt-1">所有有效發票已被選取</small>' : ''}
+            <small class="text-muted d-block mt-1">支援一筆發票分多次收款，可重複選擇同一發票</small>
           </div>
           <div class="mb-3">
             <label class="form-label">銀行匯入金額</label>
@@ -904,17 +904,12 @@ ${payments.map(pay => `
             <label class="form-label">對應發票</label>
             <select name="invoice_id" class="form-select">
               <option value="">-- 選擇發票 --</option>
-              ${invoices.map(i => {
-                const isCurrentPayment = i.id == pay.invoice_id;
-                const isValid = !i.status || i.status === '有效';
-                const isUsedByOther = typeof usedInvoiceIds !== 'undefined' && usedInvoiceIds.includes(i.id) && !isCurrentPayment;
-                // 顯示：當前選取的發票（含作廢）或 有效且未被其他收款選取
-                if (isCurrentPayment || (isValid && !isUsedByOther)) {
-                  const suffix = isCurrentPayment && !isValid ? ' (已作廢/折讓)' : '';
-                  return `<option value="${i.id}" ${isCurrentPayment ? 'selected' : ''}>${i.invoice_number} ($${i.amount_with_tax?.toLocaleString()})${suffix}</option>`;
-                }
-                return '';
-              }).filter(opt => opt !== '').join('')}
+              ${(typeof invoiceUnpaidSummary !== 'undefined' ? invoiceUnpaidSummary : []).map(s => {
+                const isCurrent = s.invoice_id == pay.invoice_id;
+                const unpaidLabel = s.unpaid > 0 ? `，未收 $${s.unpaid.toLocaleString()}` : '，已收齊';
+                const suffix = !s.isValid ? ' (已作廢/折讓)' : '';
+                return `<option value="${s.invoice_id}" ${isCurrent ? 'selected' : ''}>${s.invoice_number} (總額 $${s.amount.toLocaleString()}${unpaidLabel})${suffix}</option>`;
+              }).join('')}
             </select>
           </div>
           <div class="mb-3">
