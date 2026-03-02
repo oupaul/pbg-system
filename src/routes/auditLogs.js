@@ -14,7 +14,7 @@ const FIELD_LABELS = {
     id: 'ID', project_code: '專案編號', contract_year: '簽約年度', contract_month: '簽約月份',
     status: '狀態', project_type: '專案類型', salesperson_id: '業務人員', customer_id: '客戶',
     project_name: '專案名稱', price_with_tax: '價格(含稅)', price_without_tax: '價格(未稅)',
-    sales_discount: '銷貨折讓', is_new_customer: '新客戶', expected_invoice_year_month: '預計開票年月',
+    sales_discount: '銷貨折讓', is_new_customer: '新客戶', expected_invoice_year_month: '預計開發票月份',
     notes: '備註', created_at: '建立時間', updated_at: '更新時間'
   },
   invoices: {

@@ -1,14 +1,16 @@
 # 專案開立發票業績認列獎金計算總表系統
 
-[![版本](https://img.shields.io/badge/版本-v1.15.1-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
+[![版本](https://img.shields.io/badge/版本-v1.15.2-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![資料庫](https://img.shields.io/badge/資料庫-better--sqlite3-orange.svg)](https://github.com/WiseLibs/better-sqlite3)
 [![授權](https://img.shields.io/badge/授權-MIT-lightgrey.svg)](LICENSE)
 
 基於 Node.js + SQLite 的專案管理與獎金計算系統，用於管理專案、發票、收款及業務獎金。
 
-## 🚀 最新更新（v1.15.1 - 2026-02-12）
+## 🚀 最新更新（v1.15.2 - 2026-02-12）
 
+- 🔔 **開立發票提醒** - 業務員歡迎頁顯示、獨立加總業務可收到、業務員僅見自己專案
+- 📝 **預計開發票月份** - 預計開票相關顯示名稱統一為「預計開發票月份」
 - 📋 **發票收款狀態修正** - 分次收款時不再誤顯示「提前到款」，部分收款顯示待收狀態
 - 👤 **業務員收款提醒** - 儀表板/歡迎頁顯示業務員負責專案的收款提醒（即將到期/已逾期）
 - 💰 **一筆發票分多次收款** - 同一張發票可對應多筆收款，支援分批付款情境
@@ -1985,6 +1987,29 @@ invoice-bonus-system/
 #### 技術文件
 
 - `一筆發票分多次收款功能說明.md` - 新增 2.4 收款狀態說明
+
+---
+
+### 2026-02-12 - v1.15.2 開立發票提醒與預計開發票月份 🔔
+
+#### 開立發票提醒增強
+
+- ✅ 獨立加總業務的專案也可收到開立發票提醒（不再排除）
+- ✅ 業務員僅見自己負責專案的開立發票提醒（儀表板與歡迎頁）
+- ✅ 業務員歡迎頁（dashboard_view_mode = 'none'）新增開立發票提醒顯示
+- ✅ 名稱統一：開票提醒通知 → 開立發票提醒通知
+- ✅ 按鈕文字：查看所有預計本月開票專案 → 查看所有預計本月開立發票專案
+- ✅ 相關檔案：`src/routes/index.js`、`src/views/index.ejs`
+
+#### 預計開發票月份顯示名稱
+
+- ✅ 專案管理篩選、表頭：預計開票 → 預計開發票月份
+- ✅ 專案詳情、儀表板、專案範本、修改記錄：預計開票年月 → 預計開發票月份
+- ✅ 相關檔案：`src/views/projects/index.ejs`、`src/views/projects/show.ejs`、`src/views/index.ejs`、`src/views/project-templates/form.ejs`、`src/routes/auditLogs.js`
+
+#### 技術文件
+
+- `開票通知功能說明.md` - 更新為開立發票提醒、業務員權限、獨立加總說明
 
 ---
 

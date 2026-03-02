@@ -26,23 +26,80 @@ function getSeparateSalespersonIds() {
 router.get('/', (req, res) => {
   const dashboardMode = getDashboardViewMode(req.user);
 
-  // dashboard_view_mode = 'none'：顯示歡迎頁（不顯示儀表板），但業務員仍顯示收款提醒
+  // dashboard_view_mode = 'none'：顯示歡迎頁（不顯示儀表板），但業務員仍顯示收款提醒與開票提醒
   if (dashboardMode === 'none') {
     let paymentReminder = { upcoming: [], overdue: [] };
+    let upcomingInvoiceProjects = [];
+    let overdueInvoiceProjects = [];
+    let showNotification = false;
+    let daysUntilEndOfMonth = 0;
+    let currentYearMonth = '';
+    let typeColorMap = {};
+
     if (req.user && req.user.role === 'salesperson' && req.user.salesperson_id) {
+      // 收款提醒
       let paymentReminderDays = 7;
       try {
         const reminderSetting = db.prepare('SELECT setting_value FROM system_settings WHERE setting_key = ?').get('payment_reminder_days');
         if (reminderSetting) paymentReminderDays = parseInt(reminderSetting.setting_value, 10) || 7;
       } catch (e) { /* use default */ }
       paymentReminder = ReceivablesAgingService.getPaymentReminder(paymentReminderDays, null, req.user.salesperson_id);
+
+      // 開票提醒（業務員僅見自己專案）
+      let notificationEnabled = true;
+      let notificationDaysBeforeMonth = 6;
+      try {
+        const nd = db.prepare('SELECT setting_value FROM system_settings WHERE setting_key = ?').get('invoice_notification_days_before_month_end');
+        if (nd) notificationDaysBeforeMonth = parseInt(nd.setting_value, 10) || 6;
+        const ne = db.prepare('SELECT setting_value FROM system_settings WHERE setting_key = ?').get('invoice_notification_enabled');
+        if (ne) notificationEnabled = ne.setting_value === 'true';
+      } catch (e) { /* use default */ }
+      const now = new Date();
+      currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      daysUntilEndOfMonth = lastDayOfMonth - now.getDate();
+      const showUpcoming = notificationEnabled && daysUntilEndOfMonth <= notificationDaysBeforeMonth;
+
+      if (notificationEnabled) {
+        overdueInvoiceProjects = db.prepare(`
+          SELECT v.id, v.project_code, v.project_name, v.project_type, v.salesperson_name,
+            v.price_with_tax, v.expected_invoice_year_month, v.status, v.total_invoiced,
+            (v.price_with_tax - v.total_invoiced) as uninvoiced_amount, 'overdue' as notification_type
+          FROM v_project_summary v
+          WHERE v.expected_invoice_year_month IS NOT NULL AND v.expected_invoice_year_month < ?
+            AND v.status = '未結案' AND v.salesperson_id = ?
+          ORDER BY v.expected_invoice_year_month ASC, v.price_with_tax DESC
+        `).all(currentYearMonth, req.user.salesperson_id);
+      }
+      if (showUpcoming) {
+        upcomingInvoiceProjects = db.prepare(`
+          SELECT v.id, v.project_code, v.project_name, v.project_type, v.salesperson_name,
+            v.price_with_tax, v.expected_invoice_year_month, v.status, v.total_invoiced,
+            (v.price_with_tax - v.total_invoiced) as uninvoiced_amount, 'upcoming' as notification_type
+          FROM v_project_summary v
+          WHERE v.expected_invoice_year_month = ? AND v.status = '未結案' AND v.salesperson_id = ?
+          ORDER BY v.price_with_tax DESC
+        `).all(currentYearMonth, req.user.salesperson_id);
+      }
+      showNotification = notificationEnabled && (upcomingInvoiceProjects.length > 0 || overdueInvoiceProjects.length > 0);
+
+      try {
+        db.prepare('SELECT type_name, badge_color FROM project_types').all().forEach(t => { typeColorMap[t.type_name] = t.badge_color; });
+      } catch (e) { /* ignore */ }
     }
+
     return res.render('index', {
       title: '首頁',
       showWelcome: true,
       years: Project.getYears(),
       selectedYear: 'all',
-      paymentReminder
+      paymentReminder,
+      upcomingInvoiceProjects: [...upcomingInvoiceProjects, ...overdueInvoiceProjects],
+      overdueInvoiceProjects,
+      showNotification,
+      daysUntilEndOfMonth,
+      currentYearMonth,
+      typeColorMap
     });
   }
 
@@ -295,10 +352,13 @@ router.get('/', (req, res) => {
   let upcomingInvoiceProjects = [];
   let overdueInvoiceProjects = []; // 已超過設定月份的專案
   
-  const notifExcludeCond = excludeFromMain
-    ? ' AND v.id IN (SELECT id FROM projects WHERE salesperson_id NOT IN (SELECT id FROM salespeople WHERE show_separate_dashboard = 1))'
-    : '';
+  // 開票提醒：包含所有專案（含獨立加總業務）；業務員僅見自己負責專案
+  const notifSalespersonCond = (req.user && req.user.role === 'salesperson' && req.user.salesperson_id)
+    ? ' AND v.salesperson_id = ?' : '';
+  const notifSalespersonParam = (req.user && req.user.role === 'salesperson' && req.user.salesperson_id)
+    ? req.user.salesperson_id : null;
   if (notificationEnabled) {
+    const overdueParams = notifSalespersonParam != null ? [currentYearMonth, notifSalespersonParam] : [currentYearMonth];
     overdueInvoiceProjects = db.prepare(`
       SELECT 
         v.id, v.project_code, v.project_name, v.project_type, v.salesperson_name,
@@ -308,11 +368,12 @@ router.get('/', (req, res) => {
       FROM v_project_summary v
       WHERE v.expected_invoice_year_month IS NOT NULL
         AND v.expected_invoice_year_month < ?
-        AND v.status = '未結案' ${notifExcludeCond}
+        AND v.status = '未結案'${notifSalespersonCond}
       ORDER BY v.expected_invoice_year_month ASC, v.price_with_tax DESC
-    `).all(currentYearMonth);
+    `).all(...overdueParams);
   }
   if (showUpcomingNotification) {
+    const upcomingParams = notifSalespersonParam != null ? [currentYearMonth, notifSalespersonParam] : [currentYearMonth];
     upcomingInvoiceProjects = db.prepare(`
       SELECT 
         v.id, v.project_code, v.project_name, v.project_type, v.salesperson_name,
@@ -321,9 +382,9 @@ router.get('/', (req, res) => {
         'upcoming' as notification_type
       FROM v_project_summary v
       WHERE v.expected_invoice_year_month = ?
-        AND v.status = '未結案' ${notifExcludeCond}
+        AND v.status = '未結案'${notifSalespersonCond}
       ORDER BY v.price_with_tax DESC
-    `).all(currentYearMonth);
+    `).all(...upcomingParams);
   }
   
   // 如果有過期專案或當月專案，則顯示通知

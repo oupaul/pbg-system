@@ -147,13 +147,13 @@ ${typeof error !== 'undefined' && error ? '<div class="alert alert-danger alert-
   </div>
 </div>
 
-<!-- 業務預計開立發票年月 -->
+<!-- 業務預計開發票月份 -->
 ${locals.canEdit ? `
 <div class="card mb-3 border-primary">
   <div class="card-body py-2">
     <form id="expectedInvoiceForm" action="/projects/${project.id}/update-expected-invoice" method="POST" class="row g-2 align-items-center" onsubmit="return validateExpectedInvoiceForm()">
       <div class="col-auto">
-        <label class="col-form-label"><i class="bi bi-calendar-event text-primary"></i> <strong>業務預計開立發票年月：</strong></label>
+        <label class="col-form-label"><i class="bi bi-calendar-event text-primary"></i> <strong>業務預計開發票月份：</strong></label>
       </div>
       <div class="col-auto">
         <select class="form-select form-select-sm" id="expectedYear" style="width: 100px;" onchange="updateExpectedInvoiceField()">
@@ -263,9 +263,9 @@ function validateExpectedInvoiceForm() {
   }
 }
 
-// 重設預計開票年月
+// 重設預計開發票月份
 function resetExpectedInvoice() {
-  if (!confirm('確定要重設預計開票年月為「尚未設定」嗎？')) {
+  if (!confirm('確定要重設預計開發票月份為「尚未設定」嗎？')) {
     return;
   }
   
@@ -296,7 +296,7 @@ function resetExpectedInvoice() {
   <div class="card-body py-2">
     <div class="row g-2 align-items-center">
       <div class="col-auto">
-        <label class="col-form-label"><i class="bi bi-calendar-event text-info"></i> <strong>業務預計開立發票年月：</strong></label>
+        <label class="col-form-label"><i class="bi bi-calendar-event text-info"></i> <strong>業務預計開發票月份：</strong></label>
       </div>
       <div class="col-auto">
         <strong class="text-primary">${project.expected_invoice_year_month}</strong>

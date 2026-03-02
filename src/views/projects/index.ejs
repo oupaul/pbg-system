@@ -63,7 +63,7 @@ ${locals.isReadOnly ? '<div class="alert alert-info mb-4"><i class="bi bi-info-c
         </select>
       </div>
       <div class="col-md-2">
-        <label class="form-label">預計開票</label>
+        <label class="form-label">預計開發票月份</label>
         <select name="expected_invoice_year_month" class="form-select">
           <option value="">全部</option>
           ${expectedInvoiceYearMonths.map(ym => '<option value="' + ym + '" ' + (filters.expected_invoice_year_month === ym ? 'selected' : '') + '>' + ym + '</option>').join('')}
@@ -168,7 +168,7 @@ ${salespersonStats ? `
             </th>
             <th>
               <a href="?${sortLinks.expected_invoice_year_month}" class="text-white text-decoration-none">
-                預計開票${sortIcons.expected_invoice_year_month}
+                預計開發票月份${sortIcons.expected_invoice_year_month}
               </a>
             </th>
             <th>
