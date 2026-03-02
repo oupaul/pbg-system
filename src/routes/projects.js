@@ -485,6 +485,7 @@ router.get('/:id', (req, res) => {
   const costs = Cost.findByProject(project.id);
 
   // 計算每筆發票的收款狀態（與收款明細比對，僅用未刪除的收款）
+  // 支援分次收款：僅在「已收齊」時顯示提前/準時/逾期到款；部分收款時依預計收款日顯示待收狀態
   const paymentsForStatus = Payment.findByProject(project.id); // 未刪除
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   const diffDays = (d1, d2) => Math.round((new Date(d1) - new Date(d2)) / (1000 * 60 * 60 * 24));
@@ -492,26 +493,44 @@ router.get('/:id', (req, res) => {
   const invoicesWithStatus = invoices.map(inv => {
     const invPayments = paymentsForStatus.filter(p => p.invoice_id === inv.id);
     const expectedDate = inv.expected_payment_date || null;
+    const invAmount = (inv.amount_with_tax || 0) - (inv.allowance_amount || 0);
+    const paid = invPayments.reduce((s, p) => s + Payment.calculateActualReceived(p), 0);
+    const isFullyPaid = invAmount <= 0 || paid >= invAmount;
     let paymentStatus = { text: '-', class: 'text-muted' };
 
-    if (invPayments.length > 0) {
-      // 有收款記錄：取最早一筆有日期的收款（若都無日期則取第一筆）
+    if (invPayments.length > 0 && !isFullyPaid) {
+      // 部分收款：不顯示「提前到款」，改依預計收款日顯示待收狀態
+      if (!expectedDate) {
+        paymentStatus = { text: `部分收款 (未收 $${Math.round(invAmount - paid).toLocaleString()})`, class: 'text-warning' };
+      } else if (expectedDate > today) {
+        const days = diffDays(expectedDate, today);
+        paymentStatus = { text: `部分收款，將於${days}天後收款`, class: 'text-primary' };
+      } else if (expectedDate < today) {
+        const days = diffDays(today, expectedDate);
+        paymentStatus = { text: `部分收款，已逾期${days}天`, class: 'text-danger' };
+      } else {
+        paymentStatus = { text: '部分收款，預計今日收款', class: 'text-warning' };
+      }
+    } else if (invPayments.length > 0 && isFullyPaid) {
+      // 已收齊：取最後一筆收款日期與預計收款日比較（或最早一筆若無預計日）
       const withDate = invPayments.filter(p => p.payment_date);
       const sortedPayments = (withDate.length ? withDate : invPayments)
         .slice().sort((a, b) => (a.payment_date || '').localeCompare(b.payment_date || ''));
+      const lastPaymentDate = sortedPayments[sortedPayments.length - 1]?.payment_date;
       const firstPaymentDate = sortedPayments[0]?.payment_date;
+      const refDate = lastPaymentDate || firstPaymentDate;
 
-      if (!firstPaymentDate) {
-        paymentStatus = { text: '已收款', class: 'text-success' };
+      if (!refDate) {
+        paymentStatus = { text: '已收齊', class: 'text-success' };
       } else if (!expectedDate) {
-        paymentStatus = { text: '已收款', class: 'text-success' };
-      } else if (firstPaymentDate === expectedDate) {
+        paymentStatus = { text: '已收齊', class: 'text-success' };
+      } else if (refDate === expectedDate) {
         paymentStatus = { text: '準時到款', class: 'text-success' };
-      } else if (firstPaymentDate > expectedDate) {
-        const days = diffDays(firstPaymentDate, expectedDate);
+      } else if (refDate > expectedDate) {
+        const days = diffDays(refDate, expectedDate);
         paymentStatus = { text: `款項到帳但逾期${days}天`, class: 'text-warning' };
       } else {
-        const days = diffDays(expectedDate, firstPaymentDate);
+        const days = diffDays(expectedDate, refDate);
         paymentStatus = { text: `提前${days}天到款`, class: 'text-info' };
       }
     } else {

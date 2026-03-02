@@ -26,13 +26,23 @@ function getSeparateSalespersonIds() {
 router.get('/', (req, res) => {
   const dashboardMode = getDashboardViewMode(req.user);
 
-  // dashboard_view_mode = 'none'：顯示歡迎頁（不顯示儀表板）
+  // dashboard_view_mode = 'none'：顯示歡迎頁（不顯示儀表板），但業務員仍顯示收款提醒
   if (dashboardMode === 'none') {
+    let paymentReminder = { upcoming: [], overdue: [] };
+    if (req.user && req.user.role === 'salesperson' && req.user.salesperson_id) {
+      let paymentReminderDays = 7;
+      try {
+        const reminderSetting = db.prepare('SELECT setting_value FROM system_settings WHERE setting_key = ?').get('payment_reminder_days');
+        if (reminderSetting) paymentReminderDays = parseInt(reminderSetting.setting_value, 10) || 7;
+      } catch (e) { /* use default */ }
+      paymentReminder = ReceivablesAgingService.getPaymentReminder(paymentReminderDays, null, req.user.salesperson_id);
+    }
     return res.render('index', {
       title: '首頁',
       showWelcome: true,
       years: Project.getYears(),
-      selectedYear: 'all'
+      selectedYear: 'all',
+      paymentReminder
     });
   }
 
@@ -328,15 +338,17 @@ router.get('/', (req, res) => {
     receivablesAging = ReceivablesAgingService.getAgingReport(selectedYear, null);
   }
 
-  // 收款提醒：預計收款日即將到期或已逾期（admin/user 可見），始終包含全部發票（含獨立加總業務）
+  // 收款提醒：預計收款日即將到期或已逾期
+  // admin/user 可見全部；salesperson 僅見自己負責專案
   let paymentReminder = { upcoming: [], overdue: [] };
-  if (req.user && (req.user.role === 'admin' || req.user.role === 'user')) {
+  if (req.user && (req.user.role === 'admin' || req.user.role === 'user' || req.user.role === 'salesperson')) {
     let paymentReminderDays = 7;
     try {
       const reminderSetting = db.prepare('SELECT setting_value FROM system_settings WHERE setting_key = ?').get('payment_reminder_days');
       if (reminderSetting) paymentReminderDays = parseInt(reminderSetting.setting_value, 10) || 7;
     } catch (e) { /* use default */ }
-    paymentReminder = ReceivablesAgingService.getPaymentReminder(paymentReminderDays, null);
+    const salespersonFilter = (req.user.role === 'salesperson' && req.user.salesperson_id) ? req.user.salesperson_id : null;
+    paymentReminder = ReceivablesAgingService.getPaymentReminder(paymentReminderDays, null, salespersonFilter);
   }
 
   // 獨立業務區塊（all_and_separate 時，為每個 show_separate_dashboard 業務計算獨立統計）

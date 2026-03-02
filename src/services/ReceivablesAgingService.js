@@ -125,9 +125,10 @@ const ReceivablesAgingService = {
    * 取得收款提醒：即將到期（N 天內）與已逾期的未收款發票
    * @param {number} reminderDays - 提前幾天提醒（預設 7）
    * @param {number[]|null} excludeSalespersonIds - 排除的業務 ID 列表（exclude_separate 時使用）
+   * @param {number|null} salespersonId - 僅顯示該業務員負責的專案（業務員角色時使用）
    * @returns {Object} { upcoming: [], overdue: [] }
    */
-  getPaymentReminder(reminderDays = 7, excludeSalespersonIds = null) {
+  getPaymentReminder(reminderDays = 7, excludeSalespersonIds = null, salespersonId = null) {
     const today = new Date().toISOString().slice(0, 10);
     const todayDate = new Date(today);
     const futureDate = new Date(todayDate);
@@ -137,16 +138,19 @@ const ReceivablesAgingService = {
     const excludeCond = excludeSalespersonIds && excludeSalespersonIds.length > 0
       ? ` AND p.salesperson_id NOT IN (${excludeSalespersonIds.map(() => '?').join(',')})`
       : '';
+    const salespersonCond = salespersonId != null ? ' AND p.salesperson_id = ?' : '';
     const excludeParams = excludeSalespersonIds && excludeSalespersonIds.length > 0 ? excludeSalespersonIds : [];
+    const allParams = [...excludeParams];
+    if (salespersonId != null) allParams.push(salespersonId);
 
     const invoices = db.prepare(`
       SELECT i.*, p.project_code, p.project_name, p.id as project_id, sp.name as salesperson_name
       FROM invoices i
       JOIN projects p ON i.project_id = p.id
       LEFT JOIN salespeople sp ON p.salesperson_id = sp.id
-      WHERE (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) AND i.expected_payment_date IS NOT NULL ${excludeCond}
+      WHERE (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) AND i.expected_payment_date IS NOT NULL ${excludeCond}${salespersonCond}
       ORDER BY i.expected_payment_date
-    `).all(...excludeParams);
+    `).all(...allParams);
 
     const upcoming = [];
     const overdue = [];

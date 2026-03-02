@@ -1,14 +1,16 @@
 # 專案開立發票業績認列獎金計算總表系統
 
-[![版本](https://img.shields.io/badge/版本-v1.15.0-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
+[![版本](https://img.shields.io/badge/版本-v1.15.1-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![資料庫](https://img.shields.io/badge/資料庫-better--sqlite3-orange.svg)](https://github.com/WiseLibs/better-sqlite3)
 [![授權](https://img.shields.io/badge/授權-MIT-lightgrey.svg)](LICENSE)
 
 基於 Node.js + SQLite 的專案管理與獎金計算系統，用於管理專案、發票、收款及業務獎金。
 
-## 🚀 最新更新（v1.15.0 - 2026-02-12）
+## 🚀 最新更新（v1.15.1 - 2026-02-12）
 
+- 📋 **發票收款狀態修正** - 分次收款時不再誤顯示「提前到款」，部分收款顯示待收狀態
+- 👤 **業務員收款提醒** - 儀表板/歡迎頁顯示業務員負責專案的收款提醒（即將到期/已逾期）
 - 💰 **一筆發票分多次收款** - 同一張發票可對應多筆收款，支援分批付款情境
 - 📊 **業務績效圖表** - 圓餅圖、長條圖呈現業績與獎金占比
 - 🔔 **收款提醒** - 依預計收款日站內提醒（即將到期／已逾期）
@@ -1961,6 +1963,28 @@ invoice-bonus-system/
 #### 技術文件
 
 - `一筆發票分多次收款功能說明.md` - 功能說明與技術實作
+
+---
+
+### 2026-02-12 - v1.15.1 收款狀態修正與業務員收款提醒 📋
+
+#### 發票收款狀態修正（分次收款）
+
+- ✅ 部分收款時不再誤顯示「提前 n 天到款」
+- ✅ 部分收款改為顯示：`部分收款 (未收 $X)`、`部分收款，將於 n 天後收款`、`部分收款，已逾期 n 天`
+- ✅ 已收齊時以**最後一筆收款日期**與預計收款日比較（原為第一筆）
+- ✅ 相關檔案：`src/routes/projects.js`（invoicesWithStatus 計算邏輯）
+
+#### 業務員儀表板收款提醒
+
+- ✅ 業務員可見儀表板收款提醒，僅顯示自己負責專案的發票
+- ✅ 儀表板顯示方式為「不顯示」時，歡迎頁仍顯示收款提醒
+- ✅ `ReceivablesAgingService.getPaymentReminder` 新增 `salespersonId` 參數過濾
+- ✅ 相關檔案：`src/routes/index.js`、`src/services/ReceivablesAgingService.js`、`src/views/index.ejs`
+
+#### 技術文件
+
+- `一筆發票分多次收款功能說明.md` - 新增 2.4 收款狀態說明
 
 ---
 

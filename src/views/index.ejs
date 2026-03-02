@@ -6,6 +6,48 @@ ${typeof showWelcome !== 'undefined' && showWelcome ? `
   </div>
 </div>
 
+${typeof paymentReminder !== 'undefined' && paymentReminder && (paymentReminder.upcoming.length > 0 || paymentReminder.overdue.length > 0) ? `
+<!-- 收款提醒通知（業務員） -->
+<div class="alert alert-info alert-dismissible fade show mb-4" role="alert">
+  <div class="d-flex align-items-start">
+    <div class="flex-shrink-0">
+      <i class="bi bi-currency-dollar fs-3 me-3"></i>
+    </div>
+    <div class="flex-grow-1 payment-reminder-content">
+      <h5 class="alert-heading mb-2">
+        <i class="bi bi-bell-fill"></i> 收款提醒（依預計收款日）
+      </h5>
+      <p class="mb-2">
+        以下發票尚有未收款金額：
+        <span class="badge bg-warning text-dark">${paymentReminder.upcoming.length} 筆即將到期</span>
+        ${paymentReminder.overdue.length > 0 ? '<span class="badge bg-danger ms-2">' + paymentReminder.overdue.length + ' 筆已逾期</span>' : ''}
+      </p>
+      <hr>
+      <div class="table-responsive payment-reminder-table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>專案</th>
+              <th>發票號碼</th>
+              <th>業務</th>
+              <th class="text-end">未收金額</th>
+              <th>預計收款日</th>
+              <th>狀態</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${paymentReminder.upcoming.map(item => '<tr><td><code>' + item.project_code + '</code> ' + (item.project_name || '') + '</td><td><code>' + (item.invoice_number || '-') + '</code></td><td>' + item.salesperson_name + '</td><td class="text-end">$' + (item.unpaid || 0).toLocaleString() + '</td><td>' + (item.expected_payment_date || '-') + '</td><td><span class="badge bg-warning text-dark">即將到期</span></td><td><a href="/projects/' + item.project_id + '" class="btn btn-sm btn-outline-primary">查看</a></td></tr>').join('')}
+            ${paymentReminder.overdue.map(item => '<tr class="table-danger"><td><code>' + item.project_code + '</code> ' + (item.project_name || '') + '</td><td><code>' + (item.invoice_number || '-') + '</code></td><td>' + item.salesperson_name + '</td><td class="text-end">$' + (item.unpaid || 0).toLocaleString() + '</td><td>' + (item.expected_payment_date || '-') + '</td><td><span class="badge bg-danger">已逾期</span></td><td><a href="/projects/' + item.project_id + '" class="btn btn-sm btn-outline-primary">查看</a></td></tr>').join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+</div>
+` : ''}
+
 <div class="alert alert-info">
   <h5><i class="bi bi-person-check"></i> 歡迎，${locals.user.name}！</h5>
   <p class="mb-0">您的帳號為業務員，可以查看專案資訊。</p>
