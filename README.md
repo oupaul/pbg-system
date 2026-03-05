@@ -1,14 +1,15 @@
 # 專案開立發票業績認列獎金計算總表系統
 
-[![版本](https://img.shields.io/badge/版本-v1.15.2-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
+[![版本](https://img.shields.io/badge/版本-v1.15.3-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![資料庫](https://img.shields.io/badge/資料庫-better--sqlite3-orange.svg)](https://github.com/WiseLibs/better-sqlite3)
 [![授權](https://img.shields.io/badge/授權-MIT-lightgrey.svg)](LICENSE)
 
 基於 Node.js + SQLite 的專案管理與獎金計算系統，用於管理專案、發票、收款及業務獎金。
 
-## 🚀 最新更新（v1.15.2 - 2026-02-12）
+## 🚀 最新更新（v1.15.3 - 2026-02-12）
 
+- 📄 **Nginx 上傳 413 修復** - 新增 Nginx 上傳大小限制修復說明（client_max_body_size）
 - 🔔 **開立發票提醒** - 業務員歡迎頁顯示、獨立加總業務可收到、業務員僅見自己專案
 - 📝 **預計開發票月份** - 預計開票相關顯示名稱統一為「預計開發票月份」
 - 📋 **發票收款狀態修正** - 分次收款時不再誤顯示「提前到款」，部分收款顯示待收狀態
@@ -2013,6 +2014,13 @@ invoice-bonus-system/
 
 ---
 
+### 2026-02-12 - v1.15.3 Nginx 上傳 413 修復說明 📄
+
+- ✅ 新增 `Nginx上傳大小限制修復說明.md`：專案管理上傳附件出現 413 Request Entity Too Large 時，於 Nginx 設定 `client_max_body_size 10M` 之修復步驟
+- ✅ README 常見問題新增「上傳附件出現 413」並連結至該說明
+
+---
+
 ### 還原腳本多實例服務偵測修復
 
 - ✅ 修復 `restore.sh` 在多實例部署（不同 port）時只顯示一個服務的問題
@@ -3846,6 +3854,10 @@ sudo ./restore.sh backup_YYYYMMDD_HHMMSS.tar.gz
 npm run migrate
 npm run seed
 ```
+
+**Q: 上傳附件出現 413 Request Entity Too Large**
+
+使用 Nginx 反向代理時，預設上傳限制約 1MB。請在 Nginx 設定中加入 `client_max_body_size 10M;` 並重載 Nginx。詳見 **[Nginx上傳大小限制修復說明.md](Nginx上傳大小限制修復說明.md)**。
 
 ### 備份問題
 
