@@ -57,7 +57,6 @@
                 專案${sortIcons.project_amount}
               </a>
             </th>
-            <th class="text-center">儀表板獨立</th>
           </tr>
         </thead>
         <tbody>
@@ -75,9 +74,8 @@
               <td class="text-end">$${(s.lab_amount || 0).toLocaleString()}</td>
               <td class="text-end">$${(s.ad_amount || 0).toLocaleString()}</td>
               <td class="text-end">$${(s.project_amount || 0).toLocaleString()}</td>
-              <td class="text-center">${s.show_separate_dashboard ? '<span class="badge bg-info">是</span>' : '<span class="text-muted">-</span>'}</td>
             </tr>
-          `).join('') || '<tr><td colspan="8" class="text-center text-muted py-3">尚無業務人員</td></tr>'}
+          `).join('') || '<tr><td colspan="7" class="text-center text-muted py-3">尚無業務人員</td></tr>'}
         </tbody>
       </table>
     </div>

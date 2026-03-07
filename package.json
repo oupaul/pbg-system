@@ -29,6 +29,7 @@
     "migrate:project-templates": "node migrations/migrate_project_templates.js",
     "migrate:project-types-alert": "node migrations/migrate_project_types_alert_threshold.js",
     "migrate:project-types-show-in-dashboard": "node migrations/migrate_project_types_show_in_dashboard.js",
+    "migrate:project-types-separate-dashboard": "node migrations/migrate_project_types_show_separate_dashboard.js",
     "migrate:project-attachments": "node migrations/migrate_project_attachments.js",
     "migrate:project-attachments-soft-delete": "node migrations/migrate_project_attachments_soft_delete.js",
     "migrate:attachment-cleanup-setting": "node migrations/migrate_attachment_cleanup_setting.js",

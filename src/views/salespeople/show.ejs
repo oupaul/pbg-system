@@ -152,15 +152,6 @@
           <input type="date" name="resigned_date" class="form-control" value="${salesperson.resigned_date || ''}">
         </div>
         <div class="col-12">
-          <div class="form-check">
-            <input type="checkbox" name="show_separate_dashboard" class="form-check-input" id="show_separate_dashboard" value="1" ${salesperson.show_separate_dashboard ? 'checked' : ''}>
-            <label class="form-check-label" for="show_separate_dashboard">
-              <strong>儀表板獨立加總</strong>
-              <span class="text-muted small">勾選後，此業務的專案會在儀表板顯示獨立統計區塊（僅對「全部+獨立區塊」模式的角色可見）</span>
-            </label>
-          </div>
-        </div>
-        <div class="col-12">
           <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> 更新</button>
         </div>
       </div>

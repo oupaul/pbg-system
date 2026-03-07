@@ -126,10 +126,7 @@ router.get('/', (req, res) => {
     const sp = Salesperson.findById(req.user.salesperson_id);
     salespeople = sp ? [sp] : [];
   } else {
-    salespeople = Salesperson.findAll(true); // 含離職
-    if (req.user && req.user.role !== 'admin' && req.user.role !== 'user' && req.user.role !== 'boss') {
-      salespeople = salespeople.filter(s => !s.show_separate_dashboard);
-    }
+    salespeople = Salesperson.findAll(true); // 含離職（儀表板獨立加總已改為依類型，不再依業務篩選）
   }
   const projectTypes = getActiveProjectTypes();
   

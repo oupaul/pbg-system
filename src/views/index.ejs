@@ -392,16 +392,16 @@ ${typeof separateBlocks !== 'undefined' && separateBlocks && separateBlocks.leng
   <div class="col-12">
     <div class="card border-primary">
       <div class="card-header bg-primary bg-opacity-10">
-        <i class="bi bi-person-badge"></i> ${block.salespersonName} — 獨立加總
+        <i class="bi bi-tags"></i> ${block.typeName} — 獨立加總
       </div>
       <div class="card-body">
         <div class="row g-3">
           <div class="col-md-2">
-            <a href="/projects?salesperson=${encodeURIComponent(block.salespersonName)}${typeof selectedYear !== 'undefined' && selectedYear && selectedYear !== 'all' ? '&year=' + selectedYear : ''}" class="text-decoration-none text-dark d-block border rounded p-2 text-center separate-block-project-link" title="點擊查看該業務的專案">
+            <a href="/projects?type=${encodeURIComponent(block.typeName)}${typeof selectedYear !== 'undefined' && selectedYear && selectedYear !== 'all' ? '&year=' + selectedYear : ''}" class="text-decoration-none text-dark d-block border rounded p-2 text-center separate-block-project-link" title="點擊查看該類型的專案">
               <div class="small text-muted">專案數</div>
               <div class="fw-bold">${block.stats.total_projects || 0}</div>
               <small>未結案: ${block.stats.open_projects || 0} | 已結案: ${block.stats.closed_projects || 0}</small>
-              <div class="small text-primary mt-1"><i class="bi bi-box-arrow-up-right"></i> 查看專案</div>
+              <div class="small text-primary mt-1"><i class="bi bi-box-arrow-up-right"></i> 查看此類型專案</div>
             </a>
           </div>
           <div class="col-md-2">

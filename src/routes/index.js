@@ -15,11 +15,11 @@ function getDashboardViewMode(user) {
   return 'all_and_separate';
 }
 
-// 取得「儀表板獨立加總」的業務 ID 列表
-function getSeparateSalespersonIds() {
+// 取得「儀表板獨立加總」的專案類型名稱列表（project_types.show_separate_dashboard = 1）
+function getSeparateTypeNames() {
   try {
-    const rows = db.prepare('SELECT id FROM salespeople WHERE show_separate_dashboard = 1 AND status = \'active\'').all();
-    return rows.map(r => r.id);
+    const rows = db.prepare('SELECT type_name FROM project_types WHERE COALESCE(show_separate_dashboard, 0) = 1 AND is_active = 1').all();
+    return rows.map(r => r.type_name);
   } catch (e) { return []; }
 }
 
@@ -107,12 +107,13 @@ router.get('/', (req, res) => {
   const years = Project.getYears();
   const selectedYear = req.query.year && req.query.year !== 'all' ? parseInt(req.query.year) : null;
 
-  const separateIds = getSeparateSalespersonIds();
-  // 主區塊排除獨立業務：exclude_separate 時排除；all_and_separate 時也排除，避免與獨立區塊重複計算
-  const excludeFromMain = (dashboardMode === 'exclude_separate' || dashboardMode === 'all_and_separate') && separateIds.length > 0;
-  const excludeCond = excludeFromMain
-    ? ` AND p.salesperson_id NOT IN (SELECT id FROM salespeople WHERE show_separate_dashboard = 1)`
+  const separateTypeNames = getSeparateTypeNames();
+  // 主區塊排除獨立加總類型：exclude_separate 時排除；all_and_separate 時也排除，避免與獨立區塊重複計算
+  const excludeFromMain = (dashboardMode === 'exclude_separate' || dashboardMode === 'all_and_separate') && separateTypeNames.length > 0;
+  const excludeCond = excludeFromMain && separateTypeNames.length > 0
+    ? ` AND (p.project_type IS NULL OR p.project_type NOT IN (${separateTypeNames.map(() => '?').join(',')}))`
     : '';
+  const excludeCondParams = excludeFromMain ? separateTypeNames : [];
   
   // 建立類型顏色映射
   let typeColorMap = {};
@@ -126,9 +127,9 @@ router.get('/', (req, res) => {
     typeColorMap = {};
   }
   
-  // 取得統計資料
-  const excludeIds = excludeFromMain ? separateIds : null;
-  let stats = Project.getStatistics(selectedYear, excludeIds);
+  // 取得統計資料（排除獨立加總類型，避免重複計算）
+  const excludeTypeNames = excludeFromMain ? separateTypeNames : null;
+  let stats = Project.getStatistics(selectedYear, null, excludeTypeNames);
   
   // 處理 NULL 值，確保所有統計都有預設值
   if (!stats) {
@@ -181,15 +182,15 @@ router.get('/', (req, res) => {
     projectTypeStats = [];
   }
 
-  // 取得最近專案（exclude_separate 時需過濾）
+  // 取得最近專案（主區塊排除獨立加總類型時需過濾）
   let recentProjects;
-  if (excludeFromMain) {
+  if (excludeFromMain && separateTypeNames.length > 0) {
     const yearCond = selectedYear ? 'p.contract_year = ?' : '1=1';
-    const params = selectedYear ? [selectedYear] : [];
+    const params = selectedYear ? [selectedYear, ...excludeCondParams] : [...excludeCondParams];
     recentProjects = db.prepare(`
       SELECT v.* FROM v_project_summary v
       JOIN projects p ON v.id = p.id
-      WHERE ${yearCond} AND p.salesperson_id NOT IN (SELECT id FROM salespeople WHERE show_separate_dashboard = 1)
+      WHERE ${yearCond} AND (p.project_type IS NULL OR p.project_type NOT IN (${separateTypeNames.map(() => '?').join(',')}))
       ORDER BY v.updated_at DESC 
       LIMIT 10
     `).all(...params);
@@ -211,7 +212,7 @@ router.get('/', (req, res) => {
       FROM bonus_calculations bc
       JOIN projects p ON bc.project_id = p.id
       WHERE p.contract_year = ? ${excludeCond}
-    `).get(selectedYear);
+    `).get(selectedYear, ...excludeCondParams);
   } else {
     bonusStats = db.prepare(`
       SELECT 
@@ -222,7 +223,7 @@ router.get('/', (req, res) => {
       FROM bonus_calculations bc
       JOIN projects p ON bc.project_id = p.id
       WHERE 1=1 ${excludeCond}
-    `).get();
+    `).get(...excludeCondParams);
   }
   
   bonusStats = bonusStats || {
@@ -243,7 +244,7 @@ router.get('/', (req, res) => {
       FROM invoices i
       JOIN projects p ON i.project_id = p.id
       WHERE p.contract_year = ? AND (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) ${excludeCond}
-    `).get(selectedYear);
+    `).get(selectedYear, ...excludeCondParams);
   } else {
     invoiceStats = db.prepare(`
       SELECT 
@@ -253,7 +254,7 @@ router.get('/', (req, res) => {
       FROM invoices i
       JOIN projects p ON i.project_id = p.id
       WHERE (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) ${excludeCond}
-    `).get();
+    `).get(...excludeCondParams);
   }
   
   invoiceStats = invoiceStats || {
@@ -271,7 +272,7 @@ router.get('/', (req, res) => {
       FROM payments pm
       JOIN projects p ON pm.project_id = p.id
       WHERE p.contract_year = ? AND (pm.deleted_at IS NULL) ${excludeCond}
-    `).all(selectedYear);
+    `).all(selectedYear, ...excludeCondParams);
     
     const totalReceived = payments.reduce((sum, p) => {
       return sum + Payment.calculateActualReceived(p);
@@ -281,7 +282,7 @@ router.get('/', (req, res) => {
       SELECT COALESCE(SUM(p.sales_discount), 0) as total_sales_discount
       FROM projects p
       WHERE p.contract_year = ? ${excludeCond}
-    `).get(selectedYear);
+    `).get(selectedYear, ...excludeCondParams);
     
     paymentStats = {
       total_received: totalReceived,
@@ -294,7 +295,7 @@ router.get('/', (req, res) => {
           FROM payments pm
           JOIN projects p ON pm.project_id = p.id
           WHERE pm.deleted_at IS NULL ${excludeCond}
-        `).all()
+        `).all(...excludeCondParams)
       : db.prepare('SELECT bank_deposit_amount, payment_difference, difference_type FROM payments WHERE deleted_at IS NULL').all();
     
     const totalReceived = payments.reduce((sum, p) => {
@@ -302,7 +303,7 @@ router.get('/', (req, res) => {
     }, 0);
     
     const salesDiscountResult = excludeFromMain
-      ? db.prepare(`SELECT COALESCE(SUM(p.sales_discount), 0) as total_sales_discount FROM projects p WHERE 1=1 ${excludeCond}`).get()
+      ? db.prepare(`SELECT COALESCE(SUM(p.sales_discount), 0) as total_sales_discount FROM projects p WHERE 1=1 ${excludeCond}`).get(...excludeCondParams)
       : db.prepare('SELECT COALESCE(SUM(sales_discount), 0) as total_sales_discount FROM projects').get();
     
     paymentStats = {
@@ -412,59 +413,51 @@ router.get('/', (req, res) => {
     paymentReminder = ReceivablesAgingService.getPaymentReminder(paymentReminderDays, null, salespersonFilter);
   }
 
-  // 獨立業務區塊（all_and_separate 時，為每個 show_separate_dashboard 業務計算獨立統計）
+  // 獨立類型區塊（all_and_separate 時，為每個 show_separate_dashboard 類型計算獨立統計）
   let separateBlocks = [];
-  if (dashboardMode === 'all_and_separate' && separateIds.length > 0) {
-    const salespeople = db.prepare('SELECT id, name FROM salespeople WHERE id IN (' + separateIds.map(() => '?').join(',') + ')').all(...separateIds);
+  if (dashboardMode === 'all_and_separate' && separateTypeNames.length > 0) {
     const yearCondP = selectedYear ? 'p.contract_year = ?' : '1=1';
     const yearCond = selectedYear ? 'contract_year = ?' : '1=1';
-    for (const sp of salespeople) {
-      const sid = sp.id;
-      const params = selectedYear ? [sid, selectedYear] : [sid];
-      const spStats = db.prepare(`
+    for (const typeName of separateTypeNames) {
+      const params = selectedYear ? [typeName, selectedYear] : [typeName];
+      const typeStats = db.prepare(`
         SELECT COUNT(*) as total_projects,
           COALESCE(SUM(CASE WHEN p.status = '未結案' THEN 1 ELSE 0 END), 0) as open_projects,
           COALESCE(SUM(CASE WHEN p.status = '已結案' THEN 1 ELSE 0 END), 0) as closed_projects,
           COALESCE(SUM(p.price_with_tax), 0) as total_amount
-        FROM projects p WHERE p.salesperson_id = ? AND ${yearCondP}
+        FROM projects p WHERE p.project_type = ? AND ${yearCondP}
       `).get(...params);
-      const spTypeStats = db.prepare(`
-        SELECT project_type, COALESCE(SUM(price_with_tax), 0) as type_amount
-        FROM projects WHERE salesperson_id = ? AND ${yearCond}
-        GROUP BY project_type
-      `).all(...params);
-      const typeAmounts = {};
-      spTypeStats.forEach(t => { typeAmounts[t.project_type] = t.type_amount || 0; });
-      const spInvoiceStats = db.prepare(`
+      const typeAmounts = { [typeName]: typeStats.total_amount || 0 };
+      const typeInvoiceStats = db.prepare(`
         SELECT COALESCE(SUM(i.amount_with_tax - COALESCE(i.allowance_amount, 0)), 0) as total_invoiced,
           COUNT(DISTINCT i.project_id) as projects_with_invoices, COUNT(i.id) as invoice_count
         FROM invoices i JOIN projects p ON i.project_id = p.id
-        WHERE p.salesperson_id = ? AND (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) AND ${yearCondP}
+        WHERE p.project_type = ? AND (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) AND ${yearCondP}
       `).get(...params);
-      const spPayments = db.prepare(`
+      const typePayments = db.prepare(`
         SELECT pm.bank_deposit_amount, pm.payment_difference, pm.difference_type
         FROM payments pm JOIN projects p ON pm.project_id = p.id
-        WHERE p.salesperson_id = ? AND (pm.deleted_at IS NULL) AND ${yearCondP}
+        WHERE p.project_type = ? AND (pm.deleted_at IS NULL) AND ${yearCondP}
       `).all(...params);
-      const totalReceived = spPayments.reduce((s, p) => s + Payment.calculateActualReceived(p), 0);
-      const spSalesDiscount = db.prepare(`
+      const totalReceived = typePayments.reduce((s, p) => s + Payment.calculateActualReceived(p), 0);
+      const typeSalesDiscount = db.prepare(`
         SELECT COALESCE(SUM(sales_discount), 0) as total_sales_discount
-        FROM projects WHERE salesperson_id = ? AND ${yearCond}
+        FROM projects WHERE project_type = ? AND ${yearCond}
       `).get(...params);
-      const spBonusStats = db.prepare(`
+      const typeBonusStats = db.prepare(`
         SELECT SUM(bc.bonus_amount) as total_bonus,
           SUM(CASE WHEN bc.status = '已發放' THEN bc.bonus_amount ELSE 0 END) as paid_bonus,
           SUM(CASE WHEN bc.status = '待發放' THEN bc.bonus_amount ELSE 0 END) as pending_bonus
         FROM bonus_calculations bc JOIN projects p ON bc.project_id = p.id
-        WHERE p.salesperson_id = ? AND ${yearCondP}
+        WHERE p.project_type = ? AND ${yearCondP}
       `).get(...params);
-      const totalUnpaid = (spInvoiceStats.total_invoiced || 0) - totalReceived - (spSalesDiscount.total_sales_discount || 0);
+      const totalUnpaid = (typeInvoiceStats.total_invoiced || 0) - totalReceived - (typeSalesDiscount.total_sales_discount || 0);
       separateBlocks.push({
-        salespersonName: sp.name,
-        stats: { ...spStats, typeAmounts },
-        invoiceStats: spInvoiceStats || { total_invoiced: 0, projects_with_invoices: 0, invoice_count: 0 },
-        paymentStats: { total_received: totalReceived, total_sales_discount: spSalesDiscount?.total_sales_discount || 0 },
-        bonusStats: spBonusStats || { total_bonus: 0, paid_bonus: 0, pending_bonus: 0 },
+        typeName,
+        stats: { ...typeStats, typeAmounts },
+        invoiceStats: typeInvoiceStats || { total_invoiced: 0, projects_with_invoices: 0, invoice_count: 0 },
+        paymentStats: { total_received: totalReceived, total_sales_discount: typeSalesDiscount?.total_sales_discount || 0 },
+        bonusStats: typeBonusStats || { total_bonus: 0, paid_bonus: 0, pending_bonus: 0 },
         totalUnpaidInvoiced: totalUnpaid
       });
     }

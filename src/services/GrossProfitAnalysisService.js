@@ -5,14 +5,14 @@
  */
 const db = require('../models/db');
 
-// 非 admin/user/boss 時排除「儀表板獨立加總」業務員的專案
+// 非 admin/user/boss 時排除「儀表板獨立加總」類型的專案
 function excludeSeparateCondition(user) {
   if (!user || ['admin', 'user', 'boss'].includes(user.role)) return '';
-  return "(p.salesperson_id IS NULL OR p.salesperson_id NOT IN (SELECT id FROM salespeople WHERE show_separate_dashboard = 1))";
+  return "(p.project_type IS NULL OR p.project_type NOT IN (SELECT type_name FROM project_types WHERE COALESCE(show_separate_dashboard, 0) = 1))";
 }
 function excludeSeparateSalespersonCondition(user) {
   if (!user || ['admin', 'user', 'boss'].includes(user.role)) return '';
-  return "(COALESCE(s.show_separate_dashboard, 0) <> 1)";
+  return "1=1";
 }
 
 const GrossProfitAnalysisService = {

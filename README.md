@@ -1,16 +1,17 @@
 # 專案開立發票業績認列獎金計算總表系統
 
-[![版本](https://img.shields.io/badge/版本-v1.15.3-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
+[![版本](https://img.shields.io/badge/版本-v1.15.4-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![資料庫](https://img.shields.io/badge/資料庫-better--sqlite3-orange.svg)](https://github.com/WiseLibs/better-sqlite3)
 [![授權](https://img.shields.io/badge/授權-MIT-lightgrey.svg)](LICENSE)
 
 基於 Node.js + SQLite 的專案管理與獎金計算系統，用於管理專案、發票、收款及業務獎金。
 
-## 🚀 最新更新（v1.15.3 - 2026-02-12）
+## 🚀 最新更新（v1.15.4 - 2026-02-12）
 
+- 📊 **儀表板獨立加總改為依類型** - 由專案類型管理勾選「儀表板獨立加總」，該類型在儀表板以獨立區塊顯示；deploy.sh 已納入新 migration
 - 📄 **Nginx 上傳 413 修復** - 新增 Nginx 上傳大小限制修復說明（client_max_body_size）
-- 🔔 **開立發票提醒** - 業務員歡迎頁顯示、獨立加總業務可收到、業務員僅見自己專案
+- 🔔 **開立發票提醒** - 業務員歡迎頁顯示、業務員僅見自己專案
 - 📝 **預計開發票月份** - 預計開票相關顯示名稱統一為「預計開發票月份」
 - 📋 **發票收款狀態修正** - 分次收款時不再誤顯示「提前到款」，部分收款顯示待收狀態
 - 👤 **業務員收款提醒** - 儀表板/歡迎頁顯示業務員負責專案的收款提醒（即將到期/已逾期）
@@ -2011,6 +2012,15 @@ invoice-bonus-system/
 #### 技術文件
 
 - `開票通知功能說明.md` - 更新為開立發票提醒、業務員權限、獨立加總說明
+
+---
+
+### 2026-02-12 - v1.15.4 儀表板獨立加總改為依類型 📊
+
+- ✅ 儀表板獨立加總由**依業務**改為**依專案類型**：於專案類型管理勾選「儀表板獨立加總」，該類型在儀表板以獨立區塊顯示（專案數、總額、發票、收款等），連結改為 `/projects?type=類型名`
+- ✅ 新增 `project_types.show_separate_dashboard` 欄位與 migration `migrate_project_types_show_separate_dashboard.js`，deploy.sh 兩處 migration 區塊已納入
+- ✅ 業務管理移除「儀表板獨立加總」勾選與列表欄位；專案列表業務下拉改為顯示全部業務
+- ✅ 相關檔案：`src/routes/index.js`、`src/models/Project.js`、`src/routes/projectTypes.js`、`src/views/projectTypes/index.ejs`、`src/views/index.ejs`、`src/views/salespeople/*`、`src/services/GrossProfitAnalysisService.js`、`deploy.sh`、`儀表板檢視模式與獨立加總功能說明.md`
 
 ---
 
