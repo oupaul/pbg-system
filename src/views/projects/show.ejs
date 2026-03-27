@@ -80,6 +80,15 @@ ${typeof error !== 'undefined' && error ? '<div class="alert alert-danger alert-
             <label class="text-muted small">客戶</label>
             <div class="fw-bold">${project.company_name || '-'} <small class="text-muted">(${project.customer_code || '-'} / ${project.tax_id || '-'})</small></div>
           </div>
+          <div class="col-12">
+            <label class="text-muted small"><i class="bi bi-sticky"></i> 備註</label>
+            ${(() => {
+              const n = project.notes;
+              if (!n || !String(n).trim()) return '<div class="text-muted">尚無</div>';
+              const esc = String(n).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+              return '<div class="mt-1 text-break border rounded p-2 bg-light" style="white-space: pre-wrap;">' + esc + '</div>';
+            })()}
+          </div>
         </div>
       </div>
     </div>

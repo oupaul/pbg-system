@@ -1,13 +1,17 @@
 # 專案開立發票業績認列獎金計算總表系統
 
-[![版本](https://img.shields.io/badge/版本-v1.15.4-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
+[![版本](https://img.shields.io/badge/版本-v1.15.5-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![資料庫](https://img.shields.io/badge/資料庫-better--sqlite3-orange.svg)](https://github.com/WiseLibs/better-sqlite3)
 [![授權](https://img.shields.io/badge/授權-MIT-lightgrey.svg)](LICENSE)
 
 基於 Node.js + SQLite 的專案管理與獎金計算系統，用於管理專案、發票、收款及業務獎金。
 
-## 🚀 最新更新（v1.15.4 - 2026-02-12）
+## 🚀 最新更新（v1.15.5 - 2026-03-27）
+
+- 📝 **專案詳情顯示備註** - 專案資訊卡片顯示 `projects.notes`，保留換行；編輯仍於專案表單進行（詳見 `專案詳情備註顯示說明.md`）
+
+## 歷史更新（v1.15.4 - 2026-02-12）
 
 - 📊 **儀表板獨立加總改為依類型** - 由專案類型管理勾選「儀表板獨立加總」，該類型在儀表板以獨立區塊顯示；deploy.sh 已納入新 migration
 - 📄 **Nginx 上傳 413 修復** - 新增 Nginx 上傳大小限制修復說明（client_max_body_size）
@@ -1097,6 +1101,7 @@ sudo ./uninstall.sh
 - **專案類型動態管理**：管理員可新增、編輯、刪除專案類型，支援自訂顏色
 - **銷貨折讓功能**：專案價格新增銷貨折讓欄位，應收帳款自動扣除折讓金額
 - 專案狀態追蹤（未結案/已結案/取消）
+- **專案詳情顯示備註**：詳情頁「專案資訊」顯示備註全文（與編輯表單同一欄位），無內容時顯示「尚無」
 - 新/舊客戶標記
 - 業務預計開立發票年月記錄與編輯
 - **多維度篩選功能**：
@@ -1905,6 +1910,15 @@ invoice-bonus-system/
 #### 技術文件
 
 - `專案毛利分析功能說明.md` - 更新 PDF 版面、標題分頁、標題重複與置中、手機版章節
+
+---
+
+### 2026-03-27 - 專案詳情顯示備註
+
+- ✅ 專案詳情頁「專案資訊」區塊新增備註顯示（資料來源：`v_project_summary.notes`）
+- ✅ 輸出前 HTML 跳脫、多行文字保留換行
+- ✅ 相關檔案：`src/views/projects/show.ejs`
+- 📄 技術文件：`專案詳情備註顯示說明.md`
 
 ---
 
