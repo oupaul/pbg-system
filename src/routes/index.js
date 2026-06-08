@@ -4,6 +4,7 @@ const db = require('../models/db');
 const Project = require('../models/Project');
 const ReceivablesAgingService = require('../services/ReceivablesAgingService');
 const Role = require('../models/Role');
+const cache = require('../services/CacheService');
 
 // 取得使用者角色的儀表板檢視模式
 function getDashboardViewMode(user) {
@@ -64,10 +65,11 @@ router.get('/', (req, res) => {
         overdueInvoiceProjects = db.prepare(`
           SELECT v.id, v.project_code, v.project_name, v.project_type, v.salesperson_name,
             v.price_with_tax, v.expected_invoice_year_month, v.status, v.total_invoiced,
-            (v.price_with_tax - v.total_invoiced) as uninvoiced_amount, 'overdue' as notification_type
+            v.uninvoiced_amount, 'overdue' as notification_type
           FROM v_project_summary v
           WHERE v.expected_invoice_year_month IS NOT NULL AND v.expected_invoice_year_month < ?
             AND v.status = '未結案' AND v.salesperson_id = ?
+            AND v.uninvoiced_amount > 0
           ORDER BY v.expected_invoice_year_month ASC, v.price_with_tax DESC
         `).all(currentYearMonth, req.user.salesperson_id);
       }
@@ -75,9 +77,10 @@ router.get('/', (req, res) => {
         upcomingInvoiceProjects = db.prepare(`
           SELECT v.id, v.project_code, v.project_name, v.project_type, v.salesperson_name,
             v.price_with_tax, v.expected_invoice_year_month, v.status, v.total_invoiced,
-            (v.price_with_tax - v.total_invoiced) as uninvoiced_amount, 'upcoming' as notification_type
+            v.uninvoiced_amount, 'upcoming' as notification_type
           FROM v_project_summary v
           WHERE v.expected_invoice_year_month = ? AND v.status = '未結案' AND v.salesperson_id = ?
+            AND v.uninvoiced_amount > 0
           ORDER BY v.price_with_tax DESC
         `).all(currentYearMonth, req.user.salesperson_id);
       }
@@ -129,7 +132,12 @@ router.get('/', (req, res) => {
   
   // 取得統計資料（排除獨立加總類型，避免重複計算）
   const excludeTypeNames = excludeFromMain ? separateTypeNames : null;
-  let stats = Project.getStatistics(selectedYear, null, excludeTypeNames);
+  const statsCacheKey = `dashboard:stats:${selectedYear || 'all'}:${(excludeTypeNames || []).join(',')}`;
+  let stats = cache.get(statsCacheKey);
+  if (stats === undefined) {
+    stats = Project.getStatistics(selectedYear, null, excludeTypeNames);
+    cache.set(statsCacheKey, stats, 5 * 60 * 1000);
+  }
   
   // 處理 NULL 值，確保所有統計都有預設值
   if (!stats) {
@@ -361,29 +369,31 @@ router.get('/', (req, res) => {
   if (notificationEnabled) {
     const overdueParams = notifSalespersonParam != null ? [currentYearMonth, notifSalespersonParam] : [currentYearMonth];
     overdueInvoiceProjects = db.prepare(`
-      SELECT 
+      SELECT
         v.id, v.project_code, v.project_name, v.project_type, v.salesperson_name,
         v.price_with_tax, v.expected_invoice_year_month, v.status, v.total_invoiced,
-        (v.price_with_tax - v.total_invoiced) as uninvoiced_amount,
+        v.uninvoiced_amount,
         'overdue' as notification_type
       FROM v_project_summary v
       WHERE v.expected_invoice_year_month IS NOT NULL
         AND v.expected_invoice_year_month < ?
-        AND v.status = '未結案'${notifSalespersonCond}
+        AND v.status = '未結案'
+        AND v.uninvoiced_amount > 0${notifSalespersonCond}
       ORDER BY v.expected_invoice_year_month ASC, v.price_with_tax DESC
     `).all(...overdueParams);
   }
   if (showUpcomingNotification) {
     const upcomingParams = notifSalespersonParam != null ? [currentYearMonth, notifSalespersonParam] : [currentYearMonth];
     upcomingInvoiceProjects = db.prepare(`
-      SELECT 
+      SELECT
         v.id, v.project_code, v.project_name, v.project_type, v.salesperson_name,
         v.price_with_tax, v.expected_invoice_year_month, v.status, v.total_invoiced,
-        (v.price_with_tax - v.total_invoiced) as uninvoiced_amount,
+        v.uninvoiced_amount,
         'upcoming' as notification_type
       FROM v_project_summary v
       WHERE v.expected_invoice_year_month = ?
-        AND v.status = '未結案'${notifSalespersonCond}
+        AND v.status = '未結案'
+        AND v.uninvoiced_amount > 0${notifSalespersonCond}
       ORDER BY v.price_with_tax DESC
     `).all(...upcomingParams);
   }

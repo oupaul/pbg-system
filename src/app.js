@@ -13,14 +13,18 @@ const PORT = process.env.PORT || 3000;
 console.log('[啟動] Express 應用程式建立完成，PORT:', PORT);
 
 // 設定檔案上傳
-const upload = multer({ 
+const upload = multer({
   dest: path.join(__dirname, '..', 'uploads'),
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB
 });
 
 // Session 設定
+const sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret) {
+  console.warn('[安全警告] SESSION_SECRET 未設定！請在生產環境中設定此環境變數以確保安全性。');
+}
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'invoice-bonus-system-secret-key-change-in-production',
+  secret: sessionSecret || 'invoice-bonus-system-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -48,7 +52,7 @@ console.log('[啟動] ✓ EJS模板引擎設定完成');
 
 // 載入認證中間件
 console.log('[啟動] 載入認證中間件...');
-const { requireAuth, setUserPermissions } = require('./middleware/auth');
+const { requireAuth, requireImportExport, setUserPermissions } = require('./middleware/auth');
 console.log('[啟動] ✓ 認證中間件載入完成');
 
 // 載入部署配置
@@ -180,7 +184,7 @@ try {
   app.use('/bonuses', requireAuth, bonusRoutes);
   app.use('/salespeople', requireAuth, salespersonRoutes);
   app.use('/customers', requireAuth, customerRoutes);
-  app.use('/import-export', requireAuth, importExportRoutes(upload));
+  app.use('/import-export', requireAuth, requireImportExport, importExportRoutes(upload));
   app.use('/audit-logs', requireAuth, auditLogRoutes);
   app.use('/users', requireAuth, userRoutes);
   app.use('/backup-restore', requireAuth, backupRestoreRoutes);

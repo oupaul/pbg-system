@@ -89,6 +89,9 @@ router.post('/', async (req, res) => {
     // 收集權限設定
     const dashboardMode = ['all_and_separate', 'exclude_separate', 'none'].includes(req.body.dashboard_view_mode)
       ? req.body.dashboard_view_mode : 'all_and_separate';
+    const validScopes = ['all', 'assigned', 'own', 'none'];
+    const projectViewScope = validScopes.includes(req.body.project_view_scope)
+      ? req.body.project_view_scope : 'all';
     const permissions = {
       role_key,
       role_name,
@@ -99,10 +102,11 @@ router.post('/', async (req, res) => {
       can_manage_roles: req.body.can_manage_roles === 'on' ? 1 : 0,
       can_manage_settings: req.body.can_manage_settings === 'on' ? 1 : 0,
       can_backup_restore: req.body.can_backup_restore === 'on' ? 1 : 0,
-      can_view_all_projects: req.body.can_view_all_projects === 'on' ? 1 : 0,
-      can_view_own_projects: req.body.can_view_own_projects === 'on' ? 1 : 0,
+      can_view_all_projects: projectViewScope === 'all' ? 1 : 0,
+      can_view_own_projects: (projectViewScope === 'own' || projectViewScope === 'assigned') ? 1 : 0,
+      project_view_scope: projectViewScope,
       dashboard_view_mode: dashboardMode,
-      is_system_role: 0, // 新建角色永遠不是系統角色
+      is_system_role: 0,
       is_active: is_active === 'on' ? 1 : 0,
       display_order: parseInt(display_order) || 0
     };
@@ -159,6 +163,9 @@ async function handleRoleUpdate(req, res) {
 
     const dashboardMode = ['all_and_separate', 'exclude_separate', 'none'].includes(req.body.dashboard_view_mode)
       ? req.body.dashboard_view_mode : 'all_and_separate';
+    const validScopes = ['all', 'assigned', 'own', 'none'];
+    const projectViewScope = validScopes.includes(req.body.project_view_scope)
+      ? req.body.project_view_scope : 'all';
     // 收集更新資料
     const updateData = {
       role_name,
@@ -169,8 +176,9 @@ async function handleRoleUpdate(req, res) {
       can_manage_roles: req.body.can_manage_roles === 'on' ? 1 : 0,
       can_manage_settings: req.body.can_manage_settings === 'on' ? 1 : 0,
       can_backup_restore: req.body.can_backup_restore === 'on' ? 1 : 0,
-      can_view_all_projects: req.body.can_view_all_projects === 'on' ? 1 : 0,
-      can_view_own_projects: req.body.can_view_own_projects === 'on' ? 1 : 0,
+      can_view_all_projects: projectViewScope === 'all' ? 1 : 0,
+      can_view_own_projects: (projectViewScope === 'own' || projectViewScope === 'assigned') ? 1 : 0,
+      project_view_scope: projectViewScope,
       dashboard_view_mode: dashboardMode,
       is_active: is_active === 'on' ? 1 : 0,
       display_order: parseInt(display_order) || 0

@@ -43,15 +43,20 @@ const Role = {
     try {
       const dashboardMode = ['all_and_separate', 'exclude_separate', 'none'].includes(data.dashboard_view_mode)
         ? data.dashboard_view_mode : 'all_and_separate';
+      const validScopes = ['all', 'assigned', 'own', 'none'];
+      const scopeValue = validScopes.includes(data.project_view_scope)
+        ? data.project_view_scope : 'all';
+
       const result = db.prepare(`
         INSERT INTO roles (
           role_key, role_name, description,
           can_edit, can_delete, can_manage_users, can_manage_roles,
           can_manage_settings, can_backup_restore,
           can_view_all_projects, can_view_own_projects,
+          project_view_scope,
           dashboard_view_mode,
           is_system_role, is_active, display_order
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         data.role_key,
         data.role_name,
@@ -64,6 +69,7 @@ const Role = {
         data.can_backup_restore || 0,
         data.can_view_all_projects !== undefined ? data.can_view_all_projects : 1,
         data.can_view_own_projects !== undefined ? data.can_view_own_projects : 1,
+        scopeValue,
         dashboardMode,
         data.is_system_role || 0,
         data.is_active !== undefined ? data.is_active : 1,
@@ -161,6 +167,13 @@ const Role = {
           ? data.dashboard_view_mode : 'all_and_separate';
         fields.push('dashboard_view_mode = ?');
         values.push(valid);
+      }
+      if (data.project_view_scope !== undefined) {
+        const validScopes = ['all', 'assigned', 'own', 'none'];
+        const scope = validScopes.includes(data.project_view_scope)
+          ? data.project_view_scope : 'all';
+        fields.push('project_view_scope = ?');
+        values.push(scope);
       }
 
       if (fields.length === 0) {

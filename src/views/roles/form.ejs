@@ -223,47 +223,27 @@
           </div>
         </div>
 
-        <!-- 專案檢視權限 -->
+        <!-- 專案可見範圍 -->
         <div class="card mt-4">
           <div class="card-header bg-light">
-            <h5 class="mb-0">專案檢視權限</h5>
+            <h5 class="mb-0">專案可見範圍</h5>
           </div>
           <div class="card-body">
-            <div class="row">
-              <div class="col-md-6">
-                <div class="form-check form-switch mb-3">
-                  <input 
-                    class="form-check-input" 
-                    type="checkbox" 
-                    id="can_view_all_projects" 
-                    name="can_view_all_projects"
-                    ${!role || role.can_view_all_projects ? 'checked' : ''}
-                  >
-                  <label class="form-check-label" for="can_view_all_projects">
-                    <strong>檢視所有專案</strong>
-                    <div class="text-muted small">可以查看系統中的所有專案</div>
-                  </label>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="form-check form-switch mb-3">
-                  <input 
-                    class="form-check-input" 
-                    type="checkbox" 
-                    id="can_view_own_projects" 
-                    name="can_view_own_projects"
-                    ${!role || role.can_view_own_projects ? 'checked' : ''}
-                  >
-                  <label class="form-check-label" for="can_view_own_projects">
-                    <strong>檢視自己的專案</strong>
-                    <div class="text-muted small">只能查看自己負責的專案（需綁定業務員）</div>
-                  </label>
-                </div>
-              </div>
+            <div class="mb-3">
+              <label for="project_view_scope" class="form-label">可看哪些專案</label>
+              <select class="form-select" id="project_view_scope" name="project_view_scope">
+                <option value="all"      ${(!role || role.project_view_scope === 'all'      || (!role.project_view_scope && role.can_view_all_projects)) ? 'selected' : ''}>全部專案</option>
+                <option value="assigned" ${(role && role.project_view_scope === 'assigned') ? 'selected' : ''}>指定業務的專案</option>
+                <option value="own"      ${(role && (role.project_view_scope === 'own' || (!role.project_view_scope && !role.can_view_all_projects))) ? 'selected' : ''}>自己負責的專案（業務員）</option>
+                <option value="none"     ${(role && role.project_view_scope === 'none')     ? 'selected' : ''}>不可看任何專案</option>
+              </select>
             </div>
-            <div class="alert alert-info mt-2">
-              <i class="bi bi-info-circle"></i> 
-              如果兩者都勾選，則可以檢視所有專案。如果只勾選「檢視自己的專案」，則需要在使用者管理中綁定業務員。
+            <div class="alert alert-info">
+              <i class="bi bi-info-circle"></i>
+              <strong>全部專案</strong>：可查看所有業務的專案（適合 admin、老闆）。<br>
+              <strong>指定業務的專案</strong>：在使用者設定中指派可看哪些業務員的專案（適合主管或助理）。<br>
+              <strong>自己負責的專案</strong>：只能看自己擔任業務的專案（適合業務員，需綁定業務員帳號）。<br>
+              <strong>不可看任何專案</strong>：無法查看任何專案列表。
             </div>
           </div>
         </div>

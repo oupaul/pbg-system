@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Payment = require('../models/Payment');
 const { getUserInfo } = require('../utils/authHelper');
+const cache = require('../services/CacheService');
 
 // 新增收款
 router.post('/', (req, res) => {
@@ -17,6 +18,7 @@ router.post('/', (req, res) => {
       userInfo: getUserInfo(req)
     });
 
+    cache.delByPrefix('dashboard:');
     res.redirect(`/projects/${req.body.project_id}`);
   } catch (err) {
     console.error(err);

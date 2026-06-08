@@ -1,23 +1,45 @@
 const db = require('./db');
 const AuditLogService = require('../services/AuditLogService');
+const { PROJECT_VIEW_SCOPE, ROLES } = require('../constants');
+
+// Return salesperson IDs accessible to a user via user_salesperson_access table
+function getAssignedSalespersonIds(userId) {
+  try {
+    const rows = db.prepare(
+      'SELECT salesperson_id FROM user_salesperson_access WHERE user_id = ?'
+    ).all(userId);
+    return rows.map(r => r.salesperson_id);
+  } catch {
+    return [];
+  }
+}
 
 const Project = {
   // 取得所有專案（含關聯資料）
-  // 新增 user 參數用於角色過濾
   findAll(filters = {}, user = null) {
     let sql = `SELECT * FROM v_project_summary WHERE 1=1`;
     const params = [];
 
-    // 角色過濾邏輯
+    // Project visibility filtering based on role's project_view_scope
     if (user) {
-      if (user.role === 'salesperson' && user.salesperson_id) {
-        // 業務員只能看到自己負責的專案
+      const scope = user.project_view_scope ||
+        (user.role === ROLES.SALESPERSON ? PROJECT_VIEW_SCOPE.OWN : PROJECT_VIEW_SCOPE.ALL);
+
+      if (scope === PROJECT_VIEW_SCOPE.OWN && user.salesperson_id) {
         sql += ` AND salesperson_id = ?`;
         params.push(user.salesperson_id);
-      } else if (user.role !== 'admin' && user.role !== 'user' && user.role !== 'boss') {
-        // 非管理員、一般人員、老闆：不顯示「儀表板獨立加總」類型的專案
-        sql += ` AND (project_type IS NULL OR project_type NOT IN (SELECT type_name FROM project_types WHERE COALESCE(show_separate_dashboard, 0) = 1))`;
+      } else if (scope === PROJECT_VIEW_SCOPE.ASSIGNED) {
+        const ids = getAssignedSalespersonIds(user.id);
+        if (ids.length > 0) {
+          sql += ` AND salesperson_id IN (${ids.map(() => '?').join(',')})`;
+          params.push(...ids);
+        } else {
+          sql += ` AND 1=0`;
+        }
+      } else if (scope === PROJECT_VIEW_SCOPE.NONE) {
+        sql += ` AND 1=0`;
       }
+      // PROJECT_VIEW_SCOPE.ALL — no filter applied
     }
 
     if (filters.year) {
@@ -113,11 +135,18 @@ const Project = {
       return null;
     }
     
-    // 角色權限檢查
-    if (user && user.role === 'salesperson' && user.salesperson_id) {
-      // 業務員只能查看自己負責的專案
-      if (project.salesperson_id !== user.salesperson_id) {
-        return null; // 無權限查看
+    // Project visibility check using project_view_scope
+    if (user) {
+      const scope = user.project_view_scope ||
+        (user.role === ROLES.SALESPERSON ? PROJECT_VIEW_SCOPE.OWN : PROJECT_VIEW_SCOPE.ALL);
+
+      if (scope === PROJECT_VIEW_SCOPE.OWN && user.salesperson_id) {
+        if (project.salesperson_id !== user.salesperson_id) return null;
+      } else if (scope === PROJECT_VIEW_SCOPE.ASSIGNED) {
+        const ids = getAssignedSalespersonIds(user.id);
+        if (!ids.includes(project.salesperson_id)) return null;
+      } else if (scope === PROJECT_VIEW_SCOPE.NONE) {
+        return null;
       }
     }
     

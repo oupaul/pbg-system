@@ -376,7 +376,11 @@ if [ -d "${PROJECT_DIR}/migrations" ]; then
         npm run migrate:attachment-cleanup-setting 2>/dev/null || node migrations/migrate_attachment_cleanup_setting.js || warning "附件清理設定遷移失敗（可能已存在）"
         npm run migrate:report-groups 2>/dev/null || node migrations/migrate_report_groups.js || warning "報表群組遷移失敗（可能已存在）"
         npm run migrate:dashboard-view-mode 2>/dev/null || node migrations/migrate_dashboard_view_mode.js || warning "儀表板檢視模式遷移失敗（可能已存在）"
-        
+        npm run migrate:remove-project-type-check 2>/dev/null || node migrations/migrate_remove_project_type_check.js || warning "移除專案類型 CHECK 約束遷移失敗（可能已存在）"
+        npm run migrate:permission-scope 2>/dev/null || node migrations/migrate_permission_scope.js || warning "RBAC 權限範圍遷移失敗（可能已存在）"
+        npm run migrate:invoice-summary 2>/dev/null || node migrations/migrate_v_invoice_summary.js || warning "發票彙總視圖遷移失敗（可能已存在）"
+        npm run migrate:rename-user-role 2>/dev/null || node migrations/migrate_rename_user_role.js || warning "角色名稱更新失敗（可能已存在）"
+
         # 首次安裝時插入種子資料
         if [ "$IS_FIRST_INSTALL" = true ]; then
             log "插入種子資料..."
@@ -414,6 +418,9 @@ if [ -d "${PROJECT_DIR}/migrations" ]; then
         npm run migrate:attachment-cleanup-setting 2>/dev/null || node migrations/migrate_attachment_cleanup_setting.js || warning "附件清理設定遷移失敗（可能已存在）"
         npm run migrate:report-groups 2>/dev/null || node migrations/migrate_report_groups.js || warning "報表群組遷移失敗（可能已存在）"
         npm run migrate:dashboard-view-mode 2>/dev/null || node migrations/migrate_dashboard_view_mode.js || warning "儀表板檢視模式遷移失敗（可能已存在）"
+        npm run migrate:permission-scope 2>/dev/null || node migrations/migrate_permission_scope.js || warning "RBAC 權限範圍遷移失敗（可能已存在）"
+        npm run migrate:invoice-summary 2>/dev/null || node migrations/migrate_v_invoice_summary.js || warning "發票彙總視圖遷移失敗（可能已存在）"
+        npm run migrate:rename-user-role 2>/dev/null || node migrations/migrate_rename_user_role.js || warning "角色名稱更新失敗（可能已存在）"
         log "✓ 增量遷移完成"
     fi
 else

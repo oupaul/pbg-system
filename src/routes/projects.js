@@ -14,6 +14,7 @@ const Customer = require('../models/Customer');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireEditPermission } = require('../middleware/auth');
 const AuditLogService = require('../services/AuditLogService');
+const cache = require('../services/CacheService');
 
 // 專案附件上傳：儲存至 uploads/attachments，檔名唯一
 const attachmentsDir = path.join(__dirname, '..', '..', 'uploads', 'attachments');
@@ -372,6 +373,7 @@ router.post('/', requireEditPermission, (req, res) => {
       ));
     }
 
+    cache.delByPrefix('dashboard:');
     res.redirect(`/projects/${projectId}`);
   } catch (err) {
     console.error(err);
@@ -475,7 +477,8 @@ router.get('/:id', (req, res) => {
   }
 
   const showDeleted = req.query.show_deleted === '1' || req.query.show_deleted === 'true';
-  const invoices = Invoice.findByProject(project.id, { includeDeleted: showDeleted });
+  // findByProjectWithPayments 優先使用 v_invoice_summary 視圖，每筆發票附帶 total_received / unpaid_amount
+  const invoices = Invoice.findByProjectWithPayments(project.id, { includeDeleted: showDeleted });
   const payments = Payment.findByProject(project.id, { includeDeleted: showDeleted });
   const bonuses = Bonus.findByProject(project.id);
   const Cost = require('../models/Cost');
@@ -551,7 +554,8 @@ router.get('/:id', (req, res) => {
   // 有效發票（供收款對應選擇，僅 有效 狀態）
   const validInvoices = Invoice.findValidByProject ? Invoice.findValidByProject(project.id) : invoices.filter(i => !i.status || i.status === '有效');
 
-  // 每筆發票的已收款/未收款摘要（支援一筆發票分多次收款）
+  // 每筆發票的已收款/未收款摘要
+  // invoices 已透過 findByProjectWithPayments 取得 total_received / unpaid_amount，直接使用，不需再掃 paymentsForStatus
   const invoiceIdsInPayments = new Set(paymentsForStatus.filter(p => p.invoice_id).map(p => p.invoice_id));
   const allInvsForSummary = [...validInvoices];
   invoices.forEach(inv => {
@@ -559,11 +563,17 @@ router.get('/:id', (req, res) => {
       allInvsForSummary.push(inv); // 含已作廢但曾有收款的發票（供編輯時顯示）
     }
   });
+  // 以視圖提供的 total_received / unpaid_amount 為主；若視圖尚未建立則回退計算
   const invoiceUnpaidSummary = allInvsForSummary.map(inv => {
-    const invPayments = paymentsForStatus.filter(p => p.invoice_id === inv.id);
-    const paid = invPayments.reduce((s, p) => s + Payment.calculateActualReceived(p), 0);
-    const invAmount = (inv.amount_with_tax || 0) - (inv.allowance_amount || 0);
-    const unpaid = Math.max(0, invAmount - paid);
+    const invAmount = inv.recognized_amount != null
+      ? inv.recognized_amount
+      : (inv.amount_with_tax || 0) - (inv.allowance_amount || 0);
+    const paid = inv.total_received != null
+      ? inv.total_received
+      : paymentsForStatus.filter(p => p.invoice_id === inv.id).reduce((s, p) => s + Payment.calculateActualReceived(p), 0);
+    const unpaid = inv.unpaid_amount != null
+      ? inv.unpaid_amount
+      : Math.max(0, invAmount - paid);
     const isValid = !inv.status || inv.status === '有效';
     return { invoice_id: inv.id, invoice_number: inv.invoice_number, amount: invAmount, paid, unpaid, isValid };
   });
@@ -700,10 +710,10 @@ router.post('/:id', requireEditPermission, (req, res) => {
       userInfo: getUserInfo(req) // 添加用戶資訊用於審計日誌
     });
 
+    cache.delByPrefix('dashboard:');
     res.redirect(`/projects/${req.params.id}`);
   } catch (err) {
     console.error(err);
-    // 檢查是否為唯一約束錯誤
     if (err.message && err.message.includes('UNIQUE constraint')) {
       return res.redirect(`/projects/${req.params.id}/edit?error=` + encodeURIComponent(
         `專案編號 "${req.body.project_code}" 在類型 "${req.body.project_type}" 中已存在`
@@ -778,6 +788,7 @@ router.post('/:id/update-expected-invoice', requireEditPermission, (req, res) =>
 router.post('/:id/delete', requireEditPermission, (req, res) => {
   try {
     Project.delete(req.params.id);
+    cache.delByPrefix('dashboard:');
     res.redirect('/projects');
   } catch (err) {
     console.error(err);

@@ -3,6 +3,7 @@ const router = express.Router();
 const User = require('../models/User');
 const AuditLogService = require('../services/AuditLogService');
 const { getUserInfo } = require('../utils/authHelper');
+const { loginRateLimiter, resetOnSuccess } = require('../middleware/rateLimiter');
 
 // 登入頁面
 router.get('/login', (req, res, next) => {
@@ -43,7 +44,7 @@ router.get('/login', (req, res, next) => {
 });
 
 // 處理登入
-router.post('/login', async (req, res) => {
+router.post('/login', loginRateLimiter, async (req, res) => {
   console.log('[登入] POST /login 請求');
   console.log('[登入] Request body:', { username: req.body.username, password: '[已隱藏]', redirect: req.body.redirect });
   console.log('[登入] Session ID:', req.sessionID);
@@ -81,6 +82,9 @@ router.post('/login', async (req, res) => {
     console.log('[登入] 帳號已被停用');
     return res.redirect(`/login?error=${encodeURIComponent('帳號已被停用')}&redirect=${encodeURIComponent(redirect)}`);
   }
+
+  // 登入成功 — 清除速率限制計數
+  resetOnSuccess(req.ip || req.connection.remoteAddress || 'unknown');
 
   // 登入成功，設置 session
   console.log('[登入] 登入成功，設置 session');

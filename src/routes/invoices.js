@@ -3,6 +3,7 @@ const router = express.Router();
 const Invoice = require('../models/Invoice');
 const Project = require('../models/Project');
 const { getUserInfo } = require('../utils/authHelper');
+const cache = require('../services/CacheService');
 
 // 新增發票
 router.post('/', (req, res) => {
@@ -16,6 +17,7 @@ router.post('/', (req, res) => {
       userInfo: getUserInfo(req)
     });
 
+    cache.delByPrefix('dashboard:');
     res.redirect(`/projects/${req.body.project_id}`);
   } catch (err) {
     console.error(err);
@@ -118,7 +120,7 @@ router.post('/:id/void-and-reissue', (req, res) => {
       return res.redirect('/projects?error=' + encodeURIComponent('找不到發票'));
     }
     projectId = invoice.project_id;
-    Invoice.voidAndReissue(req.params.id, {
+    const result = Invoice.voidAndReissue(req.params.id, {
       invoice_date: req.body.invoice_date,
       invoice_number: req.body.invoice_number,
       amount_with_tax: req.body.amount_with_tax,
@@ -126,7 +128,10 @@ router.post('/:id/void-and-reissue', (req, res) => {
     }, {
       void_reason: (req.body.void_reason || '').trim() || undefined
     }, getUserInfo(req));
-    res.redirect(`/projects/${projectId}?success=` + encodeURIComponent('發票已作廢並重開'));
+    const movedMsg = result && result.movedPayments > 0
+      ? `（已自動轉移 ${result.movedPayments} 筆收款記錄至新發票）`
+      : '';
+    res.redirect(`/projects/${projectId}?success=` + encodeURIComponent(`發票已作廢並重開${movedMsg}`));
   } catch (err) {
     console.error(err);
     if (!projectId) {

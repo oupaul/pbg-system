@@ -29,13 +29,17 @@ const GrossProfitAnalysisService = {
       : '';
     const params = year ? [year, year] : [];
     
-    // 角色權限過濾
+    // 角色權限過濾：admin/user 看全部；其他角色只看自己的 salesperson 專案
     let roleCondition = '';
-    if (user && user.role === 'salesperson' && user.salesperson_id) {
-      roleCondition = 'p.salesperson_id = ?';
-      params.push(user.salesperson_id);
+    if (user && !['admin', 'user'].includes(user.role)) {
+      if (user.salesperson_id) {
+        roleCondition = 'p.salesperson_id = ?';
+        params.push(user.salesperson_id);
+      } else {
+        roleCondition = '1=0'; // 無 salesperson_id 的非管理員看不到任何資料
+      }
     }
-    
+
     // 狀態篩選：只顯示未結案或已結案
     let statusCondition = '';
     if (statusFilter === '已結案') {
@@ -44,7 +48,7 @@ const GrossProfitAnalysisService = {
     } else if (statusFilter === '未結案') {
       statusCondition = "(COALESCE(p.status, '未結案') = '未結案')";
     }
-    
+
     // 組合 WHERE 條件
     let whereClause = '';
     const conditions = [];
@@ -58,7 +62,7 @@ const GrossProfitAnalysisService = {
     }
 
     const sql = `
-      SELECT 
+      SELECT
         p.id,
         p.project_code,
         COALESCE(cust.company_name, '') as customer_name,
@@ -71,8 +75,8 @@ const GrossProfitAnalysisService = {
         p.price_without_tax as revenue,
         COALESCE(c.total_cost, 0) as total_cost,
         (p.price_without_tax - COALESCE(c.total_cost, 0)) as gross_profit,
-        CASE WHEN p.price_without_tax > 0 
-          THEN ROUND((p.price_without_tax - COALESCE(c.total_cost, 0)) / p.price_without_tax * 100, 1) 
+        CASE WHEN p.price_without_tax > 0
+          THEN ROUND((p.price_without_tax - COALESCE(c.total_cost, 0)) / p.price_without_tax * 100, 1)
           ELSE 0 END as gross_margin_pct
       FROM projects p
       LEFT JOIN customers cust ON p.customer_id = cust.id
@@ -90,7 +94,7 @@ const GrossProfitAnalysisService = {
     } catch (err) {
       if (err.message && (err.message.includes('no such table') || err.message.includes('report_groups') || err.message.includes('customers'))) {
         const fallbackParams = year ? [year, year] : [];
-        if (user && user.role === 'salesperson' && user.salesperson_id) {
+        if (user && !['admin', 'user'].includes(user.role) && user.salesperson_id) {
           fallbackParams.push(user.salesperson_id);
         }
         if (statusFilter === '已結案') fallbackParams.push('已結案');
@@ -134,13 +138,17 @@ const GrossProfitAnalysisService = {
       : '';
     const params = year ? [year, year] : [];
     
-    // 角色權限過濾
+    // 角色權限過濾：admin/user 看全部；其他角色只看自己的 salesperson 專案
     let roleCondition = '';
-    if (user && user.role === 'salesperson' && user.salesperson_id) {
-      roleCondition = 'p.salesperson_id = ?';
-      params.push(user.salesperson_id);
+    if (user && !['admin', 'user'].includes(user.role)) {
+      if (user.salesperson_id) {
+        roleCondition = 'p.salesperson_id = ?';
+        params.push(user.salesperson_id);
+      } else {
+        roleCondition = '1=0';
+      }
     }
-    
+
     // 狀態篩選
     let statusCondition = '';
     if (statusFilter === '已結案') {
@@ -149,7 +157,7 @@ const GrossProfitAnalysisService = {
     } else if (statusFilter === '未結案') {
       statusCondition = "(COALESCE(p.status, '未結案') = '未結案')";
     }
-    
+
     // 組合 WHERE 條件
     const conditions = ['p.id IS NOT NULL'];
     if (yearCondition) conditions.push(yearCondition);
@@ -197,13 +205,17 @@ const GrossProfitAnalysisService = {
       : '';
     const params = year ? [year, year] : [];
     
-    // 角色權限過濾
+    // 角色權限過濾：admin/user 看全部；其他角色只看自己的 salesperson 專案
     let roleCondition = '';
-    if (user && user.role === 'salesperson' && user.salesperson_id) {
-      roleCondition = 'p.salesperson_id = ?';
-      params.push(user.salesperson_id);
+    if (user && !['admin', 'user'].includes(user.role)) {
+      if (user.salesperson_id) {
+        roleCondition = 'p.salesperson_id = ?';
+        params.push(user.salesperson_id);
+      } else {
+        roleCondition = '1=0';
+      }
     }
-    
+
     // 狀態篩選
     let statusCondition = '';
     if (statusFilter === '已結案') {
@@ -212,7 +224,7 @@ const GrossProfitAnalysisService = {
     } else if (statusFilter === '未結案') {
       statusCondition = "(COALESCE(p.status, '未結案') = '未結案')";
     }
-    
+
     // 組合 WHERE 條件
     const conditions = [];
     if (yearCondition) conditions.push(yearCondition);
@@ -223,7 +235,7 @@ const GrossProfitAnalysisService = {
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
     const sql = `
-      SELECT 
+      SELECT
         p.project_type,
         COUNT(p.id) as project_count,
         COALESCE(SUM(p.price_without_tax), 0) as total_revenue,
@@ -259,13 +271,17 @@ const GrossProfitAnalysisService = {
       : '';
     const params = year ? [year, year] : [];
     
-    // 角色權限過濾
+    // 角色權限過濾：admin/user 看全部；其他角色只看自己的 salesperson 專案
     let roleCondition = '';
-    if (user && user.role === 'salesperson' && user.salesperson_id) {
-      roleCondition = 'p.salesperson_id = ?';
-      params.push(user.salesperson_id);
+    if (user && !['admin', 'user'].includes(user.role)) {
+      if (user.salesperson_id) {
+        roleCondition = 'p.salesperson_id = ?';
+        params.push(user.salesperson_id);
+      } else {
+        roleCondition = '1=0';
+      }
     }
-    
+
     // 狀態篩選
     let statusCondition = '';
     if (statusFilter === '已結案') {
@@ -274,7 +290,7 @@ const GrossProfitAnalysisService = {
     } else if (statusFilter === '未結案') {
       statusCondition = "(COALESCE(p.status, '未結案') = '未結案')";
     }
-    
+
     // 組合 WHERE 條件
     const conditions = [];
     if (yearCondition) conditions.push(yearCondition);

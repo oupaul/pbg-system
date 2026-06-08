@@ -357,7 +357,19 @@ function resetExpectedInvoice() {
               <td><code>${inv.invoice_number || '-'}</code></td>
               <td>${inv.expected_payment_date || '-'}</td>
               <td class="text-end">$${(inv.amount_with_tax || 0).toLocaleString()}${(inv.allowance_amount || 0) > 0 ? ' <span class="text-muted small">折讓 $' + (inv.allowance_amount || 0).toLocaleString() + '，認列 $' + Math.max(0, (inv.amount_with_tax || 0) - (inv.allowance_amount || 0)).toLocaleString() + '</span>' : ''}</td>
-              <td><span class="${typeof inv.paymentStatus !== 'undefined' ? inv.paymentStatus.class : 'text-muted'}">${typeof inv.paymentStatus !== 'undefined' ? inv.paymentStatus.text : '-'}</span></td>
+              <td>${(() => {
+                const isValid = !inv.status || inv.status === '有效';
+                const received = inv.total_received != null ? inv.total_received : null;
+                const unpaid   = inv.unpaid_amount  != null ? inv.unpaid_amount  : null;
+                const amountHtml = (isValid && received != null)
+                  ? '<div class="small text-muted lh-1 mb-1">已收 <strong class="text-success">$' + Math.round(received).toLocaleString() + '</strong>' +
+                    (unpaid > 0 ? ' / 未收 <strong class="text-danger">$' + Math.round(unpaid).toLocaleString() + '</strong>' : ' <span class="badge bg-success-subtle text-success border border-success-subtle">✓ 收齊</span>') +
+                    '</div>'
+                  : '';
+                const statusHtml = '<span class="' + (typeof inv.paymentStatus !== 'undefined' ? inv.paymentStatus.class : 'text-muted') + '">' +
+                                   (typeof inv.paymentStatus !== 'undefined' ? inv.paymentStatus.text : '-') + '</span>';
+                return amountHtml + statusHtml;
+              })()}</td>
               <td class="text-end">${actionCell}</td>
             </tr>
           `}).join('') : '<tr><td colspan="7" class="text-center text-muted py-3">尚無發票</td></tr>'}

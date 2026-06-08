@@ -6,8 +6,10 @@ const { requireAuth } = require('../middleware/auth');
 const { getUserInfo } = require('../utils/authHelper');
 const AuditLogService = require('../services/AuditLogService');
 const db = require('../models/db');
+const { PROJECT_VIEW_SCOPE } = require('../constants');
 
-// 輔助函數：檢查是否為管理員
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
 function requireAdmin(req, res, next) {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).render('error', {
@@ -19,28 +21,56 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+function getRoles() {
+  try {
+    return db.prepare(
+      'SELECT role_key, role_name, project_view_scope FROM roles WHERE is_active = 1 ORDER BY display_order ASC, role_name ASC'
+    ).all();
+  } catch {
+    return [
+      { role_key: 'admin',       role_name: '管理員',     project_view_scope: 'all' },
+      { role_key: 'user',        role_name: '專案管理員', project_view_scope: 'all' },
+      { role_key: 'salesperson', role_name: '業務員',     project_view_scope: 'own' },
+      { role_key: 'boss',        role_name: '老闆',       project_view_scope: 'all' }
+    ];
+  }
+}
+
+function getAssignedSalespersonIds(userId) {
+  try {
+    const rows = db.prepare(
+      'SELECT salesperson_id FROM user_salesperson_access WHERE user_id = ?'
+    ).all(userId);
+    return rows.map(r => r.salesperson_id);
+  } catch {
+    return [];
+  }
+}
+
+function saveAssignedSalespersonIds(userId, ids) {
+  const del = db.prepare('DELETE FROM user_salesperson_access WHERE user_id = ?');
+  const ins = db.prepare(
+    'INSERT OR IGNORE INTO user_salesperson_access (user_id, salesperson_id) VALUES (?, ?)'
+  );
+  db.transaction(() => {
+    del.run(userId);
+    for (const spId of ids) ins.run(userId, spId);
+  })();
+}
+
+// ── Routes ───────────────────────────────────────────────────────────────────
+
 // 使用者列表（僅管理員）
 router.get('/', requireAuth, requireAdmin, (req, res) => {
   const users = User.findAll();
-  
-  // 取得所有角色資訊（用於顯示角色名稱）
   let rolesMap = {};
   try {
-    const roles = db.prepare('SELECT role_key, role_name FROM roles').all();
-    roles.forEach(role => {
-      rolesMap[role.role_key] = role.role_name;
-    });
-  } catch (err) {
-    console.warn('無法讀取角色列表:', err.message);
-    // 使用預設角色名稱
-    rolesMap = {
-      'admin': '管理員',
-      'user': '一般使用者',
-      'salesperson': '業務員',
-      'boss': '老闆'
-    };
+    db.prepare('SELECT role_key, role_name FROM roles').all()
+      .forEach(r => { rolesMap[r.role_key] = r.role_name; });
+  } catch {
+    rolesMap = { admin: '管理員', user: '專案管理員', salesperson: '業務員', boss: '老闆' };
   }
-  
+
   res.render('users/index', {
     title: '使用者管理',
     users,
@@ -53,28 +83,12 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
 
 // 新增使用者表單（僅管理員）
 router.get('/new', requireAuth, requireAdmin, (req, res) => {
-  const salespeople = Salesperson.findAll(true); // 只取得在職的業務員
-  
-  // 取得所有啟用的角色
-  let roles = [];
-  try {
-    roles = db.prepare('SELECT role_key, role_name FROM roles WHERE is_active = 1 ORDER BY display_order ASC, role_name ASC').all();
-  } catch (err) {
-    console.warn('無法讀取角色列表，使用預設角色:', err.message);
-    // 如果讀取失敗，使用預設角色
-    roles = [
-      { role_key: 'admin', role_name: '管理員' },
-      { role_key: 'user', role_name: '一般使用者' },
-      { role_key: 'salesperson', role_name: '業務員' },
-      { role_key: 'boss', role_name: '老闆' }
-    ];
-  }
-  
   res.render('users/form', {
     title: '新增使用者',
     user: null,
-    salespeople,
-    roles,
+    salespeople: Salesperson.findAll(true),
+    roles: getRoles(),
+    assignedSalespersonIds: [],
     action: '/users',
     error: req.query.error || ''
   });
@@ -83,24 +97,24 @@ router.get('/new', requireAuth, requireAdmin, (req, res) => {
 // 建立使用者（僅管理員）
 router.post('/', requireAuth, requireAdmin, async (req, res) => {
   const { username, password, name, role, salesperson_id } = req.body;
+  // assigned_salespeople may be a single value or array from multiselect
+  const assignedRaw = req.body.assigned_salespeople;
+  const assignedIds = assignedRaw
+    ? (Array.isArray(assignedRaw) ? assignedRaw : [assignedRaw]).map(Number).filter(Boolean)
+    : [];
 
   if (!username || !password || !name) {
     return res.redirect('/users/new?error=' + encodeURIComponent('請填寫所有必填欄位'));
   }
-
   if (password.length < 6) {
     return res.redirect('/users/new?error=' + encodeURIComponent('密碼長度至少需要 6 個字元'));
   }
-
-  // 如果角色是業務員，必須選擇業務人員
   if (role === 'salesperson' && !salesperson_id) {
     return res.redirect('/users/new?error=' + encodeURIComponent('業務員角色必須關聯一位業務人員'));
   }
 
   try {
-    // 檢查用戶名是否已存在
-    const existingUser = User.findByUsername(username);
-    if (existingUser) {
+    if (User.findByUsername(username)) {
       return res.redirect('/users/new?error=' + encodeURIComponent('使用者名稱已存在'));
     }
 
@@ -113,11 +127,14 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
       is_active: 1
     });
 
-    // 記錄新增操作
+    // Save assigned-salesperson access if the role uses 'assigned' scope
+    const roleRecord = getRoles().find(r => r.role_key === role);
+    if (roleRecord && roleRecord.project_view_scope === PROJECT_VIEW_SCOPE.ASSIGNED) {
+      saveAssignedSalespersonIds(userId, assignedIds);
+    }
+
     AuditLogService.logCreate('users', userId, {
-      username,
-      name,
-      role: role || 'user',
+      username, name, role: role || 'user',
       salesperson_id: role === 'salesperson' ? salesperson_id : null,
       is_active: 1
     }, getUserInfo(req));
@@ -133,35 +150,15 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
 router.get('/:id/edit', requireAuth, requireAdmin, (req, res) => {
   const user = User.findById(req.params.id);
   if (!user) {
-    return res.status(404).render('error', {
-      title: '找不到使用者',
-      message: '找不到使用者',
-      error: {}
-    });
+    return res.status(404).render('error', { title: '找不到使用者', message: '找不到使用者', error: {} });
   }
 
-  const salespeople = Salesperson.findAll(true); // 只取得在職的業務員
-  
-  // 取得所有啟用的角色
-  let roles = [];
-  try {
-    roles = db.prepare('SELECT role_key, role_name FROM roles WHERE is_active = 1 ORDER BY display_order ASC, role_name ASC').all();
-  } catch (err) {
-    console.warn('無法讀取角色列表，使用預設角色:', err.message);
-    // 如果讀取失敗，使用預設角色
-    roles = [
-      { role_key: 'admin', role_name: '管理員' },
-      { role_key: 'user', role_name: '一般使用者' },
-      { role_key: 'salesperson', role_name: '業務員' },
-      { role_key: 'boss', role_name: '老闆' }
-    ];
-  }
-  
   res.render('users/form', {
     title: '編輯使用者',
     user,
-    salespeople,
-    roles,
+    salespeople: Salesperson.findAll(true),
+    roles: getRoles(),
+    assignedSalespersonIds: getAssignedSalespersonIds(user.id),
     action: `/users/${user.id}`,
     error: req.query.error || ''
   });
@@ -170,18 +167,17 @@ router.get('/:id/edit', requireAuth, requireAdmin, (req, res) => {
 // 更新使用者（僅管理員）
 router.post('/:id', requireAuth, requireAdmin, async (req, res) => {
   const { name, role, password, is_active, salesperson_id } = req.body;
-  const userId = parseInt(req.params.id);
+  const assignedRaw = req.body.assigned_salespeople;
+  const assignedIds = assignedRaw
+    ? (Array.isArray(assignedRaw) ? assignedRaw : [assignedRaw]).map(Number).filter(Boolean)
+    : [];
 
+  const userId = parseInt(req.params.id);
   const user = User.findById(userId);
   if (!user) {
-    return res.status(404).render('error', {
-      title: '找不到使用者',
-      message: '找不到使用者',
-      error: {}
-    });
+    return res.status(404).render('error', { title: '找不到使用者', message: '找不到使用者', error: {} });
   }
 
-  // 如果角色是業務員，必須選擇業務人員
   if (role === 'salesperson' && !salesperson_id) {
     return res.redirect(`/users/${userId}/edit?error=` + encodeURIComponent('業務員角色必須關聯一位業務人員'));
   }
@@ -194,52 +190,37 @@ router.post('/:id', requireAuth, requireAdmin, async (req, res) => {
   };
 
   try {
-    // 取得舊值用於審計日誌
-    const oldUser = db.prepare(`SELECT * FROM users WHERE id = ?`).get(userId);
-    if (!oldUser) {
-      return res.status(404).render('error', {
-        title: '找不到使用者',
-        message: '找不到使用者',
-        error: {}
-      });
-    }
+    const oldUser = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
 
-    // 如果有提供新密碼，使用 updatePassword 方法
     if (password && password.length > 0) {
       if (password.length < 6) {
         return res.redirect(`/users/${userId}/edit?error=` + encodeURIComponent('密碼長度至少需要 6 個字元'));
       }
       await User.updatePassword(userId, password);
-      // 從 updateData 中移除 password，因為已經用 updatePassword 處理了
-      delete updateData.password;
     }
 
-    // 執行更新（不包含密碼）
     const updateSuccess = await User.update(userId, updateData);
-    
+
+    // Update assigned-salesperson access when role uses 'assigned' scope
+    const roleRecord = getRoles().find(r => r.role_key === role);
+    if (roleRecord && roleRecord.project_view_scope === PROJECT_VIEW_SCOPE.ASSIGNED) {
+      saveAssignedSalespersonIds(userId, assignedIds);
+    } else {
+      // Clear access entries when role no longer uses assigned scope
+      try {
+        db.prepare('DELETE FROM user_salesperson_access WHERE user_id = ?').run(userId);
+      } catch { /* table may not exist yet */ }
+    }
+
     if (updateSuccess) {
-      // 取得新值用於審計日誌（排除密碼雜湊）
-      const newUser = db.prepare(`SELECT id, username, name, role, is_active FROM users WHERE id = ?`).get(userId);
-      const newDataForLog = {
-        name: newUser.name,
-        role: newUser.role,
-        is_active: newUser.is_active
-      };
-      
-      // 如果有更新密碼，只記錄 "密碼已更新" 而不記錄實際密碼
-      if (password && password.length > 0) {
-        newDataForLog.password = '[已更新]';
-      }
-      
-      const oldDataForLog = {
-        name: oldUser.name,
-        role: oldUser.role,
-        is_active: oldUser.is_active
-      };
-      
-      // 記錄更新操作
-      AuditLogService.logUpdate('users', userId, oldDataForLog, newDataForLog, getUserInfo(req));
-      
+      const newUser = db.prepare('SELECT id, username, name, role, is_active FROM users WHERE id = ?').get(userId);
+      const newDataForLog = { name: newUser.name, role: newUser.role, is_active: newUser.is_active };
+      if (password && password.length > 0) newDataForLog.password = '[已更新]';
+
+      AuditLogService.logUpdate('users', userId, {
+        name: oldUser.name, role: oldUser.role, is_active: oldUser.is_active
+      }, newDataForLog, getUserInfo(req));
+
       res.redirect('/users?success=' + encodeURIComponent(`使用者 ${name} 已成功更新`));
     } else {
       res.redirect(`/users/${userId}/edit?error=` + encodeURIComponent('更新失敗，請確認資料是否正確'));
@@ -256,14 +237,8 @@ router.post('/:id/toggle-active', requireAuth, requireAdmin, async (req, res) =>
   const user = User.findById(userId);
 
   if (!user) {
-    return res.status(404).render('error', {
-      title: '找不到使用者',
-      message: '找不到使用者',
-      error: {}
-    });
+    return res.status(404).render('error', { title: '找不到使用者', message: '找不到使用者', error: {} });
   }
-
-  // 防止停用自己
   if (user.id === req.user.id) {
     return res.redirect('/users?error=' + encodeURIComponent('無法停用自己的帳號'));
   }
@@ -276,4 +251,3 @@ router.post('/:id/toggle-active', requireAuth, requireAdmin, async (req, res) =>
 });
 
 module.exports = router;
-

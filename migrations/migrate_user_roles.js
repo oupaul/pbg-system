@@ -108,7 +108,7 @@ function migrateUserRoles() {
     console.log('  - salesperson (業務員): 只能查看自己負責的專案，無編輯權限');
     console.log('  - boss (老闆): 可查看所有專案，無編輯權限');
     console.log('  - admin (管理員): 完整權限');
-    console.log('  - user (一般用戶): 完整權限');
+    console.log('  - user (專案管理員): 可以編輯專案、客戶、業務、發票、收款等所有專案相關資料');
     
   } catch (err) {
     console.error('❌ 遷移失敗:', err);

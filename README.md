@@ -1,15 +1,27 @@
 # 專案開立發票業績認列獎金計算總表系統
 
-[![版本](https://img.shields.io/badge/版本-v1.15.5-blue.svg)](https://github.com/your-repo/invoice-bonus-system)
+[![版本](https://img.shields.io/badge/版本-v1.16.0-blue.svg)](https://github.com/oupaul/pbg-system)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
 [![資料庫](https://img.shields.io/badge/資料庫-better--sqlite3-orange.svg)](https://github.com/WiseLibs/better-sqlite3)
 [![授權](https://img.shields.io/badge/授權-MIT-lightgrey.svg)](LICENSE)
 
 基於 Node.js + SQLite 的專案管理與獎金計算系統，用於管理專案、發票、收款及業務獎金。
 
-## 🚀 最新更新（v1.15.5 - 2026-03-27）
+## 🚀 最新更新（v1.16.0 - 2026-06-09）
 
-- 📝 **專案詳情顯示備註** - 專案資訊卡片顯示 `projects.notes`，保留換行；編輯仍於專案表單進行（詳見 `專案詳情備註顯示說明.md`）
+- 🔐 **RBAC 權限範圍強化** - roles 表新增 `project_view_scope` 欄位，支援 all / assigned / own / none 四種範圍；新增 `user_salesperson_access` 對照表，支援「assigned」多業務存取
+- 🚫 **匯入/匯出存取限制** - 僅系統管理員（admin）與專案管理員（user）可進入匯入/匯出頁面，其他角色路由層 403 攔截
+- 📊 **毛利分析角色過濾** - 非 admin/user 角色僅能看到自己負責的專案；未綁定業務員者顯示空資料並隱藏導覽連結
+- ✏️ **角色顯示名稱更新** - `user` 角色顯示名稱從「一般使用者」改為「**專案管理員**」（`role_key` 不變，程式邏輯不受影響）
+- ⚡ **登入速率限制** - 新增 `rateLimiter.js` middleware，防止暴力破解（10 分鐘內同 IP 最多 10 次失敗）
+- 🗃️ **儀表板快取** - 新增 `CacheService`，儀表板統計資料 TTL 快取，減少重複 DB 查詢
+- 🏗️ **常數集中管理** - 新增 `src/constants.js`，統一 ROLES、PROJECT_VIEW_SCOPE 等魔術字串
+- 📋 **範本動態類型** - 匯入範例範本「填寫說明」工作表的專案類型清單從 DB 動態讀取，不再 hardcode
+- 🔄 **部署腳本全面更新** - `deploy.sh`、`restore.sh`、`install.sh` 補齊所有缺漏的 migration 條目
+
+## 歷史更新（v1.15.5 - 2026-03-27）
+
+- 📝 **專案詳情顯示備註** - 專案資訊卡片顯示 `projects.notes`，保留換行；編輯仍於專案表單進行
 
 ## 歷史更新（v1.15.4 - 2026-02-12）
 
@@ -1222,7 +1234,7 @@ sudo ./uninstall.sh
   - 資料檢視權限（檢視所有專案、檢視自己的專案）
 - **系統預設角色**：
   - 管理員（admin）：完整系統權限
-  - 一般使用者（user）：完整編輯權限
+  - 專案管理員（user）：完整編輯權限，可使用匯入/匯出與毛利分析（可見所有專案）
   - 業務員（salesperson）：只能查看自己負責的專案（唯讀）
   - 老闆（boss）：可查看所有專案（唯讀）
 - **角色特性**：
@@ -1278,8 +1290,10 @@ invoice-bonus-system/
 │   └── js/
 ├── src/                    # 原始碼
 │   ├── app.js              # 應用程式入口
+│   ├── constants.js        # 🆕 集中管理常數（ROLES、PROJECT_VIEW_SCOPE）
 │   ├── middleware/         # 中間件
-│   │   └── auth.js         # 認證中間件
+│   │   ├── auth.js         # 認證中間件（含 requireImportExport）
+│   │   └── rateLimiter.js  # 🆕 登入速率限制 middleware
 │   ├── models/             # 資料模型
 │   │   ├── db.js           # 資料庫連線
 │   │   ├── Project.js      # 專案模型
@@ -1303,9 +1317,11 @@ invoice-bonus-system/
 │   │   ├── auditLogs.js    # 修改記錄路由
 │   │   └── api.js          # API 路由
 │   ├── services/           # 服務層
-│   │   ├── ExcelImportService.js  # Excel 匯入服務
-│   │   ├── ExcelExportService.js  # Excel 匯出服務
-│   │   └── AuditLogService.js     # 修改記錄服務
+│   │   ├── ExcelImportService.js       # Excel 匯入服務
+│   │   ├── ExcelExportService.js       # Excel 匯出服務
+│   │   ├── GrossProfitAnalysisService.js # 毛利分析服務（含角色過濾）
+│   │   ├── CacheService.js             # 🆕 儀表板統計快取服務
+│   │   └── AuditLogService.js          # 修改記錄服務
 │   ├── utils/              # 工具函數
 │   │   └── authHelper.js   # 認證輔助函數
 │   └── views/              # EJS 模板
@@ -1476,23 +1492,119 @@ invoice-bonus-system/
 - **`bonus_tiers`** - 獎金級距設定
 
 #### 系統資料表
-- **`users`** - 使用者帳號與權限
+- **`users`** - 使用者帳號與權限（含 `salesperson_id` 業務員綁定）
+- **`roles`** - 角色定義與權限配置（含 `project_view_scope`）
+- **`user_salesperson_access`** - 🆕 使用者可存取的業務員對照表（支援 assigned scope）
 - **`audit_logs`** - 完整修改記錄（稽核日誌）
 
 #### 視圖（Views）
 - **`v_project_summary`** - 專案彙總視圖
   - 整合專案、業務、客戶資訊
   - 包含已開立發票總額、未開立發票金額、已收款總額
-  - 🆕 包含預計開票年月資訊
+  - 包含預計開票年月資訊
+- **`v_invoice_summary`** - 🆕 發票彙總視圖
+  - 整合發票與收款資訊，計算每張發票的已收金額與未收金額
 
 ### 安全性
-- Session-based 認證機制
-- 密碼雜湊儲存（bcrypt）
+- Session-based 認證機制（express-session，httpOnly + secure cookie）
+- 密碼雜湊儲存（Argon2id，向後兼容 bcrypt）
 - 路由保護（需登入才能訪問）
-- 角色權限控制（管理員/一般使用者）
-- SQL 注入防護（使用參數化查詢）
+- **登入速率限制**：10 分鐘內同 IP 最多 10 次失敗即封鎖（`rateLimiter.js`）
+- **角色存取控制（RBAC）**：
+  - `requireAdmin`：僅管理員可存取（依 roles 表 `can_manage_users`）
+  - `requireImportExport`：僅 admin / user 可存取匯入/匯出
+  - `requireEditPermission`：依 roles 表 `can_edit` 判斷
+  - `project_view_scope`：all / assigned / own / none 四種範圍
+- SQL 注入防護（better-sqlite3 參數化查詢）
+- 檔案上傳限制（multer，10MB 上限，白名單 MIME 類型）
 
 ## 更新日誌
+
+### 2026-06-09 - v1.16.0 RBAC 強化與角色存取控制 🔐
+
+#### 新增功能
+
+**1. RBAC 權限範圍強化** ✨
+- ✅ roles 表新增 `project_view_scope` 欄位（all / assigned / own / none）
+- ✅ 新增 `user_salesperson_access` 對照表，支援「assigned」多業務存取範圍
+- ✅ `Project.js` 過濾邏輯依 `project_view_scope` 動態套用
+- ✅ 角色表單與 API 完整支援 `project_view_scope` 設定
+- ✅ 新增 migration：`migrations/migrate_permission_scope.js`
+
+**2. 匯入/匯出存取限制** 🚫
+- ✅ 新增 `requireImportExport` middleware（`src/middleware/auth.js`）
+- ✅ `/import-export` 路由層 403 攔截，HTML 渲染錯誤頁面，API 回傳 JSON
+- ✅ 非 admin/user 角色進入匯入/匯出頁面顯示「權限不足」
+
+**3. 毛利分析角色過濾** 📊
+- ✅ `GrossProfitAnalysisService` 所有 4 個方法更新過濾邏輯
+- ✅ 非 admin/user 角色僅看到自己（`salesperson_id`）負責的專案
+- ✅ 無 `salesperson_id` 的非管理角色（如 boss）使用 `1=0` 回傳空資料
+- ✅ 側邊欄毛利分析連結對無 `salesperson_id` 的角色隱藏
+
+**4. 角色顯示名稱更新** ✏️
+- ✅ `user` 角色 `role_name` 從「一般使用者」改為「**專案管理員**」
+- ✅ `role_key` 不變，所有程式邏輯不受影響
+- ✅ 新增 migration：`migrations/migrate_rename_user_role.js`
+- ✅ `package.json` 新增 `migrate:rename-user-role` 指令
+
+**5. 登入速率限制** ⚡
+- ✅ 新增 `src/middleware/rateLimiter.js`
+- ✅ 同 IP 10 分鐘內超過 10 次登入失敗自動封鎖
+- ✅ 返回 429 Too Many Requests，含友善中文訊息
+
+**6. 儀表板快取** 🗃️
+- ✅ 新增 `src/services/CacheService.js`（記憶體快取，可設 TTL）
+- ✅ 儀表板統計 API 套用快取，減少重複 DB 查詢
+
+**7. 常數集中管理** 🏗️
+- ✅ 新增 `src/constants.js`，統一定義 `ROLES`、`PROJECT_VIEW_SCOPE`
+- ✅ 消除各處 hardcode 的角色字串
+
+**8. 範本動態類型** 📋
+- ✅ `ExcelExportService.generateTemplate()` 從 DB 動態讀取 `project_types` 作為填寫說明
+- ✅ 加入「匯出計算欄位，匯入時忽略」標示，新增說明注記 #7
+
+**9. 部署腳本全面更新** 🔄
+- ✅ `deploy.sh`：全新安裝區段補齊 4 個缺漏 migration；增量遷移區段補齊 3 個
+- ✅ `restore.sh`：還原後自動執行 migration 清單補齊 12 個缺漏條目
+- ✅ `install.sh`：從 4 個 migration 擴充至完整 31 個，對齊 deploy.sh
+
+#### 資料庫變更
+
+**新增資料表**：
+- `user_salesperson_access` - 使用者可存取的業務員對照表
+
+**修改資料表**：
+- `roles` 新增 `project_view_scope` 欄位（預設 `all`）
+
+**新增視圖**：
+- `v_invoice_summary` - 發票彙總視圖（發票 ↔ 收款整合）
+
+**新增 migration 腳本**：
+- `migrations/migrate_permission_scope.js`
+- `migrations/migrate_v_invoice_summary.js`
+- `migrations/migrate_rename_user_role.js`
+
+#### 升級指南
+
+```bash
+# 更新程式碼後，執行以下 3 個新 migration
+npm run migrate:permission-scope
+npm run migrate:invoice-summary
+npm run migrate:rename-user-role
+
+# 或直接執行 deploy.sh（含完整增量遷移）
+sudo ./deploy.sh
+```
+
+#### 向後兼容
+
+- ✅ 現有 `role_key` 值不變，程式邏輯不受影響
+- ✅ 所有 migration 均具冪等性（重複執行安全）
+- ✅ `project_view_scope` 預設值為 `all`，現有角色行為不變
+
+---
 
 ### 2026-01-12 - v1.8.8 快速新增客戶功能 ⚡
 
