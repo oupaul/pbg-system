@@ -87,7 +87,49 @@
 
 ## 快速開始
 
-### 一鍵部署（唯一入口）
+### 從 GitHub 一行指令安裝／更新 🆕
+
+#### 全新主機（一行指令）
+
+```bash
+# 公開 Repo：
+bash <(curl -fsSL https://raw.githubusercontent.com/oupaul/pbg-system/develop/setup.sh)
+
+# 私有 Repo（需 GitHub Personal Access Token）：
+export GH_TOKEN=ghp_xxxxxxxxxxxx
+bash <(curl -fsSL https://raw.githubusercontent.com/oupaul/pbg-system/develop/setup.sh)
+
+# 指定 branch（如 main）：
+DEPLOY_BRANCH=main bash <(curl -fsSL https://raw.githubusercontent.com/oupaul/pbg-system/develop/setup.sh)
+```
+
+`setup.sh` 會自動：
+1. 安裝 git（如尚未安裝）
+2. 從 GitHub clone 最新版本
+3. 移交給 `deploy.sh` 完成所有部署流程（與下方手動流程完全一致）
+
+#### 更新現有安裝到最新版本
+
+```bash
+# 在伺服器上執行（推薦）：
+sudo /opt/your-install-dir/update.sh
+
+# 或遠端一行指令：
+bash <(curl -fsSL https://raw.githubusercontent.com/oupaul/pbg-system/develop/update.sh)
+```
+
+`update.sh` 會自動：
+1. 偵測安裝目錄（from systemd unit / deploy.config.sh）
+2. 從 GitHub 下載最新版本
+3. rsync 同步程式碼（保留 `data/`、`uploads/`、`deploy.config.sh` 不被覆蓋）
+4. 移交給 `deploy.sh` 執行增量遷移並重啟服務
+
+> **注意**：若 GitHub Repo 為私有，需先設定 `export GH_TOKEN=ghp_xxxxxxxxxxxx`。  
+> Personal Access Token 建立方式：GitHub → Settings → Developer settings → Personal access tokens → 選擇 `repo` 權限。
+
+---
+
+### 手動部署（本機有程式碼時）
 
 **deploy.sh 是唯一的部署腳本**，自動偵測首次安裝或更新：
 
