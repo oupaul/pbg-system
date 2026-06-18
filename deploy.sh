@@ -110,8 +110,13 @@ input_config() {
     fi
 }
 
-# 輸入配置
-input_config
+# 輸入配置，或從既有設定檔讀取
+if [ -f "${PROJECT_DIR}/deploy.config.sh" ]; then
+    source "${PROJECT_DIR}/deploy.config.sh"
+    info "已從 deploy.config.sh 讀取現有配置（服務：${SERVICE_NAME}，目錄：${INSTALL_DIR}）"
+else
+    input_config
+fi
 
 # 檢查是否為 root
 if [ "$EUID" -ne 0 ]; then
