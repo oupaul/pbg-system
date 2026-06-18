@@ -103,6 +103,9 @@ ${locals.isReadOnly ? '<div class="alert alert-info mb-4"><i class="bi bi-info-c
       ${invoiceYears.filter(y => y != currentYear && y != lastYear).map(y =>
         `<a href="${invoiceYearLinks['y_' + y]}" class="btn btn-sm ${filters.invoice_year == y ? 'btn-primary' : 'btn-outline-secondary'}">${y}</a>`
       ).join('')}
+      <button type="button" class="btn btn-sm btn-outline-info ms-auto" onclick="showInvoiceDetailModal()">
+        <i class="bi bi-list-ul"></i> 查看發票明細
+      </button>
     </div>
   </div>
 </div>
@@ -298,4 +301,106 @@ ${salespersonStats ? `
     共 ${projects.length} 筆專案
   </div>
 </div>
+
+<!-- 發票明細模態視窗 -->
+<div class="modal fade" id="invoiceDetailModal" tabindex="-1" aria-labelledby="invoiceDetailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="invoiceDetailModalLabel">
+          <i class="bi bi-receipt"></i> 發票明細清單
+          ${filters.invoice_year ? '<span class="badge bg-success ms-2">發票年度：' + filters.invoice_year + '</span>' : ''}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="invoiceDetailBody">
+        <div class="text-center py-4">
+          <div class="spinner-border text-primary" role="status"></div>
+          <p class="mt-2 text-muted">載入中...</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <small class="text-muted me-auto" id="invoiceDetailCount"></small>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showInvoiceDetailModal() {
+  const modal = new bootstrap.Modal(document.getElementById('invoiceDetailModal'));
+  const body = document.getElementById('invoiceDetailBody');
+  const countEl = document.getElementById('invoiceDetailCount');
+
+  body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 text-muted">載入中...</p></div>';
+  countEl.textContent = '';
+  modal.show();
+
+  const params = new URLSearchParams(window.location.search);
+  fetch('/projects/invoice-detail?' + params.toString())
+    .then(r => r.json())
+    .then(data => {
+      const fmt = n => '$' + Math.round(n || 0).toLocaleString();
+      if (!data.invoices || data.invoices.length === 0) {
+        body.innerHTML = '<p class="text-center text-muted py-5"><i class="bi bi-inbox fs-3 d-block mb-2"></i>無符合條件的發票明細</p>';
+        return;
+      }
+
+      const rows = data.invoices.map(inv => {
+        const net = (inv.amount_with_tax || 0) - (inv.allowance_amount || 0);
+        const unpaid = net - (inv.paid_amount || 0);
+        return '<tr>' +
+          '<td>' + (inv.invoice_date || '-') + '</td>' +
+          '<td><code>' + (inv.invoice_number || '-') + '</code></td>' +
+          '<td><code>' + inv.project_code + '</code></td>' +
+          '<td class="text-truncate" style="max-width:160px" title="' + inv.project_name + '">' + inv.project_name + '</td>' +
+          '<td>' + (inv.salesperson_name || '-') + '</td>' +
+          '<td class="text-end">' + fmt(inv.amount_with_tax) + '</td>' +
+          '<td class="text-end">' + (inv.allowance_amount ? fmt(inv.allowance_amount) : '-') + '</td>' +
+          '<td class="text-end fw-semibold">' + fmt(net) + '</td>' +
+          '<td class="text-end text-success">' + fmt(inv.paid_amount) + '</td>' +
+          '<td class="text-end ' + (unpaid > 0 ? 'text-danger fw-bold' : 'text-muted') + '">' + fmt(unpaid) + '</td>' +
+          '</tr>';
+      }).join('');
+
+      const t = data.totals;
+      body.innerHTML =
+        '<div class="table-responsive">' +
+        '<table class="table table-sm table-hover table-striped mb-0">' +
+        '<thead class="table-dark sticky-top">' +
+        '<tr>' +
+          '<th>發票日期</th>' +
+          '<th>發票號碼</th>' +
+          '<th>專案編號</th>' +
+          '<th>專案名稱</th>' +
+          '<th>業務</th>' +
+          '<th class="text-end">發票金額(含稅)</th>' +
+          '<th class="text-end">折讓</th>' +
+          '<th class="text-end">淨金額</th>' +
+          '<th class="text-end">已收款</th>' +
+          '<th class="text-end">未收款</th>' +
+        '</tr>' +
+        '</thead>' +
+        '<tbody>' + rows + '</tbody>' +
+        '<tfoot class="table-secondary fw-bold border-top border-2">' +
+        '<tr>' +
+          '<td colspan="5">合計 ' + t.count + ' 筆</td>' +
+          '<td class="text-end">' + fmt(t.totalAmount) + '</td>' +
+          '<td class="text-end">' + (t.totalAllowance ? fmt(t.totalAllowance) : '-') + '</td>' +
+          '<td class="text-end">' + fmt(t.totalNet) + '</td>' +
+          '<td class="text-end">' + fmt(t.totalPaid) + '</td>' +
+          '<td class="text-end ' + (t.totalUnpaid > 0 ? 'text-danger' : '') + '">' + fmt(t.totalUnpaid) + '</td>' +
+        '</tr>' +
+        '</tfoot>' +
+        '</table>' +
+        '</div>';
+
+      countEl.textContent = '共 ' + t.count + ' 筆發票';
+    })
+    .catch(() => {
+      body.innerHTML = '<p class="text-center text-danger py-4"><i class="bi bi-exclamation-triangle"></i> 載入失敗，請重試</p>';
+    });
+}
+</script>
 `}) %>

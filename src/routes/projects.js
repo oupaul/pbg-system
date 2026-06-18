@@ -295,6 +295,75 @@ router.get('/', (req, res) => {
   });
 });
 
+// 發票明細清單 API（供模態視窗 AJAX 使用）
+router.get('/invoice-detail', (req, res) => {
+  const yearFilter = req.query.year || 'all';
+  const filters = {
+    year: yearFilter !== 'all' ? yearFilter : null,
+    status: req.query.status || null,
+    type: req.query.type || null,
+    salesperson: req.query.salesperson || null,
+    keyword: req.query.keyword || null,
+    expected_invoice_year_month: req.query.expected_invoice_year_month || null,
+    uninvoiced: req.query.uninvoiced === 'true',
+    unpaid: req.query.unpaid === 'true',
+    overdue_unpaid: req.query.overdue_unpaid === 'true',
+    invoice_year: req.query.invoice_year || null,
+    sortBy: 'contract_year',
+    sortOrder: 'DESC'
+  };
+
+  const projects = Project.findAll(filters, req.user);
+  const projectIds = projects.map(p => p.id);
+
+  if (projectIds.length === 0) {
+    return res.json({ invoices: [], totals: { count: 0, totalAmount: 0, totalAllowance: 0, totalNet: 0, totalPaid: 0, totalUnpaid: 0 } });
+  }
+
+  const placeholders = projectIds.map(() => '?').join(',');
+  let sql = `
+    SELECT
+      i.id, i.invoice_number, i.invoice_date,
+      i.amount_with_tax, COALESCE(i.allowance_amount, 0) AS allowance_amount,
+      i.status,
+      proj.project_code, proj.project_name,
+      COALESCE(sp.name, '') AS salesperson_name,
+      COALESCE(SUM(CASE WHEN pay.difference_type = '匯費'
+        THEN pay.bank_deposit_amount + COALESCE(pay.payment_difference, 0)
+        ELSE pay.bank_deposit_amount END), 0) AS paid_amount
+    FROM invoices i
+    JOIN projects proj ON proj.id = i.project_id
+    LEFT JOIN salespeople sp ON sp.id = proj.salesperson_id
+    LEFT JOIN payments pay ON pay.invoice_id = i.id AND pay.deleted_at IS NULL
+    WHERE i.project_id IN (${placeholders})
+      AND (i.status IS NULL OR i.status = '有效')
+      AND i.deleted_at IS NULL
+  `;
+  const sqlParams = [...projectIds];
+
+  if (filters.invoice_year) {
+    sql += ` AND strftime('%Y', i.invoice_date) = ?`;
+    sqlParams.push(filters.invoice_year);
+  }
+
+  sql += ` GROUP BY i.id ORDER BY i.invoice_date DESC, proj.project_code`;
+
+  const invoices = db.prepare(sql).all(...sqlParams);
+
+  let totalAmount = 0, totalAllowance = 0, totalNet = 0, totalPaid = 0;
+  invoices.forEach(inv => {
+    totalAmount += inv.amount_with_tax || 0;
+    totalAllowance += inv.allowance_amount || 0;
+    totalNet += (inv.amount_with_tax || 0) - (inv.allowance_amount || 0);
+    totalPaid += inv.paid_amount || 0;
+  });
+
+  res.json({
+    invoices,
+    totals: { count: invoices.length, totalAmount, totalAllowance, totalNet, totalPaid, totalUnpaid: totalNet - totalPaid }
+  });
+});
+
 // 新增專案表單（需要編輯權限）
 router.get('/new', requireEditPermission, (req, res) => {
   const salespeople = Salesperson.findAll();
