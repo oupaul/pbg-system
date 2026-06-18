@@ -95,12 +95,14 @@
 # 公開 Repo：
 bash <(curl -fsSL https://raw.githubusercontent.com/oupaul/pbg-system/develop/setup.sh)
 
-# 私有 Repo（需 GitHub Personal Access Token）：
+# 私有 Repo（curl 下載腳本本身也需帶 Authorization header）：
 export GH_TOKEN=ghp_xxxxxxxxxxxx
-bash <(curl -fsSL https://raw.githubusercontent.com/oupaul/pbg-system/develop/setup.sh)
+bash <(curl -fsSL -H "Authorization: token $GH_TOKEN" \
+  https://raw.githubusercontent.com/oupaul/pbg-system/develop/setup.sh)
 
 # 指定 branch（如 main）：
-DEPLOY_BRANCH=main bash <(curl -fsSL https://raw.githubusercontent.com/oupaul/pbg-system/develop/setup.sh)
+bash <(curl -fsSL -H "Authorization: token $GH_TOKEN" \
+  https://raw.githubusercontent.com/oupaul/pbg-system/main/setup.sh)
 ```
 
 `setup.sh` 會自動：
@@ -111,11 +113,14 @@ DEPLOY_BRANCH=main bash <(curl -fsSL https://raw.githubusercontent.com/oupaul/pb
 #### 更新現有安裝到最新版本
 
 ```bash
-# 在伺服器上執行（推薦）：
-sudo /opt/your-install-dir/update.sh
+# 在伺服器上執行（推薦，GH_TOKEN 會由 update.sh 自行使用）：
+export GH_TOKEN=ghp_xxxxxxxxxxxx
+sudo -E /opt/your-install-dir/update.sh
 
-# 或遠端一行指令：
-bash <(curl -fsSL https://raw.githubusercontent.com/oupaul/pbg-system/develop/update.sh)
+# 或遠端一行指令（私有 Repo 需帶 Authorization header）：
+export GH_TOKEN=ghp_xxxxxxxxxxxx
+bash <(curl -fsSL -H "Authorization: token $GH_TOKEN" \
+  https://raw.githubusercontent.com/oupaul/pbg-system/develop/update.sh)
 ```
 
 `update.sh` 會自動：
@@ -124,7 +129,8 @@ bash <(curl -fsSL https://raw.githubusercontent.com/oupaul/pbg-system/develop/up
 3. rsync 同步程式碼（保留 `data/`、`uploads/`、`deploy.config.sh` 不被覆蓋）
 4. 移交給 `deploy.sh` 執行增量遷移並重啟服務
 
-> **注意**：若 GitHub Repo 為私有，需先設定 `export GH_TOKEN=ghp_xxxxxxxxxxxx`。  
+> **私有 Repo 重要說明**：  
+> `raw.githubusercontent.com` 對私有 repo 也需要驗證，因此 **curl 下載腳本這一步本身**就要加上 `-H "Authorization: token $GH_TOKEN"`，光是設定環境變數是不夠的。  
 > Personal Access Token 建立方式：GitHub → Settings → Developer settings → Personal access tokens → 選擇 `repo` 權限。
 
 ---

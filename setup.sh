@@ -5,12 +5,14 @@
 #   公開 Repo:
 #     bash <(curl -fsSL https://raw.githubusercontent.com/oupaul/pbg-system/develop/setup.sh)
 #
-#   私有 Repo（使用 GitHub Personal Access Token）:
+#   私有 Repo（需帶 Authorization header 下載腳本本身）:
 #     export GH_TOKEN=ghp_xxxxxxxxxxxx
-#     bash <(curl -fsSL https://raw.githubusercontent.com/oupaul/pbg-system/develop/setup.sh)
+#     bash <(curl -fsSL -H "Authorization: token $GH_TOKEN" \
+#       https://raw.githubusercontent.com/oupaul/pbg-system/develop/setup.sh)
 #
 #   指定 branch:
-#     DEPLOY_BRANCH=main bash <(curl -fsSL ...)
+#     DEPLOY_BRANCH=main bash <(curl -fsSL -H "Authorization: token $GH_TOKEN" \
+#       https://raw.githubusercontent.com/oupaul/pbg-system/main/setup.sh)
 
 set -e
 
