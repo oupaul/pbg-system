@@ -92,17 +92,15 @@ ${locals.isReadOnly ? '<div class="alert alert-info mb-4"><i class="bi bi-info-c
   </div>
 </div>
 
-<!-- 發票年度快速篩選 -->
+<!-- 發票年度篩選 -->
 <div class="card mb-4">
   <div class="card-body py-2">
-    <div class="d-flex align-items-center gap-2 flex-wrap">
-      <span class="text-muted fw-semibold me-1" style="white-space:nowrap"><i class="bi bi-receipt"></i> 發票年度：</span>
-      <a href="${invoiceYearLinks.all}" class="btn btn-sm ${!filters.invoice_year ? 'btn-secondary' : 'btn-outline-secondary'}">全部</a>
-      <a href="${invoiceYearLinks.thisYear}" class="btn btn-sm ${filters.invoice_year == currentYear ? 'btn-primary' : 'btn-outline-primary'}">今年（${currentYear}）</a>
-      <a href="${invoiceYearLinks.lastYear}" class="btn btn-sm ${filters.invoice_year == lastYear ? 'btn-primary' : 'btn-outline-primary'}">去年（${lastYear}）</a>
-      ${invoiceYears.filter(y => y != currentYear && y != lastYear).map(y =>
-        `<a href="${invoiceYearLinks['y_' + y]}" class="btn btn-sm ${filters.invoice_year == y ? 'btn-primary' : 'btn-outline-secondary'}">${y}</a>`
-      ).join('')}
+    <div class="d-flex align-items-center gap-2">
+      <span class="text-muted fw-semibold" style="white-space:nowrap"><i class="bi bi-receipt"></i> 發票年度：</span>
+      <select class="form-select form-select-sm" style="width:130px" id="invoiceYearSelect" onchange="onInvoiceYearChange(this)">
+        <option value="">全部</option>
+        ${invoiceYears.map(y => `<option value="${y}" ${filters.invoice_year == y ? 'selected' : ''}>${y} 年</option>`).join('')}
+      </select>
       <button type="button" class="btn btn-sm btn-outline-info ms-auto" onclick="showInvoiceDetailModal()">
         <i class="bi bi-list-ul"></i> 查看發票明細
       </button>
@@ -328,6 +326,16 @@ ${salespersonStats ? `
 </div>
 
 <script>
+function onInvoiceYearChange(select) {
+  const params = new URLSearchParams(window.location.search);
+  if (select.value) {
+    params.set('invoice_year', select.value);
+  } else {
+    params.delete('invoice_year');
+  }
+  window.location.href = '/projects?' + params.toString();
+}
+
 function showInvoiceDetailModal() {
   const modal = new bootstrap.Modal(document.getElementById('invoiceDetailModal'));
   const body = document.getElementById('invoiceDetailBody');

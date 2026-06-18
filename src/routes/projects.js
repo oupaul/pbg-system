@@ -145,9 +145,6 @@ router.get('/', (req, res) => {
     typeColorMap = {};
   }
 
-  const currentYear = new Date().getFullYear().toString();
-  const lastYear = (new Date().getFullYear() - 1).toString();
-
   // 構建查詢參數字串（用於排序連結）
   const buildQueryString = (newSortBy, newSortOrder) => {
     const params = new URLSearchParams();
@@ -166,34 +163,6 @@ router.get('/', (req, res) => {
     params.append('sortOrder', newSortOrder);
     return params.toString();
   };
-
-  // 構建發票年度切換連結（保留所有其他篩選條件）
-  const buildInvoiceYearLink = (invoiceYear) => {
-    const p = new URLSearchParams();
-    if (filters.year) p.append('year', yearFilter);
-    if (filters.status) p.append('status', filters.status);
-    if (filters.type) p.append('type', filters.type);
-    if (filters.salesperson) p.append('salesperson', filters.salesperson);
-    if (filters.keyword) p.append('keyword', filters.keyword);
-    if (filters.expected_invoice_year_month) p.append('expected_invoice_year_month', filters.expected_invoice_year_month);
-    if (filters.uninvoiced) p.append('uninvoiced', 'true');
-    if (filters.unpaid) p.append('unpaid', 'true');
-    if (filters.overdue_unpaid) p.append('overdue_unpaid', 'true');
-    if (filters.sortBy && filters.sortBy !== 'contract_year') p.append('sortBy', filters.sortBy);
-    if (filters.sortOrder && filters.sortOrder !== 'DESC') p.append('sortOrder', filters.sortOrder);
-    if (invoiceYear) p.append('invoice_year', invoiceYear);
-    return '/projects?' + p.toString();
-  };
-
-  const invoiceYearLinks = {
-    all: buildInvoiceYearLink(null),
-    thisYear: buildInvoiceYearLink(currentYear),
-    lastYear: buildInvoiceYearLink(lastYear),
-  };
-  // Extra year links for each year in invoiceYears
-  invoiceYears.forEach(y => {
-    invoiceYearLinks['y_' + y] = buildInvoiceYearLink(y);
-  });
 
   // 預先生成所有排序連結和箭頭圖示，避免在模板字面量中使用 EJS 語法
   const getSortLink = (field) => {
@@ -277,9 +246,6 @@ router.get('/', (req, res) => {
     years,
     expectedInvoiceYearMonths,
     invoiceYears,
-    invoiceYearLinks,
-    currentYear,
-    lastYear,
     filters: {
       ...filters,
       year: displayYear
