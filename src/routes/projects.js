@@ -102,19 +102,21 @@ router.get('/', (req, res) => {
   
   const years = Project.getYears();
   const expectedInvoiceYearMonths = Project.getExpectedInvoiceYearMonths();
+  const invoiceYears = Project.getInvoiceYears();
   const yearFilter = req.query.year || 'all'; // 預設為 'all'（全部年度）
   const filters = {
     year: yearFilter && yearFilter !== 'all' ? yearFilter : null,
     status: req.query.status,
     type: req.query.type,
     salesperson: req.query.salesperson,
-    keyword: req.query.keyword, // 新增關鍵字搜尋
-    expected_invoice_year_month: req.query.expected_invoice_year_month, // 新增預計開票年月篩選
-    uninvoiced: req.query.uninvoiced === 'true' || req.query.uninvoiced === true, // 未開立發票
-    unpaid: req.query.unpaid === 'true' || req.query.unpaid === true, // 有未收款金額
-    overdue_unpaid: req.query.overdue_unpaid === 'true' || req.query.overdue_unpaid === true, // 逾期未收款
-    sortBy: req.query.sortBy || 'contract_year', // 排序欄位
-    sortOrder: req.query.sortOrder || 'DESC' // 排序方向
+    keyword: req.query.keyword,
+    expected_invoice_year_month: req.query.expected_invoice_year_month,
+    uninvoiced: req.query.uninvoiced === 'true' || req.query.uninvoiced === true,
+    unpaid: req.query.unpaid === 'true' || req.query.unpaid === true,
+    overdue_unpaid: req.query.overdue_unpaid === 'true' || req.query.overdue_unpaid === true,
+    invoice_year: req.query.invoice_year || null, // 發票年度篩選
+    sortBy: req.query.sortBy || 'contract_year',
+    sortOrder: req.query.sortOrder || 'DESC'
   };
 
   // 傳遞用戶資訊以進行角色過濾
@@ -143,6 +145,9 @@ router.get('/', (req, res) => {
     typeColorMap = {};
   }
 
+  const currentYear = new Date().getFullYear().toString();
+  const lastYear = (new Date().getFullYear() - 1).toString();
+
   // 構建查詢參數字串（用於排序連結）
   const buildQueryString = (newSortBy, newSortOrder) => {
     const params = new URLSearchParams();
@@ -156,10 +161,39 @@ router.get('/', (req, res) => {
     if (filters.uninvoiced) params.append('uninvoiced', 'true');
     if (filters.unpaid) params.append('unpaid', 'true');
     if (filters.overdue_unpaid) params.append('overdue_unpaid', 'true');
+    if (filters.invoice_year) params.append('invoice_year', filters.invoice_year);
     params.append('sortBy', newSortBy);
     params.append('sortOrder', newSortOrder);
     return params.toString();
   };
+
+  // 構建發票年度切換連結（保留所有其他篩選條件）
+  const buildInvoiceYearLink = (invoiceYear) => {
+    const p = new URLSearchParams();
+    if (filters.year) p.append('year', yearFilter);
+    if (filters.status) p.append('status', filters.status);
+    if (filters.type) p.append('type', filters.type);
+    if (filters.salesperson) p.append('salesperson', filters.salesperson);
+    if (filters.keyword) p.append('keyword', filters.keyword);
+    if (filters.expected_invoice_year_month) p.append('expected_invoice_year_month', filters.expected_invoice_year_month);
+    if (filters.uninvoiced) p.append('uninvoiced', 'true');
+    if (filters.unpaid) p.append('unpaid', 'true');
+    if (filters.overdue_unpaid) p.append('overdue_unpaid', 'true');
+    if (filters.sortBy && filters.sortBy !== 'contract_year') p.append('sortBy', filters.sortBy);
+    if (filters.sortOrder && filters.sortOrder !== 'DESC') p.append('sortOrder', filters.sortOrder);
+    if (invoiceYear) p.append('invoice_year', invoiceYear);
+    return '/projects?' + p.toString();
+  };
+
+  const invoiceYearLinks = {
+    all: buildInvoiceYearLink(null),
+    thisYear: buildInvoiceYearLink(currentYear),
+    lastYear: buildInvoiceYearLink(lastYear),
+  };
+  // Extra year links for each year in invoiceYears
+  invoiceYears.forEach(y => {
+    invoiceYearLinks['y_' + y] = buildInvoiceYearLink(y);
+  });
 
   // 預先生成所有排序連結和箭頭圖示，避免在模板字面量中使用 EJS 語法
   const getSortLink = (field) => {
@@ -223,10 +257,17 @@ router.get('/', (req, res) => {
     };
     projects.forEach(project => {
       salespersonStats.totalPrice += project.price_with_tax || 0;
-      salespersonStats.totalInvoiced += project.total_invoiced || 0;
-      salespersonStats.totalUninvoiced += project.uninvoiced_amount ?? ((project.price_with_tax || 0) - (project.total_invoiced || 0));
-      salespersonStats.totalReceived += project.total_received || 0;
-      salespersonStats.totalUnpaid += Math.max(0, (project.total_invoiced || 0) - (project.total_received || 0) - (project.sales_discount || 0));
+      if (filters.invoice_year) {
+        // 發票年度模式：統計只加總當年度發票金額
+        salespersonStats.totalInvoiced += project.year_invoiced || 0;
+        salespersonStats.totalReceived += project.year_received || 0;
+        salespersonStats.totalUnpaid += Math.max(0, project.year_unpaid || 0);
+      } else {
+        salespersonStats.totalInvoiced += project.total_invoiced || 0;
+        salespersonStats.totalUninvoiced += project.uninvoiced_amount ?? ((project.price_with_tax || 0) - (project.total_invoiced || 0));
+        salespersonStats.totalReceived += project.total_received || 0;
+        salespersonStats.totalUnpaid += Math.max(0, (project.total_invoiced || 0) - (project.total_received || 0) - (project.sales_discount || 0));
+      }
     });
   }
 
@@ -235,6 +276,10 @@ router.get('/', (req, res) => {
     projects,
     years,
     expectedInvoiceYearMonths,
+    invoiceYears,
+    invoiceYearLinks,
+    currentYear,
+    lastYear,
     filters: {
       ...filters,
       year: displayYear
@@ -243,7 +288,7 @@ router.get('/', (req, res) => {
     sortLinks: sortLinks,
     sortIcons: sortIcons,
     salespersonStats: salespersonStats,
-    isFilterStatsOnly: showFilterStats && !showStatsForRole, // 僅因篩選而顯示加總（非業務員/老闆）
+    isFilterStatsOnly: showFilterStats && !showStatsForRole,
     userRole: req.user ? req.user.role : null,
     projectTypes: projectTypes,
     typeColorMap: typeColorMap
