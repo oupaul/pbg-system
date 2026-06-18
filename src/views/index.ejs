@@ -551,32 +551,12 @@ ${typeof receivablesAging !== 'undefined' && receivablesAging && receivablesAgin
         </div>
         `;
         }).join('') : `
-        <div class="mb-3 project-type-item" style="cursor: pointer;" onclick="window.location.href='/projects?type=' + encodeURIComponent('食驗室')" title="點擊查看 食驗室 類型的專案">
-          <div class="d-flex justify-content-between mb-1">
-            <span><i class="bi bi-circle-fill text-primary"></i> <span class="text-decoration-underline">食驗室</span></span>
-            <span>$${(stats.lab_amount || 0).toLocaleString()}</span>
-          </div>
-          <div class="progress" style="height: 10px;">
-            <div class="progress-bar bg-primary" style="width: ${stats.total_amount ? (stats.lab_amount/stats.total_amount*100) : 0}%"></div>
-          </div>
-        </div>
-        <div class="mb-3 project-type-item" style="cursor: pointer;" onclick="window.location.href='/projects?type=' + encodeURIComponent('純廣')" title="點擊查看 純廣 類型的專案">
-          <div class="d-flex justify-content-between mb-1">
-            <span><i class="bi bi-circle-fill text-success"></i> <span class="text-decoration-underline">純廣</span></span>
-            <span>$${(stats.ad_amount || 0).toLocaleString()}</span>
-          </div>
-          <div class="progress" style="height: 10px;">
-            <div class="progress-bar bg-success" style="width: ${stats.total_amount ? (stats.ad_amount/stats.total_amount*100) : 0}%"></div>
-          </div>
-        </div>
-        <div class="mb-3 project-type-item" style="cursor: pointer;" onclick="window.location.href='/projects?type=' + encodeURIComponent('專案')" title="點擊查看 專案 類型的專案">
-          <div class="d-flex justify-content-between mb-1">
-            <span><i class="bi bi-circle-fill text-info"></i> <span class="text-decoration-underline">專案</span></span>
-            <span>$${(stats.project_amount || 0).toLocaleString()}</span>
-          </div>
-          <div class="progress" style="height: 10px;">
-            <div class="progress-bar bg-info" style="width: ${stats.total_amount ? (stats.project_amount/stats.total_amount*100) : 0}%"></div>
-          </div>
+        <div class="text-center text-muted py-4">
+          <i class="bi bi-pie-chart fs-3 d-block mb-2 opacity-50"></i>
+          <small>尚未設定專案類型</small><br>
+          <a href="/settings/project-types" class="btn btn-sm btn-outline-secondary mt-2">
+            <i class="bi bi-gear"></i> 前往設定
+          </a>
         </div>
         `}
       </div>
