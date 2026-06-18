@@ -656,45 +656,53 @@ if [ $BACKUP_TIMER_EXISTS -eq 1 ]; then
         echo "  查看狀態: sudo systemctl status ${BACKUP_SERVICE_NAME}.timer"
     fi
     echo ""
-    read -p "是否要修改自動備份設定？(y/N): " MODIFY_BACKUP
-    if [[ "$MODIFY_BACKUP" =~ ^[Yy]$ ]]; then
-        if [ -f "${PROJECT_DIR}/setup-backup-timer.sh" ]; then
-            chmod +x "${PROJECT_DIR}/setup-backup-timer.sh"
-            bash "${PROJECT_DIR}/setup-backup-timer.sh"
-        else
-            warning "找不到備份設定腳本: ${PROJECT_DIR}/setup-backup-timer.sh"
+    if [ -z "$SKIP_BACKUP_PROMPT" ]; then
+        read -p "是否要修改自動備份設定？(y/N): " MODIFY_BACKUP
+        if [[ "$MODIFY_BACKUP" =~ ^[Yy]$ ]]; then
+            if [ -f "${PROJECT_DIR}/setup-backup-timer.sh" ]; then
+                chmod +x "${PROJECT_DIR}/setup-backup-timer.sh"
+                bash "${PROJECT_DIR}/setup-backup-timer.sh"
+            else
+                warning "找不到備份設定腳本: ${PROJECT_DIR}/setup-backup-timer.sh"
+            fi
         fi
+    else
+        info "如需修改備份設定，請手動執行: sudo ${PROJECT_DIR}/setup-backup-timer.sh"
     fi
 else
     echo ""
     info "系統尚未設定自動備份"
     echo ""
-    read -p "是否要設定自動備份？(Y/n): " SETUP_BACKUP
-    if [[ ! "$SETUP_BACKUP" =~ ^[Nn]$ ]]; then
-        if [ -f "${PROJECT_DIR}/setup-backup-timer.sh" ]; then
-            chmod +x "${PROJECT_DIR}/setup-backup-timer.sh"
-            # 傳入 "1" 為預設每日備份，避免非互動或直接 Enter 導致未建立 timer
-            log "設定自動備份（預設：每日凌晨 2:00）..."
-            bash "${PROJECT_DIR}/setup-backup-timer.sh" "1"
-            if systemctl list-unit-files | grep -q "^${BACKUP_SERVICE_NAME}.timer"; then
-                # 重新載入並啟動 timer，確保 NEXT 正確顯示（避免 Trigger: n/a）
-                systemctl daemon-reload
-                systemctl restart "${BACKUP_SERVICE_NAME}.timer"
-                log "✓ 自動備份已設定完成"
+    if [ -z "$SKIP_BACKUP_PROMPT" ]; then
+        read -p "是否要設定自動備份？(Y/n): " SETUP_BACKUP
+        if [[ ! "$SETUP_BACKUP" =~ ^[Nn]$ ]]; then
+            if [ -f "${PROJECT_DIR}/setup-backup-timer.sh" ]; then
+                chmod +x "${PROJECT_DIR}/setup-backup-timer.sh"
+                # 傳入 "1" 為預設每日備份，避免非互動或直接 Enter 導致未建立 timer
+                log "設定自動備份（預設：每日凌晨 2:00）..."
+                bash "${PROJECT_DIR}/setup-backup-timer.sh" "1"
+                if systemctl list-unit-files | grep -q "^${BACKUP_SERVICE_NAME}.timer"; then
+                    # 重新載入並啟動 timer，確保 NEXT 正確顯示（避免 Trigger: n/a）
+                    systemctl daemon-reload
+                    systemctl restart "${BACKUP_SERVICE_NAME}.timer"
+                    log "✓ 自動備份已設定完成"
+                else
+                    warning "自動備份設定可能未完成，請手動執行: sudo ${PROJECT_DIR}/setup-backup-timer.sh"
+                fi
             else
-                warning "自動備份設定可能未完成，請手動執行: sudo ${PROJECT_DIR}/setup-backup-timer.sh"
-                info "詳細檢查方式請參閱：自動備份排程檢查與修正指南.md"
+                warning "找不到備份設定腳本: ${PROJECT_DIR}/setup-backup-timer.sh"
+                info "您可以稍後手動執行: sudo ${PROJECT_DIR}/setup-backup-timer.sh"
             fi
         else
-            warning "找不到備份設定腳本: ${PROJECT_DIR}/setup-backup-timer.sh"
-            info "您可以稍後手動執行: sudo ${PROJECT_DIR}/setup-backup-timer.sh"
+            info "跳過自動備份設定"
+            echo ""
+            echo "您可以稍後執行以下命令設定自動備份："
+            echo "  sudo ${PROJECT_DIR}/setup-backup-timer.sh"
+            echo ""
         fi
     else
-        info "跳過自動備份設定"
-        echo ""
-        echo "您可以稍後執行以下命令設定自動備份："
-        echo "  sudo ${PROJECT_DIR}/setup-backup-timer.sh"
-        echo ""
+        info "如需設定自動備份，請手動執行: sudo ${PROJECT_DIR}/setup-backup-timer.sh"
+    fi
         echo "或手動執行備份："
         echo "  sudo ${PROJECT_DIR}/backup.sh"
     fi

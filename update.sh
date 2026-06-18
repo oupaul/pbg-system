@@ -171,4 +171,4 @@ log "啟動部署腳本（增量更新模式）..."
 echo ""
 cd "${INSTALL_DIR}"
 chmod +x deploy.sh
-exec sudo bash deploy.sh
+exec sudo SKIP_BACKUP_PROMPT=1 bash deploy.sh
