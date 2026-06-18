@@ -8,9 +8,9 @@
 # 或遠端一行指令（公開 Repo）：
 #   bash <(curl -fsSL https://raw.githubusercontent.com/oupaul/pbg-system/develop/update.sh)
 #
-# 私有 Repo（需帶 Authorization header 下載腳本本身）：
-#   export GH_TOKEN=ghp_xxxxxxxxxxxx
-#   bash <(curl -fsSL -H "Authorization: token $GH_TOKEN" \
+# 私有 Repo（curl 本身也需帶 token，支援 ghp_ 與 github_pat_ 格式）：
+#   export GH_TOKEN=github_pat_xxxxxxxxxxxx   # 或 ghp_xxxxxxxxxxxx
+#   bash <(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
 #     https://raw.githubusercontent.com/oupaul/pbg-system/develop/update.sh)
 
 set -e

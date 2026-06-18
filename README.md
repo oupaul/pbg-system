@@ -95,13 +95,13 @@
 # 公開 Repo：
 bash <(curl -fsSL https://raw.githubusercontent.com/oupaul/pbg-system/develop/setup.sh)
 
-# 私有 Repo（curl 下載腳本本身也需帶 Authorization header）：
-export GH_TOKEN=ghp_xxxxxxxxxxxx
-bash <(curl -fsSL -H "Authorization: token $GH_TOKEN" \
+# 私有 Repo（curl 本身也需帶 token，支援 ghp_ 與 github_pat_ 格式）：
+export GH_TOKEN=github_pat_xxxxxxxxxxxx   # 或 ghp_xxxxxxxxxxxx
+bash <(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
   https://raw.githubusercontent.com/oupaul/pbg-system/develop/setup.sh)
 
 # 指定 branch（如 main）：
-bash <(curl -fsSL -H "Authorization: token $GH_TOKEN" \
+bash <(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
   https://raw.githubusercontent.com/oupaul/pbg-system/main/setup.sh)
 ```
 
@@ -114,12 +114,12 @@ bash <(curl -fsSL -H "Authorization: token $GH_TOKEN" \
 
 ```bash
 # 在伺服器上執行（推薦，GH_TOKEN 會由 update.sh 自行使用）：
-export GH_TOKEN=ghp_xxxxxxxxxxxx
+export GH_TOKEN=github_pat_xxxxxxxxxxxx   # 或 ghp_xxxxxxxxxxxx
 sudo -E /opt/your-install-dir/update.sh
 
 # 或遠端一行指令（私有 Repo 需帶 Authorization header）：
-export GH_TOKEN=ghp_xxxxxxxxxxxx
-bash <(curl -fsSL -H "Authorization: token $GH_TOKEN" \
+export GH_TOKEN=github_pat_xxxxxxxxxxxx
+bash <(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
   https://raw.githubusercontent.com/oupaul/pbg-system/develop/update.sh)
 ```
 
@@ -130,8 +130,9 @@ bash <(curl -fsSL -H "Authorization: token $GH_TOKEN" \
 4. 移交給 `deploy.sh` 執行增量遷移並重啟服務
 
 > **私有 Repo 重要說明**：  
-> `raw.githubusercontent.com` 對私有 repo 也需要驗證，因此 **curl 下載腳本這一步本身**就要加上 `-H "Authorization: token $GH_TOKEN"`，光是設定環境變數是不夠的。  
-> Personal Access Token 建立方式：GitHub → Settings → Developer settings → Personal access tokens → 選擇 `repo` 權限。
+> `raw.githubusercontent.com` 對私有 repo 也需要驗證，因此 **curl 下載腳本這一步本身**就要加上 `-H "Authorization: Bearer $GH_TOKEN"`，光是設定環境變數是不夠的。  
+> 支援兩種 token 格式：classic (`ghp_xxx`) 與 fine-grained (`github_pat_xxx`)，`Bearer` scheme 兩者皆適用。  
+> Personal Access Token 建立方式：GitHub → Settings → Developer settings → Personal access tokens → 選擇 `repo`（classic）或 Contents: Read（fine-grained）權限。
 
 ---
 
