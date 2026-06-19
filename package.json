@@ -7,6 +7,7 @@
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
     "migrate": "node migrations/migrate.js",
+    "migrate:run": "node migrations/runner.js",
     "migrate:users": "node migrations/migrate_users.js",
     "migrate:project-code": "node migrations/migrate_project_code_unique.js",
     "migrate:project-customer": "node migrations/migrate_project_customer_unique.js",
