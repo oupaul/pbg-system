@@ -320,6 +320,8 @@ if [ -f "${PROJECT_DIR}/package.json" ]; then
         log "檢測到 package.json 更新，重新安裝依賴..."
         cd "${PROJECT_DIR}"
         npm install || error "依賴套件安裝失敗"
+        log "修復已知安全性漏洞（非破壞性）..."
+        npm audit fix --audit-level=high 2>&1 | tail -5 || true
         log "✓ 依賴套件更新完成"
     else
         log "✓ 依賴套件無需更新"
