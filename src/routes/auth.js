@@ -5,6 +5,12 @@ const AuditLogService = require('../services/AuditLogService');
 const { getUserInfo } = require('../utils/authHelper');
 const { loginRateLimiter, resetOnSuccess } = require('../middleware/rateLimiter');
 
+// 只允許相對路徑重新導向，防止 open redirect
+function safeRedirect(redirect) {
+  if (typeof redirect === 'string' && /^\/(?!\/)/.test(redirect)) return redirect;
+  return '/';
+}
+
 // 登入頁面
 router.get('/login', (req, res, next) => {
   try {
@@ -15,7 +21,7 @@ router.get('/login', (req, res, next) => {
     
     // 如果已經登入，重定向到首頁或原始請求的頁面
     if (req.session && req.session.user) {
-      const redirect = req.query.redirect || '/';
+      const redirect = safeRedirect(req.query.redirect);
       console.log('[登入] 已登入，重定向到:', redirect);
       return res.redirect(redirect);
     }
@@ -50,7 +56,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
   console.log('[登入] Session ID:', req.sessionID);
   
   const { username, password } = req.body;
-  const redirect = req.body.redirect || '/';
+  const redirect = safeRedirect(req.body.redirect);
 
   if (!username || !password) {
     console.log('[登入] 驗證失敗: 帳號或密碼為空');
@@ -126,7 +132,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
   console.log('[登入] 重定向到:', redirect);
   console.log('[登入] Session 最終狀態:', req.session.user);
 
-  // 重定向到原始請求的頁面或首頁
+  // 重定向到原始請求的頁面或首頁（已驗證為相對路徑）
   res.redirect(redirect);
 });
 

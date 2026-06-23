@@ -4,9 +4,10 @@ const Invoice = require('../models/Invoice');
 const Project = require('../models/Project');
 const { getUserInfo } = require('../utils/authHelper');
 const cache = require('../services/CacheService');
+const { requireEditPermission } = require('../middleware/auth');
 
 // 新增發票
-router.post('/', (req, res) => {
+router.post('/', requireEditPermission, (req, res) => {
   try {
     Invoice.create({
       project_id: req.body.project_id,
@@ -26,7 +27,7 @@ router.post('/', (req, res) => {
 });
 
 // 更新發票
-router.post('/:id', (req, res) => {
+router.post('/:id', requireEditPermission, (req, res) => {
   try {
     const invoice = Invoice.findById(req.params.id);
     if (!invoice) {
@@ -58,7 +59,7 @@ router.post('/:id', (req, res) => {
 });
 
 // 刪除發票（軟刪除）
-router.post('/:id/delete', (req, res) => {
+router.post('/:id/delete', requireEditPermission, (req, res) => {
   try {
     const invoice = Invoice.findById(req.params.id);
     if (!invoice) {
@@ -76,7 +77,7 @@ router.post('/:id/delete', (req, res) => {
 });
 
 // 還原發票
-router.post('/:id/restore', (req, res) => {
+router.post('/:id/restore', requireEditPermission, (req, res) => {
   try {
     const invoice = Invoice.findById(req.params.id);
     if (!invoice) {
@@ -92,7 +93,7 @@ router.post('/:id/restore', (req, res) => {
 });
 
 // 作廢發票
-router.post('/:id/void', (req, res) => {
+router.post('/:id/void', requireEditPermission, (req, res) => {
   let projectId;
   try {
     const invoice = Invoice.findById(req.params.id);
@@ -112,7 +113,7 @@ router.post('/:id/void', (req, res) => {
 });
 
 // 作廢並重開
-router.post('/:id/void-and-reissue', (req, res) => {
+router.post('/:id/void-and-reissue', requireEditPermission, (req, res) => {
   let projectId;
   try {
     const invoice = Invoice.findById(req.params.id);
@@ -143,7 +144,7 @@ router.post('/:id/void-and-reissue', (req, res) => {
 });
 
 // 整筆折讓
-router.post('/:id/allowance', (req, res) => {
+router.post('/:id/allowance', requireEditPermission, (req, res) => {
   let projectId;
   try {
     const invoice = Invoice.findById(req.params.id);
@@ -163,7 +164,7 @@ router.post('/:id/allowance', (req, res) => {
 });
 
 // 部分折讓
-router.post('/:id/partial-allowance', (req, res) => {
+router.post('/:id/partial-allowance', requireEditPermission, (req, res) => {
   let projectId;
   try {
     const invoice = Invoice.findById(req.params.id);
