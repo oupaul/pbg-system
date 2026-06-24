@@ -398,6 +398,12 @@ fi
 
 if [ "$NEED_UPDATE" = true ]; then
     log "更新 systemd 服務文件..."
+    # 保留現有 SESSION_SECRET；首次安裝時產生隨機值
+    EXISTING_SECRET=$(grep "^Environment=SESSION_SECRET=" "$SERVICE_FILE" 2>/dev/null | cut -d'=' -f3-)
+    if [ -z "$EXISTING_SECRET" ]; then
+        EXISTING_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | sha256sum | cut -d' ' -f1)
+        log "已產生新的 SESSION_SECRET"
+    fi
     sudo tee "$SERVICE_FILE" > /dev/null <<EOF
 [Unit]
 Description=專案開立發票業績認列獎金計算總表系統
@@ -413,6 +419,7 @@ WorkingDirectory=${PROJECT_DIR}
 Environment=NODE_ENV=production
 Environment=PORT=${PORT}
 Environment="PATH=${PATH}"
+Environment=SESSION_SECRET=${EXISTING_SECRET}
 ExecStart=${NODE_PATH} ${PROJECT_DIR}/src/app.js
 Restart=always
 RestartSec=10

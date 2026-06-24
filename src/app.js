@@ -19,12 +19,12 @@ const upload = multer({
 });
 
 // Session 設定
-const sessionSecret = process.env.SESSION_SECRET;
-if (!sessionSecret) {
-  console.warn('[安全警告] SESSION_SECRET 未設定！請在生產環境中設定此環境變數以確保安全性。');
+const sessionSecret = process.env.SESSION_SECRET || require('crypto').randomBytes(32).toString('hex');
+if (!process.env.SESSION_SECRET) {
+  console.warn('[安全警告] SESSION_SECRET 未設定！本次使用臨時隨機金鑰，重啟後所有 session 將失效。正式部署請確認 deploy.sh 已設定此環境變數。');
 }
 app.use(session({
-  secret: sessionSecret || 'invoice-bonus-system-secret-key-change-in-production',
+  secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
   cookie: {
