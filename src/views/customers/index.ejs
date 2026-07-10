@@ -10,6 +10,13 @@
   </div>
 </div>
 
+${error ? `
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle"></i> ${error}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
 <!-- 搜尋表單 -->
 <div class="card mb-4">
   <div class="card-body">
@@ -73,12 +80,13 @@
                 專案數${(sortIcons && sortIcons.project_count) || ''}
               </a>
             </th>
+            <th>負責業務</th>
           </tr>
         </thead>
         <tbody>
           ${(!customers || customers.length === 0) ? `
             <tr>
-              <td colspan="4" class="text-center text-muted py-3">
+              <td colspan="5" class="text-center text-muted py-3">
                 ${(typeof searchKeyword !== 'undefined' && searchKeyword) ? `找不到符合「<strong>${searchKeyword}</strong>」的客戶` : '尚無客戶'}
               </td>
             </tr>
@@ -88,6 +96,7 @@
               <td>${c.tax_id || '-'}</td>
               <td><strong>${c.company_name || ''}</strong></td>
               <td class="text-center">${c.project_count || 0}</td>
+              <td>${c.owner_salesperson_name || '-'}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -120,6 +129,28 @@
           <div class="mb-3">
             <label class="form-label">公司名稱</label>
             <input type="text" name="company_name" class="form-control" required>
+          </div>
+          <hr>
+          <div class="mb-3">
+            <label class="form-label">負責業務</label>
+            <select name="owner_salesperson_id" class="form-select">
+              <option value="">-- 選擇業務 --</option>
+              ${(salespeople || []).map(s => '<option value="' + s.id + '">' + (s.name || '').replace(/"/g, '&quot;') + '</option>').join('')}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">聯絡人</label>
+            <input type="text" name="contact_name" class="form-control">
+          </div>
+          <div class="row g-2">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">聯絡電話</label>
+              <input type="text" name="contact_phone" class="form-control">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">聯絡信箱</label>
+              <input type="email" name="contact_email" class="form-control">
+            </div>
           </div>
         </div>
         <div class="modal-footer">

@@ -42,6 +42,7 @@ const MIGRATIONS = [
   'migrate_v_invoice_summary',
   'migrate_rename_user_role',
   'migrate_crm_pipeline_activity',
+  'migrate_customer_contact_owner',
 ];
 
 function run() {

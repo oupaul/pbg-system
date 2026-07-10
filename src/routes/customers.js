@@ -4,6 +4,7 @@ const Customer = require('../models/Customer');
 const Project = require('../models/Project');
 const Pipeline = require('../models/Pipeline');
 const Activity = require('../models/Activity');
+const Salesperson = require('../models/Salesperson');
 const db = require('../models/db');
 const { getUserInfo } = require('../utils/authHelper');
 
@@ -99,7 +100,9 @@ router.get('/', (req, res) => {
       sortLinks: sortLinks || {},
       sortIcons: sortIcons || {},
       searchKeyword: searchKeyword || '',
-      req: req
+      salespeople: Salesperson.findAll(),
+      req: req,
+      error: req.query.error || ''
     });
   } catch (err) {
     console.error('客戶列表錯誤:', err);
@@ -152,6 +155,10 @@ router.post('/', (req, res) => {
       tax_id: req.body.tax_id,
       company_name: req.body.company_name,
       is_new_customer: req.body.is_new_customer === '1',
+      contact_name: req.body.contact_name,
+      contact_phone: req.body.contact_phone,
+      contact_email: req.body.contact_email,
+      owner_salesperson_id: req.body.owner_salesperson_id || null,
       userInfo: getUserInfo(req)
     });
     res.redirect('/customers');
@@ -200,6 +207,7 @@ router.get('/:id', (req, res) => {
     stats,
     pipelines,
     activities,
+    salespeople: Salesperson.findAll(),
     error: req.query.error || ''
   });
 });
@@ -240,6 +248,10 @@ router.post('/:id', (req, res) => {
       tax_id: req.body.tax_id,
       company_name: req.body.company_name,
       is_new_customer: req.body.is_new_customer === '1' ? 1 : 0,
+      contact_name: req.body.contact_name,
+      contact_phone: req.body.contact_phone,
+      contact_email: req.body.contact_email,
+      owner_salesperson_id: req.body.owner_salesperson_id || null,
       userInfo: getUserInfo(req)
     });
     res.redirect(`/customers/${req.params.id}`);

@@ -5,9 +5,10 @@ const Customer = {
   // 取得所有客戶
   findAll() {
     return db.prepare(`
-      SELECT c.*, COUNT(p.id) as project_count
+      SELECT c.*, COUNT(p.id) as project_count, s.name as owner_salesperson_name
       FROM customers c
       LEFT JOIN projects p ON c.id = p.customer_id
+      LEFT JOIN salespeople s ON c.owner_salesperson_id = s.id
       GROUP BY c.id
       ORDER BY c.company_name
     `).all();
@@ -15,7 +16,12 @@ const Customer = {
 
   // 依ID取得
   findById(id) {
-    return db.prepare(`SELECT * FROM customers WHERE id = ?`).get(id);
+    return db.prepare(`
+      SELECT c.*, s.name as owner_salesperson_name
+      FROM customers c
+      LEFT JOIN salespeople s ON c.owner_salesperson_id = s.id
+      WHERE c.id = ?
+    `).get(id);
   },
 
   // 依客戶編號取得
@@ -36,15 +42,17 @@ const Customer = {
     
     const searchTerm = `%${keyword.trim()}%`;
     return db.prepare(`
-      SELECT c.*, COUNT(p.id) as project_count
+      SELECT c.*, COUNT(p.id) as project_count, s.name as owner_salesperson_name
       FROM customers c
       LEFT JOIN projects p ON c.id = p.customer_id
-      WHERE c.customer_code LIKE ? 
-         OR c.tax_id LIKE ? 
+      LEFT JOIN salespeople s ON c.owner_salesperson_id = s.id
+      WHERE c.customer_code LIKE ?
+         OR c.tax_id LIKE ?
          OR c.company_name LIKE ?
+         OR c.contact_name LIKE ?
       GROUP BY c.id
       ORDER BY c.company_name
-    `).all(searchTerm, searchTerm, searchTerm);
+    `).all(searchTerm, searchTerm, searchTerm, searchTerm);
   },
 
   // 新增客戶
@@ -60,16 +68,23 @@ const Customer = {
     }
     
     const stmt = db.prepare(`
-      INSERT INTO customers (customer_code, tax_id, company_name, is_new_customer)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO customers (
+        customer_code, tax_id, company_name, is_new_customer,
+        contact_name, contact_phone, contact_email, owner_salesperson_id
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    
+
     try {
       const result = stmt.run(
         data.customer_code,
         data.tax_id || null,
         data.company_name,
-        data.is_new_customer ? 1 : 0
+        data.is_new_customer ? 1 : 0,
+        data.contact_name || null,
+        data.contact_phone || null,
+        data.contact_email || null,
+        data.owner_salesperson_id || null
       );
       
       const customerId = result.lastInsertRowid;
@@ -91,7 +106,11 @@ const Customer = {
         customer_code: data.customer_code,
         tax_id: data.tax_id || null,
         company_name: data.company_name,
-        is_new_customer: data.is_new_customer ? 1 : 0
+        is_new_customer: data.is_new_customer ? 1 : 0,
+        contact_name: data.contact_name || null,
+        contact_phone: data.contact_phone || null,
+        contact_email: data.contact_email || null,
+        owner_salesperson_id: data.owner_salesperson_id || null
       }, data.userInfo);
       
       return customerId;
@@ -159,7 +178,39 @@ const Customer = {
     } else {
       newData.is_new_customer = oldRecord.is_new_customer;
     }
-    
+
+    if (data.contact_name !== undefined) {
+      fields.push('contact_name = ?');
+      values.push(data.contact_name || null);
+      newData.contact_name = data.contact_name || null;
+    } else {
+      newData.contact_name = oldRecord.contact_name;
+    }
+
+    if (data.contact_phone !== undefined) {
+      fields.push('contact_phone = ?');
+      values.push(data.contact_phone || null);
+      newData.contact_phone = data.contact_phone || null;
+    } else {
+      newData.contact_phone = oldRecord.contact_phone;
+    }
+
+    if (data.contact_email !== undefined) {
+      fields.push('contact_email = ?');
+      values.push(data.contact_email || null);
+      newData.contact_email = data.contact_email || null;
+    } else {
+      newData.contact_email = oldRecord.contact_email;
+    }
+
+    if (data.owner_salesperson_id !== undefined) {
+      fields.push('owner_salesperson_id = ?');
+      values.push(data.owner_salesperson_id || null);
+      newData.owner_salesperson_id = data.owner_salesperson_id || null;
+    } else {
+      newData.owner_salesperson_id = oldRecord.owner_salesperson_id;
+    }
+
     // 如果沒有要更新的欄位，直接返回
     if (fields.length === 0) return false;
     
