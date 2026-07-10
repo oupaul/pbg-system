@@ -17,8 +17,8 @@ router.get('/', (req, res) => {
     // 搜尋關鍵字
     const searchKeyword = req.query.search || '';
 
-    // 根據是否有搜尋關鍵字決定使用哪個方法
-    let customers = searchKeyword ? Customer.search(searchKeyword) : Customer.findAll();
+    // 根據是否有搜尋關鍵字決定使用哪個方法（依角色權限範圍過濾）
+    let customers = searchKeyword ? Customer.search(searchKeyword, req.user) : Customer.findAll(req.user);
     
     // 確保 customers 是陣列
     if (!Array.isArray(customers)) {
@@ -170,7 +170,7 @@ router.post('/', (req, res) => {
 
 // 客戶詳情
 router.get('/:id', (req, res) => {
-  const customer = Customer.findById(req.params.id);
+  const customer = Customer.findById(req.params.id, req.user);
   if (!customer) {
     return res.status(404).render('error', { message: '找不到客戶', error: {} });
   }
@@ -215,6 +215,10 @@ router.get('/:id', (req, res) => {
 // 新增活動紀錄
 router.post('/:id/activities', (req, res) => {
   try {
+    if (!Customer.findById(req.params.id, req.user)) {
+      return res.status(404).render('error', { message: '找不到客戶', error: {} });
+    }
+
     Activity.create({
       customer_id: req.params.id,
       activity_type: req.body.activity_type,
@@ -232,6 +236,10 @@ router.post('/:id/activities', (req, res) => {
 // 刪除活動紀錄
 router.post('/:id/activities/:activityId/delete', (req, res) => {
   try {
+    if (!Customer.findById(req.params.id, req.user)) {
+      return res.status(404).render('error', { message: '找不到客戶', error: {} });
+    }
+
     Activity.softDelete(req.params.activityId, getUserInfo(req));
     res.redirect(`/customers/${req.params.id}`);
   } catch (err) {
@@ -243,6 +251,10 @@ router.post('/:id/activities/:activityId/delete', (req, res) => {
 // 更新客戶
 router.post('/:id', (req, res) => {
   try {
+    if (!Customer.findById(req.params.id, req.user)) {
+      return res.status(404).render('error', { message: '找不到客戶', error: {} });
+    }
+
     Customer.update(req.params.id, {
       customer_code: req.body.customer_code,
       tax_id: req.body.tax_id,
