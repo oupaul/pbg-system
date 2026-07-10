@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../models/db');
 const Project = require('../models/Project');
 const ReceivablesAgingService = require('../services/ReceivablesAgingService');
+const ActivityReminderService = require('../services/ActivityReminderService');
 const Role = require('../models/Role');
 const cache = require('../services/CacheService');
 
@@ -30,6 +31,7 @@ router.get('/', (req, res) => {
   // dashboard_view_mode = 'none'：顯示歡迎頁（不顯示儀表板），但業務員仍顯示收款提醒與開票提醒
   if (dashboardMode === 'none') {
     let paymentReminder = { upcoming: [], overdue: [] };
+    let activityReminders = [];
     let upcomingInvoiceProjects = [];
     let overdueInvoiceProjects = [];
     let showNotification = false;
@@ -45,6 +47,14 @@ router.get('/', (req, res) => {
         if (reminderSetting) paymentReminderDays = parseInt(reminderSetting.setting_value, 10) || 7;
       } catch (e) { /* use default */ }
       paymentReminder = ReceivablesAgingService.getPaymentReminder(paymentReminderDays, null, req.user.salesperson_id);
+
+      // 客戶追蹤提醒（業務員僅見自己負責的客戶）
+      let activityReminderDays = 14;
+      try {
+        const arSetting = db.prepare('SELECT setting_value FROM system_settings WHERE setting_key = ?').get('activity_reminder_days');
+        if (arSetting) activityReminderDays = parseInt(arSetting.setting_value, 10) || 14;
+      } catch (e) { /* use default */ }
+      activityReminders = ActivityReminderService.getOverdueCustomers(activityReminderDays, req.user.salesperson_id);
 
       // 開票提醒（業務員僅見自己專案）
       let notificationEnabled = true;
@@ -97,6 +107,7 @@ router.get('/', (req, res) => {
       years: Project.getYears(),
       selectedYear: 'all',
       paymentReminder,
+      activityReminders,
       upcomingInvoiceProjects: [...upcomingInvoiceProjects, ...overdueInvoiceProjects],
       overdueInvoiceProjects,
       showNotification,
@@ -423,6 +434,19 @@ router.get('/', (req, res) => {
     paymentReminder = ReceivablesAgingService.getPaymentReminder(paymentReminderDays, null, salespersonFilter);
   }
 
+  // 客戶追蹤提醒：有負責業務但超過設定天數沒有活動紀錄的客戶
+  // admin/user 可見全部；salesperson 僅見自己負責的客戶
+  let activityReminders = [];
+  if (req.user && (req.user.role === 'admin' || req.user.role === 'user' || req.user.role === 'salesperson')) {
+    let activityReminderDays = 14;
+    try {
+      const arSetting = db.prepare('SELECT setting_value FROM system_settings WHERE setting_key = ?').get('activity_reminder_days');
+      if (arSetting) activityReminderDays = parseInt(arSetting.setting_value, 10) || 14;
+    } catch (e) { /* use default */ }
+    const activitySalespersonFilter = (req.user.role === 'salesperson' && req.user.salesperson_id) ? req.user.salesperson_id : null;
+    activityReminders = ActivityReminderService.getOverdueCustomers(activityReminderDays, activitySalespersonFilter);
+  }
+
   // 獨立類型區塊（all_and_separate 時，為每個 show_separate_dashboard 類型計算獨立統計）
   let separateBlocks = [];
   if (dashboardMode === 'all_and_separate' && separateTypeNames.length > 0) {
@@ -493,6 +517,7 @@ router.get('/', (req, res) => {
     daysUntilEndOfMonth,
     receivablesAging,
     paymentReminder,
+    activityReminders,
     separateBlocks
   });
 });

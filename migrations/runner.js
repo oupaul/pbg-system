@@ -43,6 +43,7 @@ const MIGRATIONS = [
   'migrate_rename_user_role',
   'migrate_crm_pipeline_activity',
   'migrate_customer_contact_owner',
+  'migrate_activity_reminder_days',
 ];
 
 function run() {
