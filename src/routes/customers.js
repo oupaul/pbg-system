@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const Customer = require('../models/Customer');
 const Project = require('../models/Project');
+const Pipeline = require('../models/Pipeline');
+const Activity = require('../models/Activity');
 const db = require('../models/db');
 const { getUserInfo } = require('../utils/authHelper');
 
@@ -185,12 +187,49 @@ router.get('/:id', (req, res) => {
     WHERE customer_id = ?
   `).get(customer.id);
 
+  // 潛在商機（依角色權限範圍過濾）
+  const pipelines = Pipeline.findAll({ customer_id: customer.id }, req.user);
+
+  // 活動時間軸
+  const activities = Activity.findByCustomer(customer.id);
+
   res.render('customers/show', {
     title: customer.company_name,
     customer,
     projects,
-    stats
+    stats,
+    pipelines,
+    activities,
+    error: req.query.error || ''
   });
+});
+
+// 新增活動紀錄
+router.post('/:id/activities', (req, res) => {
+  try {
+    Activity.create({
+      customer_id: req.params.id,
+      activity_type: req.body.activity_type,
+      content: req.body.content,
+      activity_date: req.body.activity_date,
+      userInfo: getUserInfo(req)
+    });
+    res.redirect(`/customers/${req.params.id}`);
+  } catch (err) {
+    console.error(err);
+    res.redirect(`/customers/${req.params.id}?error=` + encodeURIComponent(err.message));
+  }
+});
+
+// 刪除活動紀錄
+router.post('/:id/activities/:activityId/delete', (req, res) => {
+  try {
+    Activity.softDelete(req.params.activityId, getUserInfo(req));
+    res.redirect(`/customers/${req.params.id}`);
+  } catch (err) {
+    console.error(err);
+    res.redirect(`/customers/${req.params.id}?error=` + encodeURIComponent(err.message));
+  }
 });
 
 // 更新客戶

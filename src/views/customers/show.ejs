@@ -11,6 +11,13 @@
   </div>
 </div>
 
+${error ? `
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle"></i> ${error}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
 <div class="row g-4 mb-4">
   <div class="col-md-4">
     <div class="card">
@@ -67,6 +74,79 @@
         </tbody>
       </table>
     </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-bullseye"></i> 潛在商機</span>
+    <a href="/pipelines/new?customer_id=${customer.id}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i> 新增商機</a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>商機名稱</th>
+            <th>業務</th>
+            <th class="text-end">預估金額</th>
+            <th>預計成交月份</th>
+            <th>狀態</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${pipelines.map(p => `
+            <tr onclick="location.href='/pipelines/${p.id}'" style="cursor:pointer">
+              <td>${p.opportunity_name}</td>
+              <td>${p.salesperson_name || '-'}</td>
+              <td class="text-end">$${(p.estimated_amount || 0).toLocaleString()}</td>
+              <td>${p.expected_close_year_month || '-'}</td>
+              <td><span class="badge bg-${p.status === '已成交' ? 'success' : p.status === '已流失' ? 'secondary' : 'warning'}">${p.status}</span></td>
+            </tr>
+          `).join('') || '<tr><td colspan="5" class="text-center text-muted py-3">尚無潛在商機</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-clock-history"></i> 活動紀錄</div>
+  <div class="card-body">
+    <form action="/customers/${customer.id}/activities" method="POST" class="row g-2 mb-4">
+      <div class="col-md-2">
+        <select name="activity_type" class="form-select">
+          <option value="拜訪">拜訪</option>
+          <option value="電話">電話</option>
+          <option value="客訴">客訴</option>
+          <option value="其他">其他</option>
+        </select>
+      </div>
+      <div class="col-md-7">
+        <input type="text" name="content" class="form-control" placeholder="記錄本次拜訪、通話或客訴的內容..." required>
+      </div>
+      <div class="col-md-2">
+        <input type="date" name="activity_date" class="form-control">
+      </div>
+      <div class="col-md-1">
+        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus-lg"></i></button>
+      </div>
+    </form>
+
+    <ul class="list-group list-group-flush">
+      ${activities.map(a => `
+        <li class="list-group-item d-flex justify-content-between align-items-start">
+          <div>
+            <span class="badge bg-${a.activity_type === '客訴' ? 'danger' : a.activity_type === '拜訪' ? 'primary' : a.activity_type === '電話' ? 'info' : 'secondary'} me-2">${a.activity_type}</span>
+            <span>${a.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
+            <div class="text-muted small mt-1">${a.activity_date} · ${a.created_by || 'system'}${a.opportunity_name ? ' · 商機：' + a.opportunity_name : ''}</div>
+          </div>
+          <form action="/customers/${customer.id}/activities/${a.id}/delete" method="POST" onsubmit="return confirm('確定要刪除此活動紀錄？')">
+            <button type="submit" class="btn btn-sm btn-link text-danger p-0"><i class="bi bi-trash"></i></button>
+          </form>
+        </li>
+      `).join('') || '<li class="list-group-item text-center text-muted py-3">尚無活動紀錄</li>'}
+    </ul>
   </div>
 </div>
 

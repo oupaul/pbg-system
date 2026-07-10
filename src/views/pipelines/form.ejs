@@ -1,0 +1,102 @@
+<%- include('../layout', { body: `
+<div class="row mb-4">
+  <div class="col">
+    <h1 class="h3">
+      <i class="bi bi-${pipeline ? 'pencil' : 'plus-lg'}"></i>
+      ${pipeline ? '編輯潛在商機' : '新增潛在商機'}
+    </h1>
+  </div>
+</div>
+
+${error ? `
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle"></i> ${error}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+<div class="card">
+  <div class="card-body">
+    <form action="${action}" method="POST">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">客戶 <span class="text-danger">*</span></label>
+          <select name="customer_id" id="customer_id" class="form-select select2-dropdown" ${pipeline ? 'disabled' : 'required'}>
+            <option value="">-- 選擇客戶 --</option>
+            ${customers.map(c => {
+              const selectedCustomerId = pipeline ? pipeline.customer_id : presetCustomerId;
+              const selected = selectedCustomerId && selectedCustomerId == c.id ? 'selected' : '';
+              const companyName = (c.company_name || '').replace(/"/g, '&quot;');
+              const customerCode = (c.customer_code || '').replace(/"/g, '&quot;');
+              return '<option value="' + c.id + '" ' + selected + '>' + companyName + ' (' + customerCode + ')</option>';
+            }).join('')}
+          </select>
+          ${pipeline ? '<input type="hidden" name="customer_id" value="' + pipeline.customer_id + '"><small class="form-text text-muted">商機建立後客戶不可變更</small>' : ''}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">業務人員</label>
+          <select name="salesperson_id" id="salesperson_id" class="form-select select2-dropdown">
+            <option value="">-- 選擇業務 --</option>
+            ${salespeople.map(s => {
+              const selected = pipeline && pipeline.salesperson_id == s.id ? 'selected' : '';
+              const name = (s.name || '').replace(/"/g, '&quot;');
+              return '<option value="' + s.id + '" ' + selected + '>' + name + '</option>';
+            }).join('')}
+          </select>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">商機名稱 <span class="text-danger">*</span></label>
+          <input type="text" name="opportunity_name" class="form-control" value="${pipeline ? (pipeline.opportunity_name || '').replace(/"/g, '&quot;') : ''}" required>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">預估專案類型</label>
+          <select name="project_type" class="form-select">
+            <option value="">-- 選擇類型 --</option>
+            ${projectTypes.map(type => {
+              const selected = pipeline && pipeline.project_type === type.type_name ? 'selected' : '';
+              return '<option value="' + type.type_name + '" ' + selected + '>' + type.type_name + '</option>';
+            }).join('')}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">預估金額</label>
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            <input type="number" name="estimated_amount" class="form-control" value="${pipeline ? (pipeline.estimated_amount || 0) : 0}" step="1" min="0">
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">預計成交月份</label>
+          <input type="month" name="expected_close_year_month" class="form-control" value="${pipeline ? (pipeline.expected_close_year_month || '') : ''}">
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">成交機率</label>
+          <div class="input-group">
+            <input type="number" name="win_probability" class="form-control" value="${pipeline && pipeline.win_probability !== null && pipeline.win_probability !== undefined ? pipeline.win_probability : ''}" min="0" max="100">
+            <span class="input-group-text">%</span>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">備註</label>
+          <textarea name="notes" class="form-control" rows="3">${pipeline ? (pipeline.notes || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</textarea>
+        </div>
+      </div>
+
+      <hr class="my-4">
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg"></i> ${pipeline ? '更新' : '建立'}
+        </button>
+        <a href="${pipeline ? '/pipelines/' + pipeline.id : '/pipelines'}" class="btn btn-secondary">
+          <i class="bi bi-x-lg"></i> 取消
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+` }) %>

@@ -1,0 +1,140 @@
+<%- include('../layout', { body: `
+<div class="row mb-4">
+  <div class="col">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/pipelines">潛在商機</a></li>
+        <li class="breadcrumb-item active">${pipeline.opportunity_name}</li>
+      </ol>
+    </nav>
+    <h1 class="h3 mt-2">
+      ${pipeline.opportunity_name}
+      <span class="badge bg-${pipeline.status === '已成交' ? 'success' : pipeline.status === '已流失' ? 'secondary' : 'warning'} align-middle">${pipeline.status}</span>
+      ${pipeline.converted_project_id ? '<span class="badge bg-info align-middle">已轉入專案</span>' : ''}
+    </h1>
+  </div>
+  <div class="col-auto d-flex gap-2 align-items-start">
+    ${locals.canEdit && !pipeline.converted_project_id ? '<a href="/pipelines/' + pipeline.id + '/edit" class="btn btn-outline-secondary"><i class="bi bi-pencil"></i> 編輯</a>' : ''}
+  </div>
+</div>
+
+${error ? `
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle"></i> ${error}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+<div class="row g-4 mb-4">
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="text-muted">客戶</h6>
+        <p class="fs-5 mb-0"><a href="/customers/${pipeline.customer_id}">${pipeline.customer_name || '-'}</a></p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="text-muted">業務人員</h6>
+        <p class="fs-5 mb-0">${pipeline.salesperson_name || '-'}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="text-muted">預估金額</h6>
+        <p class="fs-5 mb-0">$${(pipeline.estimated_amount || 0).toLocaleString()}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="text-muted">預計成交月份 / 機率</h6>
+        <p class="fs-5 mb-0">${pipeline.expected_close_year_month || '-'} ${pipeline.win_probability !== null && pipeline.win_probability !== undefined ? '(' + pipeline.win_probability + '%)' : ''}</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+${pipeline.notes ? `
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-card-text"></i> 備註</div>
+  <div class="card-body"><p class="mb-0" style="white-space: pre-wrap;">${pipeline.notes.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p></div>
+</div>
+` : ''}
+
+${pipeline.converted_project_id ? `
+<div class="card mb-4 border-info">
+  <div class="card-header bg-info text-white"><i class="bi bi-folder-check"></i> 已轉入專案</div>
+  <div class="card-body">
+    <p class="mb-2">此商機已於 ${pipeline.converted_at} 轉入專案：</p>
+    <a href="/projects/${convertedProject ? convertedProject.id : pipeline.converted_project_id}" class="btn btn-primary">
+      <i class="bi bi-folder"></i> ${convertedProject ? convertedProject.project_code + ' - ' + convertedProject.project_name : '查看專案'}
+    </a>
+  </div>
+</div>
+` : ''}
+
+${locals.canEdit && !pipeline.converted_project_id ? `
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-arrow-repeat"></i> 狀態操作</div>
+  <div class="card-body d-flex gap-2 flex-wrap">
+    ${pipeline.status !== '已成交' ? `
+      <form action="/pipelines/${pipeline.id}/status" method="POST">
+        <input type="hidden" name="status" value="已成交">
+        <button type="submit" class="btn btn-success"><i class="bi bi-check-circle"></i> 標記成交</button>
+      </form>
+    ` : `
+      <a href="/pipelines/${pipeline.id}/convert" class="btn btn-success"><i class="bi bi-box-arrow-in-right"></i> 轉入專案（由財務提供專案編號）</a>
+      <form action="/pipelines/${pipeline.id}/status" method="POST">
+        <input type="hidden" name="status" value="洽談中">
+        <button type="submit" class="btn btn-outline-warning"><i class="bi bi-arrow-counterclockwise"></i> 改回洽談中</button>
+      </form>
+    `}
+    ${pipeline.status !== '已流失' ? `
+      <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#lostReasonModal">
+        <i class="bi bi-x-circle"></i> 標記流失
+      </button>
+    ` : `
+      <form action="/pipelines/${pipeline.id}/status" method="POST">
+        <input type="hidden" name="status" value="洽談中">
+        <button type="submit" class="btn btn-outline-warning"><i class="bi bi-arrow-counterclockwise"></i> 重新開啟</button>
+      </form>
+    `}
+    <form action="/pipelines/${pipeline.id}/delete" method="POST" class="ms-auto" onsubmit="return confirm('確定要刪除此潛在商機？')">
+      <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash"></i> 刪除</button>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="lostReasonModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="/pipelines/${pipeline.id}/status" method="POST">
+        <input type="hidden" name="status" value="已流失">
+        <div class="modal-header">
+          <h5 class="modal-title">標記流失</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <label class="form-label">流失原因</label>
+          <textarea name="lost_reason" class="form-control" rows="3"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-danger">確定標記流失</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+` : ''}
+
+${pipeline.status === '已流失' && pipeline.lost_reason ? `
+<div class="alert alert-secondary"><strong>流失原因：</strong>${pipeline.lost_reason.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+` : ''}
+` }) %>
