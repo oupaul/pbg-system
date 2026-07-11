@@ -5,6 +5,7 @@
       search: (typeof searchKeyword !== 'undefined' ? searchKeyword : '') || '',
       status: (typeof statusFilter !== 'undefined' ? statusFilter : '') || '',
       party_type: (typeof partyTypeFilter !== 'undefined' ? partyTypeFilter : '') || '',
+      vendor_type: (typeof vendorTypeFilter !== 'undefined' ? vendorTypeFilter : '') || '',
       ...overrides
     };
     const qs = Object.entries(merged)
@@ -37,15 +38,10 @@ ${error ? `
 
 <div class="mb-3 d-flex flex-wrap gap-2">
   <div class="btn-group" role="group">
-    <a href="${buildFilterLink({ party_type: '' })}" class="btn btn-sm ${!partyTypeFilter ? 'btn-primary' : 'btn-outline-primary'}">全部身份</a>
-    <a href="${buildFilterLink({ party_type: '客戶' })}" class="btn btn-sm ${partyTypeFilter === '客戶' ? 'btn-info' : 'btn-outline-info'}">客戶</a>
-    <a href="${buildFilterLink({ party_type: '廠商' })}" class="btn btn-sm ${partyTypeFilter === '廠商' ? 'btn-dark' : 'btn-outline-dark'}">廠商</a>
-  </div>
-  <div class="btn-group" role="group">
-    <a href="${buildFilterLink({ status: '' })}" class="btn btn-sm ${!statusFilter ? 'btn-primary' : 'btn-outline-primary'}">全部狀態</a>
-    <a href="${buildFilterLink({ status: '往來中' })}" class="btn btn-sm ${statusFilter === '往來中' ? 'btn-success' : 'btn-outline-success'}">往來中</a>
-    <a href="${buildFilterLink({ status: '暫停往來' })}" class="btn btn-sm ${statusFilter === '暫停往來' ? 'btn-warning' : 'btn-outline-warning'}">暫停往來</a>
-    <a href="${buildFilterLink({ status: '已流失' })}" class="btn btn-sm ${statusFilter === '已流失' ? 'btn-secondary' : 'btn-outline-secondary'}">已流失</a>
+    <a href="${buildFilterLink({ party_type: '', vendor_type: '' })}" class="btn btn-sm ${!partyTypeFilter ? 'btn-primary' : 'btn-outline-primary'}">全部類型</a>
+    <a href="${buildFilterLink({ party_type: '客戶', vendor_type: '' })}" class="btn btn-sm ${partyTypeFilter === '客戶' ? 'btn-info' : 'btn-outline-info'}">客戶</a>
+    <a href="${buildFilterLink({ party_type: '廠商', vendor_type: '個人' })}" class="btn btn-sm ${partyTypeFilter === '廠商' && vendorTypeFilter === '個人' ? 'btn-dark' : 'btn-outline-dark'}">廠商-個人</a>
+    <a href="${buildFilterLink({ party_type: '廠商', vendor_type: '公司' })}" class="btn btn-sm ${partyTypeFilter === '廠商' && vendorTypeFilter === '公司' ? 'btn-dark' : 'btn-outline-dark'}">廠商-公司</a>
   </div>
 </div>
 
@@ -84,6 +80,7 @@ ${error ? `
       ` : ''}
       ${statusFilter ? '<input type="hidden" name="status" value="' + statusFilter + '">' : ''}
       ${partyTypeFilter ? '<input type="hidden" name="party_type" value="' + partyTypeFilter + '">' : ''}
+      ${vendorTypeFilter ? '<input type="hidden" name="vendor_type" value="' + vendorTypeFilter + '">' : ''}
     </form>
   </div>
 </div>
@@ -114,10 +111,26 @@ ${error ? `
                 專案數${(sortIcons && sortIcons.project_count) || ''}
               </a>
             </th>
-            <th>身份</th>
-            <th>負責業務</th>
-            <th class="text-center">等級</th>
-            <th>狀態</th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.party_type) || ''}" class="text-white text-decoration-none">
+                身份${(sortIcons && sortIcons.party_type) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.owner_salesperson_name) || ''}" class="text-white text-decoration-none">
+                負責業務${(sortIcons && sortIcons.owner_salesperson_name) || ''}
+              </a>
+            </th>
+            <th class="text-center">
+              <a href="?${(sortLinks && sortLinks.customer_level) || ''}" class="text-white text-decoration-none">
+                等級${(sortIcons && sortIcons.customer_level) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.status) || ''}" class="text-white text-decoration-none">
+                狀態${(sortIcons && sortIcons.status) || ''}
+              </a>
+            </th>
           </tr>
         </thead>
         <tbody>

@@ -21,6 +21,36 @@ main {
   font-weight: bold;
 }
 
+/* 導覽列項目多，預設 Bootstrap 的淡白色文字彼此難以區分，
+   加強未選取/hover/當前頁面三種狀態的對比，並用底色區塊標示目前所在頁面 */
+.navbar-nav .nav-link {
+  color: rgba(255, 255, 255, 0.75);
+  border-radius: 0.375rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  padding-left: 0.65rem;
+  padding-right: 0.65rem;
+  margin: 0.125rem 0.05rem;
+  transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
+  white-space: nowrap;
+}
+
+.navbar-nav .nav-link:hover,
+.navbar-nav .nav-link:focus {
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.navbar-nav .nav-link.active {
+  color: var(--primary-color);
+  background-color: #fff;
+  font-weight: 600;
+}
+
+.navbar-nav .nav-link .badge {
+  margin-left: 0.15rem;
+}
+
 /* 卡片樣式 */
 .card {
   box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);

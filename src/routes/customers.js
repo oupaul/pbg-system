@@ -22,11 +22,13 @@ router.get('/', (req, res) => {
     const statusFilter = req.query.status || '';
     // 客戶/廠商身份篩選
     const partyTypeFilter = req.query.party_type || '';
+    // 廠商類型篩選（個人/公司，僅在篩選廠商時有意義）
+    const vendorTypeFilter = req.query.vendor_type || '';
 
     // 客戶/廠商資料對所有登入者開放（僅專案依權限範圍過濾），根據是否有搜尋關鍵字決定使用哪個方法
     let customers = searchKeyword
-      ? Customer.search(searchKeyword, { status: statusFilter, party_type: partyTypeFilter })
-      : Customer.findAll({ status: statusFilter, party_type: partyTypeFilter });
+      ? Customer.search(searchKeyword, { status: statusFilter, party_type: partyTypeFilter, vendor_type: vendorTypeFilter })
+      : Customer.findAll({ status: statusFilter, party_type: partyTypeFilter, vendor_type: vendorTypeFilter });
     
     // 確保 customers 是陣列
     if (!Array.isArray(customers)) {
@@ -38,7 +40,11 @@ router.get('/', (req, res) => {
       'customer_code': 'customer_code',
       'tax_id': 'tax_id',
       'company_name': 'company_name',
-      'project_count': 'project_count'
+      'project_count': 'project_count',
+      'party_type': 'party_type',
+      'owner_salesperson_name': 'owner_salesperson_name',
+      'customer_level': 'customer_level',
+      'status': 'status'
     };
 
     const sortField = sortFieldMap[sortBy] || 'company_name';
@@ -65,11 +71,20 @@ router.get('/', (req, res) => {
       }
     });
 
-    // 生成排序連結的輔助函數
+    // 生成排序連結的輔助函數（保留目前的搜尋關鍵字與篩選條件）
     const buildQueryString = (newSortBy, newSortOrder) => {
       const params = new URLSearchParams();
       if (searchKeyword) {
         params.append('search', searchKeyword);
+      }
+      if (statusFilter) {
+        params.append('status', statusFilter);
+      }
+      if (partyTypeFilter) {
+        params.append('party_type', partyTypeFilter);
+      }
+      if (vendorTypeFilter) {
+        params.append('vendor_type', vendorTypeFilter);
       }
       params.append('sortBy', newSortBy);
       params.append('sortOrder', newSortOrder);
@@ -80,7 +95,7 @@ router.get('/', (req, res) => {
       const newOrder = sortBy === field && sortOrder === 'ASC' ? 'DESC' : 'ASC';
       return buildQueryString(field, newOrder);
     };
-    
+
     const getSortIcon = (field) => {
       if (sortBy === field) {
         return sortOrder === 'ASC' ? '<i class="bi bi-arrow-up"></i>' : '<i class="bi bi-arrow-down"></i>';
@@ -92,14 +107,22 @@ router.get('/', (req, res) => {
       customer_code: getSortLink('customer_code'),
       tax_id: getSortLink('tax_id'),
       company_name: getSortLink('company_name'),
-      project_count: getSortLink('project_count')
+      project_count: getSortLink('project_count'),
+      party_type: getSortLink('party_type'),
+      owner_salesperson_name: getSortLink('owner_salesperson_name'),
+      customer_level: getSortLink('customer_level'),
+      status: getSortLink('status')
     };
 
     const sortIcons = {
       customer_code: getSortIcon('customer_code'),
       tax_id: getSortIcon('tax_id'),
       company_name: getSortIcon('company_name'),
-      project_count: getSortIcon('project_count')
+      project_count: getSortIcon('project_count'),
+      party_type: getSortIcon('party_type'),
+      owner_salesperson_name: getSortIcon('owner_salesperson_name'),
+      customer_level: getSortIcon('customer_level'),
+      status: getSortIcon('status')
     };
   
     res.render('customers/index', {
@@ -110,6 +133,7 @@ router.get('/', (req, res) => {
       searchKeyword: searchKeyword || '',
       statusFilter,
       partyTypeFilter,
+      vendorTypeFilter,
       salespeople: Salesperson.findAll(),
       req: req,
       error: req.query.error || ''

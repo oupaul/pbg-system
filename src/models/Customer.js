@@ -10,22 +10,24 @@ function normalizePartyFields(data) {
 }
 
 const Customer = {
-  // 取得所有客戶（客戶/廠商資料對所有使用者開放，僅專案才需要依權限範圍過濾；可選擇依往來狀態/客戶廠商身份篩選）
+  // 取得所有客戶（客戶/廠商資料對所有使用者開放，僅專案才需要依權限範圍過濾；可選擇依往來狀態/客戶廠商身份/廠商類型篩選）
   findAll(filters = {}) {
     const statusCond = filters.status ? ' AND c.status = ?' : '';
     const statusParams = filters.status ? [filters.status] : [];
     // party_type = '兩者皆是' 的資料同時具備客戶與廠商身份，篩選「客戶」或「廠商」時都要包含進來
     const partyCond = filters.party_type ? ` AND (c.party_type = ? OR c.party_type = '兩者皆是')` : '';
     const partyParams = filters.party_type ? [filters.party_type] : [];
+    const vendorCond = filters.vendor_type ? ' AND c.vendor_type = ?' : '';
+    const vendorParams = filters.vendor_type ? [filters.vendor_type] : [];
     return db.prepare(`
       SELECT c.*, COUNT(p.id) as project_count, s.name as owner_salesperson_name
       FROM customers c
       LEFT JOIN projects p ON c.id = p.customer_id
       LEFT JOIN salespeople s ON c.owner_salesperson_id = s.id
-      WHERE 1=1${statusCond}${partyCond}
+      WHERE 1=1${statusCond}${partyCond}${vendorCond}
       GROUP BY c.id
       ORDER BY c.company_name
-    `).all(...statusParams, ...partyParams);
+    `).all(...statusParams, ...partyParams, ...vendorParams);
   },
 
   // 依ID取得
@@ -59,16 +61,18 @@ const Customer = {
     const statusParams = filters.status ? [filters.status] : [];
     const partyCond = filters.party_type ? ` AND (c.party_type = ? OR c.party_type = '兩者皆是')` : '';
     const partyParams = filters.party_type ? [filters.party_type] : [];
+    const vendorCond = filters.vendor_type ? ' AND c.vendor_type = ?' : '';
+    const vendorParams = filters.vendor_type ? [filters.vendor_type] : [];
     return db.prepare(`
       SELECT c.*, COUNT(p.id) as project_count, s.name as owner_salesperson_name
       FROM customers c
       LEFT JOIN projects p ON c.id = p.customer_id
       LEFT JOIN salespeople s ON c.owner_salesperson_id = s.id
-      WHERE 1=1${statusCond}${partyCond}
+      WHERE 1=1${statusCond}${partyCond}${vendorCond}
         AND (c.customer_code LIKE ? OR c.tax_id LIKE ? OR c.company_name LIKE ? OR c.contact_name LIKE ?)
       GROUP BY c.id
       ORDER BY c.company_name
-    `).all(...statusParams, ...partyParams, searchTerm, searchTerm, searchTerm, searchTerm);
+    `).all(...statusParams, ...partyParams, ...vendorParams, searchTerm, searchTerm, searchTerm, searchTerm);
   },
 
   // 新增客戶

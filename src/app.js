@@ -114,7 +114,10 @@ app.use((req, res, next) => {
   // 將閒置登出配置傳遞給所有視圖
   res.locals.idleTimeoutMinutes = getSystemSetting('idle_timeout_minutes', 30);
   res.locals.idleWarningMinutes = getSystemSetting('idle_warning_minutes', 2);
-  
+
+  // 目前路徑，供導覽列標示當前所在頁面使用
+  res.locals.currentPath = req.path;
+
   next();
 });
 
