@@ -52,7 +52,7 @@ ${success ? `
   <div class="col-md-3">
     <div class="card">
       <div class="card-body">
-        <h6 class="text-muted">負責業務 / 聯絡人</h6>
+        <h6 class="text-muted">接洽人員 / 聯絡人</h6>
         <p class="fs-5 mb-0">${customer.owner_salesperson_name || '-'}</p>
         <p class="text-muted small mb-0">${customer.contact_name || ''}${customer.contact_name && (customer.contact_phone || customer.contact_email) ? ' · ' : ''}${customer.contact_phone || ''}${customer.contact_phone && customer.contact_email ? ' · ' : ''}${customer.contact_email || ''}</p>
       </div>
@@ -183,12 +183,12 @@ ${success ? `
 
 ${locals.canEditCrm ? `
 <div class="card">
-  <div class="card-header"><i class="bi bi-gear"></i> 編輯客戶資料</div>
+  <div class="card-header"><i class="bi bi-gear"></i> 編輯資料</div>
   <div class="card-body">
     <form action="/customers/${customer.id}" method="POST">
       <div class="row g-3">
         <div class="col-md-4">
-          <label class="form-label">身份</label>
+          <label class="form-label">類型</label>
           <select name="party_type" class="form-select" id="editPartyType" onchange="document.getElementById('editVendorTypeWrap').style.display = (this.value === '客戶') ? 'none' : '';">
             <option value="客戶" ${(customer.party_type || '客戶') === '客戶' ? 'selected' : ''}>客戶</option>
             <option value="廠商" ${customer.party_type === '廠商' ? 'selected' : ''}>廠商</option>
@@ -216,7 +216,7 @@ ${locals.canEditCrm ? `
           <input type="text" name="company_name" class="form-control" value="${customer.company_name}" required>
         </div>
         <div class="col-md-4">
-          <label class="form-label">負責業務</label>
+          <label class="form-label">接洽人員</label>
           <select name="owner_salesperson_id" class="form-select">
             <option value="">-- 選擇業務 --</option>
             ${(salespeople || []).map(s => {
@@ -236,6 +236,14 @@ ${locals.canEditCrm ? `
         <div class="col-md-4">
           <label class="form-label">聯絡信箱</label>
           <input type="email" name="contact_email" class="form-control" value="${(customer.contact_email || '').replace(/"/g, '&quot;')}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">銀行名稱</label>
+          <input type="text" name="bank_name" class="form-control" value="${(customer.bank_name || '').replace(/"/g, '&quot;')}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">銀行帳號</label>
+          <input type="text" name="bank_account" class="form-control" value="${(customer.bank_account || '').replace(/"/g, '&quot;')}">
         </div>
         <div class="col-md-4">
           <label class="form-label">客戶等級</label>

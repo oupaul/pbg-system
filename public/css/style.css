@@ -21,6 +21,29 @@ main {
   font-weight: bold;
 }
 
+/* 客戶/廠商類型階層式篩選：廠商底下再分個人/公司，用縮排＋連接線呈現父子關係 */
+.party-type-tree {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.party-type-tree .vendor-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.party-type-tree .vendor-sub {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+  margin-left: 1.1rem;
+  padding-left: 0.75rem;
+  border-left: 2px solid #dee2e6;
+}
+
 /* 導覽列項目多，預設 Bootstrap 的淡白色文字彼此難以區分，
    加強未選取/hover/當前頁面三種狀態的對比，並用底色區塊標示目前所在頁面 */
 .navbar-nav .nav-link {

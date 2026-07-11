@@ -93,9 +93,10 @@ const Customer = {
       INSERT INTO customers (
         customer_code, tax_id, company_name, is_new_customer,
         contact_name, contact_phone, contact_email, owner_salesperson_id,
-        customer_level, industry, status, party_type, vendor_type
+        customer_level, industry, status, party_type, vendor_type,
+        bank_name, bank_account
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     try {
@@ -112,7 +113,9 @@ const Customer = {
         data.industry || null,
         data.status || '往來中',
         partyType,
-        vendorType
+        vendorType,
+        data.bank_name || null,
+        data.bank_account || null
       );
       
       const customerId = result.lastInsertRowid;
@@ -143,7 +146,9 @@ const Customer = {
         industry: data.industry || null,
         status: data.status || '往來中',
         party_type: partyType,
-        vendor_type: vendorType
+        vendor_type: vendorType,
+        bank_name: data.bank_name || null,
+        bank_account: data.bank_account || null
       }, data.userInfo);
       
       return customerId;
@@ -280,6 +285,22 @@ const Customer = {
     } else {
       newData.party_type = oldRecord.party_type;
       newData.vendor_type = oldRecord.vendor_type;
+    }
+
+    if (data.bank_name !== undefined) {
+      fields.push('bank_name = ?');
+      values.push(data.bank_name || null);
+      newData.bank_name = data.bank_name || null;
+    } else {
+      newData.bank_name = oldRecord.bank_name;
+    }
+
+    if (data.bank_account !== undefined) {
+      fields.push('bank_account = ?');
+      values.push(data.bank_account || null);
+      newData.bank_account = data.bank_account || null;
+    } else {
+      newData.bank_account = oldRecord.bank_account;
     }
 
     // 如果沒有要更新的欄位，直接返回

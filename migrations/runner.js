@@ -48,6 +48,7 @@ const MIGRATIONS = [
   'migrate_crm_edit_permission',
   'migrate_deletion_requests',
   'migrate_customer_vendor_party_type',
+  'migrate_customer_bank_info',
 ];
 
 function run() {

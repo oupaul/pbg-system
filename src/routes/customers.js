@@ -202,6 +202,8 @@ router.post('/', requireCrmEditPermission, (req, res) => {
       status: req.body.status,
       party_type: req.body.party_type,
       vendor_type: req.body.vendor_type,
+      bank_name: req.body.bank_name,
+      bank_account: req.body.bank_account,
       userInfo: getUserInfo(req)
     });
     res.redirect('/customers');
@@ -345,6 +347,8 @@ router.post('/:id', requireCrmEditPermission, (req, res) => {
       status: req.body.status,
       party_type: req.body.party_type,
       vendor_type: req.body.vendor_type,
+      bank_name: req.body.bank_name,
+      bank_account: req.body.bank_account,
       userInfo: getUserInfo(req)
     });
     res.redirect(`/customers/${req.params.id}`);
