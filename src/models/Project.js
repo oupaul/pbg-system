@@ -184,6 +184,73 @@ const Project = {
     return project;
   },
 
+  // 依客戶ID取得專案列表（供客戶詳情頁使用，依角色權限範圍過濾）
+  findByCustomerId(customerId, user = null) {
+    let conditions = `WHERE customer_id = ?`;
+    const params = [customerId];
+
+    if (user) {
+      const scope = user.project_view_scope ||
+        (user.role === ROLES.SALESPERSON ? PROJECT_VIEW_SCOPE.OWN : PROJECT_VIEW_SCOPE.ALL);
+
+      if (scope === PROJECT_VIEW_SCOPE.OWN && user.salesperson_id) {
+        conditions += ` AND salesperson_id = ?`;
+        params.push(user.salesperson_id);
+      } else if (scope === PROJECT_VIEW_SCOPE.ASSIGNED) {
+        const ids = getAssignedSalespersonIds(user.id);
+        if (ids.length > 0) {
+          conditions += ` AND salesperson_id IN (${ids.map(() => '?').join(',')})`;
+          params.push(...ids);
+        } else {
+          conditions += ` AND 1=0`;
+        }
+      } else if (scope === PROJECT_VIEW_SCOPE.NONE) {
+        conditions += ` AND 1=0`;
+      }
+    }
+
+    return db.prepare(`
+      SELECT * FROM v_project_summary
+      ${conditions}
+      ORDER BY contract_year DESC, contract_month DESC
+    `).all(...params);
+  },
+
+  // 依客戶ID取得專案統計（供客戶詳情頁使用，依角色權限範圍過濾，與 findByCustomerId 同一套範圍）
+  getStatsByCustomerId(customerId, user = null) {
+    let conditions = `WHERE customer_id = ?`;
+    const params = [customerId];
+
+    if (user) {
+      const scope = user.project_view_scope ||
+        (user.role === ROLES.SALESPERSON ? PROJECT_VIEW_SCOPE.OWN : PROJECT_VIEW_SCOPE.ALL);
+
+      if (scope === PROJECT_VIEW_SCOPE.OWN && user.salesperson_id) {
+        conditions += ` AND salesperson_id = ?`;
+        params.push(user.salesperson_id);
+      } else if (scope === PROJECT_VIEW_SCOPE.ASSIGNED) {
+        const ids = getAssignedSalespersonIds(user.id);
+        if (ids.length > 0) {
+          conditions += ` AND salesperson_id IN (${ids.map(() => '?').join(',')})`;
+          params.push(...ids);
+        } else {
+          conditions += ` AND 1=0`;
+        }
+      } else if (scope === PROJECT_VIEW_SCOPE.NONE) {
+        conditions += ` AND 1=0`;
+      }
+    }
+
+    return db.prepare(`
+      SELECT
+        COUNT(*) as project_count,
+        SUM(price_with_tax) as total_amount,
+        SUM(CASE WHEN status = '已結案' THEN 1 ELSE 0 END) as closed_count
+      FROM projects
+      ${conditions}
+    `).get(...params);
+  },
+
   // 依專案編號取得（舊方法，保留向後兼容）
   findByCode(code) {
     return db.prepare(`SELECT * FROM projects WHERE project_code = ? LIMIT 1`).get(code);

@@ -221,24 +221,11 @@ router.get('/:id', (req, res) => {
     return res.status(404).render('error', { message: '找不到客戶', error: {} });
   }
 
-  // 客戶的專案
-  const projects = db.prepare(`
-    SELECT p.*, s.name as salesperson_name
-    FROM projects p
-    LEFT JOIN salespeople s ON p.salesperson_id = s.id
-    WHERE p.customer_id = ?
-    ORDER BY p.contract_year DESC, p.contract_month DESC
-  `).all(customer.id);
+  // 客戶的專案（依角色權限範圍過濾，無權限查看的專案不應出現在客戶詳情頁）
+  const projects = Project.findByCustomerId(customer.id, req.user);
 
-  // 統計
-  const stats = db.prepare(`
-    SELECT 
-      COUNT(*) as project_count,
-      SUM(price_with_tax) as total_amount,
-      SUM(CASE WHEN status = '已結案' THEN 1 ELSE 0 END) as closed_count
-    FROM projects
-    WHERE customer_id = ?
-  `).get(customer.id);
+  // 統計（與 projects 同一套權限範圍，避免總數/總金額洩漏無權限查看的專案資訊）
+  const stats = Project.getStatsByCustomerId(customer.id, req.user);
 
   // 潛在商機（依角色權限範圍過濾）
   const pipelines = Pipeline.findAll({ customer_id: customer.id }, req.user);
