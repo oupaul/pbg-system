@@ -49,6 +49,7 @@ const MIGRATIONS = [
   'migrate_deletion_requests',
   'migrate_customer_vendor_party_type',
   'migrate_customer_bank_info',
+  'migrate_customer_address',
 ];
 
 function run() {

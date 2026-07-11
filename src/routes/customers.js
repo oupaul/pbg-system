@@ -204,6 +204,7 @@ router.post('/', requireCrmEditPermission, (req, res) => {
       vendor_type: req.body.vendor_type,
       bank_name: req.body.bank_name,
       bank_account: req.body.bank_account,
+      address: req.body.address,
       userInfo: getUserInfo(req)
     });
     res.redirect('/customers');
@@ -349,6 +350,7 @@ router.post('/:id', requireCrmEditPermission, (req, res) => {
       vendor_type: req.body.vendor_type,
       bank_name: req.body.bank_name,
       bank_account: req.body.bank_account,
+      address: req.body.address,
       userInfo: getUserInfo(req)
     });
     res.redirect(`/customers/${req.params.id}`);

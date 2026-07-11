@@ -67,6 +67,14 @@ ${success ? `
     </div>
   </div>
   <div class="col-12">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="text-muted"><i class="bi bi-geo-alt"></i> 地址</h6>
+        <p class="fs-5 mb-0">${(customer.address || '-').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-12">
     <div class="card bg-primary text-white">
       <div class="card-body text-center">
         <h6>專案數 / 總金額</h6>
@@ -252,6 +260,10 @@ ${locals.canEditCrm ? `
         <div class="col-md-4">
           <label class="form-label">銀行帳號</label>
           <input type="text" name="bank_account" class="form-control" value="${(customer.bank_account || '').replace(/"/g, '&quot;')}">
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">地址</label>
+          <input type="text" name="address" class="form-control" value="${(customer.address || '').replace(/"/g, '&quot;')}">
         </div>
         <div class="col-md-4">
           <label class="form-label">客戶等級</label>

@@ -94,9 +94,9 @@ const Customer = {
         customer_code, tax_id, company_name, is_new_customer,
         contact_name, contact_phone, contact_email, owner_salesperson_id,
         customer_level, industry, status, party_type, vendor_type,
-        bank_name, bank_account
+        bank_name, bank_account, address
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     try {
@@ -115,7 +115,8 @@ const Customer = {
         partyType,
         vendorType,
         data.bank_name || null,
-        data.bank_account || null
+        data.bank_account || null,
+        data.address || null
       );
       
       const customerId = result.lastInsertRowid;
@@ -148,7 +149,8 @@ const Customer = {
         party_type: partyType,
         vendor_type: vendorType,
         bank_name: data.bank_name || null,
-        bank_account: data.bank_account || null
+        bank_account: data.bank_account || null,
+        address: data.address || null
       }, data.userInfo);
       
       return customerId;
@@ -301,6 +303,14 @@ const Customer = {
       newData.bank_account = data.bank_account || null;
     } else {
       newData.bank_account = oldRecord.bank_account;
+    }
+
+    if (data.address !== undefined) {
+      fields.push('address = ?');
+      values.push(data.address || null);
+      newData.address = data.address || null;
+    } else {
+      newData.address = oldRecord.address;
     }
 
     // 如果沒有要更新的欄位，直接返回
