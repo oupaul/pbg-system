@@ -36,27 +36,19 @@ ${error ? `
   </div>
 ` : ''}
 
-<ul class="mb-3 party-type-tree">
-  <li>
+<div class="mb-3 party-type-tree">
+  <div class="tree-row">
     <a href="${buildFilterLink({ party_type: '', vendor_type: '' })}" class="btn btn-sm ${!partyTypeFilter ? 'btn-primary' : 'btn-outline-primary'}">全部類型</a>
-    <ul>
-      <li>
-        <a href="${buildFilterLink({ party_type: '客戶', vendor_type: '' })}" class="btn btn-sm ${partyTypeFilter === '客戶' ? 'btn-info' : 'btn-outline-info'}">客戶</a>
-      </li>
-      <li>
-        <a href="${buildFilterLink({ party_type: '廠商', vendor_type: '' })}" class="btn btn-sm ${partyTypeFilter === '廠商' && !vendorTypeFilter ? 'btn-dark' : 'btn-outline-dark'}">廠商</a>
-        <ul>
-          <li>
-            <a href="${buildFilterLink({ party_type: '廠商', vendor_type: '個人' })}" class="btn btn-sm ${partyTypeFilter === '廠商' && vendorTypeFilter === '個人' ? 'btn-secondary' : 'btn-outline-secondary'}">個人</a>
-          </li>
-          <li>
-            <a href="${buildFilterLink({ party_type: '廠商', vendor_type: '公司' })}" class="btn btn-sm ${partyTypeFilter === '廠商' && vendorTypeFilter === '公司' ? 'btn-secondary' : 'btn-outline-secondary'}">公司</a>
-          </li>
-        </ul>
-      </li>
-    </ul>
-  </li>
-</ul>
+  </div>
+  <div class="tree-row">
+    <a href="${buildFilterLink({ party_type: '客戶', vendor_type: '' })}" class="btn btn-sm ${partyTypeFilter === '客戶' ? 'btn-info' : 'btn-outline-info'}">客戶</a>
+    <a href="${buildFilterLink({ party_type: '廠商', vendor_type: '' })}" class="btn btn-sm ${partyTypeFilter === '廠商' && !vendorTypeFilter ? 'btn-dark' : 'btn-outline-dark'}">廠商</a>
+  </div>
+  <div class="tree-row tree-row-indent">
+    <a href="${buildFilterLink({ party_type: '廠商', vendor_type: '個人' })}" class="btn btn-sm ${partyTypeFilter === '廠商' && vendorTypeFilter === '個人' ? 'btn-secondary' : 'btn-outline-secondary'}">個人</a>
+    <a href="${buildFilterLink({ party_type: '廠商', vendor_type: '公司' })}" class="btn btn-sm ${partyTypeFilter === '廠商' && vendorTypeFilter === '公司' ? 'btn-secondary' : 'btn-outline-secondary'}">公司</a>
+  </div>
+</div>
 
 <!-- 搜尋表單 -->
 <div class="card mb-4">
