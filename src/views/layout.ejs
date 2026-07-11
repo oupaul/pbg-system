@@ -73,7 +73,7 @@
             <a class="nav-link <%= navActive('/recent-payments') %>" href="/recent-payments"><i class="bi bi-cash-coin"></i> 近期收款</a>
           </li>
           <% } %>
-          <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user' || user.role === 'salesperson' || user.role === 'boss')) { %>
+          <% if (typeof canEditCrm !== 'undefined' && canEditCrm) { %>
           <li class="nav-item">
             <a class="nav-link <%= navActive('/customers') %>" href="/customers"><i class="bi bi-building"></i> 客戶/廠商</a>
           </li>
