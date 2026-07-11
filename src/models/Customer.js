@@ -1,18 +1,5 @@
 const db = require('./db');
 const AuditLogService = require('../services/AuditLogService');
-const { PROJECT_VIEW_SCOPE, ROLES } = require('../constants');
-
-// 與 Project.js/Pipeline.js 相同的權限範圍過濾邏輯
-function getAssignedSalespersonIds(userId) {
-  try {
-    const rows = db.prepare(
-      'SELECT salesperson_id FROM user_salesperson_access WHERE user_id = ?'
-    ).all(userId);
-    return rows.map(r => r.salesperson_id);
-  } catch {
-    return [];
-  }
-}
 
 // 正規化客戶/廠商身份欄位：vendor_type 僅在具備廠商身份（廠商/兩者皆是）時才有意義
 function normalizePartyFields(data) {
@@ -22,48 +9,9 @@ function normalizePartyFields(data) {
   return { partyType, vendorType };
 }
 
-// 客戶可見條件：本人為負責業務，或客戶名下有任一專案/商機的業務為本人
-// （避免尚未設定 owner_salesperson_id 的既有客戶，因為新欄位而對原本手上有專案的業務變成不可見）
-function buildVisibilityCondition(user) {
-  if (!user) return { condition: '1=1', params: [] };
-
-  const scope = user.project_view_scope ||
-    (user.role === ROLES.SALESPERSON ? PROJECT_VIEW_SCOPE.OWN : PROJECT_VIEW_SCOPE.ALL);
-
-  if (scope === PROJECT_VIEW_SCOPE.NONE) {
-    return { condition: '1=0', params: [] };
-  }
-
-  let salespersonIds = null;
-  if (scope === PROJECT_VIEW_SCOPE.OWN && user.salesperson_id) {
-    salespersonIds = [user.salesperson_id];
-  } else if (scope === PROJECT_VIEW_SCOPE.ASSIGNED) {
-    salespersonIds = getAssignedSalespersonIds(user.id);
-  }
-
-  // scope 為 ALL，或 OWN 但使用者沒有對應的 salesperson_id：不限制
-  if (salespersonIds === null) {
-    return { condition: '1=1', params: [] };
-  }
-
-  if (salespersonIds.length === 0) {
-    return { condition: '1=0', params: [] };
-  }
-
-  const placeholders = salespersonIds.map(() => '?').join(',');
-  const condition = `(
-    c.owner_salesperson_id IN (${placeholders})
-    OR EXISTS (SELECT 1 FROM projects p2 WHERE p2.customer_id = c.id AND p2.salesperson_id IN (${placeholders}))
-    OR EXISTS (SELECT 1 FROM pipelines pl2 WHERE pl2.customer_id = c.id AND pl2.deleted_at IS NULL AND pl2.salesperson_id IN (${placeholders}))
-  )`;
-  const params = [...salespersonIds, ...salespersonIds, ...salespersonIds];
-  return { condition, params };
-}
-
 const Customer = {
-  // 取得所有客戶（依角色權限範圍過濾，可選擇依往來狀態/客戶廠商身份篩選）
-  findAll(user = null, filters = {}) {
-    const { condition, params } = buildVisibilityCondition(user);
+  // 取得所有客戶（客戶/廠商資料對所有使用者開放，僅專案才需要依權限範圍過濾；可選擇依往來狀態/客戶廠商身份篩選）
+  findAll(filters = {}) {
     const statusCond = filters.status ? ' AND c.status = ?' : '';
     const statusParams = filters.status ? [filters.status] : [];
     // party_type = '兩者皆是' 的資料同時具備客戶與廠商身份，篩選「客戶」或「廠商」時都要包含進來
@@ -74,28 +22,20 @@ const Customer = {
       FROM customers c
       LEFT JOIN projects p ON c.id = p.customer_id
       LEFT JOIN salespeople s ON c.owner_salesperson_id = s.id
-      WHERE ${condition}${statusCond}${partyCond}
+      WHERE 1=1${statusCond}${partyCond}
       GROUP BY c.id
       ORDER BY c.company_name
-    `).all(...params, ...statusParams, ...partyParams);
+    `).all(...statusParams, ...partyParams);
   },
 
-  // 依ID取得（傳入 user 時會依權限範圍檢查，超出範圍回傳 null）
-  findById(id, user = null) {
-    const customer = db.prepare(`
+  // 依ID取得
+  findById(id) {
+    return db.prepare(`
       SELECT c.*, s.name as owner_salesperson_name
       FROM customers c
       LEFT JOIN salespeople s ON c.owner_salesperson_id = s.id
       WHERE c.id = ?
     `).get(id);
-
-    if (!customer || !user) return customer || null;
-
-    const { condition, params } = buildVisibilityCondition(user);
-    if (condition === '1=1') return customer;
-
-    const visible = db.prepare(`SELECT 1 FROM customers c WHERE c.id = ? AND ${condition}`).get(id, ...params);
-    return visible ? customer : null;
   },
 
   // 依客戶編號取得
@@ -108,14 +48,13 @@ const Customer = {
     return db.prepare(`SELECT * FROM customers WHERE tax_id = ?`).get(taxId);
   },
 
-  // 關鍵字搜尋（搜尋客戶編號、統一編號、公司名稱、聯絡人，依角色權限範圍過濾，可選擇依往來狀態/客戶廠商身份篩選）
-  search(keyword, user = null, filters = {}) {
+  // 關鍵字搜尋（搜尋客戶編號、統一編號、公司名稱、聯絡人，可選擇依往來狀態/客戶廠商身份篩選）
+  search(keyword, filters = {}) {
     if (!keyword || keyword.trim() === '') {
-      return this.findAll(user, filters);
+      return this.findAll(filters);
     }
 
     const searchTerm = `%${keyword.trim()}%`;
-    const { condition, params } = buildVisibilityCondition(user);
     const statusCond = filters.status ? ' AND c.status = ?' : '';
     const statusParams = filters.status ? [filters.status] : [];
     const partyCond = filters.party_type ? ` AND (c.party_type = ? OR c.party_type = '兩者皆是')` : '';
@@ -125,11 +64,11 @@ const Customer = {
       FROM customers c
       LEFT JOIN projects p ON c.id = p.customer_id
       LEFT JOIN salespeople s ON c.owner_salesperson_id = s.id
-      WHERE ${condition}${statusCond}${partyCond}
+      WHERE 1=1${statusCond}${partyCond}
         AND (c.customer_code LIKE ? OR c.tax_id LIKE ? OR c.company_name LIKE ? OR c.contact_name LIKE ?)
       GROUP BY c.id
       ORDER BY c.company_name
-    `).all(...params, ...statusParams, ...partyParams, searchTerm, searchTerm, searchTerm, searchTerm);
+    `).all(...statusParams, ...partyParams, searchTerm, searchTerm, searchTerm, searchTerm);
   },
 
   // 新增客戶

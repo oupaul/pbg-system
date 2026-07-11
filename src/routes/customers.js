@@ -23,10 +23,10 @@ router.get('/', (req, res) => {
     // 客戶/廠商身份篩選
     const partyTypeFilter = req.query.party_type || '';
 
-    // 根據是否有搜尋關鍵字決定使用哪個方法（依角色權限範圍過濾）
+    // 客戶/廠商資料對所有登入者開放（僅專案依權限範圍過濾），根據是否有搜尋關鍵字決定使用哪個方法
     let customers = searchKeyword
-      ? Customer.search(searchKeyword, req.user, { status: statusFilter, party_type: partyTypeFilter })
-      : Customer.findAll(req.user, { status: statusFilter, party_type: partyTypeFilter });
+      ? Customer.search(searchKeyword, { status: statusFilter, party_type: partyTypeFilter })
+      : Customer.findAll({ status: statusFilter, party_type: partyTypeFilter });
     
     // 確保 customers 是陣列
     if (!Array.isArray(customers)) {
@@ -125,7 +125,7 @@ router.get('/', (req, res) => {
   }
 });
 
-// 快速新增客戶（API，返回 JSON）
+// 快速新增客戶/廠商（API，返回 JSON）
 router.post('/quick-add', (req, res) => {
   try {
     const customerId = Customer.create({
@@ -133,19 +133,23 @@ router.post('/quick-add', (req, res) => {
       tax_id: req.body.tax_id,
       company_name: req.body.company_name,
       is_new_customer: req.body.is_new_customer === '1',
+      party_type: req.body.party_type,
+      vendor_type: req.body.vendor_type,
       userInfo: getUserInfo(req)
     });
-    
+
     // 獲取新建的客戶資料
     const customer = Customer.findById(customerId);
-    
+
     res.json({
       success: true,
       customer: {
         id: customer.id,
         customer_code: customer.customer_code,
         company_name: customer.company_name,
-        tax_id: customer.tax_id
+        tax_id: customer.tax_id,
+        party_type: customer.party_type,
+        vendor_type: customer.vendor_type
       }
     });
   } catch (err) {
@@ -185,7 +189,7 @@ router.post('/', requireCrmEditPermission, (req, res) => {
 
 // 客戶詳情
 router.get('/:id', (req, res) => {
-  const customer = Customer.findById(req.params.id, req.user);
+  const customer = Customer.findById(req.params.id);
   if (!customer) {
     return res.status(404).render('error', { message: '找不到客戶', error: {} });
   }
@@ -241,7 +245,7 @@ router.get('/:id', (req, res) => {
 // 新增活動紀錄
 router.post('/:id/activities', requireCrmEditPermission, (req, res) => {
   try {
-    if (!Customer.findById(req.params.id, req.user)) {
+    if (!Customer.findById(req.params.id)) {
       return res.status(404).render('error', { message: '找不到客戶', error: {} });
     }
 
@@ -263,7 +267,7 @@ router.post('/:id/activities', requireCrmEditPermission, (req, res) => {
 // 有 can_delete 權限者直接刪除；否則送出刪除申請，待管理員核准後才真正刪除
 router.post('/:id/activities/:activityId/delete', requireCrmEditPermission, (req, res) => {
   try {
-    if (!Customer.findById(req.params.id, req.user)) {
+    if (!Customer.findById(req.params.id)) {
       return res.status(404).render('error', { message: '找不到客戶', error: {} });
     }
 
@@ -299,7 +303,7 @@ router.post('/:id/activities/:activityId/delete', requireCrmEditPermission, (req
 // 更新客戶
 router.post('/:id', requireCrmEditPermission, (req, res) => {
   try {
-    if (!Customer.findById(req.params.id, req.user)) {
+    if (!Customer.findById(req.params.id)) {
       return res.status(404).render('error', { message: '找不到客戶', error: {} });
     }
 
