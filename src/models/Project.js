@@ -430,14 +430,18 @@ const Project = {
   },
 
   // 取得專案統計
-  // excludeSalespersonIds: 保留相容用，不再使用
+  // salespersonId: 僅統計該業務員名下的專案（業務員儀表板依權限範圍過濾用）
   // excludeTypeNames: 排除的專案類型名稱陣列（儀表板主區塊排除獨立加總類型）
-  getStatistics(year = null, excludeSalespersonIds = null, excludeTypeNames = null) {
+  getStatistics(year = null, salespersonId = null, excludeTypeNames = null) {
     const conditions = [];
     const params = [];
     if (year) {
       conditions.push('contract_year = ?');
       params.push(year);
+    }
+    if (salespersonId) {
+      conditions.push('salesperson_id = ?');
+      params.push(salespersonId);
     }
     if (excludeTypeNames && excludeTypeNames.length > 0) {
       conditions.push('(project_type IS NULL OR project_type NOT IN (' + excludeTypeNames.map(() => '?').join(',') + '))');
@@ -465,6 +469,10 @@ const Project = {
     if (year) {
       typeConditions.push('contract_year = ?');
       typeParams.push(year);
+    }
+    if (salespersonId) {
+      typeConditions.push('salesperson_id = ?');
+      typeParams.push(salespersonId);
     }
     if (excludeTypeNames && excludeTypeNames.length > 0) {
       typeConditions.push('(project_type IS NULL OR project_type NOT IN (' + excludeTypeNames.map(() => '?').join(',') + '))');
