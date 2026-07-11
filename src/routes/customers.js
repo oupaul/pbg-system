@@ -4,9 +4,11 @@ const Customer = require('../models/Customer');
 const Project = require('../models/Project');
 const Pipeline = require('../models/Pipeline');
 const Activity = require('../models/Activity');
+const DeletionRequest = require('../models/DeletionRequest');
 const Salesperson = require('../models/Salesperson');
 const db = require('../models/db');
 const { getUserInfo } = require('../utils/authHelper');
+const { requireCrmEditPermission } = require('../middleware/auth');
 
 // 客戶列表
 router.get('/', (req, res) => {
@@ -153,7 +155,7 @@ router.post('/quick-add', (req, res) => {
 });
 
 // 新增客戶（傳統表單提交）
-router.post('/', (req, res) => {
+router.post('/', requireCrmEditPermission, (req, res) => {
   try {
     Customer.create({
       customer_code: req.body.customer_code,
@@ -208,6 +210,15 @@ router.get('/:id', (req, res) => {
   // 活動時間軸
   const activities = Activity.findByCustomer(customer.id);
 
+  // 活動紀錄的待審核刪除申請（避免逐筆查詢，先查出這個客戶底下所有待審核的活動刪除申請）
+  const pendingActivityDeletionIds = activities.length
+    ? db.prepare(`
+        SELECT target_id FROM deletion_requests
+        WHERE target_type = 'activity' AND status = 'pending'
+          AND target_id IN (${activities.map(() => '?').join(',')})
+      `).all(...activities.map(a => a.id)).map(r => r.target_id)
+    : [];
+
   res.render('customers/show', {
     title: customer.company_name,
     customer,
@@ -215,13 +226,15 @@ router.get('/:id', (req, res) => {
     stats,
     pipelines,
     activities,
+    pendingActivityDeletionIds,
     salespeople: Salesperson.findAll(),
-    error: req.query.error || ''
+    error: req.query.error || '',
+    success: req.query.success || ''
   });
 });
 
 // 新增活動紀錄
-router.post('/:id/activities', (req, res) => {
+router.post('/:id/activities', requireCrmEditPermission, (req, res) => {
   try {
     if (!Customer.findById(req.params.id, req.user)) {
       return res.status(404).render('error', { message: '找不到客戶', error: {} });
@@ -242,14 +255,36 @@ router.post('/:id/activities', (req, res) => {
 });
 
 // 刪除活動紀錄
-router.post('/:id/activities/:activityId/delete', (req, res) => {
+// 有 can_delete 權限者直接刪除；否則送出刪除申請，待管理員核准後才真正刪除
+router.post('/:id/activities/:activityId/delete', requireCrmEditPermission, (req, res) => {
   try {
     if (!Customer.findById(req.params.id, req.user)) {
       return res.status(404).render('error', { message: '找不到客戶', error: {} });
     }
 
-    Activity.softDelete(req.params.activityId, getUserInfo(req));
-    res.redirect(`/customers/${req.params.id}`);
+    if (req.user.canDelete) {
+      Activity.softDelete(req.params.activityId, getUserInfo(req));
+      return res.redirect(`/customers/${req.params.id}`);
+    }
+
+    const activity = Activity.findById(req.params.activityId);
+    if (!activity) {
+      return res.redirect(`/customers/${req.params.id}?error=` + encodeURIComponent('找不到此活動紀錄'));
+    }
+
+    const existing = DeletionRequest.findPendingByTarget('activity', activity.id);
+    if (existing) {
+      return res.redirect(`/customers/${req.params.id}?error=` + encodeURIComponent('此活動紀錄已送出過刪除申請，待審核中'));
+    }
+
+    DeletionRequest.create({
+      target_type: 'activity',
+      target_id: activity.id,
+      target_summary: `${activity.activity_type}：${activity.content}`,
+      requested_by: req.user.id,
+      requested_by_name: getUserInfo(req)
+    });
+    res.redirect(`/customers/${req.params.id}?success=` + encodeURIComponent('已送出刪除申請，待管理員審核後才會真正刪除'));
   } catch (err) {
     console.error(err);
     res.redirect(`/customers/${req.params.id}?error=` + encodeURIComponent(err.message));
@@ -257,7 +292,7 @@ router.post('/:id/activities/:activityId/delete', (req, res) => {
 });
 
 // 更新客戶
-router.post('/:id', (req, res) => {
+router.post('/:id', requireCrmEditPermission, (req, res) => {
   try {
     if (!Customer.findById(req.params.id, req.user)) {
       return res.status(404).render('error', { message: '找不到客戶', error: {} });

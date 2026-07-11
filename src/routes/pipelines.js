@@ -2,11 +2,12 @@ const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
 const Pipeline = require('../models/Pipeline');
+const DeletionRequest = require('../models/DeletionRequest');
 const Project = require('../models/Project');
 const Salesperson = require('../models/Salesperson');
 const Customer = require('../models/Customer');
 const { getUserInfo } = require('../utils/authHelper');
-const { requireEditPermission } = require('../middleware/auth');
+const { requireEditPermission, requireCrmEditPermission } = require('../middleware/auth');
 const cache = require('../services/CacheService');
 
 function getActiveProjectTypes() {
@@ -44,7 +45,7 @@ router.get('/', (req, res) => {
 });
 
 // 新增商機表單
-router.get('/new', requireEditPermission, (req, res) => {
+router.get('/new', requireCrmEditPermission, (req, res) => {
   res.render('pipelines/form', {
     title: '新增潛在商機',
     pipeline: null,
@@ -58,7 +59,7 @@ router.get('/new', requireEditPermission, (req, res) => {
 });
 
 // 建立商機
-router.post('/', requireEditPermission, (req, res) => {
+router.post('/', requireCrmEditPermission, (req, res) => {
   try {
     const id = Pipeline.create({
       customer_id: req.body.customer_id,
@@ -86,17 +87,20 @@ router.get('/:id', (req, res) => {
   }
 
   const convertedProject = pipeline.converted_project_id ? Project.findById(pipeline.converted_project_id) : null;
+  const pendingDeletion = DeletionRequest.findPendingByTarget('pipeline', pipeline.id);
 
   res.render('pipelines/show', {
     title: pipeline.opportunity_name,
     pipeline,
     convertedProject,
-    error: req.query.error || ''
+    pendingDeletion,
+    error: req.query.error || '',
+    success: req.query.success || ''
   });
 });
 
 // 編輯商機表單
-router.get('/:id/edit', requireEditPermission, (req, res) => {
+router.get('/:id/edit', requireCrmEditPermission, (req, res) => {
   const pipeline = Pipeline.findById(req.params.id);
   if (!pipeline) {
     return res.status(404).render('error', { title: '找不到商機', message: '找不到此潛在商機', error: {} });
@@ -115,7 +119,7 @@ router.get('/:id/edit', requireEditPermission, (req, res) => {
 });
 
 // 更新商機
-router.post('/:id', requireEditPermission, (req, res) => {
+router.post('/:id', requireCrmEditPermission, (req, res) => {
   try {
     Pipeline.update(req.params.id, {
       salesperson_id: req.body.salesperson_id || null,
@@ -135,7 +139,7 @@ router.post('/:id', requireEditPermission, (req, res) => {
 });
 
 // 標記成交 / 流失 / 重新開啟（洽談中）
-router.post('/:id/status', requireEditPermission, (req, res) => {
+router.post('/:id/status', requireCrmEditPermission, (req, res) => {
   try {
     Pipeline.setStatus(req.params.id, req.body.status, {
       lost_reason: req.body.lost_reason,
@@ -223,10 +227,32 @@ router.post('/:id/convert', requireEditPermission, (req, res) => {
 });
 
 // 刪除商機（軟刪除，已轉入專案者不可刪除）
-router.post('/:id/delete', requireEditPermission, (req, res) => {
+// 有 can_delete 權限者直接刪除；否則送出刪除申請，待管理員核准後才真正刪除
+router.post('/:id/delete', requireCrmEditPermission, (req, res) => {
+  const pipeline = Pipeline.findById(req.params.id);
+  if (!pipeline) {
+    return res.status(404).render('error', { title: '找不到商機', message: '找不到此潛在商機', error: {} });
+  }
+
   try {
-    Pipeline.softDelete(req.params.id, getUserInfo(req));
-    res.redirect('/pipelines');
+    if (req.user.canDelete) {
+      Pipeline.softDelete(req.params.id, getUserInfo(req));
+      return res.redirect('/pipelines');
+    }
+
+    const existing = DeletionRequest.findPendingByTarget('pipeline', pipeline.id);
+    if (existing) {
+      return res.redirect(`/pipelines/${pipeline.id}?error=` + encodeURIComponent('此商機已送出過刪除申請，待審核中'));
+    }
+
+    DeletionRequest.create({
+      target_type: 'pipeline',
+      target_id: pipeline.id,
+      target_summary: `${pipeline.opportunity_name}（客戶：${pipeline.customer_name || '-'}）`,
+      requested_by: req.user.id,
+      requested_by_name: getUserInfo(req)
+    });
+    res.redirect(`/pipelines/${pipeline.id}?success=` + encodeURIComponent('已送出刪除申請，待管理員審核後才會真正刪除'));
   } catch (err) {
     console.error(err);
     res.redirect(`/pipelines/${req.params.id}?error=` + encodeURIComponent(err.message));

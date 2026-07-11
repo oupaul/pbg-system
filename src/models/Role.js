@@ -53,10 +53,11 @@ const Role = {
           can_edit, can_delete, can_manage_users, can_manage_roles,
           can_manage_settings, can_backup_restore,
           can_view_all_projects, can_view_own_projects,
+          can_edit_crm,
           project_view_scope,
           dashboard_view_mode,
           is_system_role, is_active, display_order
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         data.role_key,
         data.role_name,
@@ -69,6 +70,7 @@ const Role = {
         data.can_backup_restore || 0,
         data.can_view_all_projects !== undefined ? data.can_view_all_projects : 1,
         data.can_view_own_projects !== undefined ? data.can_view_own_projects : 1,
+        data.can_edit_crm !== undefined ? data.can_edit_crm : 1,
         scopeValue,
         dashboardMode,
         data.is_system_role || 0,
@@ -153,6 +155,10 @@ const Role = {
       if (data.can_view_own_projects !== undefined) {
         fields.push('can_view_own_projects = ?');
         values.push(data.can_view_own_projects);
+      }
+      if (data.can_edit_crm !== undefined) {
+        fields.push('can_edit_crm = ?');
+        values.push(data.can_edit_crm);
       }
       if (data.is_active !== undefined) {
         fields.push('is_active = ?');
@@ -290,7 +296,8 @@ const Role = {
       can_manage_settings: role.can_manage_settings === 1,
       can_backup_restore: role.can_backup_restore === 1,
       can_view_all_projects: role.can_view_all_projects === 1,
-      can_view_own_projects: role.can_view_own_projects === 1
+      can_view_own_projects: role.can_view_own_projects === 1,
+      can_edit_crm: role.can_edit_crm === 1
     };
   },
 

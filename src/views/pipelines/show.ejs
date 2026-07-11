@@ -14,7 +14,7 @@
     </h1>
   </div>
   <div class="col-auto d-flex gap-2 align-items-start">
-    ${locals.canEdit && !pipeline.converted_project_id ? '<a href="/pipelines/' + pipeline.id + '/edit" class="btn btn-outline-secondary"><i class="bi bi-pencil"></i> 編輯</a>' : ''}
+    ${locals.canEditCrm && !pipeline.converted_project_id ? '<a href="/pipelines/' + pipeline.id + '/edit" class="btn btn-outline-secondary"><i class="bi bi-pencil"></i> 編輯</a>' : ''}
   </div>
 </div>
 
@@ -22,6 +22,19 @@ ${error ? `
   <div class="alert alert-danger alert-dismissible fade show" role="alert">
     <i class="bi bi-exclamation-triangle"></i> ${error}
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+${success ? `
+  <div class="alert alert-success alert-dismissible fade show" role="alert">
+    <i class="bi bi-check-circle"></i> ${success}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+${pendingDeletion ? `
+  <div class="alert alert-warning">
+    <i class="bi bi-hourglass-split"></i> 已送出刪除申請，等待管理員審核中（申請人：${pendingDeletion.requested_by_name || '-'}，時間：${pendingDeletion.requested_at}）
   </div>
 ` : ''}
 
@@ -79,7 +92,7 @@ ${pipeline.converted_project_id ? `
 </div>
 ` : ''}
 
-${locals.canEdit && !pipeline.converted_project_id ? `
+${locals.canEditCrm && !pipeline.converted_project_id ? `
 <div class="card mb-4">
   <div class="card-header"><i class="bi bi-arrow-repeat"></i> 狀態操作</div>
   <div class="card-body d-flex gap-2 flex-wrap">
@@ -89,7 +102,7 @@ ${locals.canEdit && !pipeline.converted_project_id ? `
         <button type="submit" class="btn btn-success"><i class="bi bi-check-circle"></i> 標記成交</button>
       </form>
     ` : `
-      <a href="/pipelines/${pipeline.id}/convert" class="btn btn-success"><i class="bi bi-box-arrow-in-right"></i> 轉入專案（由財務提供專案編號）</a>
+      ${locals.canEdit ? '<a href="/pipelines/' + pipeline.id + '/convert" class="btn btn-success"><i class="bi bi-box-arrow-in-right"></i> 轉入專案（由財務提供專案編號）</a>' : '<span class="btn btn-success disabled">已成交，待財務轉入專案</span>'}
       <form action="/pipelines/${pipeline.id}/status" method="POST">
         <input type="hidden" name="status" value="洽談中">
         <button type="submit" class="btn btn-outline-warning"><i class="bi bi-arrow-counterclockwise"></i> 改回洽談中</button>
@@ -105,9 +118,13 @@ ${locals.canEdit && !pipeline.converted_project_id ? `
         <button type="submit" class="btn btn-outline-warning"><i class="bi bi-arrow-counterclockwise"></i> 重新開啟</button>
       </form>
     `}
-    <form action="/pipelines/${pipeline.id}/delete" method="POST" class="ms-auto" onsubmit="return confirm('確定要刪除此潛在商機？')">
-      <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash"></i> 刪除</button>
-    </form>
+    ${pendingDeletion ? `
+      <span class="btn btn-outline-secondary disabled ms-auto"><i class="bi bi-hourglass-split"></i> 刪除申請審核中</span>
+    ` : `
+      <form action="/pipelines/${pipeline.id}/delete" method="POST" class="ms-auto" onsubmit="return confirm('${locals.canDelete ? "確定要刪除此潛在商機？" : "確定要送出刪除申請嗎？將由管理員審核後才會真正刪除。"}')">
+        <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash"></i> ${locals.canDelete ? '刪除' : '申請刪除'}</button>
+      </form>
+    `}
   </div>
 </div>
 

@@ -23,6 +23,13 @@ ${error ? `
   </div>
 ` : ''}
 
+${success ? `
+  <div class="alert alert-success alert-dismissible fade show" role="alert">
+    <i class="bi bi-check-circle"></i> ${success}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
 <div class="row g-4 mb-4">
   <div class="col-md-3">
     <div class="card">
@@ -94,7 +101,7 @@ ${error ? `
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center">
     <span><i class="bi bi-bullseye"></i> 潛在商機</span>
-    <a href="/pipelines/new?customer_id=${customer.id}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i> 新增商機</a>
+    ${locals.canEditCrm ? '<a href="/pipelines/new?customer_id=' + customer.id + '" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i> 新增商機</a>' : ''}
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
@@ -127,43 +134,52 @@ ${error ? `
 <div class="card mb-4">
   <div class="card-header"><i class="bi bi-clock-history"></i> 活動紀錄</div>
   <div class="card-body">
-    <form action="/customers/${customer.id}/activities" method="POST" class="row g-2 mb-4">
-      <div class="col-md-2">
-        <select name="activity_type" class="form-select">
-          <option value="拜訪">拜訪</option>
-          <option value="電話">電話</option>
-          <option value="客訴">客訴</option>
-          <option value="其他">其他</option>
-        </select>
-      </div>
-      <div class="col-md-7">
-        <input type="text" name="content" class="form-control" placeholder="記錄本次拜訪、通話或客訴的內容..." required>
-      </div>
-      <div class="col-md-2">
-        <input type="date" name="activity_date" class="form-control">
-      </div>
-      <div class="col-md-1">
-        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus-lg"></i></button>
-      </div>
-    </form>
+    ${locals.canEditCrm ? `
+      <form action="/customers/${customer.id}/activities" method="POST" class="row g-2 mb-4">
+        <div class="col-md-2">
+          <select name="activity_type" class="form-select">
+            <option value="拜訪">拜訪</option>
+            <option value="電話">電話</option>
+            <option value="客訴">客訴</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+        <div class="col-md-7">
+          <input type="text" name="content" class="form-control" placeholder="記錄本次拜訪、通話或客訴的內容..." required>
+        </div>
+        <div class="col-md-2">
+          <input type="date" name="activity_date" class="form-control">
+        </div>
+        <div class="col-md-1">
+          <button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus-lg"></i></button>
+        </div>
+      </form>
+    ` : ''}
 
     <ul class="list-group list-group-flush">
-      ${activities.map(a => `
+      ${activities.map(a => {
+        const isPending = (pendingActivityDeletionIds || []).includes(a.id);
+        const deleteControl = !locals.canEditCrm ? '' : isPending
+          ? '<span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> 審核中</span>'
+          : `<form action="/customers/${customer.id}/activities/${a.id}/delete" method="POST" onsubmit="return confirm('${locals.canDelete ? '確定要刪除此活動紀錄？' : '確定要送出刪除申請嗎？將由管理員審核後才會真正刪除。'}')">
+               <button type="submit" class="btn btn-sm btn-link ${locals.canDelete ? 'text-danger' : 'text-warning'} p-0" title="${locals.canDelete ? '刪除' : '申請刪除'}"><i class="bi bi-trash"></i></button>
+             </form>`;
+        return `
         <li class="list-group-item d-flex justify-content-between align-items-start">
           <div>
             <span class="badge bg-${a.activity_type === '客訴' ? 'danger' : a.activity_type === '拜訪' ? 'primary' : a.activity_type === '電話' ? 'info' : 'secondary'} me-2">${a.activity_type}</span>
             <span>${a.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
             <div class="text-muted small mt-1">${a.activity_date} · ${a.created_by || 'system'}${a.opportunity_name ? ' · 商機：' + a.opportunity_name : ''}</div>
           </div>
-          <form action="/customers/${customer.id}/activities/${a.id}/delete" method="POST" onsubmit="return confirm('確定要刪除此活動紀錄？')">
-            <button type="submit" class="btn btn-sm btn-link text-danger p-0"><i class="bi bi-trash"></i></button>
-          </form>
+          ${deleteControl}
         </li>
-      `).join('') || '<li class="list-group-item text-center text-muted py-3">尚無活動紀錄</li>'}
+      `;
+      }).join('') || '<li class="list-group-item text-center text-muted py-3">尚無活動紀錄</li>'}
     </ul>
   </div>
 </div>
 
+${locals.canEditCrm ? `
 <div class="card">
   <div class="card-header"><i class="bi bi-gear"></i> 編輯客戶資料</div>
   <div class="card-body">
@@ -231,4 +247,5 @@ ${error ? `
     </form>
   </div>
 </div>
+` : ''}
 `}) %>

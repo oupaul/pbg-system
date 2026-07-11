@@ -55,12 +55,6 @@
             <a class="nav-link" href="/salespeople"><i class="bi bi-people"></i> 業務管理</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="/customers"><i class="bi bi-building"></i> 客戶管理</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="/pipelines"><i class="bi bi-bullseye"></i> 潛在商機</a>
-          </li>
-          <li class="nav-item">
             <a class="nav-link" href="/import-export"><i class="bi bi-arrow-left-right"></i> 匯入/匯出</a>
           </li>
           <li class="nav-item">
@@ -68,6 +62,24 @@
           </li>
           <li class="nav-item">
             <a class="nav-link" href="/recent-payments"><i class="bi bi-cash-coin"></i> 近期收款</a>
+          </li>
+          <% } %>
+          <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user' || user.role === 'salesperson' || user.role === 'boss')) { %>
+          <li class="nav-item">
+            <a class="nav-link" href="/customers"><i class="bi bi-building"></i> 客戶管理</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/pipelines"><i class="bi bi-bullseye"></i> 潛在商機</a>
+          </li>
+          <% } %>
+          <% if (typeof canDelete !== 'undefined' && canDelete) { %>
+          <li class="nav-item">
+            <a class="nav-link" href="/deletion-requests">
+              <i class="bi bi-shield-check"></i> 刪除審核
+              <% if (typeof pendingDeletionCount !== 'undefined' && pendingDeletionCount > 0) { %>
+                <span class="badge bg-danger"><%= pendingDeletionCount %></span>
+              <% } %>
+            </a>
           </li>
           <% } %>
           <% if (typeof user !== 'undefined' && user && user.role === 'admin') { %>

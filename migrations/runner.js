@@ -45,6 +45,8 @@ const MIGRATIONS = [
   'migrate_customer_contact_owner',
   'migrate_activity_reminder_days',
   'migrate_customer_level_industry_status',
+  'migrate_crm_edit_permission',
+  'migrate_deletion_requests',
 ];
 
 function run() {
