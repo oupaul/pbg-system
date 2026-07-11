@@ -7,7 +7,12 @@
         <li class="breadcrumb-item active">${customer.company_name}</li>
       </ol>
     </nav>
-    <h1 class="h3 mt-2">${customer.company_name}</h1>
+    <h1 class="h3 mt-2">
+      ${customer.company_name}
+      ${customer.customer_level ? '<span class="badge bg-' + (customer.customer_level === 'A' ? 'success' : customer.customer_level === 'B' ? 'warning' : 'secondary') + ' align-middle">' + customer.customer_level + '級</span>' : ''}
+      <span class="badge bg-${customer.status === '往來中' ? 'success' : customer.status === '暫停往來' ? 'warning' : 'secondary'} align-middle">${customer.status || '往來中'}</span>
+    </h1>
+    ${customer.industry ? '<p class="text-muted mb-0"><i class="bi bi-building"></i> ' + customer.industry.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>' : ''}
   </div>
 </div>
 
@@ -197,6 +202,27 @@ ${error ? `
         <div class="col-md-4">
           <label class="form-label">聯絡信箱</label>
           <input type="email" name="contact_email" class="form-control" value="${(customer.contact_email || '').replace(/"/g, '&quot;')}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">客戶等級</label>
+          <select name="customer_level" class="form-select">
+            <option value="" ${!customer.customer_level ? 'selected' : ''}>-- 未分級 --</option>
+            <option value="A" ${customer.customer_level === 'A' ? 'selected' : ''}>A</option>
+            <option value="B" ${customer.customer_level === 'B' ? 'selected' : ''}>B</option>
+            <option value="C" ${customer.customer_level === 'C' ? 'selected' : ''}>C</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">產業別</label>
+          <input type="text" name="industry" class="form-control" value="${(customer.industry || '').replace(/"/g, '&quot;')}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">往來狀態</label>
+          <select name="status" class="form-select">
+            <option value="往來中" ${customer.status === '往來中' ? 'selected' : ''}>往來中</option>
+            <option value="暫停往來" ${customer.status === '暫停往來' ? 'selected' : ''}>暫停往來</option>
+            <option value="已流失" ${customer.status === '已流失' ? 'selected' : ''}>已流失</option>
+          </select>
         </div>
         <div class="col-12">
           <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> 更新</button>

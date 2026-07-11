@@ -16,9 +16,13 @@ router.get('/', (req, res) => {
     const sortOrder = req.query.sortOrder || 'ASC';
     // 搜尋關鍵字
     const searchKeyword = req.query.search || '';
+    // 往來狀態篩選
+    const statusFilter = req.query.status || '';
 
     // 根據是否有搜尋關鍵字決定使用哪個方法（依角色權限範圍過濾）
-    let customers = searchKeyword ? Customer.search(searchKeyword, req.user) : Customer.findAll(req.user);
+    let customers = searchKeyword
+      ? Customer.search(searchKeyword, req.user, { status: statusFilter })
+      : Customer.findAll(req.user, { status: statusFilter });
     
     // 確保 customers 是陣列
     if (!Array.isArray(customers)) {
@@ -100,6 +104,7 @@ router.get('/', (req, res) => {
       sortLinks: sortLinks || {},
       sortIcons: sortIcons || {},
       searchKeyword: searchKeyword || '',
+      statusFilter,
       salespeople: Salesperson.findAll(),
       req: req,
       error: req.query.error || ''
@@ -159,6 +164,9 @@ router.post('/', (req, res) => {
       contact_phone: req.body.contact_phone,
       contact_email: req.body.contact_email,
       owner_salesperson_id: req.body.owner_salesperson_id || null,
+      customer_level: req.body.customer_level || null,
+      industry: req.body.industry,
+      status: req.body.status,
       userInfo: getUserInfo(req)
     });
     res.redirect('/customers');
@@ -264,6 +272,9 @@ router.post('/:id', (req, res) => {
       contact_phone: req.body.contact_phone,
       contact_email: req.body.contact_email,
       owner_salesperson_id: req.body.owner_salesperson_id || null,
+      customer_level: req.body.customer_level || null,
+      industry: req.body.industry,
+      status: req.body.status,
       userInfo: getUserInfo(req)
     });
     res.redirect(`/customers/${req.params.id}`);

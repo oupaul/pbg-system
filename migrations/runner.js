@@ -44,6 +44,7 @@ const MIGRATIONS = [
   'migrate_crm_pipeline_activity',
   'migrate_customer_contact_owner',
   'migrate_activity_reminder_days',
+  'migrate_customer_level_industry_status',
 ];
 
 function run() {

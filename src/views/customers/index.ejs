@@ -17,6 +17,15 @@ ${error ? `
   </div>
 ` : ''}
 
+<div class="mb-3">
+  <div class="btn-group" role="group">
+    <a href="/customers${searchKeyword ? '?search=' + encodeURIComponent(searchKeyword) : ''}" class="btn btn-sm ${!statusFilter ? 'btn-primary' : 'btn-outline-primary'}">全部</a>
+    <a href="/customers?status=${encodeURIComponent('往來中')}${searchKeyword ? '&search=' + encodeURIComponent(searchKeyword) : ''}" class="btn btn-sm ${statusFilter === '往來中' ? 'btn-success' : 'btn-outline-success'}">往來中</a>
+    <a href="/customers?status=${encodeURIComponent('暫停往來')}${searchKeyword ? '&search=' + encodeURIComponent(searchKeyword) : ''}" class="btn btn-sm ${statusFilter === '暫停往來' ? 'btn-warning' : 'btn-outline-warning'}">暫停往來</a>
+    <a href="/customers?status=${encodeURIComponent('已流失')}${searchKeyword ? '&search=' + encodeURIComponent(searchKeyword) : ''}" class="btn btn-sm ${statusFilter === '已流失' ? 'btn-secondary' : 'btn-outline-secondary'}">已流失</a>
+  </div>
+</div>
+
 <!-- 搜尋表單 -->
 <div class="card mb-4">
   <div class="card-body">
@@ -50,6 +59,7 @@ ${error ? `
         <input type="hidden" name="sortBy" value="${req.query.sortBy || 'company_name'}">
         <input type="hidden" name="sortOrder" value="${req.query.sortOrder || 'ASC'}">
       ` : ''}
+      ${statusFilter ? '<input type="hidden" name="status" value="' + statusFilter + '">' : ''}
     </form>
   </div>
 </div>
@@ -81,12 +91,14 @@ ${error ? `
               </a>
             </th>
             <th>負責業務</th>
+            <th class="text-center">等級</th>
+            <th>狀態</th>
           </tr>
         </thead>
         <tbody>
           ${(!customers || customers.length === 0) ? `
             <tr>
-              <td colspan="5" class="text-center text-muted py-3">
+              <td colspan="7" class="text-center text-muted py-3">
                 ${(typeof searchKeyword !== 'undefined' && searchKeyword) ? `找不到符合「<strong>${searchKeyword}</strong>」的客戶` : '尚無客戶'}
               </td>
             </tr>
@@ -97,6 +109,8 @@ ${error ? `
               <td><strong>${c.company_name || ''}</strong></td>
               <td class="text-center">${c.project_count || 0}</td>
               <td>${c.owner_salesperson_name || '-'}</td>
+              <td class="text-center">${c.customer_level ? '<span class="badge bg-' + (c.customer_level === 'A' ? 'success' : c.customer_level === 'B' ? 'warning' : 'secondary') + '">' + c.customer_level + '</span>' : '-'}</td>
+              <td><span class="badge bg-${c.status === '往來中' ? 'success' : c.status === '暫停往來' ? 'warning' : 'secondary'}">${c.status || '往來中'}</span></td>
             </tr>
           `).join('')}
         </tbody>
@@ -150,6 +164,30 @@ ${error ? `
             <div class="col-md-6 mb-3">
               <label class="form-label">聯絡信箱</label>
               <input type="email" name="contact_email" class="form-control">
+            </div>
+          </div>
+          <hr>
+          <div class="row g-2">
+            <div class="col-md-4 mb-3">
+              <label class="form-label">客戶等級</label>
+              <select name="customer_level" class="form-select">
+                <option value="">-- 未分級 --</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+              </select>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">產業別</label>
+              <input type="text" name="industry" class="form-control">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">往來狀態</label>
+              <select name="status" class="form-select">
+                <option value="往來中" selected>往來中</option>
+                <option value="暫停往來">暫停往來</option>
+                <option value="已流失">已流失</option>
+              </select>
             </div>
           </div>
         </div>

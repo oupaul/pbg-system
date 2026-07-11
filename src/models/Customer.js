@@ -53,18 +53,20 @@ function buildVisibilityCondition(user) {
 }
 
 const Customer = {
-  // 取得所有客戶（依角色權限範圍過濾）
-  findAll(user = null) {
+  // 取得所有客戶（依角色權限範圍過濾，可選擇依往來狀態篩選）
+  findAll(user = null, filters = {}) {
     const { condition, params } = buildVisibilityCondition(user);
+    const statusCond = filters.status ? ' AND c.status = ?' : '';
+    const statusParams = filters.status ? [filters.status] : [];
     return db.prepare(`
       SELECT c.*, COUNT(p.id) as project_count, s.name as owner_salesperson_name
       FROM customers c
       LEFT JOIN projects p ON c.id = p.customer_id
       LEFT JOIN salespeople s ON c.owner_salesperson_id = s.id
-      WHERE ${condition}
+      WHERE ${condition}${statusCond}
       GROUP BY c.id
       ORDER BY c.company_name
-    `).all(...params);
+    `).all(...params, ...statusParams);
   },
 
   // 依ID取得（傳入 user 時會依權限範圍檢查，超出範圍回傳 null）
@@ -95,24 +97,26 @@ const Customer = {
     return db.prepare(`SELECT * FROM customers WHERE tax_id = ?`).get(taxId);
   },
 
-  // 關鍵字搜尋（搜尋客戶編號、統一編號、公司名稱、聯絡人，依角色權限範圍過濾）
-  search(keyword, user = null) {
+  // 關鍵字搜尋（搜尋客戶編號、統一編號、公司名稱、聯絡人，依角色權限範圍過濾，可選擇依往來狀態篩選）
+  search(keyword, user = null, filters = {}) {
     if (!keyword || keyword.trim() === '') {
-      return this.findAll(user);
+      return this.findAll(user, filters);
     }
 
     const searchTerm = `%${keyword.trim()}%`;
     const { condition, params } = buildVisibilityCondition(user);
+    const statusCond = filters.status ? ' AND c.status = ?' : '';
+    const statusParams = filters.status ? [filters.status] : [];
     return db.prepare(`
       SELECT c.*, COUNT(p.id) as project_count, s.name as owner_salesperson_name
       FROM customers c
       LEFT JOIN projects p ON c.id = p.customer_id
       LEFT JOIN salespeople s ON c.owner_salesperson_id = s.id
-      WHERE ${condition}
+      WHERE ${condition}${statusCond}
         AND (c.customer_code LIKE ? OR c.tax_id LIKE ? OR c.company_name LIKE ? OR c.contact_name LIKE ?)
       GROUP BY c.id
       ORDER BY c.company_name
-    `).all(...params, searchTerm, searchTerm, searchTerm, searchTerm);
+    `).all(...params, ...statusParams, searchTerm, searchTerm, searchTerm, searchTerm);
   },
 
   // 新增客戶
@@ -130,9 +134,10 @@ const Customer = {
     const stmt = db.prepare(`
       INSERT INTO customers (
         customer_code, tax_id, company_name, is_new_customer,
-        contact_name, contact_phone, contact_email, owner_salesperson_id
+        contact_name, contact_phone, contact_email, owner_salesperson_id,
+        customer_level, industry, status
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     try {
@@ -144,7 +149,10 @@ const Customer = {
         data.contact_name || null,
         data.contact_phone || null,
         data.contact_email || null,
-        data.owner_salesperson_id || null
+        data.owner_salesperson_id || null,
+        data.customer_level || null,
+        data.industry || null,
+        data.status || '往來中'
       );
       
       const customerId = result.lastInsertRowid;
@@ -170,7 +178,10 @@ const Customer = {
         contact_name: data.contact_name || null,
         contact_phone: data.contact_phone || null,
         contact_email: data.contact_email || null,
-        owner_salesperson_id: data.owner_salesperson_id || null
+        owner_salesperson_id: data.owner_salesperson_id || null,
+        customer_level: data.customer_level || null,
+        industry: data.industry || null,
+        status: data.status || '往來中'
       }, data.userInfo);
       
       return customerId;
@@ -269,6 +280,30 @@ const Customer = {
       newData.owner_salesperson_id = data.owner_salesperson_id || null;
     } else {
       newData.owner_salesperson_id = oldRecord.owner_salesperson_id;
+    }
+
+    if (data.customer_level !== undefined) {
+      fields.push('customer_level = ?');
+      values.push(data.customer_level || null);
+      newData.customer_level = data.customer_level || null;
+    } else {
+      newData.customer_level = oldRecord.customer_level;
+    }
+
+    if (data.industry !== undefined) {
+      fields.push('industry = ?');
+      values.push(data.industry || null);
+      newData.industry = data.industry || null;
+    } else {
+      newData.industry = oldRecord.industry;
+    }
+
+    if (data.status !== undefined) {
+      fields.push('status = ?');
+      values.push(data.status || '往來中');
+      newData.status = data.status || '往來中';
+    } else {
+      newData.status = oldRecord.status;
     }
 
     // 如果沒有要更新的欄位，直接返回
