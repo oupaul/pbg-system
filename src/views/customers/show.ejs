@@ -52,13 +52,21 @@ ${success ? `
   <div class="col-md-3">
     <div class="card">
       <div class="card-body">
-        <h6 class="text-muted">接洽人員 / 聯絡人</h6>
+        <h6 class="text-muted"><i class="bi bi-person-badge"></i> 接洽人員（我方）</h6>
         <p class="fs-5 mb-0">${customer.owner_salesperson_name || '-'}</p>
-        <p class="text-muted small mb-0">${customer.contact_name || ''}${customer.contact_name && (customer.contact_phone || customer.contact_email) ? ' · ' : ''}${customer.contact_phone || ''}${customer.contact_phone && customer.contact_email ? ' · ' : ''}${customer.contact_email || ''}</p>
       </div>
     </div>
   </div>
   <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="text-muted"><i class="bi bi-person-lines-fill"></i> 客戶聯絡窗口（對方）</h6>
+        <p class="fs-5 mb-0">${customer.contact_name || '-'}</p>
+        <p class="text-muted small mb-0">${customer.contact_phone || ''}${customer.contact_phone && customer.contact_email ? ' · ' : ''}${customer.contact_email || ''}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-12">
     <div class="card bg-primary text-white">
       <div class="card-body text-center">
         <h6>專案數 / 總金額</h6>
@@ -216,7 +224,7 @@ ${locals.canEditCrm ? `
           <input type="text" name="company_name" class="form-control" value="${customer.company_name}" required>
         </div>
         <div class="col-md-4">
-          <label class="form-label">接洽人員</label>
+          <label class="form-label">接洽人員（我方負責業務）</label>
           <select name="owner_salesperson_id" class="form-select">
             <option value="">-- 選擇業務 --</option>
             ${(salespeople || []).map(s => {
@@ -226,7 +234,7 @@ ${locals.canEditCrm ? `
           </select>
         </div>
         <div class="col-md-4">
-          <label class="form-label">聯絡人</label>
+          <label class="form-label">聯絡人（對方窗口）</label>
           <input type="text" name="contact_name" class="form-control" value="${(customer.contact_name || '').replace(/"/g, '&quot;')}">
         </div>
         <div class="col-md-4">
