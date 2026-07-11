@@ -21,27 +21,91 @@ main {
   font-weight: bold;
 }
 
-/* 客戶/廠商類型階層式篩選：廠商底下再分個人/公司，用縮排＋連接線呈現父子關係 */
-.party-type-tree {
+/* 客戶/廠商類型階層式篩選：全部類型為根節點，往下分客戶／廠商，廠商再分個人／公司，
+   以類似組織圖的方框＋連接線呈現父子關係 */
+.party-type-tree,
+.party-type-tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
   display: flex;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  justify-content: center;
 }
 
-.party-type-tree .vendor-group {
+.party-type-tree {
+  padding-top: 0;
+}
+
+.party-type-tree li {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
+  padding: 1.75rem 0.75rem 0 0.75rem;
+  position: relative;
 }
 
-.party-type-tree .vendor-sub {
-  display: flex;
-  gap: 0.4rem;
-  margin-top: 0.4rem;
-  margin-left: 1.1rem;
-  padding-left: 0.75rem;
-  border-left: 2px solid #dee2e6;
+.party-type-tree li::before,
+.party-type-tree li::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: 1.75rem;
+  border-top: 2px solid #ced4da;
+}
+
+.party-type-tree li::after {
+  right: auto;
+  left: 50%;
+  border-left: 2px solid #ced4da;
+}
+
+.party-type-tree > li {
+  padding-top: 0;
+}
+
+.party-type-tree > li::before,
+.party-type-tree > li::after {
+  display: none;
+}
+
+.party-type-tree li:only-child {
+  padding-top: 0;
+}
+
+.party-type-tree li:only-child::before,
+.party-type-tree li:only-child::after {
+  display: none;
+}
+
+.party-type-tree li:first-child::before,
+.party-type-tree li:last-child::after {
+  border: 0 none;
+}
+
+.party-type-tree li:last-child::before {
+  border-right: 2px solid #ced4da;
+  border-radius: 0 6px 0 0;
+}
+
+.party-type-tree li:first-child::after {
+  border-radius: 6px 0 0 0;
+}
+
+.party-type-tree ul::before {
+  content: '';
+  position: absolute;
+  top: -1.75rem;
+  left: 50%;
+  width: 0;
+  height: 1.75rem;
+  border-left: 2px solid #ced4da;
+}
+
+.party-type-tree .btn {
+  white-space: nowrap;
 }
 
 /* 導覽列項目多，預設 Bootstrap 的淡白色文字彼此難以區分，

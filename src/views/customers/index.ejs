@@ -36,17 +36,27 @@ ${error ? `
   </div>
 ` : ''}
 
-<div class="mb-3 party-type-tree">
-  <a href="${buildFilterLink({ party_type: '', vendor_type: '' })}" class="btn btn-sm ${!partyTypeFilter ? 'btn-primary' : 'btn-outline-primary'}">全部類型</a>
-  <a href="${buildFilterLink({ party_type: '客戶', vendor_type: '' })}" class="btn btn-sm ${partyTypeFilter === '客戶' ? 'btn-info' : 'btn-outline-info'}">客戶</a>
-  <div class="vendor-group">
-    <a href="${buildFilterLink({ party_type: '廠商', vendor_type: '' })}" class="btn btn-sm ${partyTypeFilter === '廠商' && !vendorTypeFilter ? 'btn-dark' : 'btn-outline-dark'}">廠商</a>
-    <div class="vendor-sub">
-      <a href="${buildFilterLink({ party_type: '廠商', vendor_type: '個人' })}" class="btn btn-sm ${partyTypeFilter === '廠商' && vendorTypeFilter === '個人' ? 'btn-secondary' : 'btn-outline-secondary'}">個人</a>
-      <a href="${buildFilterLink({ party_type: '廠商', vendor_type: '公司' })}" class="btn btn-sm ${partyTypeFilter === '廠商' && vendorTypeFilter === '公司' ? 'btn-secondary' : 'btn-outline-secondary'}">公司</a>
-    </div>
-  </div>
-</div>
+<ul class="mb-3 party-type-tree">
+  <li>
+    <a href="${buildFilterLink({ party_type: '', vendor_type: '' })}" class="btn btn-sm ${!partyTypeFilter ? 'btn-primary' : 'btn-outline-primary'}">全部類型</a>
+    <ul>
+      <li>
+        <a href="${buildFilterLink({ party_type: '客戶', vendor_type: '' })}" class="btn btn-sm ${partyTypeFilter === '客戶' ? 'btn-info' : 'btn-outline-info'}">客戶</a>
+      </li>
+      <li>
+        <a href="${buildFilterLink({ party_type: '廠商', vendor_type: '' })}" class="btn btn-sm ${partyTypeFilter === '廠商' && !vendorTypeFilter ? 'btn-dark' : 'btn-outline-dark'}">廠商</a>
+        <ul>
+          <li>
+            <a href="${buildFilterLink({ party_type: '廠商', vendor_type: '個人' })}" class="btn btn-sm ${partyTypeFilter === '廠商' && vendorTypeFilter === '個人' ? 'btn-secondary' : 'btn-outline-secondary'}">個人</a>
+          </li>
+          <li>
+            <a href="${buildFilterLink({ party_type: '廠商', vendor_type: '公司' })}" class="btn btn-sm ${partyTypeFilter === '廠商' && vendorTypeFilter === '公司' ? 'btn-secondary' : 'btn-outline-secondary'}">公司</a>
+          </li>
+        </ul>
+      </li>
+    </ul>
+  </li>
+</ul>
 
 <!-- 搜尋表單 -->
 <div class="card mb-4">
