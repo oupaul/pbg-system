@@ -5,7 +5,7 @@ const Project = require('../models/Project');
 const Pipeline = require('../models/Pipeline');
 const Activity = require('../models/Activity');
 const DeletionRequest = require('../models/DeletionRequest');
-const Salesperson = require('../models/Salesperson');
+const User = require('../models/User');
 const db = require('../models/db');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireCrmEditPermission } = require('../middleware/auth');
@@ -134,7 +134,7 @@ router.get('/', (req, res) => {
       statusFilter,
       partyTypeFilter,
       vendorTypeFilter,
-      salespeople: Salesperson.findAll(),
+      staffUsers: User.findActive(),
       req: req,
       error: req.query.error || ''
     });
@@ -263,7 +263,7 @@ router.get('/:id', (req, res) => {
     pipelines,
     activities,
     pendingActivityDeletionIds,
-    salespeople: Salesperson.findAll(),
+    staffUsers: User.findActive(),
     error: req.query.error || '',
     success: req.query.success || ''
   });

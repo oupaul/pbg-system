@@ -7,20 +7,20 @@ const db = require('../models/db');
 const ActivityReminderService = {
   /**
    * @param {number} reminderDays - 超過幾天沒有活動紀錄視為需要追蹤
-   * @param {number|null} salespersonId - 僅回傳該業務負責的客戶，null 為全部
+   * @param {number|null} ownerUserId - 僅回傳該接洽人員（使用者）負責的客戶，null 為全部
    * @returns {Array}
    */
-  getOverdueCustomers(reminderDays = 14, salespersonId = null) {
-    const salespersonCond = salespersonId != null ? 'AND c.owner_salesperson_id = ?' : '';
-    const params = salespersonId != null ? [salespersonId] : [];
+  getOverdueCustomers(reminderDays = 14, ownerUserId = null) {
+    const ownerCond = ownerUserId != null ? 'AND c.owner_salesperson_id = ?' : '';
+    const params = ownerUserId != null ? [ownerUserId] : [];
 
     const rows = db.prepare(`
-      SELECT c.id, c.company_name, c.customer_code, s.name as owner_salesperson_name,
+      SELECT c.id, c.company_name, c.customer_code, u.name as owner_salesperson_name,
         MAX(a.activity_date) as last_activity_date
       FROM customers c
-      JOIN salespeople s ON c.owner_salesperson_id = s.id
+      JOIN users u ON c.owner_salesperson_id = u.id
       LEFT JOIN activities a ON a.customer_id = c.id AND a.deleted_at IS NULL
-      WHERE c.owner_salesperson_id IS NOT NULL ${salespersonCond}
+      WHERE c.owner_salesperson_id IS NOT NULL ${ownerCond}
       GROUP BY c.id
       HAVING last_activity_date IS NULL
           OR last_activity_date < datetime('now', 'localtime', '-' || ? || ' days')

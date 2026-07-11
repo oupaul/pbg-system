@@ -20,10 +20,10 @@ const Customer = {
     const vendorCond = filters.vendor_type ? ' AND c.vendor_type = ?' : '';
     const vendorParams = filters.vendor_type ? [filters.vendor_type] : [];
     return db.prepare(`
-      SELECT c.*, COUNT(p.id) as project_count, s.name as owner_salesperson_name
+      SELECT c.*, COUNT(p.id) as project_count, u.name as owner_salesperson_name
       FROM customers c
       LEFT JOIN projects p ON c.id = p.customer_id
-      LEFT JOIN salespeople s ON c.owner_salesperson_id = s.id
+      LEFT JOIN users u ON c.owner_salesperson_id = u.id
       WHERE 1=1${statusCond}${partyCond}${vendorCond}
       GROUP BY c.id
       ORDER BY c.company_name
@@ -33,9 +33,9 @@ const Customer = {
   // 依ID取得
   findById(id) {
     return db.prepare(`
-      SELECT c.*, s.name as owner_salesperson_name
+      SELECT c.*, u.name as owner_salesperson_name
       FROM customers c
-      LEFT JOIN salespeople s ON c.owner_salesperson_id = s.id
+      LEFT JOIN users u ON c.owner_salesperson_id = u.id
       WHERE c.id = ?
     `).get(id);
   },
@@ -64,10 +64,10 @@ const Customer = {
     const vendorCond = filters.vendor_type ? ' AND c.vendor_type = ?' : '';
     const vendorParams = filters.vendor_type ? [filters.vendor_type] : [];
     return db.prepare(`
-      SELECT c.*, COUNT(p.id) as project_count, s.name as owner_salesperson_name
+      SELECT c.*, COUNT(p.id) as project_count, u.name as owner_salesperson_name
       FROM customers c
       LEFT JOIN projects p ON c.id = p.customer_id
-      LEFT JOIN salespeople s ON c.owner_salesperson_id = s.id
+      LEFT JOIN users u ON c.owner_salesperson_id = u.id
       WHERE 1=1${statusCond}${partyCond}${vendorCond}
         AND (c.customer_code LIKE ? OR c.tax_id LIKE ? OR c.company_name LIKE ? OR c.contact_name LIKE ?)
       GROUP BY c.id

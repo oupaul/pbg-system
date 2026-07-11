@@ -50,6 +50,7 @@ const MIGRATIONS = [
   'migrate_customer_vendor_party_type',
   'migrate_customer_bank_info',
   'migrate_customer_address',
+  'migrate_customer_owner_to_user',
 ];
 
 function run() {

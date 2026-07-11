@@ -54,7 +54,7 @@ router.get('/', (req, res) => {
         const arSetting = db.prepare('SELECT setting_value FROM system_settings WHERE setting_key = ?').get('activity_reminder_days');
         if (arSetting) activityReminderDays = parseInt(arSetting.setting_value, 10) || 14;
       } catch (e) { /* use default */ }
-      activityReminders = ActivityReminderService.getOverdueCustomers(activityReminderDays, req.user.salesperson_id);
+      activityReminders = ActivityReminderService.getOverdueCustomers(activityReminderDays, req.user.id);
 
       // 開票提醒（業務員僅見自己專案）
       let notificationEnabled = true;
@@ -452,8 +452,8 @@ router.get('/', (req, res) => {
       const arSetting = db.prepare('SELECT setting_value FROM system_settings WHERE setting_key = ?').get('activity_reminder_days');
       if (arSetting) activityReminderDays = parseInt(arSetting.setting_value, 10) || 14;
     } catch (e) { /* use default */ }
-    const activitySalespersonFilter = (req.user.role === 'salesperson' && req.user.salesperson_id) ? req.user.salesperson_id : null;
-    activityReminders = ActivityReminderService.getOverdueCustomers(activityReminderDays, activitySalespersonFilter);
+    const activityOwnerFilter = (req.user.role === 'salesperson') ? req.user.id : null;
+    activityReminders = ActivityReminderService.getOverdueCustomers(activityReminderDays, activityOwnerFilter);
   }
 
   // 獨立類型區塊（all_and_separate 時，為每個 show_separate_dashboard 類型計算獨立統計）
