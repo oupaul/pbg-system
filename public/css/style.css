@@ -22,7 +22,9 @@ main {
 }
 
 /* 客戶/廠商類型階層式篩選：全部類型在最上層，往下分客戶／廠商，廠商再分個人／公司，
-   以縮排堆疊呈現層級關係（不畫連接線），整體靠左對齊 */
+   以縮排堆疊呈現層級關係（不畫連接線），整體靠左對齊。
+   個人/公司與廠商放在同一個 vendor-col 直向容器內，確保個人的起始位置
+   一定對齊廠商按鈕的左邊界，不受客戶/廠商文字寬度影響 */
 .party-type-tree {
   display: flex;
   flex-direction: column;
@@ -32,11 +34,15 @@ main {
 
 .party-type-tree .tree-row {
   display: flex;
+  align-items: flex-start;
   gap: 0.5rem;
 }
 
-.party-type-tree .tree-row-indent {
-  margin-left: 6.5rem;
+.party-type-tree .vendor-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
 }
 
 .party-type-tree .btn {
