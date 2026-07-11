@@ -20,11 +20,13 @@ router.get('/', (req, res) => {
     const searchKeyword = req.query.search || '';
     // 往來狀態篩選
     const statusFilter = req.query.status || '';
+    // 客戶/廠商身份篩選
+    const partyTypeFilter = req.query.party_type || '';
 
     // 根據是否有搜尋關鍵字決定使用哪個方法（依角色權限範圍過濾）
     let customers = searchKeyword
-      ? Customer.search(searchKeyword, req.user, { status: statusFilter })
-      : Customer.findAll(req.user, { status: statusFilter });
+      ? Customer.search(searchKeyword, req.user, { status: statusFilter, party_type: partyTypeFilter })
+      : Customer.findAll(req.user, { status: statusFilter, party_type: partyTypeFilter });
     
     // 確保 customers 是陣列
     if (!Array.isArray(customers)) {
@@ -101,12 +103,13 @@ router.get('/', (req, res) => {
     };
   
     res.render('customers/index', {
-      title: '客戶管理',
+      title: '客戶與廠商管理',
       customers: customers || [],
       sortLinks: sortLinks || {},
       sortIcons: sortIcons || {},
       searchKeyword: searchKeyword || '',
       statusFilter,
+      partyTypeFilter,
       salespeople: Salesperson.findAll(),
       req: req,
       error: req.query.error || ''
@@ -169,6 +172,8 @@ router.post('/', requireCrmEditPermission, (req, res) => {
       customer_level: req.body.customer_level || null,
       industry: req.body.industry,
       status: req.body.status,
+      party_type: req.body.party_type,
+      vendor_type: req.body.vendor_type,
       userInfo: getUserInfo(req)
     });
     res.redirect('/customers');
@@ -310,6 +315,8 @@ router.post('/:id', requireCrmEditPermission, (req, res) => {
       customer_level: req.body.customer_level || null,
       industry: req.body.industry,
       status: req.body.status,
+      party_type: req.body.party_type,
+      vendor_type: req.body.vendor_type,
       userInfo: getUserInfo(req)
     });
     res.redirect(`/customers/${req.params.id}`);

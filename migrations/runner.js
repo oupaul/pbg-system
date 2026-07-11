@@ -47,6 +47,7 @@ const MIGRATIONS = [
   'migrate_customer_level_industry_status',
   'migrate_crm_edit_permission',
   'migrate_deletion_requests',
+  'migrate_customer_vendor_party_type',
 ];
 
 function run() {

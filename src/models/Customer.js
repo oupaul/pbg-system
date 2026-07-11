@@ -14,6 +14,14 @@ function getAssignedSalespersonIds(userId) {
   }
 }
 
+// 正規化客戶/廠商身份欄位：vendor_type 僅在具備廠商身份（廠商/兩者皆是）時才有意義
+function normalizePartyFields(data) {
+  const partyType = ['客戶', '廠商', '兩者皆是'].includes(data.party_type) ? data.party_type : '客戶';
+  const hasVendorRole = partyType === '廠商' || partyType === '兩者皆是';
+  const vendorType = hasVendorRole && ['個人', '公司'].includes(data.vendor_type) ? data.vendor_type : null;
+  return { partyType, vendorType };
+}
+
 // 客戶可見條件：本人為負責業務，或客戶名下有任一專案/商機的業務為本人
 // （避免尚未設定 owner_salesperson_id 的既有客戶，因為新欄位而對原本手上有專案的業務變成不可見）
 function buildVisibilityCondition(user) {
@@ -53,20 +61,23 @@ function buildVisibilityCondition(user) {
 }
 
 const Customer = {
-  // 取得所有客戶（依角色權限範圍過濾，可選擇依往來狀態篩選）
+  // 取得所有客戶（依角色權限範圍過濾，可選擇依往來狀態/客戶廠商身份篩選）
   findAll(user = null, filters = {}) {
     const { condition, params } = buildVisibilityCondition(user);
     const statusCond = filters.status ? ' AND c.status = ?' : '';
     const statusParams = filters.status ? [filters.status] : [];
+    // party_type = '兩者皆是' 的資料同時具備客戶與廠商身份，篩選「客戶」或「廠商」時都要包含進來
+    const partyCond = filters.party_type ? ` AND (c.party_type = ? OR c.party_type = '兩者皆是')` : '';
+    const partyParams = filters.party_type ? [filters.party_type] : [];
     return db.prepare(`
       SELECT c.*, COUNT(p.id) as project_count, s.name as owner_salesperson_name
       FROM customers c
       LEFT JOIN projects p ON c.id = p.customer_id
       LEFT JOIN salespeople s ON c.owner_salesperson_id = s.id
-      WHERE ${condition}${statusCond}
+      WHERE ${condition}${statusCond}${partyCond}
       GROUP BY c.id
       ORDER BY c.company_name
-    `).all(...params, ...statusParams);
+    `).all(...params, ...statusParams, ...partyParams);
   },
 
   // 依ID取得（傳入 user 時會依權限範圍檢查，超出範圍回傳 null）
@@ -97,7 +108,7 @@ const Customer = {
     return db.prepare(`SELECT * FROM customers WHERE tax_id = ?`).get(taxId);
   },
 
-  // 關鍵字搜尋（搜尋客戶編號、統一編號、公司名稱、聯絡人，依角色權限範圍過濾，可選擇依往來狀態篩選）
+  // 關鍵字搜尋（搜尋客戶編號、統一編號、公司名稱、聯絡人，依角色權限範圍過濾，可選擇依往來狀態/客戶廠商身份篩選）
   search(keyword, user = null, filters = {}) {
     if (!keyword || keyword.trim() === '') {
       return this.findAll(user, filters);
@@ -107,16 +118,18 @@ const Customer = {
     const { condition, params } = buildVisibilityCondition(user);
     const statusCond = filters.status ? ' AND c.status = ?' : '';
     const statusParams = filters.status ? [filters.status] : [];
+    const partyCond = filters.party_type ? ` AND (c.party_type = ? OR c.party_type = '兩者皆是')` : '';
+    const partyParams = filters.party_type ? [filters.party_type] : [];
     return db.prepare(`
       SELECT c.*, COUNT(p.id) as project_count, s.name as owner_salesperson_name
       FROM customers c
       LEFT JOIN projects p ON c.id = p.customer_id
       LEFT JOIN salespeople s ON c.owner_salesperson_id = s.id
-      WHERE ${condition}${statusCond}
+      WHERE ${condition}${statusCond}${partyCond}
         AND (c.customer_code LIKE ? OR c.tax_id LIKE ? OR c.company_name LIKE ? OR c.contact_name LIKE ?)
       GROUP BY c.id
       ORDER BY c.company_name
-    `).all(...params, ...statusParams, searchTerm, searchTerm, searchTerm, searchTerm);
+    `).all(...params, ...statusParams, ...partyParams, searchTerm, searchTerm, searchTerm, searchTerm);
   },
 
   // 新增客戶
@@ -131,13 +144,15 @@ const Customer = {
       throw new Error('公司名稱不能為空');
     }
     
+    const { partyType, vendorType } = normalizePartyFields(data);
+
     const stmt = db.prepare(`
       INSERT INTO customers (
         customer_code, tax_id, company_name, is_new_customer,
         contact_name, contact_phone, contact_email, owner_salesperson_id,
-        customer_level, industry, status
+        customer_level, industry, status, party_type, vendor_type
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     try {
@@ -152,7 +167,9 @@ const Customer = {
         data.owner_salesperson_id || null,
         data.customer_level || null,
         data.industry || null,
-        data.status || '往來中'
+        data.status || '往來中',
+        partyType,
+        vendorType
       );
       
       const customerId = result.lastInsertRowid;
@@ -181,7 +198,9 @@ const Customer = {
         owner_salesperson_id: data.owner_salesperson_id || null,
         customer_level: data.customer_level || null,
         industry: data.industry || null,
-        status: data.status || '往來中'
+        status: data.status || '往來中',
+        party_type: partyType,
+        vendor_type: vendorType
       }, data.userInfo);
       
       return customerId;
@@ -304,6 +323,20 @@ const Customer = {
       newData.status = data.status || '往來中';
     } else {
       newData.status = oldRecord.status;
+    }
+
+    if (data.party_type !== undefined || data.vendor_type !== undefined) {
+      const { partyType, vendorType } = normalizePartyFields({
+        party_type: data.party_type !== undefined ? data.party_type : oldRecord.party_type,
+        vendor_type: data.vendor_type !== undefined ? data.vendor_type : oldRecord.vendor_type
+      });
+      fields.push('party_type = ?', 'vendor_type = ?');
+      values.push(partyType, vendorType);
+      newData.party_type = partyType;
+      newData.vendor_type = vendorType;
+    } else {
+      newData.party_type = oldRecord.party_type;
+      newData.vendor_type = oldRecord.vendor_type;
     }
 
     // 如果沒有要更新的欄位，直接返回

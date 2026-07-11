@@ -3,12 +3,14 @@
   <div class="col">
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb mb-0">
-        <li class="breadcrumb-item"><a href="/customers">客戶管理</a></li>
+        <li class="breadcrumb-item"><a href="/customers">客戶與廠商管理</a></li>
         <li class="breadcrumb-item active">${customer.company_name}</li>
       </ol>
     </nav>
     <h1 class="h3 mt-2">
       ${customer.company_name}
+      <span class="badge bg-${customer.party_type === '廠商' ? 'dark' : customer.party_type === '兩者皆是' ? 'primary' : 'info'} align-middle">${customer.party_type || '客戶'}</span>
+      ${customer.vendor_type ? '<span class="badge bg-secondary align-middle">' + customer.vendor_type + '</span>' : ''}
       ${customer.customer_level ? '<span class="badge bg-' + (customer.customer_level === 'A' ? 'success' : customer.customer_level === 'B' ? 'warning' : 'secondary') + ' align-middle">' + customer.customer_level + '級</span>' : ''}
       <span class="badge bg-${customer.status === '往來中' ? 'success' : customer.status === '暫停往來' ? 'warning' : 'secondary'} align-middle">${customer.status || '往來中'}</span>
     </h1>
@@ -185,6 +187,22 @@ ${locals.canEditCrm ? `
   <div class="card-body">
     <form action="/customers/${customer.id}" method="POST">
       <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">身份</label>
+          <select name="party_type" class="form-select" id="editPartyType" onchange="document.getElementById('editVendorTypeWrap').style.display = (this.value === '客戶') ? 'none' : '';">
+            <option value="客戶" ${(customer.party_type || '客戶') === '客戶' ? 'selected' : ''}>客戶</option>
+            <option value="廠商" ${customer.party_type === '廠商' ? 'selected' : ''}>廠商</option>
+            <option value="兩者皆是" ${customer.party_type === '兩者皆是' ? 'selected' : ''}>兩者皆是（客戶+廠商）</option>
+          </select>
+        </div>
+        <div class="col-md-4" id="editVendorTypeWrap" style="${(customer.party_type === '客戶' || !customer.party_type) ? 'display:none' : ''}">
+          <label class="form-label">廠商類型</label>
+          <select name="vendor_type" class="form-select">
+            <option value="" ${!customer.vendor_type ? 'selected' : ''}>-- 選擇類型 --</option>
+            <option value="個人" ${customer.vendor_type === '個人' ? 'selected' : ''}>個人</option>
+            <option value="公司" ${customer.vendor_type === '公司' ? 'selected' : ''}>公司</option>
+          </select>
+        </div>
         <div class="col-md-4">
           <label class="form-label">客戶編號</label>
           <input type="text" name="customer_code" class="form-control" value="${customer.customer_code}" required>
