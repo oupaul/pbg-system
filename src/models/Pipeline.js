@@ -53,10 +53,11 @@ const Pipeline = {
 
     return db.prepare(`
       SELECT p.*, c.company_name as customer_name, c.customer_code,
-             s.name as salesperson_name
+             s.name as salesperson_name, ou.name as owner_user_name
       FROM pipelines p
       LEFT JOIN customers c ON p.customer_id = c.id
       LEFT JOIN salespeople s ON p.salesperson_id = s.id
+      LEFT JOIN users ou ON p.owner_user_id = ou.id
       ${conditions}
       ORDER BY
         CASE p.status WHEN '洽談中' THEN 0 WHEN '已成交' THEN 1 ELSE 2 END,
@@ -68,10 +69,11 @@ const Pipeline = {
   findById(id) {
     return db.prepare(`
       SELECT p.*, c.company_name as customer_name, c.customer_code,
-             s.name as salesperson_name
+             s.name as salesperson_name, ou.name as owner_user_name
       FROM pipelines p
       LEFT JOIN customers c ON p.customer_id = c.id
       LEFT JOIN salespeople s ON p.salesperson_id = s.id
+      LEFT JOIN users ou ON p.owner_user_id = ou.id
       WHERE p.id = ? AND p.deleted_at IS NULL
     `).get(id);
   },
@@ -82,14 +84,15 @@ const Pipeline = {
 
     const stmt = db.prepare(`
       INSERT INTO pipelines (
-        customer_id, salesperson_id, opportunity_name, project_type,
+        customer_id, salesperson_id, owner_user_id, opportunity_name, project_type,
         estimated_amount, win_probability, expected_close_year_month, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
       parseInt(data.customer_id),
       data.salesperson_id ? parseInt(data.salesperson_id) : null,
+      data.owner_user_id ? parseInt(data.owner_user_id) : null,
       data.opportunity_name.trim(),
       data.project_type || null,
       data.estimated_amount !== undefined && data.estimated_amount !== null ? parseFloat(data.estimated_amount) : 0,
@@ -114,6 +117,7 @@ const Pipeline = {
     const setField = (col, val) => { fields.push(`${col} = ?`); values.push(val); };
 
     if (data.salesperson_id !== undefined) setField('salesperson_id', data.salesperson_id ? parseInt(data.salesperson_id) : null);
+    if (data.owner_user_id !== undefined) setField('owner_user_id', data.owner_user_id ? parseInt(data.owner_user_id) : null);
     if (data.opportunity_name !== undefined) setField('opportunity_name', data.opportunity_name.trim());
     if (data.project_type !== undefined) setField('project_type', data.project_type || null);
     if (data.estimated_amount !== undefined) setField('estimated_amount', parseFloat(data.estimated_amount) || 0);

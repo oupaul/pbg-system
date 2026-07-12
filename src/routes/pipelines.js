@@ -6,6 +6,7 @@ const DeletionRequest = require('../models/DeletionRequest');
 const Project = require('../models/Project');
 const Salesperson = require('../models/Salesperson');
 const Customer = require('../models/Customer');
+const User = require('../models/User');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireEditPermission, requireCrmEditPermission } = require('../middleware/auth');
 const cache = require('../services/CacheService');
@@ -50,6 +51,7 @@ router.get('/new', requireCrmEditPermission, (req, res) => {
     title: '新增潛在商機',
     pipeline: null,
     salespeople: Salesperson.findAll(),
+    staffUsers: User.findActive(),
     customers: Customer.findAll(),
     projectTypes: getActiveProjectTypes(),
     action: '/pipelines',
@@ -64,6 +66,7 @@ router.post('/', requireCrmEditPermission, (req, res) => {
     const id = Pipeline.create({
       customer_id: req.body.customer_id,
       salesperson_id: req.body.salesperson_id || null,
+      owner_user_id: req.body.owner_user_id || null,
       opportunity_name: req.body.opportunity_name,
       project_type: req.body.project_type || null,
       estimated_amount: req.body.estimated_amount,
@@ -110,6 +113,7 @@ router.get('/:id/edit', requireCrmEditPermission, (req, res) => {
     title: '編輯潛在商機',
     pipeline,
     salespeople: Salesperson.findAll(),
+    staffUsers: User.findActive(),
     customers: Customer.findAll(),
     projectTypes: getActiveProjectTypes(),
     action: `/pipelines/${pipeline.id}`,
@@ -123,6 +127,7 @@ router.post('/:id', requireCrmEditPermission, (req, res) => {
   try {
     Pipeline.update(req.params.id, {
       salesperson_id: req.body.salesperson_id || null,
+      owner_user_id: req.body.owner_user_id || null,
       opportunity_name: req.body.opportunity_name,
       project_type: req.body.project_type || null,
       estimated_amount: req.body.estimated_amount,

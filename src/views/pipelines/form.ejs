@@ -47,6 +47,17 @@ ${error ? `
             }).join('')}
           </select>
         </div>
+        <div class="col-md-6">
+          <label class="form-label">負責人員（使用者）</label>
+          <select name="owner_user_id" id="owner_user_id" class="form-select select2-dropdown">
+            <option value="">-- 選擇使用者 --</option>
+            ${(staffUsers || []).map(u => {
+              const selected = pipeline && pipeline.owner_user_id == u.id ? 'selected' : '';
+              const name = (u.name || '').replace(/"/g, '&quot;');
+              return '<option value="' + u.id + '" ' + selected + '>' + name + '</option>';
+            }).join('')}
+          </select>
+        </div>
 
         <div class="col-12">
           <label class="form-label">商機名稱 <span class="text-danger">*</span></label>
