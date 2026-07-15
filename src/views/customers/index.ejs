@@ -1,12 +1,54 @@
+<%
+  // 組合篩選連結，保留其他已套用的篩選條件與搜尋關鍵字
+  function buildFilterLink(overrides) {
+    const merged = {
+      search: (typeof searchKeyword !== 'undefined' ? searchKeyword : '') || '',
+      status: (typeof statusFilter !== 'undefined' ? statusFilter : '') || '',
+      party_type: (typeof partyTypeFilter !== 'undefined' ? partyTypeFilter : '') || '',
+      vendor_type: (typeof vendorTypeFilter !== 'undefined' ? vendorTypeFilter : '') || '',
+      ...overrides
+    };
+    const qs = Object.entries(merged)
+      .filter(([, v]) => v)
+      .map(([k, v]) => k + '=' + encodeURIComponent(v))
+      .join('&');
+    return '/customers' + (qs ? '?' + qs : '');
+  }
+%>
 <%- include('../layout', { body: `
 <div class="row mb-4">
   <div class="col">
-    <h1 class="h3"><i class="bi bi-building"></i> 客戶管理</h1>
+    <h1 class="h3"><i class="bi bi-building"></i> 客戶與廠商管理</h1>
   </div>
   <div class="col-auto">
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newCustomerModal">
-      <i class="bi bi-plus-lg"></i> 新增客戶
-    </button>
+    ${locals.canEditCrm ? `
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newCustomerModal">
+        <i class="bi bi-plus-lg"></i> 新增客戶/廠商
+      </button>
+    ` : ''}
+  </div>
+</div>
+
+${error ? `
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle"></i> ${error}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+<div class="mb-3 party-type-tree">
+  <div class="tree-row">
+    <a href="${buildFilterLink({ party_type: '', vendor_type: '' })}" class="btn btn-sm ${!partyTypeFilter ? 'btn-primary' : 'btn-outline-primary'}">全部類型</a>
+  </div>
+  <div class="tree-row">
+    <a href="${buildFilterLink({ party_type: '客戶', vendor_type: '' })}" class="btn btn-sm ${partyTypeFilter === '客戶' ? 'btn-info' : 'btn-outline-info'}">客戶</a>
+    <div class="vendor-col">
+      <a href="${buildFilterLink({ party_type: '廠商', vendor_type: '' })}" class="btn btn-sm ${partyTypeFilter === '廠商' && !vendorTypeFilter ? 'btn-dark' : 'btn-outline-dark'}">廠商</a>
+      <div class="tree-row">
+        <a href="${buildFilterLink({ party_type: '廠商', vendor_type: '個人' })}" class="btn btn-sm ${partyTypeFilter === '廠商' && vendorTypeFilter === '個人' ? 'btn-secondary' : 'btn-outline-secondary'}">個人</a>
+        <a href="${buildFilterLink({ party_type: '廠商', vendor_type: '公司' })}" class="btn btn-sm ${partyTypeFilter === '廠商' && vendorTypeFilter === '公司' ? 'btn-secondary' : 'btn-outline-secondary'}">公司</a>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -43,6 +85,9 @@
         <input type="hidden" name="sortBy" value="${req.query.sortBy || 'company_name'}">
         <input type="hidden" name="sortOrder" value="${req.query.sortOrder || 'ASC'}">
       ` : ''}
+      ${statusFilter ? '<input type="hidden" name="status" value="' + statusFilter + '">' : ''}
+      ${partyTypeFilter ? '<input type="hidden" name="party_type" value="' + partyTypeFilter + '">' : ''}
+      ${vendorTypeFilter ? '<input type="hidden" name="vendor_type" value="' + vendorTypeFilter + '">' : ''}
     </form>
   </div>
 </div>
@@ -73,12 +118,32 @@
                 專案數${(sortIcons && sortIcons.project_count) || ''}
               </a>
             </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.party_type) || ''}" class="text-white text-decoration-none">
+                類型${(sortIcons && sortIcons.party_type) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.owner_salesperson_name) || ''}" class="text-white text-decoration-none">
+                接洽人員${(sortIcons && sortIcons.owner_salesperson_name) || ''}
+              </a>
+            </th>
+            <th class="text-center">
+              <a href="?${(sortLinks && sortLinks.customer_level) || ''}" class="text-white text-decoration-none">
+                等級${(sortIcons && sortIcons.customer_level) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.status) || ''}" class="text-white text-decoration-none">
+                狀態${(sortIcons && sortIcons.status) || ''}
+              </a>
+            </th>
           </tr>
         </thead>
         <tbody>
           ${(!customers || customers.length === 0) ? `
             <tr>
-              <td colspan="4" class="text-center text-muted py-3">
+              <td colspan="8" class="text-center text-muted py-3">
                 ${(typeof searchKeyword !== 'undefined' && searchKeyword) ? `找不到符合「<strong>${searchKeyword}</strong>」的客戶` : '尚無客戶'}
               </td>
             </tr>
@@ -88,6 +153,13 @@
               <td>${c.tax_id || '-'}</td>
               <td><strong>${c.company_name || ''}</strong></td>
               <td class="text-center">${c.project_count || 0}</td>
+              <td>
+                <span class="badge bg-${c.party_type === '廠商' ? 'dark' : c.party_type === '兩者皆是' ? 'primary' : 'info'}">${c.party_type || '客戶'}</span>
+                ${c.vendor_type ? '<span class="badge bg-secondary">' + c.vendor_type + '</span>' : ''}
+              </td>
+              <td>${c.owner_salesperson_name || '-'}</td>
+              <td class="text-center">${c.customer_level ? '<span class="badge bg-' + (c.customer_level === 'A' ? 'success' : c.customer_level === 'B' ? 'warning' : 'secondary') + '">' + c.customer_level + '</span>' : '-'}</td>
+              <td><span class="badge bg-${c.status === '往來中' ? 'success' : c.status === '暫停往來' ? 'warning' : 'secondary'}">${c.status || '往來中'}</span></td>
             </tr>
           `).join('')}
         </tbody>
@@ -95,7 +167,7 @@
     </div>
   </div>
   <div class="card-footer text-muted">
-    ${(typeof searchKeyword !== 'undefined' && searchKeyword) ? `搜尋「<strong>${searchKeyword}</strong>」結果：共 ${(customers || []).length} 位客戶` : `共 ${(customers || []).length} 位客戶`}
+    ${(typeof searchKeyword !== 'undefined' && searchKeyword) ? `搜尋「<strong>${searchKeyword}</strong>」結果：共 ${(customers || []).length} 筆` : `共 ${(customers || []).length} 筆`}
   </div>
 </div>
 
@@ -105,10 +177,26 @@
     <div class="modal-content">
       <form action="/customers" method="POST">
         <div class="modal-header">
-          <h5 class="modal-title">新增客戶</h5>
+          <h5 class="modal-title">新增客戶/廠商</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">類型 <span class="text-danger">*</span></label>
+            <select name="party_type" class="form-select" id="newPartyType" onchange="document.getElementById('newVendorTypeWrap').style.display = (this.value === '客戶') ? 'none' : '';">
+              <option value="客戶" selected>客戶</option>
+              <option value="廠商">廠商</option>
+              <option value="兩者皆是">兩者皆是（客戶+廠商）</option>
+            </select>
+          </div>
+          <div class="mb-3" id="newVendorTypeWrap" style="display:none">
+            <label class="form-label">廠商類型</label>
+            <select name="vendor_type" class="form-select">
+              <option value="">-- 選擇類型 --</option>
+              <option value="個人">個人</option>
+              <option value="公司">公司</option>
+            </select>
+          </div>
           <div class="mb-3">
             <label class="form-label">客戶編號</label>
             <input type="text" name="customer_code" class="form-control" required>
@@ -120,6 +208,66 @@
           <div class="mb-3">
             <label class="form-label">公司名稱</label>
             <input type="text" name="company_name" class="form-control" required>
+          </div>
+          <hr>
+          <div class="mb-3">
+            <label class="form-label">接洽人員</label>
+            <select name="owner_salesperson_id" class="form-select">
+              <option value="">-- 選擇使用者 --</option>
+              ${(staffUsers || []).map(u => '<option value="' + u.id + '">' + (u.name || '').replace(/"/g, '&quot;') + '</option>').join('')}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">聯絡人</label>
+            <input type="text" name="contact_name" class="form-control">
+          </div>
+          <div class="row g-2">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">聯絡電話</label>
+              <input type="text" name="contact_phone" class="form-control">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">聯絡信箱</label>
+              <input type="email" name="contact_email" class="form-control">
+            </div>
+          </div>
+          <div class="row g-2">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">銀行名稱</label>
+              <input type="text" name="bank_name" class="form-control">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">銀行帳號</label>
+              <input type="text" name="bank_account" class="form-control">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">地址</label>
+            <input type="text" name="address" class="form-control">
+          </div>
+          <hr>
+          <div class="row g-2">
+            <div class="col-md-4 mb-3">
+              <label class="form-label">客戶等級</label>
+              <select name="customer_level" class="form-select">
+                <option value="">-- 未分級 --</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+              </select>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">產業別</label>
+              <input type="text" name="industry" class="form-control">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">往來狀態</label>
+              <select name="status" class="form-select">
+                <option value="往來中" selected>往來中</option>
+                <option value="暫停往來">暫停往來</option>
+                <option value="已流失">已流失</option>
+              </select>
+            </div>
           </div>
         </div>
         <div class="modal-footer">

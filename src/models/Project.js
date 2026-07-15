@@ -184,6 +184,44 @@ const Project = {
     return project;
   },
 
+  // 判斷單一專案是否在使用者的權限範圍內（與 findAll/findById 同一套 project_view_scope 邏輯）
+  _isInScope(project, user) {
+    if (!user) return true;
+    const scope = user.project_view_scope ||
+      (user.role === ROLES.SALESPERSON ? PROJECT_VIEW_SCOPE.OWN : PROJECT_VIEW_SCOPE.ALL);
+
+    if (scope === PROJECT_VIEW_SCOPE.ALL) return true;
+    if (scope === PROJECT_VIEW_SCOPE.NONE) return false;
+    if (scope === PROJECT_VIEW_SCOPE.OWN) return !!user.salesperson_id && project.salesperson_id === user.salesperson_id;
+    if (scope === PROJECT_VIEW_SCOPE.ASSIGNED) return getAssignedSalespersonIds(user.id).includes(project.salesperson_id);
+    return false;
+  },
+
+  // 依客戶ID取得專案列表（供客戶詳情頁使用）。
+  // 客戶詳情頁的專案列表對所有看得到該客戶的人開放（客戶/廠商主檔本身即無角色限制），
+  // 但個別專案是否在使用者的 project_view_scope 範圍內則各自判斷：不在範圍內的專案
+  // 標記為 _locked（金額欄位清空、前端不可點入查看更多），而非整筆從清單中過濾掉。
+  findByCustomerId(customerId, user = null) {
+    const rows = db.prepare(`
+      SELECT * FROM v_project_summary
+      WHERE customer_id = ?
+      ORDER BY contract_year DESC, contract_month DESC
+    `).all(customerId);
+
+    return rows.map(p => {
+      if (this._isInScope(p, user)) return { ...p, _locked: false };
+      return {
+        ...p,
+        _locked: true,
+        price_with_tax: null,
+        price_without_tax: null,
+        total_invoiced: null,
+        total_received: null,
+        uninvoiced_amount: null
+      };
+    });
+  },
+
   // 依專案編號取得（舊方法，保留向後兼容）
   findByCode(code) {
     return db.prepare(`SELECT * FROM projects WHERE project_code = ? LIMIT 1`).get(code);
@@ -430,14 +468,18 @@ const Project = {
   },
 
   // 取得專案統計
-  // excludeSalespersonIds: 保留相容用，不再使用
+  // salespersonId: 僅統計該業務員名下的專案（業務員儀表板依權限範圍過濾用）
   // excludeTypeNames: 排除的專案類型名稱陣列（儀表板主區塊排除獨立加總類型）
-  getStatistics(year = null, excludeSalespersonIds = null, excludeTypeNames = null) {
+  getStatistics(year = null, salespersonId = null, excludeTypeNames = null) {
     const conditions = [];
     const params = [];
     if (year) {
       conditions.push('contract_year = ?');
       params.push(year);
+    }
+    if (salespersonId) {
+      conditions.push('salesperson_id = ?');
+      params.push(salespersonId);
     }
     if (excludeTypeNames && excludeTypeNames.length > 0) {
       conditions.push('(project_type IS NULL OR project_type NOT IN (' + excludeTypeNames.map(() => '?').join(',') + '))');
@@ -465,6 +507,10 @@ const Project = {
     if (year) {
       typeConditions.push('contract_year = ?');
       typeParams.push(year);
+    }
+    if (salespersonId) {
+      typeConditions.push('salesperson_id = ?');
+      typeParams.push(salespersonId);
     }
     if (excludeTypeNames && excludeTypeNames.length > 0) {
       typeConditions.push('(project_type IS NULL OR project_type NOT IN (' + excludeTypeNames.map(() => '?').join(',') + '))');

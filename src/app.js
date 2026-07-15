@@ -114,7 +114,10 @@ app.use((req, res, next) => {
   // 將閒置登出配置傳遞給所有視圖
   res.locals.idleTimeoutMinutes = getSystemSetting('idle_timeout_minutes', 30);
   res.locals.idleWarningMinutes = getSystemSetting('idle_warning_minutes', 2);
-  
+
+  // 目前路徑，供導覽列標示當前所在頁面使用
+  res.locals.currentPath = req.path;
+
   next();
 });
 
@@ -170,6 +173,10 @@ try {
   console.log('[啟動] ✓ salesPerformance 路由載入完成');
   const grossProfitRoutes = require('./routes/grossProfit');
   console.log('[啟動] ✓ grossProfit 路由載入完成');
+  const pipelineRoutes = require('./routes/pipelines');
+  console.log('[啟動] ✓ pipelines 路由載入完成');
+  const deletionRequestRoutes = require('./routes/deletionRequests');
+  console.log('[啟動] ✓ deletionRequests 路由載入完成');
 
   // 認證路由（不需要登入）- 必須在其他路由之前
   // authRoutes 內部已經定義了 /login 和 /logout 路徑
@@ -184,6 +191,8 @@ try {
   app.use('/bonuses', requireAuth, bonusRoutes);
   app.use('/salespeople', requireAuth, salespersonRoutes);
   app.use('/customers', requireAuth, customerRoutes);
+  app.use('/pipelines', requireAuth, pipelineRoutes);
+  app.use('/deletion-requests', requireAuth, deletionRequestRoutes);
   app.use('/import-export', requireAuth, requireImportExport, importExportRoutes(upload));
   app.use('/audit-logs', requireAuth, auditLogRoutes);
   app.use('/users', requireAuth, userRoutes);

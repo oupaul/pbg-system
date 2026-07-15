@@ -14,25 +14,39 @@ const SalesPerformanceService = {
     const yearCondition = year ? 'AND p.contract_year = ?' : '';
     const params = year ? [year] : [];
 
+    // 洽談中商機預估營收（先彙總成一列一業務，避免與 projects join 交叉相乘）
+    const pipelineYearCondition = year ? "AND substr(pl.expected_close_year_month, 1, 4) = ?" : '';
+    const pipelineParams = year ? [String(year)] : [];
+
     const sql = `
-      SELECT 
+      SELECT
         s.id,
         s.name,
         COUNT(DISTINCT p.id) as project_count,
         COALESCE(SUM(p.price_with_tax), 0) as total_price,
         COALESCE(SUM(v.total_invoiced), 0) as total_invoiced,
         COALESCE(SUM(v.total_received), 0) as total_received,
-        COALESCE(SUM(p.sales_discount), 0) as total_sales_discount
+        COALESCE(SUM(p.sales_discount), 0) as total_sales_discount,
+        COALESCE(pf.pipeline_count, 0) as pipeline_count,
+        COALESCE(pf.pipeline_amount, 0) as pipeline_amount
       FROM salespeople s
       LEFT JOIN projects p ON s.id = p.salesperson_id ${yearCondition}
       LEFT JOIN v_project_summary v ON p.id = v.id
-      WHERE s.status = 'active' OR p.id IS NOT NULL
+      LEFT JOIN (
+        SELECT pl.salesperson_id,
+          COUNT(*) as pipeline_count,
+          COALESCE(SUM(pl.estimated_amount), 0) as pipeline_amount
+        FROM pipelines pl
+        WHERE pl.status = '洽談中' AND pl.deleted_at IS NULL ${pipelineYearCondition}
+        GROUP BY pl.salesperson_id
+      ) pf ON pf.salesperson_id = s.id
+      WHERE s.status = 'active' OR p.id IS NOT NULL OR pf.salesperson_id IS NOT NULL
       GROUP BY s.id
-      HAVING project_count > 0 OR total_price > 0
+      HAVING project_count > 0 OR total_price > 0 OR pipeline_count > 0
       ORDER BY total_invoiced DESC, total_price DESC
     `;
 
-    const rows = db.prepare(sql).all(...params);
+    const rows = db.prepare(sql).all(...params, ...pipelineParams);
 
     // 取得獎金彙總
     const bonusSql = year
@@ -73,9 +87,34 @@ const SalesPerformanceService = {
         total_sales_discount: salesDiscount,
         total_unpaid: totalUnpaid,
         uninvoiced_amount: Math.max(0, (r.total_price || 0) - totalInvoiced),
+        pipeline_count: r.pipeline_count || 0,
+        pipeline_amount: r.pipeline_amount || 0,
         ...bonus
       };
     });
+  },
+
+  /**
+   * 取得全公司潛在商機總覽：洽談中預估營收、已成交但尚未轉入專案的商機（提醒財務盡快處理）
+   * @returns {{open_count:number, open_amount:number, won_pending_count:number, won_pending_amount:number}}
+   */
+  getPipelineSummary() {
+    const open = db.prepare(`
+      SELECT COUNT(*) as count, COALESCE(SUM(estimated_amount), 0) as amount
+      FROM pipelines WHERE status = '洽談中' AND deleted_at IS NULL
+    `).get();
+
+    const wonPending = db.prepare(`
+      SELECT COUNT(*) as count, COALESCE(SUM(estimated_amount), 0) as amount
+      FROM pipelines WHERE status = '已成交' AND converted_project_id IS NULL AND deleted_at IS NULL
+    `).get();
+
+    return {
+      open_count: open.count || 0,
+      open_amount: open.amount || 0,
+      won_pending_count: wonPending.count || 0,
+      won_pending_amount: wonPending.amount || 0
+    };
   }
 };
 

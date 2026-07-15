@@ -15,10 +15,12 @@ router.get('/', (req, res) => {
   const selectedYear = req.query.year && req.query.year !== 'all' ? parseInt(req.query.year) : null;
 
   const performance = SalesPerformanceService.getPerformanceBySalesperson(selectedYear);
+  const pipelineSummary = SalesPerformanceService.getPipelineSummary();
 
   res.render('sales-performance/index', {
     title: '業務績效儀表板',
     performance,
+    pipelineSummary,
     years,
     selectedYear: selectedYear ? selectedYear : 'all'
   });

@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../models/db');
 const Project = require('../models/Project');
 const ReceivablesAgingService = require('../services/ReceivablesAgingService');
+const ActivityReminderService = require('../services/ActivityReminderService');
 const Role = require('../models/Role');
 const cache = require('../services/CacheService');
 
@@ -30,6 +31,7 @@ router.get('/', (req, res) => {
   // dashboard_view_mode = 'none'：顯示歡迎頁（不顯示儀表板），但業務員仍顯示收款提醒與開票提醒
   if (dashboardMode === 'none') {
     let paymentReminder = { upcoming: [], overdue: [] };
+    let activityReminders = [];
     let upcomingInvoiceProjects = [];
     let overdueInvoiceProjects = [];
     let showNotification = false;
@@ -45,6 +47,14 @@ router.get('/', (req, res) => {
         if (reminderSetting) paymentReminderDays = parseInt(reminderSetting.setting_value, 10) || 7;
       } catch (e) { /* use default */ }
       paymentReminder = ReceivablesAgingService.getPaymentReminder(paymentReminderDays, null, req.user.salesperson_id);
+
+      // 客戶追蹤提醒（業務員僅見自己負責的客戶）
+      let activityReminderDays = 14;
+      try {
+        const arSetting = db.prepare('SELECT setting_value FROM system_settings WHERE setting_key = ?').get('activity_reminder_days');
+        if (arSetting) activityReminderDays = parseInt(arSetting.setting_value, 10) || 14;
+      } catch (e) { /* use default */ }
+      activityReminders = ActivityReminderService.getOverdueCustomers(activityReminderDays, req.user.id);
 
       // 開票提醒（業務員僅見自己專案）
       let notificationEnabled = true;
@@ -97,6 +107,7 @@ router.get('/', (req, res) => {
       years: Project.getYears(),
       selectedYear: 'all',
       paymentReminder,
+      activityReminders,
       upcomingInvoiceProjects: [...upcomingInvoiceProjects, ...overdueInvoiceProjects],
       overdueInvoiceProjects,
       showNotification,
@@ -109,6 +120,14 @@ router.get('/', (req, res) => {
   const currentYear = new Date().getFullYear();
   const years = Project.getYears();
   const selectedYear = req.query.year && req.query.year !== 'all' ? parseInt(req.query.year) : null;
+
+  // 業務員儀表板僅顯示自己負責的專案（admin/user/boss 仍看得到全公司資料）
+  const salespersonId = (req.user && req.user.role === 'salesperson' && req.user.salesperson_id)
+    ? req.user.salesperson_id : null;
+  const spCondP = salespersonId ? ' AND p.salesperson_id = ?' : '';
+  const spCondPlain = salespersonId ? ' AND salesperson_id = ?' : '';
+  const spCondV = salespersonId ? ' AND v.salesperson_id = ?' : '';
+  const spParam = salespersonId ? [salespersonId] : [];
 
   const separateTypeNames = getSeparateTypeNames();
   // 主區塊排除獨立加總類型：exclude_separate 時排除；all_and_separate 時也排除，避免與獨立區塊重複計算
@@ -130,12 +149,12 @@ router.get('/', (req, res) => {
     typeColorMap = {};
   }
   
-  // 取得統計資料（排除獨立加總類型，避免重複計算）
+  // 取得統計資料（排除獨立加總類型，避免重複計算；業務員僅計算自己名下專案）
   const excludeTypeNames = excludeFromMain ? separateTypeNames : null;
-  const statsCacheKey = `dashboard:stats:${selectedYear || 'all'}:${(excludeTypeNames || []).join(',')}`;
+  const statsCacheKey = `dashboard:stats:${selectedYear || 'all'}:${(excludeTypeNames || []).join(',')}:${salespersonId || 'all'}`;
   let stats = cache.get(statsCacheKey);
   if (stats === undefined) {
-    stats = Project.getStatistics(selectedYear, null, excludeTypeNames);
+    stats = Project.getStatistics(selectedYear, salespersonId, excludeTypeNames);
     cache.set(statsCacheKey, stats, 5 * 60 * 1000);
   }
   
@@ -190,7 +209,7 @@ router.get('/', (req, res) => {
     projectTypeStats = [];
   }
 
-  // 取得最近專案（主區塊排除獨立加總類型時需過濾）
+  // 取得最近專案（主區塊排除獨立加總類型時需過濾；業務員僅顯示自己名下專案）
   let recentProjects;
   if (excludeFromMain && separateTypeNames.length > 0) {
     const yearCond = selectedYear ? 'p.contract_year = ?' : '1=1';
@@ -198,40 +217,40 @@ router.get('/', (req, res) => {
     recentProjects = db.prepare(`
       SELECT v.* FROM v_project_summary v
       JOIN projects p ON v.id = p.id
-      WHERE ${yearCond} AND (p.project_type IS NULL OR p.project_type NOT IN (${separateTypeNames.map(() => '?').join(',')}))
-      ORDER BY v.updated_at DESC 
+      WHERE ${yearCond} AND (p.project_type IS NULL OR p.project_type NOT IN (${separateTypeNames.map(() => '?').join(',')}))${spCondP}
+      ORDER BY v.updated_at DESC
       LIMIT 10
-    `).all(...params);
+    `).all(...params, ...spParam);
   } else if (selectedYear) {
-    recentProjects = db.prepare(`SELECT * FROM v_project_summary WHERE contract_year = ? ORDER BY updated_at DESC LIMIT 10`).all(selectedYear);
+    recentProjects = db.prepare(`SELECT * FROM v_project_summary v WHERE v.contract_year = ?${spCondV} ORDER BY v.updated_at DESC LIMIT 10`).all(selectedYear, ...spParam);
   } else {
-    recentProjects = db.prepare(`SELECT * FROM v_project_summary ORDER BY updated_at DESC LIMIT 10`).all();
+    recentProjects = db.prepare(`SELECT * FROM v_project_summary v WHERE 1=1${spCondV} ORDER BY v.updated_at DESC LIMIT 10`).all(...spParam);
   }
 
   // 取得獎金統計
   let bonusStats;
   if (selectedYear) {
     bonusStats = db.prepare(`
-      SELECT 
+      SELECT
         SUM(bc.bonus_amount) as total_bonus,
         SUM(CASE WHEN bc.status = '已發放' THEN bc.bonus_amount ELSE 0 END) as paid_bonus,
         SUM(CASE WHEN bc.status = '待發放' THEN bc.bonus_amount ELSE 0 END) as pending_bonus,
         SUM(CASE WHEN bc.status = '充公' THEN bc.bonus_amount ELSE 0 END) as forfeited_bonus
       FROM bonus_calculations bc
       JOIN projects p ON bc.project_id = p.id
-      WHERE p.contract_year = ? ${excludeCond}
-    `).get(selectedYear, ...excludeCondParams);
+      WHERE p.contract_year = ? ${excludeCond}${spCondP}
+    `).get(selectedYear, ...excludeCondParams, ...spParam);
   } else {
     bonusStats = db.prepare(`
-      SELECT 
+      SELECT
         SUM(bc.bonus_amount) as total_bonus,
         SUM(CASE WHEN bc.status = '已發放' THEN bc.bonus_amount ELSE 0 END) as paid_bonus,
         SUM(CASE WHEN bc.status = '待發放' THEN bc.bonus_amount ELSE 0 END) as pending_bonus,
         SUM(CASE WHEN bc.status = '充公' THEN bc.bonus_amount ELSE 0 END) as forfeited_bonus
       FROM bonus_calculations bc
       JOIN projects p ON bc.project_id = p.id
-      WHERE 1=1 ${excludeCond}
-    `).get(...excludeCondParams);
+      WHERE 1=1 ${excludeCond}${spCondP}
+    `).get(...excludeCondParams, ...spParam);
   }
   
   bonusStats = bonusStats || {
@@ -245,24 +264,24 @@ router.get('/', (req, res) => {
   let invoiceStats;
   if (selectedYear) {
     invoiceStats = db.prepare(`
-      SELECT 
+      SELECT
         COALESCE(SUM(i.amount_with_tax - COALESCE(i.allowance_amount, 0)), 0) as total_invoiced,
         COUNT(DISTINCT i.project_id) as projects_with_invoices,
         COUNT(i.id) as invoice_count
       FROM invoices i
       JOIN projects p ON i.project_id = p.id
-      WHERE p.contract_year = ? AND (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) ${excludeCond}
-    `).get(selectedYear, ...excludeCondParams);
+      WHERE p.contract_year = ? AND (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) ${excludeCond}${spCondP}
+    `).get(selectedYear, ...excludeCondParams, ...spParam);
   } else {
     invoiceStats = db.prepare(`
-      SELECT 
+      SELECT
         COALESCE(SUM(i.amount_with_tax - COALESCE(i.allowance_amount, 0)), 0) as total_invoiced,
         COUNT(DISTINCT i.project_id) as projects_with_invoices,
         COUNT(i.id) as invoice_count
       FROM invoices i
       JOIN projects p ON i.project_id = p.id
-      WHERE (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) ${excludeCond}
-    `).get(...excludeCondParams);
+      WHERE (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) ${excludeCond}${spCondP}
+    `).get(...excludeCondParams, ...spParam);
   }
   
   invoiceStats = invoiceStats || {
@@ -271,49 +290,50 @@ router.get('/', (req, res) => {
     invoice_count: 0
   };
 
-  // 取得收款統計（已收款總額，考慮匯費差異）
+  // 取得收款統計（已收款總額，考慮匯費差異；業務員僅計算自己名下專案）
   let paymentStats;
   const Payment = require('../models/Payment');
+  const needsProjectJoin = excludeFromMain || !!salespersonId;
   if (selectedYear) {
     const payments = db.prepare(`
       SELECT pm.bank_deposit_amount, pm.payment_difference, pm.difference_type
       FROM payments pm
       JOIN projects p ON pm.project_id = p.id
-      WHERE p.contract_year = ? AND (pm.deleted_at IS NULL) ${excludeCond}
-    `).all(selectedYear, ...excludeCondParams);
-    
+      WHERE p.contract_year = ? AND (pm.deleted_at IS NULL) ${excludeCond}${spCondP}
+    `).all(selectedYear, ...excludeCondParams, ...spParam);
+
     const totalReceived = payments.reduce((sum, p) => {
       return sum + Payment.calculateActualReceived(p);
     }, 0);
-    
+
     const salesDiscountResult = db.prepare(`
       SELECT COALESCE(SUM(p.sales_discount), 0) as total_sales_discount
       FROM projects p
-      WHERE p.contract_year = ? ${excludeCond}
-    `).get(selectedYear, ...excludeCondParams);
-    
+      WHERE p.contract_year = ? ${excludeCond}${spCondP}
+    `).get(selectedYear, ...excludeCondParams, ...spParam);
+
     paymentStats = {
       total_received: totalReceived,
       total_sales_discount: salesDiscountResult ? (salesDiscountResult.total_sales_discount || 0) : 0
     };
   } else {
-    const payments = excludeFromMain
+    const payments = needsProjectJoin
       ? db.prepare(`
           SELECT pm.bank_deposit_amount, pm.payment_difference, pm.difference_type
           FROM payments pm
           JOIN projects p ON pm.project_id = p.id
-          WHERE pm.deleted_at IS NULL ${excludeCond}
-        `).all(...excludeCondParams)
+          WHERE pm.deleted_at IS NULL ${excludeCond}${spCondP}
+        `).all(...excludeCondParams, ...spParam)
       : db.prepare('SELECT bank_deposit_amount, payment_difference, difference_type FROM payments WHERE deleted_at IS NULL').all();
-    
+
     const totalReceived = payments.reduce((sum, p) => {
       return sum + Payment.calculateActualReceived(p);
     }, 0);
-    
-    const salesDiscountResult = excludeFromMain
-      ? db.prepare(`SELECT COALESCE(SUM(p.sales_discount), 0) as total_sales_discount FROM projects p WHERE 1=1 ${excludeCond}`).get(...excludeCondParams)
+
+    const salesDiscountResult = needsProjectJoin
+      ? db.prepare(`SELECT COALESCE(SUM(p.sales_discount), 0) as total_sales_discount FROM projects p WHERE 1=1 ${excludeCond}${spCondP}`).get(...excludeCondParams, ...spParam)
       : db.prepare('SELECT COALESCE(SUM(sales_discount), 0) as total_sales_discount FROM projects').get();
-    
+
     paymentStats = {
       total_received: totalReceived,
       total_sales_discount: salesDiscountResult ? (salesDiscountResult.total_sales_discount || 0) : 0
@@ -423,6 +443,19 @@ router.get('/', (req, res) => {
     paymentReminder = ReceivablesAgingService.getPaymentReminder(paymentReminderDays, null, salespersonFilter);
   }
 
+  // 客戶追蹤提醒：有負責業務但超過設定天數沒有活動紀錄的客戶
+  // admin/user 可見全部；salesperson 僅見自己負責的客戶
+  let activityReminders = [];
+  if (req.user && (req.user.role === 'admin' || req.user.role === 'user' || req.user.role === 'salesperson')) {
+    let activityReminderDays = 14;
+    try {
+      const arSetting = db.prepare('SELECT setting_value FROM system_settings WHERE setting_key = ?').get('activity_reminder_days');
+      if (arSetting) activityReminderDays = parseInt(arSetting.setting_value, 10) || 14;
+    } catch (e) { /* use default */ }
+    const activityOwnerFilter = (req.user.role === 'salesperson') ? req.user.id : null;
+    activityReminders = ActivityReminderService.getOverdueCustomers(activityReminderDays, activityOwnerFilter);
+  }
+
   // 獨立類型區塊（all_and_separate 時，為每個 show_separate_dashboard 類型計算獨立統計）
   let separateBlocks = [];
   if (dashboardMode === 'all_and_separate' && separateTypeNames.length > 0) {
@@ -435,32 +468,32 @@ router.get('/', (req, res) => {
           COALESCE(SUM(CASE WHEN p.status = '未結案' THEN 1 ELSE 0 END), 0) as open_projects,
           COALESCE(SUM(CASE WHEN p.status = '已結案' THEN 1 ELSE 0 END), 0) as closed_projects,
           COALESCE(SUM(p.price_with_tax), 0) as total_amount
-        FROM projects p WHERE p.project_type = ? AND ${yearCondP}
-      `).get(...params);
+        FROM projects p WHERE p.project_type = ? AND ${yearCondP}${spCondP}
+      `).get(...params, ...spParam);
       const typeAmounts = { [typeName]: typeStats.total_amount || 0 };
       const typeInvoiceStats = db.prepare(`
         SELECT COALESCE(SUM(i.amount_with_tax - COALESCE(i.allowance_amount, 0)), 0) as total_invoiced,
           COUNT(DISTINCT i.project_id) as projects_with_invoices, COUNT(i.id) as invoice_count
         FROM invoices i JOIN projects p ON i.project_id = p.id
-        WHERE p.project_type = ? AND (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) AND ${yearCondP}
-      `).get(...params);
+        WHERE p.project_type = ? AND (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) AND ${yearCondP}${spCondP}
+      `).get(...params, ...spParam);
       const typePayments = db.prepare(`
         SELECT pm.bank_deposit_amount, pm.payment_difference, pm.difference_type
         FROM payments pm JOIN projects p ON pm.project_id = p.id
-        WHERE p.project_type = ? AND (pm.deleted_at IS NULL) AND ${yearCondP}
-      `).all(...params);
+        WHERE p.project_type = ? AND (pm.deleted_at IS NULL) AND ${yearCondP}${spCondP}
+      `).all(...params, ...spParam);
       const totalReceived = typePayments.reduce((s, p) => s + Payment.calculateActualReceived(p), 0);
       const typeSalesDiscount = db.prepare(`
         SELECT COALESCE(SUM(sales_discount), 0) as total_sales_discount
-        FROM projects WHERE project_type = ? AND ${yearCond}
-      `).get(...params);
+        FROM projects WHERE project_type = ? AND ${yearCond}${spCondPlain}
+      `).get(...params, ...spParam);
       const typeBonusStats = db.prepare(`
         SELECT SUM(bc.bonus_amount) as total_bonus,
           SUM(CASE WHEN bc.status = '已發放' THEN bc.bonus_amount ELSE 0 END) as paid_bonus,
           SUM(CASE WHEN bc.status = '待發放' THEN bc.bonus_amount ELSE 0 END) as pending_bonus
         FROM bonus_calculations bc JOIN projects p ON bc.project_id = p.id
-        WHERE p.project_type = ? AND ${yearCondP}
-      `).get(...params);
+        WHERE p.project_type = ? AND ${yearCondP}${spCondP}
+      `).get(...params, ...spParam);
       const totalUnpaid = (typeInvoiceStats.total_invoiced || 0) - totalReceived - (typeSalesDiscount.total_sales_discount || 0);
       separateBlocks.push({
         typeName,
@@ -493,6 +526,7 @@ router.get('/', (req, res) => {
     daysUntilEndOfMonth,
     receivablesAging,
     paymentReminder,
+    activityReminders,
     separateBlocks
   });
 });

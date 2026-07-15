@@ -1,21 +1,43 @@
 const db = require('./db');
 const AuditLogService = require('../services/AuditLogService');
 
+// 正規化客戶/廠商身份欄位：vendor_type 僅在具備廠商身份（廠商/兩者皆是）時才有意義
+function normalizePartyFields(data) {
+  const partyType = ['客戶', '廠商', '兩者皆是'].includes(data.party_type) ? data.party_type : '客戶';
+  const hasVendorRole = partyType === '廠商' || partyType === '兩者皆是';
+  const vendorType = hasVendorRole && ['個人', '公司'].includes(data.vendor_type) ? data.vendor_type : null;
+  return { partyType, vendorType };
+}
+
 const Customer = {
-  // 取得所有客戶
-  findAll() {
+  // 取得所有客戶（客戶/廠商資料對所有使用者開放，僅專案才需要依權限範圍過濾；可選擇依往來狀態/客戶廠商身份/廠商類型篩選）
+  findAll(filters = {}) {
+    const statusCond = filters.status ? ' AND c.status = ?' : '';
+    const statusParams = filters.status ? [filters.status] : [];
+    // party_type = '兩者皆是' 的資料同時具備客戶與廠商身份，篩選「客戶」或「廠商」時都要包含進來
+    const partyCond = filters.party_type ? ` AND (c.party_type = ? OR c.party_type = '兩者皆是')` : '';
+    const partyParams = filters.party_type ? [filters.party_type] : [];
+    const vendorCond = filters.vendor_type ? ' AND c.vendor_type = ?' : '';
+    const vendorParams = filters.vendor_type ? [filters.vendor_type] : [];
     return db.prepare(`
-      SELECT c.*, COUNT(p.id) as project_count
+      SELECT c.*, COUNT(p.id) as project_count, u.name as owner_salesperson_name
       FROM customers c
       LEFT JOIN projects p ON c.id = p.customer_id
+      LEFT JOIN users u ON c.owner_salesperson_id = u.id
+      WHERE 1=1${statusCond}${partyCond}${vendorCond}
       GROUP BY c.id
       ORDER BY c.company_name
-    `).all();
+    `).all(...statusParams, ...partyParams, ...vendorParams);
   },
 
   // 依ID取得
   findById(id) {
-    return db.prepare(`SELECT * FROM customers WHERE id = ?`).get(id);
+    return db.prepare(`
+      SELECT c.*, u.name as owner_salesperson_name
+      FROM customers c
+      LEFT JOIN users u ON c.owner_salesperson_id = u.id
+      WHERE c.id = ?
+    `).get(id);
   },
 
   // 依客戶編號取得
@@ -28,23 +50,29 @@ const Customer = {
     return db.prepare(`SELECT * FROM customers WHERE tax_id = ?`).get(taxId);
   },
 
-  // 關鍵字搜尋（搜尋客戶編號、統一編號、公司名稱）
-  search(keyword) {
+  // 關鍵字搜尋（搜尋客戶編號、統一編號、公司名稱、聯絡人，可選擇依往來狀態/客戶廠商身份篩選）
+  search(keyword, filters = {}) {
     if (!keyword || keyword.trim() === '') {
-      return this.findAll();
+      return this.findAll(filters);
     }
-    
+
     const searchTerm = `%${keyword.trim()}%`;
+    const statusCond = filters.status ? ' AND c.status = ?' : '';
+    const statusParams = filters.status ? [filters.status] : [];
+    const partyCond = filters.party_type ? ` AND (c.party_type = ? OR c.party_type = '兩者皆是')` : '';
+    const partyParams = filters.party_type ? [filters.party_type] : [];
+    const vendorCond = filters.vendor_type ? ' AND c.vendor_type = ?' : '';
+    const vendorParams = filters.vendor_type ? [filters.vendor_type] : [];
     return db.prepare(`
-      SELECT c.*, COUNT(p.id) as project_count
+      SELECT c.*, COUNT(p.id) as project_count, u.name as owner_salesperson_name
       FROM customers c
       LEFT JOIN projects p ON c.id = p.customer_id
-      WHERE c.customer_code LIKE ? 
-         OR c.tax_id LIKE ? 
-         OR c.company_name LIKE ?
+      LEFT JOIN users u ON c.owner_salesperson_id = u.id
+      WHERE 1=1${statusCond}${partyCond}${vendorCond}
+        AND (c.customer_code LIKE ? OR c.tax_id LIKE ? OR c.company_name LIKE ? OR c.contact_name LIKE ?)
       GROUP BY c.id
       ORDER BY c.company_name
-    `).all(searchTerm, searchTerm, searchTerm);
+    `).all(...statusParams, ...partyParams, ...vendorParams, searchTerm, searchTerm, searchTerm, searchTerm);
   },
 
   // 新增客戶
@@ -59,17 +87,36 @@ const Customer = {
       throw new Error('公司名稱不能為空');
     }
     
+    const { partyType, vendorType } = normalizePartyFields(data);
+
     const stmt = db.prepare(`
-      INSERT INTO customers (customer_code, tax_id, company_name, is_new_customer)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO customers (
+        customer_code, tax_id, company_name, is_new_customer,
+        contact_name, contact_phone, contact_email, owner_salesperson_id,
+        customer_level, industry, status, party_type, vendor_type,
+        bank_name, bank_account, address
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    
+
     try {
       const result = stmt.run(
         data.customer_code,
         data.tax_id || null,
         data.company_name,
-        data.is_new_customer ? 1 : 0
+        data.is_new_customer ? 1 : 0,
+        data.contact_name || null,
+        data.contact_phone || null,
+        data.contact_email || null,
+        data.owner_salesperson_id || null,
+        data.customer_level || null,
+        data.industry || null,
+        data.status || '往來中',
+        partyType,
+        vendorType,
+        data.bank_name || null,
+        data.bank_account || null,
+        data.address || null
       );
       
       const customerId = result.lastInsertRowid;
@@ -91,7 +138,19 @@ const Customer = {
         customer_code: data.customer_code,
         tax_id: data.tax_id || null,
         company_name: data.company_name,
-        is_new_customer: data.is_new_customer ? 1 : 0
+        is_new_customer: data.is_new_customer ? 1 : 0,
+        contact_name: data.contact_name || null,
+        contact_phone: data.contact_phone || null,
+        contact_email: data.contact_email || null,
+        owner_salesperson_id: data.owner_salesperson_id || null,
+        customer_level: data.customer_level || null,
+        industry: data.industry || null,
+        status: data.status || '往來中',
+        party_type: partyType,
+        vendor_type: vendorType,
+        bank_name: data.bank_name || null,
+        bank_account: data.bank_account || null,
+        address: data.address || null
       }, data.userInfo);
       
       return customerId;
@@ -159,7 +218,101 @@ const Customer = {
     } else {
       newData.is_new_customer = oldRecord.is_new_customer;
     }
-    
+
+    if (data.contact_name !== undefined) {
+      fields.push('contact_name = ?');
+      values.push(data.contact_name || null);
+      newData.contact_name = data.contact_name || null;
+    } else {
+      newData.contact_name = oldRecord.contact_name;
+    }
+
+    if (data.contact_phone !== undefined) {
+      fields.push('contact_phone = ?');
+      values.push(data.contact_phone || null);
+      newData.contact_phone = data.contact_phone || null;
+    } else {
+      newData.contact_phone = oldRecord.contact_phone;
+    }
+
+    if (data.contact_email !== undefined) {
+      fields.push('contact_email = ?');
+      values.push(data.contact_email || null);
+      newData.contact_email = data.contact_email || null;
+    } else {
+      newData.contact_email = oldRecord.contact_email;
+    }
+
+    if (data.owner_salesperson_id !== undefined) {
+      fields.push('owner_salesperson_id = ?');
+      values.push(data.owner_salesperson_id || null);
+      newData.owner_salesperson_id = data.owner_salesperson_id || null;
+    } else {
+      newData.owner_salesperson_id = oldRecord.owner_salesperson_id;
+    }
+
+    if (data.customer_level !== undefined) {
+      fields.push('customer_level = ?');
+      values.push(data.customer_level || null);
+      newData.customer_level = data.customer_level || null;
+    } else {
+      newData.customer_level = oldRecord.customer_level;
+    }
+
+    if (data.industry !== undefined) {
+      fields.push('industry = ?');
+      values.push(data.industry || null);
+      newData.industry = data.industry || null;
+    } else {
+      newData.industry = oldRecord.industry;
+    }
+
+    if (data.status !== undefined) {
+      fields.push('status = ?');
+      values.push(data.status || '往來中');
+      newData.status = data.status || '往來中';
+    } else {
+      newData.status = oldRecord.status;
+    }
+
+    if (data.party_type !== undefined || data.vendor_type !== undefined) {
+      const { partyType, vendorType } = normalizePartyFields({
+        party_type: data.party_type !== undefined ? data.party_type : oldRecord.party_type,
+        vendor_type: data.vendor_type !== undefined ? data.vendor_type : oldRecord.vendor_type
+      });
+      fields.push('party_type = ?', 'vendor_type = ?');
+      values.push(partyType, vendorType);
+      newData.party_type = partyType;
+      newData.vendor_type = vendorType;
+    } else {
+      newData.party_type = oldRecord.party_type;
+      newData.vendor_type = oldRecord.vendor_type;
+    }
+
+    if (data.bank_name !== undefined) {
+      fields.push('bank_name = ?');
+      values.push(data.bank_name || null);
+      newData.bank_name = data.bank_name || null;
+    } else {
+      newData.bank_name = oldRecord.bank_name;
+    }
+
+    if (data.bank_account !== undefined) {
+      fields.push('bank_account = ?');
+      values.push(data.bank_account || null);
+      newData.bank_account = data.bank_account || null;
+    } else {
+      newData.bank_account = oldRecord.bank_account;
+    }
+
+    if (data.address !== undefined) {
+      fields.push('address = ?');
+      values.push(data.address || null);
+      newData.address = data.address || null;
+    } else {
+      newData.address = oldRecord.address;
+    }
+
     // 如果沒有要更新的欄位，直接返回
     if (fields.length === 0) return false;
     

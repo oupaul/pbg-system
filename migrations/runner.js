@@ -41,6 +41,17 @@ const MIGRATIONS = [
   'migrate_permission_scope',
   'migrate_v_invoice_summary',
   'migrate_rename_user_role',
+  'migrate_crm_pipeline_activity',
+  'migrate_customer_contact_owner',
+  'migrate_activity_reminder_days',
+  'migrate_customer_level_industry_status',
+  'migrate_crm_edit_permission',
+  'migrate_deletion_requests',
+  'migrate_customer_vendor_party_type',
+  'migrate_customer_bank_info',
+  'migrate_customer_address',
+  'migrate_customer_owner_to_user',
+  'migrate_pipeline_owner_user',
 ];
 
 function run() {

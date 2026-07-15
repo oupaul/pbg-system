@@ -13,6 +13,36 @@
   </div>
 </div>
 
+<div class="row g-4 mb-4">
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="text-muted"><i class="bi bi-bullseye"></i> 洽談中商機</h6>
+        <h4 class="mb-0">${(pipelineSummary?.open_count || 0)} 筆 / $${(pipelineSummary?.open_amount || 0).toLocaleString()}</h4>
+        <a href="/pipelines?status=${encodeURIComponent('洽談中')}" class="small">查看商機列表</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100 ${(pipelineSummary?.won_pending_count || 0) > 0 ? 'border-warning' : ''}">
+      <div class="card-body">
+        <h6 class="text-muted"><i class="bi bi-exclamation-triangle"></i> 已成交待轉入專案</h6>
+        <h4 class="mb-0 ${(pipelineSummary?.won_pending_count || 0) > 0 ? 'text-warning' : ''}">${(pipelineSummary?.won_pending_count || 0)} 筆 / $${(pipelineSummary?.won_pending_amount || 0).toLocaleString()}</h4>
+        ${(pipelineSummary?.won_pending_count || 0) > 0 ? '<a href="/pipelines?status=' + encodeURIComponent('已成交') + '" class="small">提醒財務盡快建立專案</a>' : '<span class="small text-muted">目前無待處理項目</span>'}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="text-muted"><i class="bi bi-graph-up-arrow"></i> 商機潛在總營收</h6>
+        <h4 class="mb-0">$${((pipelineSummary?.open_amount || 0) + (pipelineSummary?.won_pending_amount || 0)).toLocaleString()}</h4>
+        <span class="small text-muted">洽談中 + 已成交待轉入</span>
+      </div>
+    </div>
+  </div>
+</div>
+
 ${(performance || []).length > 0 ? `
 <div class="row g-4 mb-4">
   <div class="col-md-6">
@@ -50,11 +80,13 @@ ${(performance || []).length > 0 ? `
             <th class="text-end">總獎金</th>
             <th class="text-end">已發放</th>
             <th class="text-end">待發放</th>
+            <th class="text-center">洽談中商機</th>
+            <th class="text-end">預估金額</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          ${(performance || []).length ? (performance || []).map(p => '<tr><td><strong>' + p.name + '</strong></td><td class="text-center">' + (p.project_count || 0) + '</td><td class="text-end">$' + (p.total_price || 0).toLocaleString() + '</td><td class="text-end text-success">$' + (p.total_invoiced || 0).toLocaleString() + '</td><td class="text-end">$' + (p.uninvoiced_amount || 0).toLocaleString() + '</td><td class="text-end">$' + (p.total_received || 0).toLocaleString() + '</td><td class="text-end ' + (p.total_unpaid > 0 ? 'text-danger fw-bold' : '') + '">$' + (p.total_unpaid || 0).toLocaleString() + '</td><td class="text-end">$' + (p.total_bonus || 0).toLocaleString() + '</td><td class="text-end text-success">$' + (p.paid_bonus || 0).toLocaleString() + '</td><td class="text-end text-warning">$' + (p.pending_bonus || 0).toLocaleString() + '</td><td><a href="/projects?salesperson=' + encodeURIComponent(p.name) + (selectedYear !== 'all' ? '&year=' + selectedYear : '') + '" class="btn btn-sm btn-outline-primary">專案</a> <a href="/bonuses' + (selectedYear !== 'all' ? '?year=' + selectedYear : '') + '" class="btn btn-sm btn-outline-info">獎金</a></td></tr>').join('') : '<tr><td colspan="11" class="text-center text-muted py-4">尚無資料</td></tr>'}
+          ${(performance || []).length ? (performance || []).map(p => '<tr><td><strong>' + p.name + '</strong></td><td class="text-center">' + (p.project_count || 0) + '</td><td class="text-end">$' + (p.total_price || 0).toLocaleString() + '</td><td class="text-end text-success">$' + (p.total_invoiced || 0).toLocaleString() + '</td><td class="text-end">$' + (p.uninvoiced_amount || 0).toLocaleString() + '</td><td class="text-end">$' + (p.total_received || 0).toLocaleString() + '</td><td class="text-end ' + (p.total_unpaid > 0 ? 'text-danger fw-bold' : '') + '">$' + (p.total_unpaid || 0).toLocaleString() + '</td><td class="text-end">$' + (p.total_bonus || 0).toLocaleString() + '</td><td class="text-end text-success">$' + (p.paid_bonus || 0).toLocaleString() + '</td><td class="text-end text-warning">$' + (p.pending_bonus || 0).toLocaleString() + '</td><td class="text-center">' + (p.pipeline_count || 0) + '</td><td class="text-end">$' + (p.pipeline_amount || 0).toLocaleString() + '</td><td><a href="/projects?salesperson=' + encodeURIComponent(p.name) + (selectedYear !== 'all' ? '&year=' + selectedYear : '') + '" class="btn btn-sm btn-outline-primary">專案</a> <a href="/bonuses' + (selectedYear !== 'all' ? '?year=' + selectedYear : '') + '" class="btn btn-sm btn-outline-info">獎金</a></td></tr>').join('') : '<tr><td colspan="13" class="text-center text-muted py-4">尚無資料</td></tr>'}
         </tbody>
       </table>
     </div>

@@ -132,6 +132,11 @@ const User = {
     }
   },
 
+  // 取得啟用中的使用者（供「接洽人員」等下拉選單使用）
+  findActive() {
+    return db.prepare(`SELECT id, name FROM users WHERE is_active = 1 ORDER BY name`).all();
+  },
+
   // 創建用戶
   async create(data) {
     const passwordHash = await this.hashPassword(data.password);
