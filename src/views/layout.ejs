@@ -19,6 +19,10 @@
       if (href === '/') return path === '/' ? 'active' : '';
       return path.indexOf(href) === 0 ? 'active' : '';
     }
+    // 群組下拉選單：只要目前頁面屬於群組內任一項目，下拉選單本身也標示 active
+    function navGroupActive(hrefs) {
+      return hrefs.some(href => navActive(href) === 'active') ? 'active' : '';
+    }
   %>
   <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
     <div class="container-fluid">
@@ -38,39 +42,12 @@
           <li class="nav-item">
             <a class="nav-link <%= navActive('/projects') %>" href="/projects"><i class="bi bi-folder"></i> 專案管理</a>
           </li>
-          <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user')) { %>
-          <li class="nav-item">
-            <a class="nav-link <%= navActive('/project-templates') %>" href="/project-templates"><i class="bi bi-file-earmark-text"></i> 專案範本</a>
-          </li>
-          <% } %>
           <li class="nav-item">
             <a class="nav-link <%= navActive('/search') %>" href="/search"><i class="bi bi-search"></i> 搜尋</a>
           </li>
-          <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user' || user.role === 'boss')) { %>
-          <li class="nav-item">
-            <a class="nav-link <%= navActive('/bonuses') %>" href="/bonuses"><i class="bi bi-currency-dollar"></i> 獎金管理</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link <%= navActive('/sales-performance') %>" href="/sales-performance"><i class="bi bi-graph-up"></i> 業務績效</a>
-          </li>
-          <% } %>
           <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user' || user.salesperson_id)) { %>
           <li class="nav-item">
             <a class="nav-link <%= navActive('/gross-profit') %>" href="/gross-profit"><i class="bi bi-pie-chart"></i> 毛利分析</a>
-          </li>
-          <% } %>
-          <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user')) { %>
-          <li class="nav-item">
-            <a class="nav-link <%= navActive('/salespeople') %>" href="/salespeople"><i class="bi bi-people"></i> 業務管理</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link <%= navActive('/import-export') %>" href="/import-export"><i class="bi bi-arrow-left-right"></i> 匯入/匯出</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link <%= navActive('/audit-logs') %>" href="/audit-logs"><i class="bi bi-clock-history"></i> 修改記錄</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link <%= navActive('/recent-payments') %>" href="/recent-payments"><i class="bi bi-cash-coin"></i> 近期收款</a>
           </li>
           <% } %>
           <% if (typeof canEditCrm !== 'undefined' && canEditCrm) { %>
@@ -91,24 +68,42 @@
             </a>
           </li>
           <% } %>
-          <% if (typeof user !== 'undefined' && user && user.role === 'admin') { %>
-          <li class="nav-item">
-            <a class="nav-link <%= navActive('/project-types') %>" href="/project-types"><i class="bi bi-tags"></i> 類型管理</a>
+
+          <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user' || user.role === 'boss')) { %>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle <%= navGroupActive(['/bonuses', '/sales-performance', '/salespeople', '/recent-payments']) %>" href="#" id="salesGroupDropdown" role="button" data-bs-toggle="dropdown">
+              <i class="bi bi-graph-up-arrow"></i> 業務數據
+            </a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item <%= navActive('/bonuses') %>" href="/bonuses"><i class="bi bi-currency-dollar"></i> 獎金管理</a></li>
+              <li><a class="dropdown-item <%= navActive('/sales-performance') %>" href="/sales-performance"><i class="bi bi-graph-up"></i> 業務績效</a></li>
+              <% if (user.role === 'admin' || user.role === 'user') { %>
+              <li><a class="dropdown-item <%= navActive('/salespeople') %>" href="/salespeople"><i class="bi bi-people"></i> 業務管理</a></li>
+              <li><a class="dropdown-item <%= navActive('/recent-payments') %>" href="/recent-payments"><i class="bi bi-cash-coin"></i> 近期收款</a></li>
+              <% } %>
+            </ul>
           </li>
-          <li class="nav-item">
-            <a class="nav-link <%= navActive('/report-groups') %>" href="/report-groups"><i class="bi bi-collection"></i> 報表群組</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link <%= navActive('/roles') %>" href="/roles"><i class="bi bi-shield-check"></i> 角色管理</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link <%= navActive('/settings') %>" href="/settings"><i class="bi bi-gear"></i> 系統設定</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link <%= navActive('/backup-restore') %>" href="/backup-restore"><i class="bi bi-archive"></i> 備份還原</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link <%= navActive('/health') %>" href="/health"><i class="bi bi-heart-pulse"></i> 系統健康</a>
+          <% } %>
+
+          <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user')) { %>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle <%= navGroupActive(['/project-templates', '/import-export', '/audit-logs', '/project-types', '/report-groups', '/roles', '/settings', '/backup-restore', '/health']) %>" href="#" id="systemGroupDropdown" role="button" data-bs-toggle="dropdown">
+              <i class="bi bi-gear-wide-connected"></i> 系統設定
+            </a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item <%= navActive('/project-templates') %>" href="/project-templates"><i class="bi bi-file-earmark-text"></i> 專案範本</a></li>
+              <li><a class="dropdown-item <%= navActive('/import-export') %>" href="/import-export"><i class="bi bi-arrow-left-right"></i> 匯入/匯出</a></li>
+              <li><a class="dropdown-item <%= navActive('/audit-logs') %>" href="/audit-logs"><i class="bi bi-clock-history"></i> 修改記錄</a></li>
+              <% if (user.role === 'admin') { %>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item <%= navActive('/project-types') %>" href="/project-types"><i class="bi bi-tags"></i> 類型管理</a></li>
+              <li><a class="dropdown-item <%= navActive('/report-groups') %>" href="/report-groups"><i class="bi bi-collection"></i> 報表群組</a></li>
+              <li><a class="dropdown-item <%= navActive('/roles') %>" href="/roles"><i class="bi bi-shield-check"></i> 角色管理</a></li>
+              <li><a class="dropdown-item <%= navActive('/settings') %>" href="/settings"><i class="bi bi-gear"></i> 系統設定</a></li>
+              <li><a class="dropdown-item <%= navActive('/backup-restore') %>" href="/backup-restore"><i class="bi bi-archive"></i> 備份還原</a></li>
+              <li><a class="dropdown-item <%= navActive('/health') %>" href="/health"><i class="bi bi-heart-pulse"></i> 系統健康</a></li>
+              <% } %>
+            </ul>
           </li>
           <% } %>
         </ul>
