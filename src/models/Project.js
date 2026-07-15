@@ -197,60 +197,29 @@ const Project = {
     return false;
   },
 
-  // 依客戶ID取得專案列表（供客戶詳情頁使用）
-  // options.isCrmOwner：當前使用者是此客戶的接洽人員時，允許看到全部專案的「列表」資訊，
-  // 但權限範圍外的專案會被標記為 _locked（金額欄位清空、前端不可點入查看更多），
-  // 而非像一般情況直接整筆從清單中過濾掉
-  findByCustomerId(customerId, user = null, options = {}) {
-    if (options.isCrmOwner) {
-      const rows = db.prepare(`
-        SELECT * FROM v_project_summary
-        WHERE customer_id = ?
-        ORDER BY contract_year DESC, contract_month DESC
-      `).all(customerId);
-
-      return rows.map(p => {
-        if (this._isInScope(p, user)) return { ...p, _locked: false };
-        return {
-          ...p,
-          _locked: true,
-          price_with_tax: null,
-          price_without_tax: null,
-          total_invoiced: null,
-          total_received: null,
-          uninvoiced_amount: null
-        };
-      });
-    }
-
-    let conditions = `WHERE customer_id = ?`;
-    const params = [customerId];
-
-    if (user) {
-      const scope = user.project_view_scope ||
-        (user.role === ROLES.SALESPERSON ? PROJECT_VIEW_SCOPE.OWN : PROJECT_VIEW_SCOPE.ALL);
-
-      if (scope === PROJECT_VIEW_SCOPE.OWN && user.salesperson_id) {
-        conditions += ` AND salesperson_id = ?`;
-        params.push(user.salesperson_id);
-      } else if (scope === PROJECT_VIEW_SCOPE.ASSIGNED) {
-        const ids = getAssignedSalespersonIds(user.id);
-        if (ids.length > 0) {
-          conditions += ` AND salesperson_id IN (${ids.map(() => '?').join(',')})`;
-          params.push(...ids);
-        } else {
-          conditions += ` AND 1=0`;
-        }
-      } else if (scope === PROJECT_VIEW_SCOPE.NONE) {
-        conditions += ` AND 1=0`;
-      }
-    }
-
-    return db.prepare(`
+  // 依客戶ID取得專案列表（供客戶詳情頁使用）。
+  // 客戶詳情頁的專案列表對所有看得到該客戶的人開放（客戶/廠商主檔本身即無角色限制），
+  // 但個別專案是否在使用者的 project_view_scope 範圍內則各自判斷：不在範圍內的專案
+  // 標記為 _locked（金額欄位清空、前端不可點入查看更多），而非整筆從清單中過濾掉。
+  findByCustomerId(customerId, user = null) {
+    const rows = db.prepare(`
       SELECT * FROM v_project_summary
-      ${conditions}
+      WHERE customer_id = ?
       ORDER BY contract_year DESC, contract_month DESC
-    `).all(...params).map(p => ({ ...p, _locked: false }));
+    `).all(customerId);
+
+    return rows.map(p => {
+      if (this._isInScope(p, user)) return { ...p, _locked: false };
+      return {
+        ...p,
+        _locked: true,
+        price_with_tax: null,
+        price_without_tax: null,
+        total_invoiced: null,
+        total_received: null,
+        uninvoiced_amount: null
+      };
+    });
   },
 
   // 依專案編號取得（舊方法，保留向後兼容）
