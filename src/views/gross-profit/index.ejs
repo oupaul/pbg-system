@@ -219,7 +219,10 @@
               </tr>
             </thead>
             <tbody>
-              ${(byType || []).length ? (byType || []).map(r => '<tr><td><span class="badge bg-info">' + (r.project_type || '') + '</span></td><td class="text-center">' + (r.project_count || 0) + '</td><td class="text-end">$' + (r.total_revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">$' + (r.total_cost || 0).toLocaleString() + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger') + '">$' + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">' + (r.gross_margin_pct || 0) + '%</td></tr>').join('') : '<tr><td colspan="6" class="text-center text-muted py-4">尚無資料</td></tr>'}
+              ${(byType || []).length ? (byType || []).map(r => {
+                const typeColor = (typeof typeColorMap !== 'undefined' && r.project_type && typeColorMap[r.project_type]) ? typeColorMap[r.project_type] : 'info';
+                return '<tr><td><span class="badge bg-' + typeColor + '">' + (r.project_type || '') + '</span></td><td class="text-center">' + (r.project_count || 0) + '</td><td class="text-end">$' + (r.total_revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">$' + (r.total_cost || 0).toLocaleString() + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger') + '">$' + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">' + (r.gross_margin_pct || 0) + '%</td></tr>';
+              }).join('') : '<tr><td colspan="6" class="text-center text-muted py-4">尚無資料</td></tr>'}
             </tbody>
           </table>
         </div>
