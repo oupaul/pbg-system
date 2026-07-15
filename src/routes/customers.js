@@ -221,11 +221,19 @@ router.get('/:id', (req, res) => {
     return res.status(404).render('error', { message: '找不到客戶', error: {} });
   }
 
-  // 客戶的專案（依角色權限範圍過濾，無權限查看的專案不應出現在客戶詳情頁）
-  const projects = Project.findByCustomerId(customer.id, req.user);
+  // 客戶的專案：一般情況依角色權限範圍過濾（無權限的專案不出現）；
+  // 若目前使用者是此客戶的接洽人員，改為看得到全部專案「列表」資訊，
+  // 但範圍外的專案會被標記為 _locked（金額清空、前端不可點入查看更多）
+  const isCrmOwner = !!(req.user && customer.owner_salesperson_id && Number(customer.owner_salesperson_id) === Number(req.user.id));
+  const projects = Project.findByCustomerId(customer.id, req.user, { isCrmOwner });
 
-  // 統計（與 projects 同一套權限範圍，避免總數/總金額洩漏無權限查看的專案資訊）
-  const stats = Project.getStatsByCustomerId(customer.id, req.user);
+  // 統計：件數為目前看得到的全部列表筆數，總金額只加總未被鎖定（有權限查看金額）的專案，
+  // 避免鎖定專案的金額透過加總洩漏
+  const stats = {
+    project_count: projects.length,
+    total_amount: projects.reduce((sum, p) => sum + (p._locked ? 0 : (p.price_with_tax || 0)), 0),
+    closed_count: projects.filter(p => p.status === '已結案').length
+  };
 
   // 潛在商機（依角色權限範圍過濾）
   const pipelines = Pipeline.findAll({ customer_id: customer.id }, req.user);
