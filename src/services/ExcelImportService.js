@@ -1021,9 +1021,10 @@ class ExcelImportService {
           if (invoiceDate) {
         Invoice.create({
           project_id: currentProjectId,
-              invoice_date: invoiceDate,
-              invoice_number: row[COLS.INVOICE_NUMBER] ? String(row[COLS.INVOICE_NUMBER]).trim() : null,
-              amount_with_tax: cleanNumber(row[COLS.INVOICE_AMOUNT]) || 0
+          invoice_date: invoiceDate,
+          invoice_number: row[COLS.INVOICE_NUMBER] ? String(row[COLS.INVOICE_NUMBER]).trim() : null,
+          amount_with_tax: cleanNumber(row[COLS.INVOICE_AMOUNT]) || 0,
+          _skipOverInvoiceCheck: true  // 匯入歷史資料，跳過超額開票驗證
         });
         results.invoices++;
           }

@@ -1,10 +1,157 @@
 <%- include('layout', { body: ` 
-${locals.user && locals.user.role === 'salesperson' ? `
+${typeof showWelcome !== 'undefined' && showWelcome ? `
 <div class="row mb-4">
   <div class="col">
     <h1 class="h3"><i class="bi bi-info-circle"></i> 歡迎</h1>
   </div>
 </div>
+
+${typeof paymentReminder !== 'undefined' && paymentReminder && (paymentReminder.upcoming.length > 0 || paymentReminder.overdue.length > 0) ? `
+<!-- 收款提醒通知（業務員） -->
+<div class="alert alert-info alert-dismissible fade show mb-4" role="alert">
+  <div class="d-flex align-items-start">
+    <div class="flex-shrink-0">
+      <i class="bi bi-currency-dollar fs-3 me-3"></i>
+    </div>
+    <div class="flex-grow-1 payment-reminder-content">
+      <h5 class="alert-heading mb-2">
+        <i class="bi bi-bell-fill"></i> 收款提醒（依預計收款日）
+      </h5>
+      <p class="mb-2">
+        以下發票尚有未收款金額：
+        <span class="badge bg-warning text-dark">${paymentReminder.upcoming.length} 筆即將到期</span>
+        ${paymentReminder.overdue.length > 0 ? '<span class="badge bg-danger ms-2">' + paymentReminder.overdue.length + ' 筆已逾期</span>' : ''}
+      </p>
+      <hr>
+      <div class="table-responsive payment-reminder-table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>專案</th>
+              <th>發票號碼</th>
+              <th>業務</th>
+              <th class="text-end">未收金額</th>
+              <th>預計收款日</th>
+              <th>狀態</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${paymentReminder.upcoming.map(item => '<tr><td><code>' + item.project_code + '</code> ' + (item.project_name || '') + '</td><td><code>' + (item.invoice_number || '-') + '</code></td><td>' + item.salesperson_name + '</td><td class="text-end">$' + (item.unpaid || 0).toLocaleString() + '</td><td>' + (item.expected_payment_date || '-') + '</td><td><span class="badge bg-warning text-dark">即將到期</span></td><td><a href="/projects/' + item.project_id + '" class="btn btn-sm btn-outline-primary">查看</a></td></tr>').join('')}
+            ${paymentReminder.overdue.map(item => '<tr class="table-danger"><td><code>' + item.project_code + '</code> ' + (item.project_name || '') + '</td><td><code>' + (item.invoice_number || '-') + '</code></td><td>' + item.salesperson_name + '</td><td class="text-end">$' + (item.unpaid || 0).toLocaleString() + '</td><td>' + (item.expected_payment_date || '-') + '</td><td><span class="badge bg-danger">已逾期</span></td><td><a href="/projects/' + item.project_id + '" class="btn btn-sm btn-outline-primary">查看</a></td></tr>').join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+</div>
+` : ''}
+
+${typeof activityReminders !== 'undefined' && activityReminders && activityReminders.length > 0 ? `
+<!-- 客戶追蹤提醒 -->
+<div class="alert alert-secondary alert-dismissible fade show mb-4" role="alert">
+  <div class="d-flex align-items-start">
+    <div class="flex-shrink-0">
+      <i class="bi bi-person-lines-fill fs-3 me-3"></i>
+    </div>
+    <div class="flex-grow-1">
+      <h5 class="alert-heading mb-2">
+        <i class="bi bi-bell-fill"></i> 客戶追蹤提醒
+      </h5>
+      <p class="mb-2">
+        以下客戶已一段時間沒有活動紀錄：
+        <span class="badge bg-secondary">${activityReminders.length} 位客戶待追蹤</span>
+      </p>
+      <hr>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>客戶</th>
+              <th>負責業務</th>
+              <th>最後聯絡</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${activityReminders.slice(0, 10).map(item => '<tr><td><code>' + item.customer_code + '</code> ' + item.company_name + '</td><td>' + (item.owner_salesperson_name || '-') + '</td><td>' + (item.last_activity_date ? item.days_since_last_activity + ' 天前 (' + item.last_activity_date.slice(0, 10) + ')' : '<span class="badge bg-danger">從未聯絡</span>') + '</td><td><a href="/customers/' + item.id + '" class="btn btn-sm btn-outline-primary">查看</a></td></tr>').join('')}
+          </tbody>
+        </table>
+      </div>
+      ${activityReminders.length > 10 ? '<div class="mt-2 small text-muted">僅顯示前 10 筆，共 ' + activityReminders.length + ' 位客戶待追蹤</div>' : ''}
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+</div>
+` : ''}
+
+${typeof showNotification !== 'undefined' && showNotification && (typeof upcomingInvoiceProjects !== 'undefined' && upcomingInvoiceProjects.length > 0 || typeof overdueInvoiceProjects !== 'undefined' && overdueInvoiceProjects.length > 0) ? `
+<!-- 開立發票提醒通知（業務員） -->
+<div class="alert alert-warning alert-dismissible fade show mb-4" role="alert">
+  <div class="d-flex align-items-start">
+    <div class="flex-shrink-0">
+      <i class="bi bi-exclamation-triangle-fill fs-3 me-3"></i>
+    </div>
+    <div class="flex-grow-1">
+      <h5 class="alert-heading mb-2">
+        <i class="bi bi-bell-fill"></i> 開立發票提醒通知
+      </h5>
+      <p class="mb-2">
+        ${typeof upcomingInvoiceProjects !== 'undefined' && upcomingInvoiceProjects.length > 0 ? `<strong>本月還剩 ${(typeof daysUntilEndOfMonth !== 'undefined' ? daysUntilEndOfMonth : 0) + 1} 天！</strong>` : ''}
+        以下 <span class="badge bg-danger">${typeof upcomingInvoiceProjects !== 'undefined' ? upcomingInvoiceProjects.length : 0}</span> 個專案需要開立發票：
+        ${typeof overdueInvoiceProjects !== 'undefined' && overdueInvoiceProjects.length > 0 ? `<span class="badge bg-warning text-dark ms-2">含 ${overdueInvoiceProjects.length} 個已過期專案</span>` : ''}
+      </p>
+      <hr>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>專案編號</th>
+              <th>專案名稱</th>
+              <th>預計開發票月份</th>
+              <th>業務</th>
+              <th>專案金額</th>
+              <th>已開發票</th>
+              <th>未開發票</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(typeof upcomingInvoiceProjects !== 'undefined' ? upcomingInvoiceProjects : []).map(p => {
+              const isOverdue = p.notification_type === 'overdue' || (typeof overdueInvoiceProjects !== 'undefined' && overdueInvoiceProjects.some(op => op.id === p.id));
+              return `
+              <tr class="${isOverdue ? 'table-danger' : ''}">
+                <td><code>${p.project_code}</code></td>
+                <td>
+                  <span class="badge bg-${typeof typeColorMap !== 'undefined' && typeColorMap[p.project_type] ? typeColorMap[p.project_type] : (p.project_type === '食驗室' ? 'primary' : p.project_type === '純廣' ? 'success' : 'info')}">${p.project_type}</span>
+                  ${p.project_name}
+                </td>
+                <td>
+                  ${p.expected_invoice_year_month || '-'}
+                  ${isOverdue ? '<span class="badge bg-danger ms-1">已過期</span>' : ''}
+                </td>
+                <td>${p.salesperson_name || '-'}</td>
+                <td class="text-end">$${(p.price_with_tax || 0).toLocaleString()}</td>
+                <td class="text-end ${p.total_invoiced > 0 ? 'text-success' : 'text-muted'}">$${(p.total_invoiced || 0).toLocaleString()}</td>
+                <td class="text-end ${p.uninvoiced_amount > 0 ? 'text-danger fw-bold' : ''}">$${(p.uninvoiced_amount || 0).toLocaleString()}</td>
+                <td><a href="/projects/${p.id}" class="btn btn-sm btn-outline-primary"><i class="bi bi-arrow-right"></i> 查看</a></td>
+              </tr>
+            `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-3">
+        <a href="/projects?expected_invoice_year_month=${typeof currentYearMonth !== 'undefined' ? currentYearMonth : ''}&status=未結案" class="btn btn-sm btn-warning">
+          <i class="bi bi-filter"></i> 查看所有預計本月開立發票專案
+        </a>
+      </div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+</div>
+` : ''}
 
 <div class="alert alert-info">
   <h5><i class="bi bi-person-check"></i> 歡迎，${locals.user.name}！</h5>
@@ -48,7 +195,7 @@ ${typeof showNotification !== 'undefined' && locals.user && locals.user.role ===
 ` : ''}
 
 ${showNotification && (typeof upcomingInvoiceProjects !== 'undefined' && upcomingInvoiceProjects.length > 0 || typeof overdueInvoiceProjects !== 'undefined' && overdueInvoiceProjects.length > 0) ? `
-<!-- 開票提醒通知 -->
+<!-- 開立發票提醒通知 -->
 <div class="alert alert-warning alert-dismissible fade show mb-4" role="alert">
   <div class="d-flex align-items-start">
     <div class="flex-shrink-0">
@@ -56,7 +203,7 @@ ${showNotification && (typeof upcomingInvoiceProjects !== 'undefined' && upcomin
     </div>
     <div class="flex-grow-1">
       <h5 class="alert-heading mb-2">
-        <i class="bi bi-bell-fill"></i> 開票提醒通知
+        <i class="bi bi-bell-fill"></i> 開立發票提醒通知
       </h5>
       <p class="mb-2">
         ${typeof upcomingInvoiceProjects !== 'undefined' && upcomingInvoiceProjects.length > 0 ? `<strong>本月還剩 ${daysUntilEndOfMonth + 1} 天！</strong>` : ''}
@@ -75,7 +222,7 @@ ${showNotification && (typeof upcomingInvoiceProjects !== 'undefined' && upcomin
             <tr>
               <th>專案編號</th>
               <th>專案名稱</th>
-              <th>預計開票年月</th>
+              <th>預計開發票月份</th>
               <th>業務</th>
               <th>專案金額</th>
               <th>已開發票</th>
@@ -118,9 +265,89 @@ ${showNotification && (typeof upcomingInvoiceProjects !== 'undefined' && upcomin
       </div>
       <div class="mt-3">
         <a href="/projects?expected_invoice_year_month=${currentYearMonth}&status=未結案" class="btn btn-sm btn-warning">
-          <i class="bi bi-filter"></i> 查看所有預計本月開票專案
+          <i class="bi bi-filter"></i> 查看所有預計本月開立發票專案
         </a>
       </div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+</div>
+` : ''}
+
+${typeof paymentReminder !== 'undefined' && paymentReminder && (paymentReminder.upcoming.length > 0 || paymentReminder.overdue.length > 0) ? `
+<!-- 收款提醒通知 -->
+<div class="alert alert-info alert-dismissible fade show mb-4" role="alert">
+  <div class="d-flex align-items-start">
+    <div class="flex-shrink-0">
+      <i class="bi bi-currency-dollar fs-3 me-3"></i>
+    </div>
+    <div class="flex-grow-1 payment-reminder-content">
+      <h5 class="alert-heading mb-2">
+        <i class="bi bi-bell-fill"></i> 收款提醒（依預計收款日）
+      </h5>
+      <p class="mb-2">
+        以下發票尚有未收款金額：
+        <span class="badge bg-warning text-dark">${paymentReminder.upcoming.length} 筆即將到期</span>
+        ${paymentReminder.overdue.length > 0 ? '<span class="badge bg-danger ms-2">' + paymentReminder.overdue.length + ' 筆已逾期</span>' : ''}
+      </p>
+      <hr>
+      <div class="table-responsive payment-reminder-table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>專案</th>
+              <th>發票號碼</th>
+              <th>業務</th>
+              <th class="text-end">未收金額</th>
+              <th>預計收款日</th>
+              <th>狀態</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${paymentReminder.upcoming.map(item => '<tr><td><code>' + item.project_code + '</code> ' + (item.project_name || '') + '</td><td><code>' + (item.invoice_number || '-') + '</code></td><td>' + item.salesperson_name + '</td><td class="text-end">$' + (item.unpaid || 0).toLocaleString() + '</td><td>' + (item.expected_payment_date || '-') + '</td><td><span class="badge bg-warning text-dark">即將到期</span></td><td><a href="/projects/' + item.project_id + '" class="btn btn-sm btn-outline-primary">查看</a></td></tr>').join('')}
+            ${paymentReminder.overdue.map(item => '<tr class="table-danger"><td><code>' + item.project_code + '</code> ' + (item.project_name || '') + '</td><td><code>' + (item.invoice_number || '-') + '</code></td><td>' + item.salesperson_name + '</td><td class="text-end">$' + (item.unpaid || 0).toLocaleString() + '</td><td>' + (item.expected_payment_date || '-') + '</td><td><span class="badge bg-danger">已逾期</span></td><td><a href="/projects/' + item.project_id + '" class="btn btn-sm btn-outline-primary">查看</a></td></tr>').join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+</div>
+` : ''}
+
+${typeof activityReminders !== 'undefined' && activityReminders && activityReminders.length > 0 ? `
+<!-- 客戶追蹤提醒 -->
+<div class="alert alert-secondary alert-dismissible fade show mb-4" role="alert">
+  <div class="d-flex align-items-start">
+    <div class="flex-shrink-0">
+      <i class="bi bi-person-lines-fill fs-3 me-3"></i>
+    </div>
+    <div class="flex-grow-1">
+      <h5 class="alert-heading mb-2">
+        <i class="bi bi-bell-fill"></i> 客戶追蹤提醒
+      </h5>
+      <p class="mb-2">
+        以下客戶已一段時間沒有活動紀錄：
+        <span class="badge bg-secondary">${activityReminders.length} 位客戶待追蹤</span>
+      </p>
+      <hr>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>客戶</th>
+              <th>負責業務</th>
+              <th>最後聯絡</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${activityReminders.slice(0, 10).map(item => '<tr><td><code>' + item.customer_code + '</code> ' + item.company_name + '</td><td>' + (item.owner_salesperson_name || '-') + '</td><td>' + (item.last_activity_date ? item.days_since_last_activity + ' 天前 (' + item.last_activity_date.slice(0, 10) + ')' : '<span class="badge bg-danger">從未聯絡</span>') + '</td><td><a href="/customers/' + item.id + '" class="btn btn-sm btn-outline-primary">查看</a></td></tr>').join('')}
+          </tbody>
+        </table>
+      </div>
+      ${activityReminders.length > 10 ? '<div class="mt-2 small text-muted">僅顯示前 10 筆，共 ' + activityReminders.length + ' 位客戶待追蹤</div>' : ''}
     </div>
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
   </div>
@@ -206,7 +433,7 @@ ${showNotification && (typeof upcomingInvoiceProjects !== 'undefined' && upcomin
   </div>
   
   <div class="col-md-3">
-    <div class="card bg-danger text-white h-100">
+    <div class="card text-white h-100" style="background: linear-gradient(135deg, #fd7e14 0%, #e8590c 100%);">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center">
           <div>
@@ -221,7 +448,7 @@ ${showNotification && (typeof upcomingInvoiceProjects !== 'undefined' && upcomin
   </div>
   
   <div class="col-md-3">
-    <div class="card text-white h-100" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
+    <div class="card bg-danger text-white h-100">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center">
           <div>
@@ -235,6 +462,147 @@ ${showNotification && (typeof upcomingInvoiceProjects !== 'undefined' && upcomin
     </div>
   </div>
 </div>
+
+${typeof separateBlocks !== 'undefined' && separateBlocks && separateBlocks.length > 0 ? separateBlocks.map(block => `
+<div class="row g-4 mb-4">
+  <div class="col-12">
+    <div class="card border-primary">
+      <div class="card-header bg-primary bg-opacity-10">
+        <i class="bi bi-tags"></i> ${block.typeName} — 獨立加總
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-2">
+            <a href="/projects?type=${encodeURIComponent(block.typeName)}${typeof selectedYear !== 'undefined' && selectedYear && selectedYear !== 'all' ? '&year=' + selectedYear : ''}" class="text-decoration-none text-dark d-block border rounded p-2 text-center separate-block-project-link" title="點擊查看該類型的專案">
+              <div class="small text-muted">專案數</div>
+              <div class="fw-bold">${block.stats.total_projects || 0}</div>
+              <small>未結案: ${block.stats.open_projects || 0} | 已結案: ${block.stats.closed_projects || 0}</small>
+              <div class="small text-primary mt-1"><i class="bi bi-box-arrow-up-right"></i> 查看此類型專案</div>
+            </a>
+          </div>
+          <div class="col-md-2">
+            <div class="border rounded p-2 text-center">
+              <div class="small text-muted">總金額</div>
+              <div class="fw-bold">$${(block.stats.total_amount || 0).toLocaleString()}</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="border rounded p-2 text-center">
+              <div class="small text-muted">已開立發票</div>
+              <div class="fw-bold">$${(block.invoiceStats.total_invoiced || 0).toLocaleString()}</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="border rounded p-2 text-center">
+              <div class="small text-muted">未開立發票</div>
+              <div class="fw-bold">$${((block.stats.total_amount || 0) - (block.invoiceStats.total_invoiced || 0)).toLocaleString()}</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="border rounded p-2 text-center">
+              <div class="small text-muted">已收款</div>
+              <div class="fw-bold">$${(block.paymentStats.total_received || 0).toLocaleString()}</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="border rounded p-2 text-center">
+              <div class="small text-muted">未收款</div>
+              <div class="fw-bold">$${(block.totalUnpaidInvoiced || 0).toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`).join('') : ''}
+
+${typeof receivablesAging !== 'undefined' && receivablesAging && receivablesAging.total > 0 ? `
+<div class="row g-4 mb-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-calendar-range"></i> 應收帳款帳齡分析
+        <small class="text-muted ms-2">（依發票預計收款日）</small>
+      </div>
+      <div class="card-body">
+        <div class="row g-3 mb-3">
+          <div class="col-md-2">
+            <div class="border rounded p-2 text-center ${receivablesAging.buckets.notYetDue.amount > 0 ? 'bg-success bg-opacity-10' : ''}">
+              <div class="small text-muted">未到期</div>
+              <div class="fw-bold">$${(receivablesAging.buckets.notYetDue.amount || 0).toLocaleString()}</div>
+              <div class="small">${receivablesAging.buckets.notYetDue.count || 0} 筆</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="border rounded p-2 text-center ${receivablesAging.buckets.days1_30.amount > 0 ? 'bg-warning bg-opacity-25' : ''}">
+              <div class="small text-muted">1-30 天</div>
+              <div class="fw-bold">$${(receivablesAging.buckets.days1_30.amount || 0).toLocaleString()}</div>
+              <div class="small">${receivablesAging.buckets.days1_30.count || 0} 筆</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="border rounded p-2 text-center ${receivablesAging.buckets.days31_60.amount > 0 ? 'bg-warning bg-opacity-25' : ''}">
+              <div class="small text-muted">31-60 天</div>
+              <div class="fw-bold">$${(receivablesAging.buckets.days31_60.amount || 0).toLocaleString()}</div>
+              <div class="small">${receivablesAging.buckets.days31_60.count || 0} 筆</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="border rounded p-2 text-center ${receivablesAging.buckets.days61_90.amount > 0 ? 'bg-danger bg-opacity-25' : ''}">
+              <div class="small text-muted">61-90 天</div>
+              <div class="fw-bold">$${(receivablesAging.buckets.days61_90.amount || 0).toLocaleString()}</div>
+              <div class="small">${receivablesAging.buckets.days61_90.count || 0} 筆</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="border rounded p-2 text-center ${receivablesAging.buckets.over90.amount > 0 ? 'bg-danger bg-opacity-25' : ''}">
+              <div class="small text-muted">90 天以上</div>
+              <div class="fw-bold">$${(receivablesAging.buckets.over90.amount || 0).toLocaleString()}</div>
+              <div class="small">${receivablesAging.buckets.over90.count || 0} 筆</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="border rounded p-2 text-center ${receivablesAging.buckets.noDate.amount > 0 ? 'bg-secondary bg-opacity-25' : ''}">
+              <div class="small text-muted">未設預計日</div>
+              <div class="fw-bold">$${(receivablesAging.buckets.noDate.amount || 0).toLocaleString()}</div>
+              <div class="small">${receivablesAging.buckets.noDate.count || 0} 筆</div>
+            </div>
+          </div>
+        </div>
+        <details>
+          <summary class="btn btn-sm btn-outline-secondary">展開明細</summary>
+          <div class="table-responsive mt-2">
+            <table class="table table-sm table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>專案</th>
+                  <th>發票號碼</th>
+                  <th>業務</th>
+                  <th class="text-end">未收金額</th>
+                  <th>預計收款日</th>
+                  <th>帳齡</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${[
+                  { b: receivablesAging.buckets.notYetDue, label: '未到期' },
+                  { b: receivablesAging.buckets.days1_30, label: '1-30天' },
+                  { b: receivablesAging.buckets.days31_60, label: '31-60天' },
+                  { b: receivablesAging.buckets.days61_90, label: '61-90天' },
+                  { b: receivablesAging.buckets.over90, label: '90天以上' },
+                  { b: receivablesAging.buckets.noDate, label: '未設預計日' }
+                ].map(function(g){ return g.b.items.map(function(item){ return '<tr><td><code>'+item.project_code+'</code> '+item.project_name+'</td><td><code>'+(item.invoice_number||'-')+'</code></td><td>'+item.salesperson_name+'</td><td class="text-end">$'+(item.amount||0).toLocaleString()+'</td><td>'+(item.expected_payment_date||'-')+'</td><td><span class="badge bg-secondary">'+g.label+'</span></td><td><a href="/projects/'+item.project_id+'" class="btn btn-sm btn-outline-primary">查看</a></td></tr>'; }).join(''); }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+</div>
+` : ''}
 
 <div class="row g-4 mb-4">
   <div class="col-md-4">
@@ -259,32 +627,12 @@ ${showNotification && (typeof upcomingInvoiceProjects !== 'undefined' && upcomin
         </div>
         `;
         }).join('') : `
-        <div class="mb-3 project-type-item" style="cursor: pointer;" onclick="window.location.href='/projects?type=' + encodeURIComponent('食驗室')" title="點擊查看 食驗室 類型的專案">
-          <div class="d-flex justify-content-between mb-1">
-            <span><i class="bi bi-circle-fill text-primary"></i> <span class="text-decoration-underline">食驗室</span></span>
-            <span>$${(stats.lab_amount || 0).toLocaleString()}</span>
-          </div>
-          <div class="progress" style="height: 10px;">
-            <div class="progress-bar bg-primary" style="width: ${stats.total_amount ? (stats.lab_amount/stats.total_amount*100) : 0}%"></div>
-          </div>
-        </div>
-        <div class="mb-3 project-type-item" style="cursor: pointer;" onclick="window.location.href='/projects?type=' + encodeURIComponent('純廣')" title="點擊查看 純廣 類型的專案">
-          <div class="d-flex justify-content-between mb-1">
-            <span><i class="bi bi-circle-fill text-success"></i> <span class="text-decoration-underline">純廣</span></span>
-            <span>$${(stats.ad_amount || 0).toLocaleString()}</span>
-          </div>
-          <div class="progress" style="height: 10px;">
-            <div class="progress-bar bg-success" style="width: ${stats.total_amount ? (stats.ad_amount/stats.total_amount*100) : 0}%"></div>
-          </div>
-        </div>
-        <div class="mb-3 project-type-item" style="cursor: pointer;" onclick="window.location.href='/projects?type=' + encodeURIComponent('專案')" title="點擊查看 專案 類型的專案">
-          <div class="d-flex justify-content-between mb-1">
-            <span><i class="bi bi-circle-fill text-info"></i> <span class="text-decoration-underline">專案</span></span>
-            <span>$${(stats.project_amount || 0).toLocaleString()}</span>
-          </div>
-          <div class="progress" style="height: 10px;">
-            <div class="progress-bar bg-info" style="width: ${stats.total_amount ? (stats.project_amount/stats.total_amount*100) : 0}%"></div>
-          </div>
+        <div class="text-center text-muted py-4">
+          <i class="bi bi-pie-chart fs-3 d-block mb-2 opacity-50"></i>
+          <small>尚未設定專案類型</small><br>
+          <a href="/settings/project-types" class="btn btn-sm btn-outline-secondary mt-2">
+            <i class="bi bi-gear"></i> 前往設定
+          </a>
         </div>
         `}
       </div>
@@ -304,6 +652,10 @@ ${showNotification && (typeof upcomingInvoiceProjects !== 'undefined' && upcomin
     }
     .project-type-item .text-decoration-underline {
       text-decoration: underline;
+    }
+    .separate-block-project-link:hover {
+      background-color: rgba(13, 110, 253, 0.08);
+      border-color: var(--bs-primary) !important;
     }
   </style>
   

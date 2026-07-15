@@ -110,8 +110,13 @@ input_config() {
     fi
 }
 
-# 輸入配置
-input_config
+# 輸入配置，或從既有設定檔讀取
+if [ -f "${PROJECT_DIR}/deploy.config.sh" ]; then
+    source "${PROJECT_DIR}/deploy.config.sh"
+    info "已從 deploy.config.sh 讀取現有配置（服務：${SERVICE_NAME}，目錄：${INSTALL_DIR}）"
+else
+    input_config
+fi
 
 # 檢查是否為 root
 if [ "$EUID" -ne 0 ]; then
@@ -287,56 +292,9 @@ if [ -f "${PROJECT_DIR}/data/invoice_bonus.db" ]; then
             log "✓ expected_invoice_year_month 欄位已存在"
         fi
         
-        # 強制更新視圖定義（確保包含所有最新欄位）
-        log "更新 v_project_summary 視圖..."
-        sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" <<'EOF'
-BEGIN TRANSACTION;
-DROP VIEW IF EXISTS v_project_summary;
-CREATE VIEW v_project_summary AS
-SELECT 
-  p.id,
-  p.project_code,
-  p.contract_year,
-  p.contract_month,
-  p.status,
-  p.project_type,
-  p.project_name,
-  p.price_with_tax,
-  p.price_without_tax,
-  p.is_new_customer,
-  p.salesperson_id,
-  p.customer_id,
-  p.expected_invoice_year_month,
-  p.notes,
-  p.created_at,
-  p.updated_at,
-  s.name as salesperson_name,
-  s.status as salesperson_status,
-  c.customer_code,
-  c.tax_id,
-  c.company_name,
-  COALESCE((SELECT SUM(amount_with_tax) FROM invoices WHERE project_id = p.id), 0) as total_invoiced,
-  p.price_with_tax - COALESCE((SELECT SUM(amount_with_tax) FROM invoices WHERE project_id = p.id), 0) as uninvoiced_amount,
-  COALESCE((SELECT SUM(bank_deposit_amount) FROM payments WHERE project_id = p.id), 0) as total_received
-FROM projects p
-LEFT JOIN salespeople s ON p.salesperson_id = s.id
-LEFT JOIN customers c ON p.customer_id = c.id;
-COMMIT;
-EOF
-        
-        if [ $? -eq 0 ]; then
-            log "✓ 視圖更新成功"
-            
-            # 驗證視圖是否包含 expected_invoice_year_month
-            VIEW_CHECK=$(sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" "SELECT sql FROM sqlite_master WHERE type='view' AND name='v_project_summary';" | grep "expected_invoice_year_month" || echo "")
-            if [ -n "$VIEW_CHECK" ]; then
-                log "✓ 視圖驗證成功（包含 expected_invoice_year_month）"
-            else
-                warning "視圖驗證失敗，但會繼續部署"
-            fi
-        else
-            warning "視圖更新失敗，繼續部署..."
-        fi
+        # 視圖將由 migrate:invoice-status 在步驟 5 更新（含 sales_discount、匯費、有效發票篩選）
+        # 此處僅確保 expected_invoice_year_month 欄位存在，視圖由 migration 統一處理
+        log "✓ 資料庫結構檢查完成（v_project_summary 將於步驟 5 由 migration 更新）"
     else
         log "projects 表不存在，將在步驟 5 中創建"
     fi
@@ -362,6 +320,8 @@ if [ -f "${PROJECT_DIR}/package.json" ]; then
         log "檢測到 package.json 更新，重新安裝依賴..."
         cd "${PROJECT_DIR}"
         npm install || error "依賴套件安裝失敗"
+        log "修復已知安全性漏洞（非破壞性）..."
+        npm audit fix --audit-level=high 2>&1 | tail -5 || true
         log "✓ 依賴套件更新完成"
     else
         log "✓ 依賴套件無需更新"
@@ -393,52 +353,20 @@ fi
 
 # 步驟 5: 執行資料庫遷移
 if [ -d "${PROJECT_DIR}/migrations" ]; then
-    log "步驟 5/7: 檢查資料庫遷移..."
+    log "步驟 5/7: 執行資料庫遷移..."
+    cd "${PROJECT_DIR}"
     if [ ! -f "${PROJECT_DIR}/data/invoice_bonus.db" ]; then
-        log "資料庫不存在，執行完整遷移..."
-        cd "${PROJECT_DIR}"
+        log "資料庫不存在，建立初始結構..."
         npm run migrate || error "基礎資料庫遷移失敗"
-        npm run migrate:project-code || warning "專案編號唯一約束遷移失敗（可能已存在）"
-        npm run migrate:project-customer || warning "專案編號+客戶唯一約束遷移失敗（可能已存在）"
-        npm run migrate:project-name || warning "專案編號+客戶+專案名稱唯一約束遷移失敗（可能已存在）"
-        npm run migrate:user-roles || warning "使用者角色遷移失敗（可能已存在）"
-        npm run migrate:roles || warning "角色管理表遷移失敗（可能已存在）"
-        npm run migrate:remove-user-role-check || warning "移除使用者角色 CHECK 約束遷移失敗（可能已存在）"
-        npm run migrate:system-settings || warning "系統設定表遷移失敗（可能已存在）"
-              npm run migrate:project-types || warning "專案類型表遷移失敗（可能已存在）"
-              npm run migrate:sales-discount || warning "銷貨折讓欄位遷移失敗（可能已存在）"
-              npm run migrate:costs || warning "成本明細表遷移失敗（可能已存在）"
-              npm run migrate:update-total-received || warning "更新收款總額計算遷移失敗（可能已存在）"
-              npm run migrate:invoice-expected-payment-date || warning "發票預計收款日欄位遷移失敗（可能已存在）"
-        
-        # 首次安裝時插入種子資料
-        if [ "$IS_FIRST_INSTALL" = true ]; then
-            log "插入種子資料..."
-            npm run seed || warning "種子資料插入失敗（可能已存在）"
-        fi
-        
-        log "✓ 資料庫初始化完成"
-    else
-        log "資料庫已存在，執行增量遷移..."
-        cd "${PROJECT_DIR}"
-        # 執行增量遷移（這些 migration 會檢查是否已存在，安全執行）
-        npm run migrate:project-code || warning "專案編號唯一約束遷移失敗（可能已存在）"
-        npm run migrate:project-customer || warning "專案編號+客戶唯一約束遷移失敗（可能已存在）"
-        npm run migrate:project-name || warning "專案編號+客戶+專案名稱唯一約束遷移失敗（可能已存在）"
-        npm run migrate:user-roles || warning "使用者角色遷移失敗（可能已存在）"
-        npm run migrate:roles || warning "角色管理表遷移失敗（可能已存在）"
-        npm run migrate:remove-user-role-check || warning "移除使用者角色 CHECK 約束遷移失敗（可能已存在）"
-        npm run migrate:system-settings || warning "系統設定表遷移失敗（可能已存在）"
-        npm run migrate:project-types || warning "專案類型表遷移失敗（可能已存在）"
-              npm run migrate:remove-project-type-check || warning "移除專案類型 CHECK 約束遷移失敗（可能已存在）"
-              npm run migrate:sales-discount || warning "銷貨折讓欄位遷移失敗（可能已存在）"
-              npm run migrate:costs || warning "成本明細表遷移失敗（可能已存在）"
-              npm run migrate:update-total-received || warning "更新收款總額計算遷移失敗（可能已存在）"
-              npm run migrate:invoice-expected-payment-date || warning "發票預計收款日欄位遷移失敗（可能已存在）"
-        log "✓ 增量遷移完成"
     fi
+    node migrations/runner.js || warning "部分 migration 執行失敗，請檢查上方輸出"
+    if [ "$IS_FIRST_INSTALL" = true ] && [ ! -f "${PROJECT_DIR}/data/.seeded" ]; then
+        log "插入種子資料..."
+        npm run seed && touch "${PROJECT_DIR}/data/.seeded" || warning "種子資料插入失敗（可能已存在）"
+    fi
+    log "✓ 資料庫遷移完成"
 else
-    log "步驟 4/6: 跳過資料庫遷移（找不到 migrations 目錄）"
+    log "步驟 5/7: 跳過資料庫遷移（找不到 migrations 目錄）"
 fi
 
 # 步驟 5: 檢查並更新 systemd 服務配置
@@ -470,6 +398,12 @@ fi
 
 if [ "$NEED_UPDATE" = true ]; then
     log "更新 systemd 服務文件..."
+    # 保留現有 SESSION_SECRET；首次安裝時產生隨機值
+    EXISTING_SECRET=$(grep "^Environment=SESSION_SECRET=" "$SERVICE_FILE" 2>/dev/null | cut -d'=' -f3-)
+    if [ -z "$EXISTING_SECRET" ]; then
+        EXISTING_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | sha256sum | cut -d' ' -f1)
+        log "已產生新的 SESSION_SECRET"
+    fi
     sudo tee "$SERVICE_FILE" > /dev/null <<EOF
 [Unit]
 Description=專案開立發票業績認列獎金計算總表系統
@@ -485,6 +419,7 @@ WorkingDirectory=${PROJECT_DIR}
 Environment=NODE_ENV=production
 Environment=PORT=${PORT}
 Environment="PATH=${PATH}"
+Environment=SESSION_SECRET=${EXISTING_SECRET}
 ExecStart=${NODE_PATH} ${PROJECT_DIR}/src/app.js
 Restart=always
 RestartSec=10
@@ -670,47 +605,52 @@ if [ $BACKUP_TIMER_EXISTS -eq 1 ]; then
         echo "  查看狀態: sudo systemctl status ${BACKUP_SERVICE_NAME}.timer"
     fi
     echo ""
-    read -p "是否要修改自動備份設定？(y/N): " MODIFY_BACKUP
-    if [[ "$MODIFY_BACKUP" =~ ^[Yy]$ ]]; then
-        if [ -f "${PROJECT_DIR}/setup-backup-timer.sh" ]; then
-            chmod +x "${PROJECT_DIR}/setup-backup-timer.sh"
-            bash "${PROJECT_DIR}/setup-backup-timer.sh"
-        else
-            warning "找不到備份設定腳本: ${PROJECT_DIR}/setup-backup-timer.sh"
+    if [ -z "$SKIP_BACKUP_PROMPT" ]; then
+        read -p "是否要修改自動備份設定？(y/N): " MODIFY_BACKUP
+        if [[ "$MODIFY_BACKUP" =~ ^[Yy]$ ]]; then
+            if [ -f "${PROJECT_DIR}/setup-backup-timer.sh" ]; then
+                chmod +x "${PROJECT_DIR}/setup-backup-timer.sh"
+                bash "${PROJECT_DIR}/setup-backup-timer.sh"
+            else
+                warning "找不到備份設定腳本: ${PROJECT_DIR}/setup-backup-timer.sh"
+            fi
         fi
+    else
+        info "如需修改備份設定，請手動執行: sudo ${PROJECT_DIR}/setup-backup-timer.sh"
     fi
 else
     echo ""
     info "系統尚未設定自動備份"
     echo ""
-    read -p "是否要設定自動備份？(Y/n): " SETUP_BACKUP
-    if [[ ! "$SETUP_BACKUP" =~ ^[Nn]$ ]]; then
-        if [ -f "${PROJECT_DIR}/setup-backup-timer.sh" ]; then
-            chmod +x "${PROJECT_DIR}/setup-backup-timer.sh"
-            # 傳入 "1" 為預設每日備份，避免非互動或直接 Enter 導致未建立 timer
-            log "設定自動備份（預設：每日凌晨 2:00）..."
-            bash "${PROJECT_DIR}/setup-backup-timer.sh" "1"
-            if systemctl list-unit-files | grep -q "^${BACKUP_SERVICE_NAME}.timer"; then
-                # 重新載入並啟動 timer，確保 NEXT 正確顯示（避免 Trigger: n/a）
-                systemctl daemon-reload
-                systemctl restart "${BACKUP_SERVICE_NAME}.timer"
-                log "✓ 自動備份已設定完成"
+    if [ -z "$SKIP_BACKUP_PROMPT" ]; then
+        read -p "是否要設定自動備份？(Y/n): " SETUP_BACKUP
+        if [[ ! "$SETUP_BACKUP" =~ ^[Nn]$ ]]; then
+            if [ -f "${PROJECT_DIR}/setup-backup-timer.sh" ]; then
+                chmod +x "${PROJECT_DIR}/setup-backup-timer.sh"
+                # 傳入 "1" 為預設每日備份，避免非互動或直接 Enter 導致未建立 timer
+                log "設定自動備份（預設：每日凌晨 2:00）..."
+                bash "${PROJECT_DIR}/setup-backup-timer.sh" "1"
+                if systemctl list-unit-files | grep -q "^${BACKUP_SERVICE_NAME}.timer"; then
+                    # 重新載入並啟動 timer，確保 NEXT 正確顯示（避免 Trigger: n/a）
+                    systemctl daemon-reload
+                    systemctl restart "${BACKUP_SERVICE_NAME}.timer"
+                    log "✓ 自動備份已設定完成"
+                else
+                    warning "自動備份設定可能未完成，請手動執行: sudo ${PROJECT_DIR}/setup-backup-timer.sh"
+                fi
             else
-                warning "自動備份設定可能未完成，請手動執行: sudo ${PROJECT_DIR}/setup-backup-timer.sh"
-                info "詳細檢查方式請參閱：自動備份排程檢查與修正指南.md"
+                warning "找不到備份設定腳本: ${PROJECT_DIR}/setup-backup-timer.sh"
+                info "您可以稍後手動執行: sudo ${PROJECT_DIR}/setup-backup-timer.sh"
             fi
         else
-            warning "找不到備份設定腳本: ${PROJECT_DIR}/setup-backup-timer.sh"
-            info "您可以稍後手動執行: sudo ${PROJECT_DIR}/setup-backup-timer.sh"
+            info "跳過自動備份設定"
+            echo ""
+            echo "您可以稍後執行以下命令設定自動備份："
+            echo "  sudo ${PROJECT_DIR}/setup-backup-timer.sh"
+            echo ""
         fi
     else
-        info "跳過自動備份設定"
-        echo ""
-        echo "您可以稍後執行以下命令設定自動備份："
-        echo "  sudo ${PROJECT_DIR}/setup-backup-timer.sh"
-        echo ""
-        echo "或手動執行備份："
-        echo "  sudo ${PROJECT_DIR}/backup.sh"
+        info "如需設定自動備份，請手動執行: sudo ${PROJECT_DIR}/setup-backup-timer.sh"
     fi
 fi
 

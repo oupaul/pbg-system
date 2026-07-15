@@ -48,6 +48,14 @@ function migrate() {
 
     console.log('檢測到舊的 project_type CHECK 約束，開始移除...');
 
+    // 取得目前 projects 的完整欄位清單（不依賴硬編碼）
+    const currentColumns = db.prepare('PRAGMA table_info(projects)').all().map(c => c.name);
+
+    // 從現有 CREATE SQL 移除 CHECK 約束並改名為 projects_new
+    const newTableSql = createTableSql
+      .replace(/CHECK\s*\(\s*project_type\s+IN\s*\([^)]+\)\s*\)/g, '')
+      .replace(/^CREATE TABLE\s+(?:"projects"|projects)\b/, 'CREATE TABLE IF NOT EXISTS projects_new');
+
     // 暫時禁用外鍵約束，避免刪除 projects 表時影響相關資料（invoices, payments 等）
     console.log('暫時禁用外鍵約束（保護相關資料）...');
     db.pragma('foreign_keys = OFF');
@@ -59,44 +67,14 @@ function migrate() {
       db.exec(`DROP VIEW IF EXISTS v_project_summary`);
       db.exec(`DROP VIEW IF EXISTS v_bonus_summary`);
 
-      // 2. 創建新表（移除 CHECK 約束，但保留 NOT NULL）
+      // 1. 用現有結構建立 projects_new（只移除 CHECK，保留所有欄位）
       console.log('創建新表結構（移除 CHECK 約束）...');
-      
-      // 檢查是否存在 sales_discount 欄位
-      const tableInfo = db.prepare("PRAGMA table_info(projects)").all();
-      const hasSalesDiscount = tableInfo.some(col => col.name === 'sales_discount');
-      
-      db.exec(`
-        CREATE TABLE IF NOT EXISTS projects_new (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          project_code TEXT NOT NULL,
-          contract_year INTEGER NOT NULL,
-          contract_month INTEGER NOT NULL,
-          status TEXT DEFAULT '未結案' CHECK(status IN ('未結案', '已結案', '取消')),
-          project_type TEXT NOT NULL,
-          salesperson_id INTEGER,
-          customer_id INTEGER,
-          project_name TEXT NOT NULL,
-          price_with_tax REAL DEFAULT 0,
-          price_without_tax REAL DEFAULT 0,
-          is_new_customer INTEGER DEFAULT 0,
-          expected_invoice_year_month TEXT,
-          ${hasSalesDiscount ? 'sales_discount REAL DEFAULT 0,' : ''}
-          notes TEXT,
-          created_at TEXT DEFAULT (datetime('now', 'localtime')),
-          updated_at TEXT DEFAULT (datetime('now', 'localtime')),
-          FOREIGN KEY (salesperson_id) REFERENCES salespeople(id),
-          FOREIGN KEY (customer_id) REFERENCES customers(id),
-          UNIQUE(project_code, project_type, customer_id, project_name)
-        )
-      `);
+      db.exec(newTableSql);
 
-      // 3. 複製資料
+      // 2. 用明確欄位名複製資料（避免 SELECT * 因欄位數不符出錯）
       console.log('複製資料...');
-      db.exec(`
-        INSERT INTO projects_new 
-        SELECT * FROM projects
-      `);
+      const colList = currentColumns.join(', ');
+      db.exec(`INSERT INTO projects_new (${colList}) SELECT ${colList} FROM projects`);
 
       // 4. 刪除舊表（外鍵約束已禁用，不會影響相關資料）
       console.log('刪除舊表...');

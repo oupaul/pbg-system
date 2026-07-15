@@ -56,6 +56,9 @@
     bodyHtml += '            <th style="width: 60px;">排序</th>';
     bodyHtml += '            <th>類型名稱</th>';
     bodyHtml += '            <th>顏色標籤</th>';
+    bodyHtml += '            <th>毛利警示閾值(%)</th>';
+    bodyHtml += '            <th>儀表板顯示</th>';
+    bodyHtml += '            <th>獨立加總</th>';
     bodyHtml += '            <th>狀態</th>';
     bodyHtml += '            <th style="width: 200px;">操作</th>';
     bodyHtml += '          </tr>';
@@ -66,6 +69,10 @@
       const statusBadge = type.is_active === 1 ? 
         '<span class="badge bg-success">啟用</span>' : 
         '<span class="badge bg-secondary">停用</span>';
+      const showInDashboard = (type.show_in_dashboard === 1 || type.show_in_dashboard === '1' || type.show_in_dashboard == null);
+      const showSeparateDashboard = (type.show_separate_dashboard === 1 || type.show_separate_dashboard === '1');
+      const dashboardBadge = showInDashboard ? '<span class="badge bg-info">顯示</span>' : '<span class="badge bg-secondary">不顯示</span>';
+      const separateBadge = showSeparateDashboard ? '<span class="badge bg-primary">是</span>' : '<span class="text-muted">-</span>';
       const badgePreview = '<span class="badge bg-' + type.badge_color + '">' + type.type_name + '</span>';
       const colorDescription = colorNames[type.badge_color] || type.badge_color;
       
@@ -73,9 +80,12 @@
       bodyHtml += '            <td>' + type.display_order + '</td>';
       bodyHtml += '            <td><strong>' + type.type_name + '</strong></td>';
       bodyHtml += '            <td>' + badgePreview + ' <small class="text-muted">(' + colorDescription + ')</small></td>';
+      bodyHtml += '            <td>' + (type.alert_margin_threshold != null && type.alert_margin_threshold !== '' ? type.alert_margin_threshold + '%' : '<span class="text-muted">-</span>') + '</td>';
+      bodyHtml += '            <td>' + dashboardBadge + '</td>';
+      bodyHtml += '            <td>' + separateBadge + '</td>';
       bodyHtml += '            <td>' + statusBadge + '</td>';
       bodyHtml += '            <td>';
-      bodyHtml += '              <button type="button" class="btn btn-sm btn-outline-primary" onclick="editType(' + type.id + ', \'' + type.type_name.replace(/'/g, "\\'") + '\', \'' + type.badge_color + '\', ' + type.display_order + ', ' + type.is_active + ')">';
+      bodyHtml += '              <button type="button" class="btn btn-sm btn-outline-primary" onclick="editType(' + type.id + ', \'' + type.type_name.replace(/'/g, "\\'") + '\', \'' + type.badge_color + '\', ' + type.display_order + ', ' + type.is_active + ', ' + (type.alert_margin_threshold != null && type.alert_margin_threshold !== '' ? type.alert_margin_threshold : 'null') + ', ' + (showInDashboard ? '1' : '0') + ', ' + (showSeparateDashboard ? '1' : '0') + ')">';
       bodyHtml += '                <i class="bi bi-pencil"></i> 編輯';
       bodyHtml += '              </button>';
       bodyHtml += '              <form action="/project-types/delete/' + type.id + '" method="POST" style="display:inline" onsubmit="return confirm(\'確定要刪除此類型？\\n\\n注意：如果有專案使用此類型，將無法刪除。\')">';
@@ -127,6 +137,25 @@
   bodyHtml += '            <input type="number" name="display_order" class="form-control" min="0" value="0">';
   bodyHtml += '            <small class="form-text text-muted">數字越小越靠前，相同數字按名稱排序</small>';
   bodyHtml += '          </div>';
+  bodyHtml += '          <div class="mb-3">';
+  bodyHtml += '            <label class="form-label">毛利警示閾值(%)</label>';
+  bodyHtml += '            <input type="number" name="alert_margin_threshold" class="form-control" min="0" max="100" step="0.1" placeholder="留空則不警示">';
+  bodyHtml += '            <small class="form-text text-muted">毛利率低於此值時，該類型下的「每個專案」在毛利分析專案明細顯示警示</small>';
+  bodyHtml += '          </div>';
+  bodyHtml += '          <div class="mb-3">';
+  bodyHtml += '            <div class="form-check form-switch">';
+  bodyHtml += '              <input class="form-check-input" type="checkbox" name="show_in_dashboard" value="1" checked>';
+  bodyHtml += '              <label class="form-check-label">儀表板專案類型分布顯示</label>';
+  bodyHtml += '            </div>';
+  bodyHtml += '            <small class="form-text text-muted">勾選後，此類型會在首頁儀表板的「專案類型分布」區塊中顯示</small>';
+  bodyHtml += '          </div>';
+  bodyHtml += '          <div class="mb-3">';
+  bodyHtml += '            <div class="form-check form-switch">';
+  bodyHtml += '              <input class="form-check-input" type="checkbox" name="show_separate_dashboard" value="1">';
+  bodyHtml += '              <label class="form-check-label">儀表板獨立加總</label>';
+  bodyHtml += '            </div>';
+  bodyHtml += '            <small class="form-text text-muted">勾選後，此類型會在首頁儀表板以獨立區塊顯示統計（專案數、總額、發票、收款等）</small>';
+  bodyHtml += '          </div>';
   bodyHtml += '        </div>';
   bodyHtml += '        <div class="modal-footer">';
   bodyHtml += '          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>';
@@ -170,6 +199,27 @@
   bodyHtml += '            <small class="form-text text-muted">數字越小越靠前，相同數字按名稱排序</small>';
   bodyHtml += '          </div>';
   bodyHtml += '          <div class="mb-3">';
+  bodyHtml += '            <label class="form-label">毛利警示閾值(%)</label>';
+  bodyHtml += '            <input type="number" name="alert_margin_threshold" id="editAlertMarginThreshold" class="form-control" min="0" max="100" step="0.1" placeholder="留空則不警示">';
+  bodyHtml += '            <small class="form-text text-muted">毛利率低於此值時，該類型下的「每個專案」在毛利分析專案明細顯示警示</small>';
+  bodyHtml += '          </div>';
+  bodyHtml += '          <div class="mb-3">';
+  bodyHtml += '            <label class="form-label">儀表板專案類型分布</label>';
+  bodyHtml += '            <div class="form-check form-switch">';
+  bodyHtml += '              <input class="form-check-input" type="checkbox" name="show_in_dashboard" id="editShowInDashboard" value="1">';
+  bodyHtml += '              <label class="form-check-label" for="editShowInDashboard">顯示</label>';
+  bodyHtml += '            </div>';
+  bodyHtml += '            <small class="form-text text-muted">勾選後，此類型會在首頁儀表板的「專案類型分布」區塊中顯示</small>';
+  bodyHtml += '          </div>';
+  bodyHtml += '          <div class="mb-3">';
+  bodyHtml += '            <label class="form-label">儀表板獨立加總</label>';
+  bodyHtml += '            <div class="form-check form-switch">';
+  bodyHtml += '              <input class="form-check-input" type="checkbox" name="show_separate_dashboard" id="editShowSeparateDashboard" value="1">';
+  bodyHtml += '              <label class="form-check-label" for="editShowSeparateDashboard">獨立加總</label>';
+  bodyHtml += '            </div>';
+  bodyHtml += '            <small class="form-text text-muted">勾選後，此類型會在首頁儀表板以獨立區塊顯示統計</small>';
+  bodyHtml += '          </div>';
+  bodyHtml += '          <div class="mb-3">';
   bodyHtml += '            <label class="form-label">狀態</label>';
   bodyHtml += '            <div class="form-check form-switch">';
   bodyHtml += '              <input class="form-check-input" type="checkbox" name="is_active" id="editIsActive" value="1" checked>';
@@ -188,12 +238,17 @@
   bodyHtml += '</div>';
 
   bodyHtml += '<script>';
-  bodyHtml += 'function editType(id, name, color, order, isActive) {';
+  bodyHtml += 'function editType(id, name, color, order, isActive, alertThreshold, showInDashboard, showSeparateDashboard) {';
   bodyHtml += '  document.getElementById("editTypeForm").action = "/project-types/update/" + id;';
   bodyHtml += '  document.getElementById("editTypeName").value = name;';
   bodyHtml += '  document.getElementById("editBadgeColor").value = color;';
   bodyHtml += '  document.getElementById("editDisplayOrder").value = order;';
   bodyHtml += '  document.getElementById("editIsActive").checked = isActive === 1;';
+  bodyHtml += '  document.getElementById("editAlertMarginThreshold").value = (alertThreshold != null && alertThreshold !== \'\' && !isNaN(alertThreshold)) ? alertThreshold : \'\';';
+  bodyHtml += '  var dashEl = document.getElementById("editShowInDashboard");';
+  bodyHtml += '  if (dashEl) dashEl.checked = (showInDashboard === 1 || showInDashboard === \'1\' || showInDashboard == null);';
+  bodyHtml += '  var sepEl = document.getElementById("editShowSeparateDashboard");';
+  bodyHtml += '  if (sepEl) sepEl.checked = (showSeparateDashboard === 1 || showSeparateDashboard === \'1\');';
   bodyHtml += '  updateColorPreview("edit");';
   bodyHtml += '  new bootstrap.Modal(document.getElementById("editTypeModal")).show();';
   bodyHtml += '}';

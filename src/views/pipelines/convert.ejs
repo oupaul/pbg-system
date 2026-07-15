@@ -1,0 +1,93 @@
+<%- include('../layout', { body: `
+<div class="row mb-4">
+  <div class="col">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/pipelines">潛在商機</a></li>
+        <li class="breadcrumb-item"><a href="/pipelines/${pipeline.id}">${pipeline.opportunity_name}</a></li>
+        <li class="breadcrumb-item active">轉入專案</li>
+      </ol>
+    </nav>
+    <h1 class="h3 mt-2"><i class="bi bi-box-arrow-in-right"></i> 轉入專案</h1>
+    <p class="text-muted mb-0">此商機已標記成交，請由財務人員提供正式的專案編號以完成建檔。</p>
+  </div>
+</div>
+
+${error ? `
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle"></i> ${error}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+<div class="card">
+  <div class="card-body">
+    <form action="/pipelines/${pipeline.id}/convert" method="POST">
+      <div class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label">專案編號 <span class="text-danger">*</span></label>
+          <input type="text" name="project_code" class="form-control" placeholder="由財務人員提供" required autofocus>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">簽約年度 <span class="text-danger">*</span></label>
+          <input type="number" name="contract_year" class="form-control" value="${new Date().getFullYear()}" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">專案月份</label>
+          <select name="contract_month" class="form-select">
+            ${[1,2,3,4,5,6,7,8,9,10,11,12].map(m => '<option value="' + m + '" ' + (new Date().getMonth() + 1 === m ? 'selected' : '') + '>' + m + '月</option>').join('')}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">專案類型 <span class="text-danger">*</span></label>
+          <select name="project_type" class="form-select" required>
+            <option value="">-- 選擇類型 --</option>
+            ${projectTypes.map(type => {
+              const selected = pipeline.project_type === type.type_name ? 'selected' : '';
+              return '<option value="' + type.type_name + '" ' + selected + '>' + type.type_name + '</option>';
+            }).join('')}
+          </select>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">專案名稱 <span class="text-danger">*</span></label>
+          <input type="text" name="project_name" class="form-control" value="${(pipeline.opportunity_name || '').replace(/"/g, '&quot;')}" required>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">客戶</label>
+          <input type="text" class="form-control" value="${(pipeline.customer_name || '').replace(/"/g, '&quot;')}" disabled>
+          <small class="form-text text-muted">沿用商機的客戶，不可變更</small>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">價格(含稅)</label>
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            <input type="number" name="price_with_tax" class="form-control" value="${pipeline.estimated_amount || 0}" step="1">
+          </div>
+          <small class="form-text text-muted">預設帶入商機預估金額，可依實際成交金額調整</small>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">價格(未稅)</label>
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            <input type="number" name="price_without_tax" class="form-control" value="0" step="1">
+          </div>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">備註</label>
+          <textarea name="notes" class="form-control" rows="3">${(pipeline.notes || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+        </div>
+      </div>
+
+      <hr class="my-4">
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-success"><i class="bi bi-check-lg"></i> 建立專案</button>
+        <a href="/pipelines/${pipeline.id}" class="btn btn-secondary"><i class="bi bi-x-lg"></i> 取消</a>
+      </div>
+    </form>
+  </div>
+</div>
+` }) %>

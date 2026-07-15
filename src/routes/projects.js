@@ -1,5 +1,9 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
+const multer = require('multer');
 const db = require('../models/db');
 const Project = require('../models/Project');
 const Invoice = require('../models/Invoice');
@@ -9,6 +13,50 @@ const Salesperson = require('../models/Salesperson');
 const Customer = require('../models/Customer');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireEditPermission } = require('../middleware/auth');
+const AuditLogService = require('../services/AuditLogService');
+const cache = require('../services/CacheService');
+
+// 專案附件上傳：儲存至 uploads/attachments，檔名唯一
+const attachmentsDir = path.join(__dirname, '..', '..', 'uploads', 'attachments');
+if (!fs.existsSync(attachmentsDir)) {
+  fs.mkdirSync(attachmentsDir, { recursive: true });
+}
+const uploadAttachment = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, attachmentsDir),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname) || '';
+      const name = `project_${req.params.id}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}${ext}`;
+      cb(null, name);
+    }
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
+
+/** 修正上傳檔名編碼：瀏覽器常以 UTF-8 傳送中文，若被解為 Latin-1 會變亂碼 */
+function fixFilenameEncoding(name) {
+  if (!name || typeof name !== 'string') return name;
+  try {
+    const decoded = Buffer.from(name, 'latin1').toString('utf8');
+    return decoded;
+  } catch (e) {
+    return name;
+  }
+}
+
+function getAttachmentsByProject(projectId, options = {}) {
+  try {
+    const table = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='project_attachments'").get();
+    if (!table) return [];
+    const includeDeleted = options.includeDeleted === true;
+    const sql = includeDeleted
+      ? 'SELECT * FROM project_attachments WHERE project_id = ? ORDER BY deleted_at IS NULL DESC, created_at DESC'
+      : 'SELECT * FROM project_attachments WHERE project_id = ? AND deleted_at IS NULL ORDER BY created_at DESC';
+    return db.prepare(sql).all(projectId);
+  } catch (e) {
+    return [];
+  }
+}
 
 // 輔助函數：獲取所有啟用的專案類型
 function getActiveProjectTypes() {
@@ -36,6 +84,17 @@ function getProjectTypeColor(typeName) {
   }
 }
 
+// 輔助函數：獲取所有報表群組（供專案表單下拉選單）
+function getReportGroups() {
+  try {
+    return db.prepare(`
+      SELECT * FROM report_groups ORDER BY display_order ASC, name ASC
+    `).all();
+  } catch (err) {
+    return [];
+  }
+}
+
 // 專案列表
 router.get('/', (req, res) => {
   // Debug: 檢查用戶資訊
@@ -43,26 +102,35 @@ router.get('/', (req, res) => {
   
   const years = Project.getYears();
   const expectedInvoiceYearMonths = Project.getExpectedInvoiceYearMonths();
+  const invoiceYears = Project.getInvoiceYears();
   const yearFilter = req.query.year || 'all'; // 預設為 'all'（全部年度）
   const filters = {
     year: yearFilter && yearFilter !== 'all' ? yearFilter : null,
     status: req.query.status,
     type: req.query.type,
     salesperson: req.query.salesperson,
-    keyword: req.query.keyword, // 新增關鍵字搜尋
-    expected_invoice_year_month: req.query.expected_invoice_year_month, // 新增預計開票年月篩選
-    uninvoiced: req.query.uninvoiced === 'true' || req.query.uninvoiced === true, // 未開立發票
-    unpaid: req.query.unpaid === 'true' || req.query.unpaid === true, // 有未收款金額
-    overdue_unpaid: req.query.overdue_unpaid === 'true' || req.query.overdue_unpaid === true, // 逾期未收款
-    sortBy: req.query.sortBy || 'contract_year', // 排序欄位
-    sortOrder: req.query.sortOrder || 'DESC' // 排序方向
+    keyword: req.query.keyword,
+    expected_invoice_year_month: req.query.expected_invoice_year_month,
+    uninvoiced: req.query.uninvoiced === 'true' || req.query.uninvoiced === true,
+    unpaid: req.query.unpaid === 'true' || req.query.unpaid === true,
+    overdue_unpaid: req.query.overdue_unpaid === 'true' || req.query.overdue_unpaid === true,
+    invoice_year: req.query.invoice_year || null, // 發票年度篩選
+    sortBy: req.query.sortBy || 'contract_year',
+    sortOrder: req.query.sortOrder || 'DESC'
   };
 
   // 傳遞用戶資訊以進行角色過濾
   const projects = Project.findAll(filters, req.user);
   console.log('[專案列表] 查詢到的專案數量:', projects.length);
   
-  const salespeople = Salesperson.findAll(true);
+  // 業務下拉清單：業務員只顯示自己；非 admin/user/boss 排除獨立計算業務；含離職人員
+  let salespeople;
+  if (req.user && req.user.role === 'salesperson' && req.user.salesperson_id) {
+    const sp = Salesperson.findById(req.user.salesperson_id);
+    salespeople = sp ? [sp] : [];
+  } else {
+    salespeople = Salesperson.findAll(true); // 含離職（儀表板獨立加總已改為依類型，不再依業務篩選）
+  }
   const projectTypes = getActiveProjectTypes();
   
   // 建立類型顏色映射（包括所有類型，不僅是啟用的）
@@ -90,6 +158,7 @@ router.get('/', (req, res) => {
     if (filters.uninvoiced) params.append('uninvoiced', 'true');
     if (filters.unpaid) params.append('unpaid', 'true');
     if (filters.overdue_unpaid) params.append('overdue_unpaid', 'true');
+    if (filters.invoice_year) params.append('invoice_year', filters.invoice_year);
     params.append('sortBy', newSortBy);
     params.append('sortOrder', newSortOrder);
     return params.toString();
@@ -143,24 +212,31 @@ router.get('/', (req, res) => {
   // 確保年度篩選預設為 'all'（全部年度）
   const displayYear = yearFilter && yearFilter !== 'all' ? yearFilter : 'all';
 
-  // 計算統計資訊（對業務員和老闆角色顯示）
+  // 計算統計資訊：所有角色皆顯示（依目前篩選結果加總）
+  const showFilterStats = filters.uninvoiced || filters.unpaid || filters.overdue_unpaid;
+  const showStatsForRole = !!req.user; // 登入者皆顯示
   let salespersonStats = null;
-  if (req.user && (req.user.role === 'salesperson' || req.user.role === 'boss')) {
+  if (showStatsForRole || showFilterStats) {
     salespersonStats = {
-      totalPrice: 0,           // 專案價格金額總和
-      totalInvoiced: 0,        // 已開立發票金額總和
-      totalUninvoiced: 0,      // 未開發票金額總和
-      totalReceived: 0,        // 已收款金額總和
-      totalUnpaid: 0           // 未收款金額總和
+      totalPrice: 0,
+      totalInvoiced: 0,
+      totalUninvoiced: 0,
+      totalReceived: 0,
+      totalUnpaid: 0
     };
-    
     projects.forEach(project => {
       salespersonStats.totalPrice += project.price_with_tax || 0;
-      salespersonStats.totalInvoiced += project.total_invoiced || 0;
-      salespersonStats.totalUninvoiced += project.uninvoiced_amount || 0;
-      salespersonStats.totalReceived += project.total_received || 0;
-      // 未收款金額 = 已開立發票金額 - 已收款金額 - 銷貨折讓
-      salespersonStats.totalUnpaid += (project.total_invoiced || 0) - (project.total_received || 0) - (project.sales_discount || 0);
+      if (filters.invoice_year) {
+        // 發票年度模式：統計只加總當年度發票金額
+        salespersonStats.totalInvoiced += project.year_invoiced || 0;
+        salespersonStats.totalReceived += project.year_received || 0;
+        salespersonStats.totalUnpaid += Math.max(0, project.year_unpaid || 0);
+      } else {
+        salespersonStats.totalInvoiced += project.total_invoiced || 0;
+        salespersonStats.totalUninvoiced += project.uninvoiced_amount ?? ((project.price_with_tax || 0) - (project.total_invoiced || 0));
+        salespersonStats.totalReceived += project.total_received || 0;
+        salespersonStats.totalUnpaid += Math.max(0, (project.total_invoiced || 0) - (project.total_received || 0) - (project.sales_discount || 0));
+      }
     });
   }
 
@@ -169,17 +245,88 @@ router.get('/', (req, res) => {
     projects,
     years,
     expectedInvoiceYearMonths,
+    invoiceYears,
     filters: {
       ...filters,
       year: displayYear
     },
     salespeople,
-    sortLinks: sortLinks, // 傳遞預生成的排序連結
-    sortIcons: sortIcons, // 傳遞預生成的箭頭圖示
-    salespersonStats: salespersonStats, // 統計資訊（業務員和老闆）
-    userRole: req.user ? req.user.role : null, // 傳遞用戶角色
-    projectTypes: projectTypes, // 傳遞專案類型列表
-    typeColorMap: typeColorMap // 傳遞類型顏色映射
+    sortLinks: sortLinks,
+    sortIcons: sortIcons,
+    salespersonStats: salespersonStats,
+    isFilterStatsOnly: showFilterStats && !showStatsForRole,
+    userRole: req.user ? req.user.role : null,
+    projectTypes: projectTypes,
+    typeColorMap: typeColorMap
+  });
+});
+
+// 發票明細清單 API（供模態視窗 AJAX 使用）
+router.get('/invoice-detail', (req, res) => {
+  const yearFilter = req.query.year || 'all';
+  const filters = {
+    year: yearFilter !== 'all' ? yearFilter : null,
+    status: req.query.status || null,
+    type: req.query.type || null,
+    salesperson: req.query.salesperson || null,
+    keyword: req.query.keyword || null,
+    expected_invoice_year_month: req.query.expected_invoice_year_month || null,
+    uninvoiced: req.query.uninvoiced === 'true',
+    unpaid: req.query.unpaid === 'true',
+    overdue_unpaid: req.query.overdue_unpaid === 'true',
+    invoice_year: req.query.invoice_year || null,
+    sortBy: 'contract_year',
+    sortOrder: 'DESC'
+  };
+
+  const projects = Project.findAll(filters, req.user);
+  const projectIds = projects.map(p => p.id);
+
+  if (projectIds.length === 0) {
+    return res.json({ invoices: [], totals: { count: 0, totalAmount: 0, totalAllowance: 0, totalNet: 0, totalPaid: 0, totalUnpaid: 0 } });
+  }
+
+  const placeholders = projectIds.map(() => '?').join(',');
+  let sql = `
+    SELECT
+      i.id, i.invoice_number, i.invoice_date,
+      i.amount_with_tax, COALESCE(i.allowance_amount, 0) AS allowance_amount,
+      i.status,
+      proj.project_code, proj.project_name,
+      COALESCE(sp.name, '') AS salesperson_name,
+      COALESCE(SUM(CASE WHEN pay.difference_type = '匯費'
+        THEN pay.bank_deposit_amount + COALESCE(pay.payment_difference, 0)
+        ELSE pay.bank_deposit_amount END), 0) AS paid_amount
+    FROM invoices i
+    JOIN projects proj ON proj.id = i.project_id
+    LEFT JOIN salespeople sp ON sp.id = proj.salesperson_id
+    LEFT JOIN payments pay ON pay.invoice_id = i.id AND pay.deleted_at IS NULL
+    WHERE i.project_id IN (${placeholders})
+      AND (i.status IS NULL OR i.status = '有效')
+      AND i.deleted_at IS NULL
+  `;
+  const sqlParams = [...projectIds];
+
+  if (filters.invoice_year) {
+    sql += ` AND strftime('%Y', i.invoice_date) = ?`;
+    sqlParams.push(filters.invoice_year);
+  }
+
+  sql += ` GROUP BY i.id ORDER BY i.invoice_date DESC, proj.project_code`;
+
+  const invoices = db.prepare(sql).all(...sqlParams);
+
+  let totalAmount = 0, totalAllowance = 0, totalNet = 0, totalPaid = 0;
+  invoices.forEach(inv => {
+    totalAmount += inv.amount_with_tax || 0;
+    totalAllowance += inv.allowance_amount || 0;
+    totalNet += (inv.amount_with_tax || 0) - (inv.allowance_amount || 0);
+    totalPaid += inv.paid_amount || 0;
+  });
+
+  res.json({
+    invoices,
+    totals: { count: invoices.length, totalAmount, totalAllowance, totalNet, totalPaid, totalUnpaid: totalNet - totalPaid }
   });
 });
 
@@ -188,13 +335,38 @@ router.get('/new', requireEditPermission, (req, res) => {
   const salespeople = Salesperson.findAll();
   const customers = Customer.findAll();
   const projectTypes = getActiveProjectTypes();
+  let project = null;
+  if (req.query.from_template) {
+    const ProjectTemplate = require('../models/ProjectTemplate');
+    const template = ProjectTemplate.findById(req.query.from_template);
+    if (template) {
+      project = {
+        project_code: '',
+        contract_year: new Date().getFullYear(),
+        contract_month: new Date().getMonth() + 1,
+        status: '未結案',
+        project_type: template.project_type,
+        salesperson_id: template.salesperson_id,
+        customer_id: template.customer_id,
+        project_name: template.project_name,
+        price_with_tax: template.price_with_tax,
+        price_without_tax: template.price_without_tax,
+        sales_discount: template.sales_discount,
+        is_new_customer: template.is_new_customer,
+        expected_invoice_year_month: template.expected_invoice_year_month,
+        notes: template.notes
+      };
+    }
+  }
 
+  const reportGroups = getReportGroups();
   res.render('projects/form', {
     title: '新增專案',
-    project: null,
+    project,
     salespeople,
     customers,
     projectTypes,
+    reportGroups,
     action: '/projects',
     method: 'POST'
   });
@@ -270,6 +442,7 @@ router.post('/', requireEditPermission, (req, res) => {
       sales_discount: parseFloat(req.body.sales_discount) || 0,
       is_new_customer: req.body.is_new_customer === '1',
       notes: req.body.notes ? req.body.notes.trim() : null,
+      report_group_id: req.body.report_group_id || null,
       userInfo: getUserInfo(req)
     });
 
@@ -280,6 +453,7 @@ router.post('/', requireEditPermission, (req, res) => {
       ));
     }
 
+    cache.delByPrefix('dashboard:');
     res.redirect(`/projects/${projectId}`);
   } catch (err) {
     console.error(err);
@@ -293,6 +467,87 @@ router.post('/', requireEditPermission, (req, res) => {
   }
 });
 
+// 專案附件下載/預覽（需有專案檢視權限；已軟刪除者不可下載）
+router.get('/:id/attachments/:attachmentId/download', (req, res) => {
+  const project = Project.findById(req.params.id, req.user);
+  if (!project) return res.status(404).send('找不到專案或無權限');
+  try {
+    const row = db.prepare('SELECT * FROM project_attachments WHERE id = ? AND project_id = ?').get(req.params.attachmentId, req.params.id);
+    if (!row) return res.status(404).send('找不到附件');
+    if (row.deleted_at) return res.status(410).send('此附件已刪除');
+    const filePath = path.join(attachmentsDir, row.stored_filename);
+    if (!fs.existsSync(filePath)) return res.status(404).send('檔案不存在');
+    const name = encodeURIComponent(row.original_filename).replace(/'/g, '%27');
+    const mimeType = row.mime_type || 'application/octet-stream';
+    const isPDF = mimeType === 'application/pdf';
+    res.setHeader('Content-Type', mimeType);
+    // PDF 使用 inline 預覽，其他檔案使用 attachment 下載
+    res.setHeader('Content-Disposition', `${isPDF ? 'inline' : 'attachment'}; filename*=UTF-8''${name}`);
+    res.sendFile(path.resolve(filePath));
+  } catch (err) {
+    console.error('附件下載錯誤:', err);
+    res.status(500).send('下載失敗');
+  }
+});
+
+// 專案附件軟刪除（需編輯權限）
+router.post('/:id/attachments/:attachmentId/delete', requireEditPermission, (req, res) => {
+  try {
+    const row = db.prepare('SELECT * FROM project_attachments WHERE id = ? AND project_id = ?').get(req.params.attachmentId, req.params.id);
+    if (!row) return res.redirect(`/projects/${req.params.id}?error=` + encodeURIComponent('找不到附件'));
+    const oldData = { ...row };
+    db.prepare("UPDATE project_attachments SET deleted_at = datetime('now', 'localtime') WHERE id = ?").run(req.params.attachmentId);
+    const newData = { ...oldData, deleted_at: new Date().toISOString().slice(0, 19).replace('T', ' ') };
+    AuditLogService.logUpdate('project_attachments', req.params.attachmentId, oldData, newData, getUserInfo(req));
+    res.redirect(`/projects/${req.params.id}?success=` + encodeURIComponent('附件已刪除（可於「顯示已刪除」中還原）'));
+  } catch (err) {
+    console.error('附件刪除錯誤:', err);
+    res.redirect(`/projects/${req.params.id}?error=` + encodeURIComponent(err.message));
+  }
+});
+
+// 專案附件還原（需編輯權限）
+router.post('/:id/attachments/:attachmentId/restore', requireEditPermission, (req, res) => {
+  try {
+    const row = db.prepare('SELECT * FROM project_attachments WHERE id = ? AND project_id = ?').get(req.params.attachmentId, req.params.id);
+    if (!row) return res.redirect(`/projects/${req.params.id}?error=` + encodeURIComponent('找不到附件'));
+    if (!row.deleted_at) return res.redirect(`/projects/${req.params.id}?success=` + encodeURIComponent('附件未刪除'));
+    const oldData = { ...row };
+    db.prepare('UPDATE project_attachments SET deleted_at = NULL WHERE id = ?').run(req.params.attachmentId);
+    const newData = { ...oldData, deleted_at: null };
+    AuditLogService.logUpdate('project_attachments', req.params.attachmentId, oldData, newData, getUserInfo(req));
+    res.redirect(`/projects/${req.params.id}?show_deleted=1&success=` + encodeURIComponent('附件已還原'));
+  } catch (err) {
+    console.error('附件還原錯誤:', err);
+    res.redirect(`/projects/${req.params.id}?error=` + encodeURIComponent(err.message));
+  }
+});
+
+// 專案附件上傳（需編輯權限）
+router.post('/:id/attachments', requireEditPermission, uploadAttachment.single('file'), (req, res) => {
+  if (!req.file) return res.redirect(`/projects/${req.params.id}?error=` + encodeURIComponent('請選擇檔案'));
+  try {
+    const displayName = fixFilenameEncoding(req.file.originalname || req.file.filename);
+    const result = db.prepare(`
+      INSERT INTO project_attachments (project_id, original_filename, stored_filename, mime_type, file_size)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(req.params.id, displayName, req.file.filename, req.file.mimetype || null, req.file.size || 0);
+    const newData = {
+      project_id: req.params.id,
+      original_filename: displayName,
+      stored_filename: req.file.filename,
+      mime_type: req.file.mimetype || null,
+      file_size: req.file.size || 0
+    };
+    AuditLogService.logCreate('project_attachments', result.lastInsertRowid, newData, getUserInfo(req));
+    res.redirect(`/projects/${req.params.id}?success=` + encodeURIComponent('附件已上傳'));
+  } catch (err) {
+    console.error('附件上傳錯誤:', err);
+    if (req.file && req.file.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    res.redirect(`/projects/${req.params.id}?error=` + encodeURIComponent(err.message));
+  }
+});
+
 // 專案詳情
 router.get('/:id', (req, res) => {
   // 傳遞用戶資訊以進行權限檢查
@@ -301,39 +556,61 @@ router.get('/:id', (req, res) => {
     return res.status(404).render('error', { message: '找不到專案或無權限查看', error: {} });
   }
 
-  const invoices = Invoice.findByProject(project.id);
-  const payments = Payment.findByProject(project.id);
+  const showDeleted = req.query.show_deleted === '1' || req.query.show_deleted === 'true';
+  // findByProjectWithPayments 優先使用 v_invoice_summary 視圖，每筆發票附帶 total_received / unpaid_amount
+  const invoices = Invoice.findByProjectWithPayments(project.id, { includeDeleted: showDeleted });
+  const payments = Payment.findByProject(project.id, { includeDeleted: showDeleted });
   const bonuses = Bonus.findByProject(project.id);
   const Cost = require('../models/Cost');
   const costs = Cost.findByProject(project.id);
 
-  // 計算每筆發票的收款狀態（與收款明細比對）
+  // 計算每筆發票的收款狀態（與收款明細比對，僅用未刪除的收款）
+  // 支援分次收款：僅在「已收齊」時顯示提前/準時/逾期到款；部分收款時依預計收款日顯示待收狀態
+  const paymentsForStatus = Payment.findByProject(project.id); // 未刪除
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   const diffDays = (d1, d2) => Math.round((new Date(d1) - new Date(d2)) / (1000 * 60 * 60 * 24));
 
   const invoicesWithStatus = invoices.map(inv => {
-    const invPayments = payments.filter(p => p.invoice_id === inv.id);
+    const invPayments = paymentsForStatus.filter(p => p.invoice_id === inv.id);
     const expectedDate = inv.expected_payment_date || null;
+    const invAmount = (inv.amount_with_tax || 0) - (inv.allowance_amount || 0);
+    const paid = invPayments.reduce((s, p) => s + Payment.calculateActualReceived(p), 0);
+    const isFullyPaid = invAmount <= 0 || paid >= invAmount;
     let paymentStatus = { text: '-', class: 'text-muted' };
 
-    if (invPayments.length > 0) {
-      // 有收款記錄：取最早一筆有日期的收款（若都無日期則取第一筆）
+    if (invPayments.length > 0 && !isFullyPaid) {
+      // 部分收款：不顯示「提前到款」，改依預計收款日顯示待收狀態
+      if (!expectedDate) {
+        paymentStatus = { text: `部分收款 (未收 $${Math.round(invAmount - paid).toLocaleString()})`, class: 'text-warning' };
+      } else if (expectedDate > today) {
+        const days = diffDays(expectedDate, today);
+        paymentStatus = { text: `部分收款，將於${days}天後收款`, class: 'text-primary' };
+      } else if (expectedDate < today) {
+        const days = diffDays(today, expectedDate);
+        paymentStatus = { text: `部分收款，已逾期${days}天`, class: 'text-danger' };
+      } else {
+        paymentStatus = { text: '部分收款，預計今日收款', class: 'text-warning' };
+      }
+    } else if (invPayments.length > 0 && isFullyPaid) {
+      // 已收齊：取最後一筆收款日期與預計收款日比較（或最早一筆若無預計日）
       const withDate = invPayments.filter(p => p.payment_date);
       const sortedPayments = (withDate.length ? withDate : invPayments)
         .slice().sort((a, b) => (a.payment_date || '').localeCompare(b.payment_date || ''));
+      const lastPaymentDate = sortedPayments[sortedPayments.length - 1]?.payment_date;
       const firstPaymentDate = sortedPayments[0]?.payment_date;
+      const refDate = lastPaymentDate || firstPaymentDate;
 
-      if (!firstPaymentDate) {
-        paymentStatus = { text: '已收款', class: 'text-success' };
+      if (!refDate) {
+        paymentStatus = { text: '已收齊', class: 'text-success' };
       } else if (!expectedDate) {
-        paymentStatus = { text: '已收款', class: 'text-success' };
-      } else if (firstPaymentDate === expectedDate) {
+        paymentStatus = { text: '已收齊', class: 'text-success' };
+      } else if (refDate === expectedDate) {
         paymentStatus = { text: '準時到款', class: 'text-success' };
-      } else if (firstPaymentDate > expectedDate) {
-        const days = diffDays(firstPaymentDate, expectedDate);
+      } else if (refDate > expectedDate) {
+        const days = diffDays(refDate, expectedDate);
         paymentStatus = { text: `款項到帳但逾期${days}天`, class: 'text-warning' };
       } else {
-        const days = diffDays(expectedDate, firstPaymentDate);
+        const days = diffDays(expectedDate, refDate);
         paymentStatus = { text: `提前${days}天到款`, class: 'text-info' };
       }
     } else {
@@ -354,13 +631,37 @@ router.get('/:id', (req, res) => {
     return { ...inv, paymentStatus };
   });
 
-  // 找出已被選取的發票 ID（用於新增收款時排除）
-  const usedInvoiceIds = new Set(payments.filter(p => p.invoice_id).map(p => p.invoice_id));
+  // 有效發票（供收款對應選擇，僅 有效 狀態）
+  const validInvoices = Invoice.findValidByProject ? Invoice.findValidByProject(project.id) : invoices.filter(i => !i.status || i.status === '有效');
 
-  // 計算彙總
-  const totalInvoiced = invoices.reduce((sum, i) => sum + (i.amount_with_tax || 0), 0);
-  // 計算實際收款金額（考慮匯費差異）- 使用 Payment.calculateActualReceived 方法保持一致性
-  const totalReceived = payments.reduce((sum, p) => sum + Payment.calculateActualReceived(p), 0);
+  // 每筆發票的已收款/未收款摘要
+  // invoices 已透過 findByProjectWithPayments 取得 total_received / unpaid_amount，直接使用，不需再掃 paymentsForStatus
+  const invoiceIdsInPayments = new Set(paymentsForStatus.filter(p => p.invoice_id).map(p => p.invoice_id));
+  const allInvsForSummary = [...validInvoices];
+  invoices.forEach(inv => {
+    if (!allInvsForSummary.some(i => i.id === inv.id) && invoiceIdsInPayments.has(inv.id)) {
+      allInvsForSummary.push(inv); // 含已作廢但曾有收款的發票（供編輯時顯示）
+    }
+  });
+  // 以視圖提供的 total_received / unpaid_amount 為主；若視圖尚未建立則回退計算
+  const invoiceUnpaidSummary = allInvsForSummary.map(inv => {
+    const invAmount = inv.recognized_amount != null
+      ? inv.recognized_amount
+      : (inv.amount_with_tax || 0) - (inv.allowance_amount || 0);
+    const paid = inv.total_received != null
+      ? inv.total_received
+      : paymentsForStatus.filter(p => p.invoice_id === inv.id).reduce((s, p) => s + Payment.calculateActualReceived(p), 0);
+    const unpaid = inv.unpaid_amount != null
+      ? inv.unpaid_amount
+      : Math.max(0, invAmount - paid);
+    const isValid = !inv.status || inv.status === '有效';
+    return { invoice_id: inv.id, invoice_number: inv.invoice_number, amount: invAmount, paid, unpaid, isValid };
+  });
+
+  // 計算彙總（僅計有效發票）
+  const totalInvoiced = Invoice.getTotalByProject(project.id);
+  // 計算實際收款金額（考慮匯費差異，僅計未刪除收款）
+  const totalReceived = paymentsForStatus.reduce((sum, p) => sum + Payment.calculateActualReceived(p), 0);
   const totalBonus = bonuses.reduce((sum, b) => sum + (b.bonus_amount || 0), 0);
   const totalCost = Cost.getTotalByProject(project.id);
   const grossProfit = (project.price_without_tax || 0) - totalCost;
@@ -377,15 +678,22 @@ router.get('/:id', (req, res) => {
     typeColorMap = {};
   }
 
+  const attachments = getAttachmentsByProject(project.id, { includeDeleted: showDeleted });
+
   res.render('projects/show', {
     title: project.project_name,
     project,
     invoices: invoicesWithStatus,
+    validInvoices, // 有效發票（收款對應用）
+    invoiceUnpaidSummary, // 每筆發票已收/未收摘要（支援分次收款）
     payments,
     costs,
+    attachments,
     bonuses,
     typeColorMap,
-    usedInvoiceIds: Array.from(usedInvoiceIds), // 已使用的發票 ID 列表
+    showDeleted, // 是否顯示已刪除的發票/收款
+    success: req.query.success ? decodeURIComponent(req.query.success) : null,
+    error: req.query.error ? decodeURIComponent(req.query.error) : null,
     summary: {
       totalInvoiced,
       uninvoiced: project.price_with_tax - totalInvoiced,
@@ -408,6 +716,7 @@ router.get('/:id/edit', requireEditPermission, (req, res) => {
   const salespeople = Salesperson.findAll(true);
   const customers = Customer.findAll();
   const projectTypes = getActiveProjectTypes();
+  const reportGroups = getReportGroups();
 
   res.render('projects/form', {
     title: '編輯專案',
@@ -415,6 +724,7 @@ router.get('/:id/edit', requireEditPermission, (req, res) => {
     salespeople,
     customers,
     projectTypes,
+    reportGroups,
     action: `/projects/${project.id}`,
     method: 'POST'
   });
@@ -476,13 +786,14 @@ router.post('/:id', requireEditPermission, (req, res) => {
       sales_discount: req.body.sales_discount ? parseFloat(req.body.sales_discount) : 0,
       is_new_customer: req.body.is_new_customer === '1' ? 1 : 0,
       notes: req.body.notes || null,
+      report_group_id: req.body.report_group_id && req.body.report_group_id !== '' ? parseInt(req.body.report_group_id) : null,
       userInfo: getUserInfo(req) // 添加用戶資訊用於審計日誌
     });
 
+    cache.delByPrefix('dashboard:');
     res.redirect(`/projects/${req.params.id}`);
   } catch (err) {
     console.error(err);
-    // 檢查是否為唯一約束錯誤
     if (err.message && err.message.includes('UNIQUE constraint')) {
       return res.redirect(`/projects/${req.params.id}/edit?error=` + encodeURIComponent(
         `專案編號 "${req.body.project_code}" 在類型 "${req.body.project_type}" 中已存在`
@@ -557,6 +868,7 @@ router.post('/:id/update-expected-invoice', requireEditPermission, (req, res) =>
 router.post('/:id/delete', requireEditPermission, (req, res) => {
   try {
     Project.delete(req.params.id);
+    cache.delByPrefix('dashboard:');
     res.redirect('/projects');
   } catch (err) {
     console.error(err);

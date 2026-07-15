@@ -1,0 +1,85 @@
+<%- include('../layout', { title: title, body: `
+<div class="row mb-4">
+  <div class="col">
+    <h1 class="h3">
+      <i class="bi bi-file-earmark-text"></i>
+      ${title}
+    </h1>
+  </div>
+</div>
+
+${typeof error !== 'undefined' && error ? '<div class="alert alert-danger mb-4">' + error + '</div>' : ''}
+
+<div class="card">
+  <div class="card-body">
+    <form action="${action}" method="POST">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">範本名稱 <span class="text-danger">*</span></label>
+          <input type="text" name="name" class="form-control" value="${template ? (template.name || '').replace(/"/g, '&quot;') : ''}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">說明（選填）</label>
+          <input type="text" name="description" class="form-control" value="${template ? (template.description || '').replace(/"/g, '&quot;') : ''}" placeholder="例如：常態型專案範本">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">專案類型</label>
+          <select name="project_type" class="form-select">
+            <option value="">-- 選擇類型 --</option>
+            ${typeof projectTypes !== 'undefined' && projectTypes ? projectTypes.map(type => {
+              const selected = template && template.project_type === type.type_name ? 'selected' : '';
+              return '<option value="' + type.type_name + '" ' + selected + '>' + type.type_name + '</option>';
+            }).join('') : '<option value="食驗室">食驗室</option><option value="純廣">純廣</option><option value="專案">專案</option>'}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">業務人員</label>
+          <select name="salesperson_id" class="form-select">
+            <option value="">-- 選擇業務 --</option>
+            ${(salespeople || []).map(s => { const selected = template && template.salesperson_id == s.id ? 'selected' : ''; return '<option value="' + s.id + '" ' + selected + '>' + (s.name || '').replace(/"/g, '&quot;') + '</option>'; }).join('')}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">客戶</label>
+          <select name="customer_id" class="form-select">
+            <option value="">-- 選擇客戶 --</option>
+            ${(customers || []).map(c => { const selected = template && template.customer_id == c.id ? 'selected' : ''; return '<option value="' + c.id + '" ' + selected + '>' + (c.company_name || '').replace(/"/g, '&quot;') + ' (' + (c.customer_code || '') + ')</option>'; }).join('')}
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label">專案名稱（預設）</label>
+          <input type="text" name="project_name" class="form-control" value="${template ? (template.project_name || '').replace(/"/g, '&quot;') : ''}" placeholder="從範本建立專案時可帶入">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">新客戶</label>
+          <div class="form-check mt-2">
+            <input type="checkbox" name="is_new_customer" value="1" class="form-check-input" ${template && template.is_new_customer ? 'checked' : ''}>
+            <label class="form-check-label">是新客戶</label>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">預計開發票月份</label>
+          <input type="text" name="expected_invoice_year_month" class="form-control" value="${template ? (template.expected_invoice_year_month || '') : ''}" placeholder="YYYY-MM">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">價格(含稅)</label>
+          <input type="number" name="price_with_tax" class="form-control" value="${template ? (template.price_with_tax || 0) : 0}" step="1">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">銷貨折讓</label>
+          <input type="number" name="sales_discount" class="form-control" value="${template ? (template.sales_discount || 0) : 0}" step="1" min="0">
+        </div>
+        <div class="col-12">
+          <label class="form-label">備註</label>
+          <textarea name="notes" class="form-control" rows="2">${template ? (template.notes || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</textarea>
+        </div>
+      </div>
+      <hr class="my-4">
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> ${template ? '更新' : '建立'}</button>
+        <a href="/project-templates" class="btn btn-secondary"><i class="bi bi-x-lg"></i> 取消</a>
+      </div>
+    </form>
+  </div>
+</div>
+` }) %>

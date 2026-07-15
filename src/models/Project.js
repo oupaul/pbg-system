@@ -1,43 +1,65 @@
 const db = require('./db');
 const AuditLogService = require('../services/AuditLogService');
+const { PROJECT_VIEW_SCOPE, ROLES } = require('../constants');
+
+// Return salesperson IDs accessible to a user via user_salesperson_access table
+function getAssignedSalespersonIds(userId) {
+  try {
+    const rows = db.prepare(
+      'SELECT salesperson_id FROM user_salesperson_access WHERE user_id = ?'
+    ).all(userId);
+    return rows.map(r => r.salesperson_id);
+  } catch {
+    return [];
+  }
+}
 
 const Project = {
   // 取得所有專案（含關聯資料）
-  // 新增 user 參數用於角色過濾
   findAll(filters = {}, user = null) {
-    let sql = `SELECT * FROM v_project_summary WHERE 1=1`;
+    let conditions = `WHERE 1=1`;
     const params = [];
 
-    // 角色過濾邏輯
+    // Project visibility filtering based on role's project_view_scope
     if (user) {
-      if (user.role === 'salesperson' && user.salesperson_id) {
-        // 業務員只能看到自己負責的專案
-        sql += ` AND salesperson_id = ?`;
+      const scope = user.project_view_scope ||
+        (user.role === ROLES.SALESPERSON ? PROJECT_VIEW_SCOPE.OWN : PROJECT_VIEW_SCOPE.ALL);
+
+      if (scope === PROJECT_VIEW_SCOPE.OWN && user.salesperson_id) {
+        conditions += ` AND salesperson_id = ?`;
         params.push(user.salesperson_id);
+      } else if (scope === PROJECT_VIEW_SCOPE.ASSIGNED) {
+        const ids = getAssignedSalespersonIds(user.id);
+        if (ids.length > 0) {
+          conditions += ` AND salesperson_id IN (${ids.map(() => '?').join(',')})`;
+          params.push(...ids);
+        } else {
+          conditions += ` AND 1=0`;
+        }
+      } else if (scope === PROJECT_VIEW_SCOPE.NONE) {
+        conditions += ` AND 1=0`;
       }
-      // boss 可以看到所有專案，不需要額外過濾
-      // admin 和 user 也可以看到所有專案
+      // PROJECT_VIEW_SCOPE.ALL — no filter applied
     }
 
     if (filters.year) {
-      sql += ` AND contract_year = ?`;
+      conditions += ` AND contract_year = ?`;
       params.push(filters.year);
     }
     if (filters.status) {
-      sql += ` AND status = ?`;
+      conditions += ` AND status = ?`;
       params.push(filters.status);
     }
     if (filters.type) {
-      sql += ` AND project_type = ?`;
+      conditions += ` AND project_type = ?`;
       params.push(filters.type);
     }
     if (filters.salesperson) {
-      sql += ` AND salesperson_name LIKE ?`;
+      conditions += ` AND salesperson_name LIKE ?`;
       params.push(`%${filters.salesperson}%`);
     }
-    // 新增：支援關鍵字搜尋（專案編號、專案名稱、公司名稱）
     if (filters.keyword) {
-      sql += ` AND (project_code LIKE ? OR project_name LIKE ? OR company_name LIKE ?)`;
+      conditions += ` AND (project_code LIKE ? OR project_name LIKE ? OR company_name LIKE ?)`;
       const keywordPattern = `%${filters.keyword}%`;
       params.push(keywordPattern, keywordPattern, keywordPattern);
     }
@@ -55,50 +77,76 @@ const Project = {
       'total_invoiced': 'total_invoiced',
       'uninvoiced_amount': 'uninvoiced_amount',
       'total_received': 'total_received',
-      'unpaid_amount': 'unpaid_amount', // 未收款金額，需要在 ORDER BY 中使用計算表達式
+      'unpaid_amount': 'unpaid_amount',
       'expected_invoice_year_month': 'expected_invoice_year_month',
       'status': 'status'
     };
-    
+
     let sortField = filters.sortBy && validSortFields[filters.sortBy] ? validSortFields[filters.sortBy] : 'contract_year';
     const sortOrder = filters.sortOrder && filters.sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
-    
-    // 處理未收款金額的排序（視圖中沒有此欄位，需要在 ORDER BY 中使用計算表達式）
+
     if (sortField === 'unpaid_amount') {
       sortField = `(total_invoiced - COALESCE(total_received, 0) - COALESCE(sales_discount, 0))`;
     }
-    
-    // 新增：篩選未開立發票的專案（有未開立發票金額的專案）
-    // 排除「非營利專案」和「廣告交換」類型
+
     if (filters.uninvoiced === true || filters.uninvoiced === 'true') {
-      sql += ` AND (price_with_tax > COALESCE(total_invoiced, 0)) AND project_type NOT IN ('非營利專案', '廣告交換')`;
+      conditions += ` AND (price_with_tax > COALESCE(total_invoiced, 0)) AND project_type NOT IN ('非營利專案', '廣告交換')`;
     }
-
-    // 新增：篩選有未收款金額的專案（已開立發票 - 已收款 - 銷貨折讓 > 0）
-    // 排除「非營利專案」和「廣告交換」類型
     if (filters.unpaid === true || filters.unpaid === 'true') {
-      sql += ` AND (total_invoiced > 0) AND (total_invoiced - COALESCE(total_received, 0) - COALESCE(sales_discount, 0) > 0) AND project_type NOT IN ('非營利專案', '廣告交換')`;
+      conditions += ` AND (total_invoiced > 0) AND (total_invoiced - COALESCE(total_received, 0) - COALESCE(sales_discount, 0) > 0) AND project_type NOT IN ('非營利專案', '廣告交換')`;
     }
-
-    // 新增：篩選逾期未收款專案（有未收款且至少一筆發票的預計收款日已過期）
     if (filters.overdue_unpaid === true || filters.overdue_unpaid === 'true') {
-      sql += ` AND (total_invoiced > 0) AND (total_invoiced - COALESCE(total_received, 0) - COALESCE(sales_discount, 0) > 0) AND project_type NOT IN ('非營利專案', '廣告交換')`;
-      sql += ` AND id IN (SELECT DISTINCT project_id FROM invoices WHERE expected_payment_date IS NOT NULL AND TRIM(expected_payment_date) <> '' AND date(expected_payment_date) < date('now', 'localtime'))`;
+      conditions += ` AND (total_invoiced > 0) AND (total_invoiced - COALESCE(total_received, 0) - COALESCE(sales_discount, 0) > 0) AND project_type NOT IN ('非營利專案', '廣告交換')`;
+      conditions += ` AND id IN (SELECT DISTINCT project_id FROM invoices WHERE expected_payment_date IS NOT NULL AND TRIM(expected_payment_date) <> '' AND date(expected_payment_date) < date('now', 'localtime'))`;
     }
-
-    // 新增：篩選預計開票年月
     if (filters.expected_invoice_year_month) {
-      sql += ` AND expected_invoice_year_month = ?`;
+      conditions += ` AND expected_invoice_year_month = ?`;
       params.push(filters.expected_invoice_year_month);
     }
 
-    // 如果排序欄位不是預設的，添加次要排序
+    let orderBy;
     if (sortField !== 'contract_year') {
-      sql += ` ORDER BY ${sortField} ${sortOrder}, contract_year DESC, contract_month DESC, project_code`;
+      orderBy = `ORDER BY ${sortField} ${sortOrder}, contract_year DESC, contract_month DESC, project_code`;
     } else {
-      sql += ` ORDER BY ${sortField} ${sortOrder}, contract_month ${sortOrder === 'ASC' ? 'ASC' : 'DESC'}, project_code`;
+      orderBy = `ORDER BY ${sortField} ${sortOrder}, contract_month ${sortOrder === 'ASC' ? 'ASC' : 'DESC'}, project_code`;
     }
-    
+
+    // 發票年度篩選：使用 CTE 計算當年度已開發票金額與已收款金額
+    if (filters.invoice_year) {
+      const sql = `
+        WITH year_invoice_data AS (
+          SELECT project_id,
+            COALESCE(SUM(amount_with_tax - COALESCE(allowance_amount, 0)), 0) AS year_invoiced
+          FROM invoices
+          WHERE strftime('%Y', invoice_date) = ?
+            AND (status IS NULL OR status = '有效') AND deleted_at IS NULL
+          GROUP BY project_id
+        ),
+        year_payment_data AS (
+          SELECT i.project_id,
+            COALESCE(SUM(CASE WHEN p.difference_type = '匯費'
+              THEN p.bank_deposit_amount + COALESCE(p.payment_difference, 0)
+              ELSE p.bank_deposit_amount END), 0) AS year_received
+          FROM invoices i
+          JOIN payments p ON p.invoice_id = i.id
+          WHERE strftime('%Y', i.invoice_date) = ?
+            AND (i.status IS NULL OR i.status = '有效') AND i.deleted_at IS NULL AND p.deleted_at IS NULL
+          GROUP BY i.project_id
+        )
+        SELECT vps.*,
+          COALESCE(yid.year_invoiced, 0) AS year_invoiced,
+          COALESCE(ypd.year_received, 0) AS year_received,
+          COALESCE(yid.year_invoiced, 0) - COALESCE(ypd.year_received, 0) AS year_unpaid
+        FROM v_project_summary vps
+        INNER JOIN year_invoice_data yid ON yid.project_id = vps.id
+        LEFT JOIN year_payment_data ypd ON ypd.project_id = vps.id
+        ${conditions}
+        ${orderBy}
+      `;
+      return db.prepare(sql).all(filters.invoice_year, filters.invoice_year, ...params);
+    }
+
+    const sql = `SELECT * FROM v_project_summary ${conditions} ${orderBy}`;
     return db.prepare(sql).all(...params);
   },
 
@@ -112,15 +160,66 @@ const Project = {
       return null;
     }
     
-    // 角色權限檢查
-    if (user && user.role === 'salesperson' && user.salesperson_id) {
-      // 業務員只能查看自己負責的專案
-      if (project.salesperson_id !== user.salesperson_id) {
-        return null; // 無權限查看
+    // Project visibility check using project_view_scope
+    if (user) {
+      const scope = user.project_view_scope ||
+        (user.role === ROLES.SALESPERSON ? PROJECT_VIEW_SCOPE.OWN : PROJECT_VIEW_SCOPE.ALL);
+
+      if (scope === PROJECT_VIEW_SCOPE.OWN && user.salesperson_id) {
+        if (project.salesperson_id !== user.salesperson_id) return null;
+      } else if (scope === PROJECT_VIEW_SCOPE.ASSIGNED) {
+        const ids = getAssignedSalespersonIds(user.id);
+        if (!ids.includes(project.salesperson_id)) return null;
+      } else if (scope === PROJECT_VIEW_SCOPE.NONE) {
+        return null;
       }
     }
     
+    // 視圖 v_project_summary 可能未含 report_group_id，從 projects 表補上（供編輯表單報表群組選單）
+    try {
+      const base = db.prepare(`SELECT report_group_id FROM projects WHERE id = ?`).get(id);
+      if (base !== undefined) project.report_group_id = base.report_group_id;
+    } catch (_) { /* 若 projects 尚無 report_group_id 欄位則略過 */ }
+    
     return project;
+  },
+
+  // 判斷單一專案是否在使用者的權限範圍內（與 findAll/findById 同一套 project_view_scope 邏輯）
+  _isInScope(project, user) {
+    if (!user) return true;
+    const scope = user.project_view_scope ||
+      (user.role === ROLES.SALESPERSON ? PROJECT_VIEW_SCOPE.OWN : PROJECT_VIEW_SCOPE.ALL);
+
+    if (scope === PROJECT_VIEW_SCOPE.ALL) return true;
+    if (scope === PROJECT_VIEW_SCOPE.NONE) return false;
+    if (scope === PROJECT_VIEW_SCOPE.OWN) return !!user.salesperson_id && project.salesperson_id === user.salesperson_id;
+    if (scope === PROJECT_VIEW_SCOPE.ASSIGNED) return getAssignedSalespersonIds(user.id).includes(project.salesperson_id);
+    return false;
+  },
+
+  // 依客戶ID取得專案列表（供客戶詳情頁使用）。
+  // 客戶詳情頁的專案列表對所有看得到該客戶的人開放（客戶/廠商主檔本身即無角色限制），
+  // 但個別專案是否在使用者的 project_view_scope 範圍內則各自判斷：不在範圍內的專案
+  // 標記為 _locked（金額欄位清空、前端不可點入查看更多），而非整筆從清單中過濾掉。
+  findByCustomerId(customerId, user = null) {
+    const rows = db.prepare(`
+      SELECT * FROM v_project_summary
+      WHERE customer_id = ?
+      ORDER BY contract_year DESC, contract_month DESC
+    `).all(customerId);
+
+    return rows.map(p => {
+      if (this._isInScope(p, user)) return { ...p, _locked: false };
+      return {
+        ...p,
+        _locked: true,
+        price_with_tax: null,
+        price_without_tax: null,
+        total_invoiced: null,
+        total_received: null,
+        uninvoiced_amount: null
+      };
+    });
   },
 
   // 依專案編號取得（舊方法，保留向後兼容）
@@ -178,13 +277,15 @@ const Project = {
     const isNewCustomer = data.is_new_customer ? 1 : 0;
     const expectedInvoiceYearMonth = data.expected_invoice_year_month || null;
     const notes = data.notes || null;
+    const reportGroupId = data.report_group_id !== undefined && data.report_group_id !== null && data.report_group_id !== ''
+      ? parseInt(data.report_group_id) : null;
     
     const stmt = db.prepare(`
       INSERT INTO projects (
         project_code, contract_year, contract_month, status, project_type,
         salesperson_id, customer_id, project_name, price_with_tax, price_without_tax,
-        sales_discount, is_new_customer, expected_invoice_year_month, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        sales_discount, is_new_customer, expected_invoice_year_month, notes, report_group_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     try {
@@ -202,7 +303,8 @@ const Project = {
         salesDiscount,
         isNewCustomer,
         expectedInvoiceYearMonth,
-        notes
+        notes,
+        reportGroupId
       );
       
       const projectId = result.lastInsertRowid;
@@ -271,7 +373,7 @@ const Project = {
     const allowedFields = [
       'project_code', 'contract_year', 'contract_month', 'status', 'project_type',
       'salesperson_id', 'customer_id', 'project_name', 'price_with_tax', 
-      'price_without_tax', 'sales_discount', 'is_new_customer', 'expected_invoice_year_month', 'notes'
+      'price_without_tax', 'sales_discount', 'is_new_customer', 'expected_invoice_year_month', 'notes', 'report_group_id'
     ];
 
     const newData = {};
@@ -288,7 +390,7 @@ const Project = {
         let value = data[field];
         if (value === '') {
           value = null;
-        } else if (field === 'salesperson_id' || field === 'customer_id') {
+        } else if (field === 'salesperson_id' || field === 'customer_id' || field === 'report_group_id') {
           // 外鍵欄位：空字串或 'null' 轉為 null，否則轉為整數
           value = (value === '' || value === 'null' || value === null) ? null : parseInt(value);
         } else if (field === 'contract_year' || field === 'contract_month') {
@@ -343,6 +445,18 @@ const Project = {
     `).all().map(r => r.contract_year);
   },
 
+  // 取得有開立發票的年份列表（用於發票年度篩選）
+  getInvoiceYears() {
+    return db.prepare(`
+      SELECT DISTINCT strftime('%Y', invoice_date) AS year
+      FROM invoices
+      WHERE invoice_date IS NOT NULL AND invoice_date != ''
+        AND (status IS NULL OR status = '有效')
+        AND deleted_at IS NULL
+      ORDER BY year DESC
+    `).all().map(r => r.year).filter(Boolean);
+  },
+
   // 取得所有預計開票年月（用於篩選）
   getExpectedInvoiceYearMonths() {
     return db.prepare(`
@@ -354,7 +468,24 @@ const Project = {
   },
 
   // 取得專案統計
-  getStatistics(year = null) {
+  // salespersonId: 僅統計該業務員名下的專案（業務員儀表板依權限範圍過濾用）
+  // excludeTypeNames: 排除的專案類型名稱陣列（儀表板主區塊排除獨立加總類型）
+  getStatistics(year = null, salespersonId = null, excludeTypeNames = null) {
+    const conditions = [];
+    const params = [];
+    if (year) {
+      conditions.push('contract_year = ?');
+      params.push(year);
+    }
+    if (salespersonId) {
+      conditions.push('salesperson_id = ?');
+      params.push(salespersonId);
+    }
+    if (excludeTypeNames && excludeTypeNames.length > 0) {
+      conditions.push('(project_type IS NULL OR project_type NOT IN (' + excludeTypeNames.map(() => '?').join(',') + '))');
+      params.push(...excludeTypeNames);
+    }
+    const whereClause = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
     let sql = `
       SELECT 
         COUNT(*) as total_projects,
@@ -362,43 +493,39 @@ const Project = {
         COALESCE(SUM(CASE WHEN status = '已結案' THEN 1 ELSE 0 END), 0) as closed_projects,
         COALESCE(SUM(price_with_tax), 0) as total_amount
       FROM projects
+      ${whereClause}
     `;
+    var result = db.prepare(sql).get(...params);
     
-    if (year) {
-      sql += ` WHERE contract_year = ?`;
-      var result = db.prepare(sql).get(year);
-    } else {
-      var result = db.prepare(sql).get();
-    }
-    
-    // 為了向後兼容，保留舊的欄位名稱
     result = result || {};
     result.lab_amount = 0;
     result.ad_amount = 0;
     result.project_amount = 0;
     
-    // 動態統計所有專案類型的金額
+    const typeConditions = ['project_type IS NOT NULL', "project_type != ''"];
+    const typeParams = [];
+    if (year) {
+      typeConditions.push('contract_year = ?');
+      typeParams.push(year);
+    }
+    if (salespersonId) {
+      typeConditions.push('salesperson_id = ?');
+      typeParams.push(salespersonId);
+    }
+    if (excludeTypeNames && excludeTypeNames.length > 0) {
+      typeConditions.push('(project_type IS NULL OR project_type NOT IN (' + excludeTypeNames.map(() => '?').join(',') + '))');
+      typeParams.push(...excludeTypeNames);
+    }
     let typeStatsSql = `
       SELECT 
         project_type,
         COALESCE(SUM(price_with_tax), 0) as type_amount
       FROM projects
-      WHERE project_type IS NOT NULL AND project_type != ''
+      WHERE ${typeConditions.join(' AND ')}
+      GROUP BY project_type
     `;
+    var typeStats = db.prepare(typeStatsSql).all(...typeParams);
     
-    if (year) {
-      typeStatsSql += ` AND contract_year = ?`;
-    }
-    
-    typeStatsSql += ` GROUP BY project_type`;
-    
-    if (year) {
-      var typeStats = db.prepare(typeStatsSql).all(year);
-    } else {
-      var typeStats = db.prepare(typeStatsSql).all();
-    }
-    
-    // 將類型統計存儲到 result 中
     result.typeAmounts = {};
     typeStats.forEach(stat => {
       result.typeAmounts[stat.project_type] = stat.type_amount || 0;

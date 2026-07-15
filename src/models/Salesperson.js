@@ -81,6 +81,14 @@ const Salesperson = {
     } else {
       newData.resigned_date = oldRecord.resigned_date;
     }
+    if (data.show_separate_dashboard !== undefined) {
+      const val = data.show_separate_dashboard ? 1 : 0;
+      fields.push('show_separate_dashboard = ?');
+      values.push(val);
+      newData.show_separate_dashboard = val;
+    } else if (oldRecord.show_separate_dashboard !== undefined) {
+      newData.show_separate_dashboard = oldRecord.show_separate_dashboard;
+    }
     
     // 如果沒有要更新的欄位，直接返回
     if (fields.length === 0) return false;
@@ -109,6 +117,93 @@ const Salesperson = {
       person = this.findById(id);
     }
     return person;
+  },
+
+  // 整批移轉專案：將 fromId 業務的指定範圍專案全部改為 toId 負責
+  // scope: 'all' | 'open'（僅未結案）| 'year'（指定年度，需 year 參數）
+  // 同步更新 user_salesperson_access，確保有 'assigned' 存取權的使用者不斷線
+  transferProjects(fromId, toId, options = {}, userInfo = null) {
+    const { scope = 'open', year = null } = options;
+    fromId = parseInt(fromId);
+    toId   = parseInt(toId);
+
+    const from = this.findById(fromId);
+    const to   = this.findById(toId);
+    if (!from) throw new Error('來源業務不存在');
+    if (!to)   throw new Error('目標業務不存在');
+    if (fromId === toId) throw new Error('來源和目標業務不可相同');
+
+    // 建立 WHERE 子句（UPDATE 用）
+    const conditions = ['salesperson_id = ?'];
+    const whereParams = [fromId];
+    if (scope === 'open') {
+      conditions.push("status = '未結案'");
+    } else if (scope === 'year' && year) {
+      conditions.push('contract_year = ?');
+      whereParams.push(parseInt(year));
+    }
+    const whereSql = conditions.join(' AND ');
+
+    let transferredCount = 0;
+
+    const doTransfer = db.transaction(() => {
+      // 1. 批次更新 projects
+      const result = db.prepare(
+        `UPDATE projects
+         SET salesperson_id = ?, updated_at = datetime('now', 'localtime')
+         WHERE ${whereSql}`
+      ).run(toId, ...whereParams);
+      transferredCount = result.changes;
+
+      // 2. 同步 user_salesperson_access：原本可以看 fromId 的使用者也加上 toId
+      try {
+        const usersWithAccess = db.prepare(
+          'SELECT DISTINCT user_id FROM user_salesperson_access WHERE salesperson_id = ?'
+        ).all(fromId);
+        for (const { user_id } of usersWithAccess) {
+          db.prepare(
+            'INSERT OR IGNORE INTO user_salesperson_access (user_id, salesperson_id) VALUES (?, ?)'
+          ).run(user_id, toId);
+        }
+      } catch (e) {
+        // user_salesperson_access 不存在時略過（舊環境）
+        console.warn('[transferProjects] user_salesperson_access 同步跳過:', e.message);
+      }
+
+      return transferredCount;
+    });
+
+    transferredCount = doTransfer();
+
+    // 稽核記錄
+    AuditLogService.logCreate('project_transfer', null, {
+      from_salesperson_id: fromId,
+      from_salesperson_name: from.name,
+      to_salesperson_id: toId,
+      to_salesperson_name: to.name,
+      scope,
+      year: year || null,
+      transferred_count: transferredCount
+    }, userInfo);
+
+    return transferredCount;
+  },
+
+  // 取得某業務符合條件的專案列表（供移轉預覽）
+  getProjectsForTransfer(fromId, options = {}) {
+    const { scope = 'open', year = null } = options;
+    let sql = `SELECT id, project_code, project_name, project_type, status, contract_year,
+                      price_with_tax, total_invoiced, uninvoiced_amount
+               FROM v_project_summary WHERE salesperson_id = ?`;
+    const params = [parseInt(fromId)];
+    if (scope === 'open') {
+      sql += " AND status = '未結案'";
+    } else if (scope === 'year' && year) {
+      sql += ' AND contract_year = ?';
+      params.push(parseInt(year));
+    }
+    sql += ' ORDER BY contract_year DESC, project_code';
+    return db.prepare(sql).all(...params);
   },
 
   // 取得業務業績統計

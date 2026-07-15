@@ -1,0 +1,248 @@
+<%- include('../layout', { body: `
+<div class="row mb-4">
+  <div class="col">
+    <h1 class="h3">
+      <i class="bi bi-${pipeline ? 'pencil' : 'plus-lg'}"></i>
+      ${pipeline ? '編輯潛在商機' : '新增潛在商機'}
+    </h1>
+  </div>
+</div>
+
+${error ? `
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle"></i> ${error}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+<div class="card">
+  <div class="card-body">
+    <form action="${action}" method="POST">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">客戶 <span class="text-danger">*</span></label>
+          <select name="customer_id" id="customer_id" class="form-select select2-dropdown" ${pipeline ? 'disabled' : 'required'}>
+            <option value="">-- 選擇客戶 --</option>
+            ${customers.map(c => {
+              const selectedCustomerId = pipeline ? pipeline.customer_id : presetCustomerId;
+              const selected = selectedCustomerId && selectedCustomerId == c.id ? 'selected' : '';
+              const companyName = (c.company_name || '').replace(/"/g, '&quot;');
+              const customerCode = (c.customer_code || '').replace(/"/g, '&quot;');
+              return '<option value="' + c.id + '" ' + selected + '>' + companyName + ' (' + customerCode + ')</option>';
+            }).join('')}
+          </select>
+          ${pipeline
+            ? '<input type="hidden" name="customer_id" value="' + pipeline.customer_id + '"><small class="form-text text-muted">商機建立後客戶不可變更</small>'
+            : '<small class="form-text text-muted">找不到客戶/廠商？<a href="#" id="quickAddCustomerLink" class="text-primary">快速新增</a></small>'
+          }
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">業務人員</label>
+          <select name="salesperson_id" id="salesperson_id" class="form-select select2-dropdown">
+            <option value="">-- 選擇業務 --</option>
+            ${salespeople.map(s => {
+              const selected = pipeline && pipeline.salesperson_id == s.id ? 'selected' : '';
+              const name = (s.name || '').replace(/"/g, '&quot;');
+              return '<option value="' + s.id + '" ' + selected + '>' + name + '</option>';
+            }).join('')}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">負責人員（使用者）</label>
+          <select name="owner_user_id" id="owner_user_id" class="form-select select2-dropdown">
+            <option value="">-- 選擇使用者 --</option>
+            ${(staffUsers || []).map(u => {
+              const selected = pipeline && pipeline.owner_user_id == u.id ? 'selected' : '';
+              const name = (u.name || '').replace(/"/g, '&quot;');
+              return '<option value="' + u.id + '" ' + selected + '>' + name + '</option>';
+            }).join('')}
+          </select>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">商機名稱 <span class="text-danger">*</span></label>
+          <input type="text" name="opportunity_name" class="form-control" value="${pipeline ? (pipeline.opportunity_name || '').replace(/"/g, '&quot;') : ''}" required>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">預估專案類型</label>
+          <select name="project_type" class="form-select">
+            <option value="">-- 選擇類型 --</option>
+            ${projectTypes.map(type => {
+              const selected = pipeline && pipeline.project_type === type.type_name ? 'selected' : '';
+              return '<option value="' + type.type_name + '" ' + selected + '>' + type.type_name + '</option>';
+            }).join('')}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">預估金額</label>
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            <input type="number" name="estimated_amount" class="form-control" value="${pipeline ? (pipeline.estimated_amount || 0) : 0}" step="1" min="0">
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">預計成交月份</label>
+          <input type="month" name="expected_close_year_month" class="form-control" value="${pipeline ? (pipeline.expected_close_year_month || '') : ''}">
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">成交機率</label>
+          <div class="input-group">
+            <input type="number" name="win_probability" class="form-control" value="${pipeline && pipeline.win_probability !== null && pipeline.win_probability !== undefined ? pipeline.win_probability : ''}" min="0" max="100">
+            <span class="input-group-text">%</span>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">備註</label>
+          <textarea name="notes" class="form-control" rows="3">${pipeline ? (pipeline.notes || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</textarea>
+        </div>
+      </div>
+
+      <hr class="my-4">
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg"></i> ${pipeline ? '更新' : '建立'}
+        </button>
+        <a href="${pipeline ? '/pipelines/' + pipeline.id : '/pipelines'}" class="btn btn-secondary">
+          <i class="bi bi-x-lg"></i> 取消
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+${!pipeline ? `
+<!-- 快速新增客戶/廠商 Modal -->
+<div class="modal fade" id="quickAddCustomerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title">
+          <i class="bi bi-building-add"></i> 快速新增客戶/廠商
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="quickAddCustomerForm">
+          <div class="mb-3">
+            <label class="form-label">類型 <span class="text-danger">*</span></label>
+            <select name="party_type" id="quickAddPartyType" class="form-select" onchange="document.getElementById('quickAddVendorTypeWrap').style.display = (this.value === '客戶') ? 'none' : '';">
+              <option value="客戶" selected>客戶</option>
+              <option value="廠商">廠商</option>
+              <option value="兩者皆是">兩者皆是（客戶+廠商）</option>
+            </select>
+          </div>
+          <div class="mb-3" id="quickAddVendorTypeWrap" style="display:none">
+            <label class="form-label">廠商類型</label>
+            <select name="vendor_type" class="form-select">
+              <option value="">-- 選擇類型 --</option>
+              <option value="個人">個人</option>
+              <option value="公司">公司</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">客戶編號 <span class="text-danger">*</span></label>
+            <input type="text" name="customer_code" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">公司名稱 <span class="text-danger">*</span></label>
+            <input type="text" name="company_name" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">統一編號</label>
+            <input type="text" name="tax_id" class="form-control" maxlength="8" pattern="[0-9]{8}">
+            <small class="form-text text-muted">8 位數字</small>
+          </div>
+        </form>
+        <div id="quickAddCustomerError" class="alert alert-danger d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-lg"></i> 取消
+        </button>
+        <button type="button" class="btn btn-primary" id="quickAddCustomerSubmit">
+          <i class="bi bi-check-lg"></i> 新增並選擇
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const quickAddLink = document.getElementById('quickAddCustomerLink');
+  const quickAddModal = new bootstrap.Modal(document.getElementById('quickAddCustomerModal'));
+  const quickAddForm = document.getElementById('quickAddCustomerForm');
+  const quickAddSubmit = document.getElementById('quickAddCustomerSubmit');
+  const quickAddError = document.getElementById('quickAddCustomerError');
+
+  if (quickAddLink) {
+    quickAddLink.addEventListener('click', function(e) {
+      e.preventDefault();
+      quickAddForm.reset();
+      document.getElementById('quickAddVendorTypeWrap').style.display = 'none';
+      quickAddError.classList.add('d-none');
+      quickAddModal.show();
+    });
+  }
+
+  if (quickAddSubmit) {
+    quickAddSubmit.addEventListener('click', async function() {
+      const formData = new FormData(quickAddForm);
+
+      if (!formData.get('customer_code') || !formData.get('company_name')) {
+        quickAddError.textContent = '請填寫客戶編號和公司名稱';
+        quickAddError.classList.remove('d-none');
+        return;
+      }
+
+      quickAddSubmit.disabled = true;
+      quickAddSubmit.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 新增中...';
+      quickAddError.classList.add('d-none');
+
+      try {
+        const response = await fetch('/customers/quick-add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_code: formData.get('customer_code'),
+            company_name: formData.get('company_name'),
+            tax_id: formData.get('tax_id') || '',
+            party_type: formData.get('party_type'),
+            vendor_type: formData.get('vendor_type') || ''
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          const customer = result.customer;
+          const displayText = customer.company_name + ' (' + customer.customer_code + ')';
+          const newOption = new Option(displayText, customer.id, true, true);
+          $('#customer_id').append(newOption).trigger('change');
+
+          quickAddModal.hide();
+          if (typeof showToast === 'function') {
+            showToast('新增成功：' + customer.company_name, 'success');
+          }
+        } else {
+          quickAddError.textContent = result.error || '新增失敗';
+          quickAddError.classList.remove('d-none');
+        }
+      } catch (error) {
+        console.error('快速新增客戶/廠商錯誤:', error);
+        quickAddError.textContent = '新增時發生錯誤：' + error.message;
+        quickAddError.classList.remove('d-none');
+      } finally {
+        quickAddSubmit.disabled = false;
+        quickAddSubmit.innerHTML = '<i class="bi bi-check-lg"></i> 新增並選擇';
+      }
+    });
+  }
+});
+</script>
+` : ''}
+` }) %>

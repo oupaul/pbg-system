@@ -3,16 +3,37 @@
   <div class="col">
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb mb-0">
-        <li class="breadcrumb-item"><a href="/customers">客戶管理</a></li>
+        <li class="breadcrumb-item"><a href="/customers">客戶與廠商管理</a></li>
         <li class="breadcrumb-item active">${customer.company_name}</li>
       </ol>
     </nav>
-    <h1 class="h3 mt-2">${customer.company_name}</h1>
+    <h1 class="h3 mt-2">
+      ${customer.company_name}
+      <span class="badge bg-${customer.party_type === '廠商' ? 'dark' : customer.party_type === '兩者皆是' ? 'primary' : 'info'} align-middle">${customer.party_type || '客戶'}</span>
+      ${customer.vendor_type ? '<span class="badge bg-secondary align-middle">' + customer.vendor_type + '</span>' : ''}
+      ${customer.customer_level ? '<span class="badge bg-' + (customer.customer_level === 'A' ? 'success' : customer.customer_level === 'B' ? 'warning' : 'secondary') + ' align-middle">' + customer.customer_level + '級</span>' : ''}
+      <span class="badge bg-${customer.status === '往來中' ? 'success' : customer.status === '暫停往來' ? 'warning' : 'secondary'} align-middle">${customer.status || '往來中'}</span>
+    </h1>
+    ${customer.industry ? '<p class="text-muted mb-0"><i class="bi bi-building"></i> ' + customer.industry.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>' : ''}
   </div>
 </div>
 
+${error ? `
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle"></i> ${error}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+${success ? `
+  <div class="alert alert-success alert-dismissible fade show" role="alert">
+    <i class="bi bi-check-circle"></i> ${success}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
 <div class="row g-4 mb-4">
-  <div class="col-md-4">
+  <div class="col-md-3">
     <div class="card">
       <div class="card-body">
         <h6 class="text-muted">客戶編號</h6>
@@ -20,7 +41,7 @@
       </div>
     </div>
   </div>
-  <div class="col-md-4">
+  <div class="col-md-3">
     <div class="card">
       <div class="card-body">
         <h6 class="text-muted">統一編號</h6>
@@ -28,7 +49,32 @@
       </div>
     </div>
   </div>
-  <div class="col-md-4">
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="text-muted"><i class="bi bi-person-badge"></i> 接洽人員（我方）</h6>
+        <p class="fs-5 mb-0">${customer.owner_salesperson_name || '-'}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="text-muted"><i class="bi bi-person-lines-fill"></i> 客戶聯絡窗口（對方）</h6>
+        <p class="fs-5 mb-0">${customer.contact_name || '-'}</p>
+        <p class="text-muted small mb-0">${customer.contact_phone || ''}${customer.contact_phone && customer.contact_email ? ' · ' : ''}${customer.contact_email || ''}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="text-muted"><i class="bi bi-geo-alt"></i> 地址</h6>
+        <p class="fs-5 mb-0">${(customer.address || '-').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-12">
     <div class="card bg-primary text-white">
       <div class="card-body text-center">
         <h6>專案數 / 總金額</h6>
@@ -55,12 +101,12 @@
         </thead>
         <tbody>
           ${projects.map(p => `
-            <tr onclick="location.href='/projects/${p.id}'" style="cursor:pointer">
-              <td><code>${p.project_code}</code></td>
+            <tr ${p._locked ? '' : `onclick="location.href='/projects/${p.id}'" style="cursor:pointer"`}>
+              <td><code>${p.project_code}</code>${p._locked ? ' <i class="bi bi-lock-fill text-muted" title="無權限查看此專案"></i>' : ''}</td>
               <td>${p.project_name}</td>
               <td><span class="badge bg-${p.project_type === '食驗室' ? 'primary' : p.project_type === '純廣' ? 'success' : 'info'}">${p.project_type}</span></td>
               <td>${p.salesperson_name || '-'}</td>
-              <td class="text-end">$${(p.price_with_tax || 0).toLocaleString()}</td>
+              <td class="text-end">${p._locked ? '<span class="text-muted">-</span>' : '$' + (p.price_with_tax || 0).toLocaleString()}</td>
               <td><span class="badge bg-${p.status === '已結案' ? 'secondary' : 'warning'}">${p.status}</span></td>
             </tr>
           `).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">尚無專案</td></tr>'}
@@ -70,11 +116,109 @@
   </div>
 </div>
 
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-bullseye"></i> 潛在商機</span>
+    ${locals.canEditCrm ? '<a href="/pipelines/new?customer_id=' + customer.id + '" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i> 新增商機</a>' : ''}
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>商機名稱</th>
+            <th>業務</th>
+            <th class="text-end">預估金額</th>
+            <th>預計成交月份</th>
+            <th>狀態</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${pipelines.map(p => `
+            <tr onclick="location.href='/pipelines/${p.id}'" style="cursor:pointer">
+              <td>${p.opportunity_name}</td>
+              <td>${p.salesperson_name || '-'}</td>
+              <td class="text-end">$${(p.estimated_amount || 0).toLocaleString()}</td>
+              <td>${p.expected_close_year_month || '-'}</td>
+              <td><span class="badge bg-${p.status === '已成交' ? 'success' : p.status === '已流失' ? 'secondary' : 'warning'}">${p.status}</span></td>
+            </tr>
+          `).join('') || '<tr><td colspan="5" class="text-center text-muted py-3">尚無潛在商機</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-clock-history"></i> 活動紀錄</div>
+  <div class="card-body">
+    ${locals.canEditCrm ? `
+      <form action="/customers/${customer.id}/activities" method="POST" class="row g-2 mb-4">
+        <div class="col-md-2">
+          <select name="activity_type" class="form-select">
+            <option value="拜訪">拜訪</option>
+            <option value="電話">電話</option>
+            <option value="客訴">客訴</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+        <div class="col-md-7">
+          <input type="text" name="content" class="form-control" placeholder="記錄本次拜訪、通話或客訴的內容..." required>
+        </div>
+        <div class="col-md-2">
+          <input type="date" name="activity_date" class="form-control">
+        </div>
+        <div class="col-md-1">
+          <button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus-lg"></i></button>
+        </div>
+      </form>
+    ` : ''}
+
+    <ul class="list-group list-group-flush">
+      ${activities.map(a => {
+        const isPending = (pendingActivityDeletionIds || []).includes(a.id);
+        const deleteControl = !locals.canEditCrm ? '' : isPending
+          ? '<span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> 審核中</span>'
+          : `<form action="/customers/${customer.id}/activities/${a.id}/delete" method="POST" onsubmit="return confirm('${locals.canDelete ? '確定要刪除此活動紀錄？' : '確定要送出刪除申請嗎？將由管理員審核後才會真正刪除。'}')">
+               <button type="submit" class="btn btn-sm btn-link ${locals.canDelete ? 'text-danger' : 'text-warning'} p-0" title="${locals.canDelete ? '刪除' : '申請刪除'}"><i class="bi bi-trash"></i></button>
+             </form>`;
+        return `
+        <li class="list-group-item d-flex justify-content-between align-items-start">
+          <div>
+            <span class="badge bg-${a.activity_type === '客訴' ? 'danger' : a.activity_type === '拜訪' ? 'primary' : a.activity_type === '電話' ? 'info' : 'secondary'} me-2">${a.activity_type}</span>
+            <span>${a.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
+            <div class="text-muted small mt-1">${a.activity_date} · ${a.created_by || 'system'}${a.opportunity_name ? ' · 商機：' + a.opportunity_name : ''}</div>
+          </div>
+          ${deleteControl}
+        </li>
+      `;
+      }).join('') || '<li class="list-group-item text-center text-muted py-3">尚無活動紀錄</li>'}
+    </ul>
+  </div>
+</div>
+
+${locals.canEditCrm ? `
 <div class="card">
-  <div class="card-header"><i class="bi bi-gear"></i> 編輯客戶資料</div>
+  <div class="card-header"><i class="bi bi-gear"></i> 編輯資料</div>
   <div class="card-body">
     <form action="/customers/${customer.id}" method="POST">
       <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">類型</label>
+          <select name="party_type" class="form-select" id="editPartyType" onchange="document.getElementById('editVendorTypeWrap').style.display = (this.value === '客戶') ? 'none' : '';">
+            <option value="客戶" ${(customer.party_type || '客戶') === '客戶' ? 'selected' : ''}>客戶</option>
+            <option value="廠商" ${customer.party_type === '廠商' ? 'selected' : ''}>廠商</option>
+            <option value="兩者皆是" ${customer.party_type === '兩者皆是' ? 'selected' : ''}>兩者皆是（客戶+廠商）</option>
+          </select>
+        </div>
+        <div class="col-md-4" id="editVendorTypeWrap" style="${(customer.party_type === '客戶' || !customer.party_type) ? 'display:none' : ''}">
+          <label class="form-label">廠商類型</label>
+          <select name="vendor_type" class="form-select">
+            <option value="" ${!customer.vendor_type ? 'selected' : ''}>-- 選擇類型 --</option>
+            <option value="個人" ${customer.vendor_type === '個人' ? 'selected' : ''}>個人</option>
+            <option value="公司" ${customer.vendor_type === '公司' ? 'selected' : ''}>公司</option>
+          </select>
+        </div>
         <div class="col-md-4">
           <label class="form-label">客戶編號</label>
           <input type="text" name="customer_code" class="form-control" value="${customer.customer_code}" required>
@@ -87,6 +231,61 @@
           <label class="form-label">公司名稱</label>
           <input type="text" name="company_name" class="form-control" value="${customer.company_name}" required>
         </div>
+        <div class="col-md-4">
+          <label class="form-label">接洽人員（我方使用者）</label>
+          <select name="owner_salesperson_id" class="form-select">
+            <option value="">-- 選擇使用者 --</option>
+            ${(staffUsers || []).map(u => {
+              const selected = customer.owner_salesperson_id == u.id ? 'selected' : '';
+              return '<option value="' + u.id + '" ' + selected + '>' + (u.name || '').replace(/"/g, '&quot;') + '</option>';
+            }).join('')}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">聯絡人（對方窗口）</label>
+          <input type="text" name="contact_name" class="form-control" value="${(customer.contact_name || '').replace(/"/g, '&quot;')}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">聯絡電話</label>
+          <input type="text" name="contact_phone" class="form-control" value="${(customer.contact_phone || '').replace(/"/g, '&quot;')}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">聯絡信箱</label>
+          <input type="email" name="contact_email" class="form-control" value="${(customer.contact_email || '').replace(/"/g, '&quot;')}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">銀行名稱</label>
+          <input type="text" name="bank_name" class="form-control" value="${(customer.bank_name || '').replace(/"/g, '&quot;')}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">銀行帳號</label>
+          <input type="text" name="bank_account" class="form-control" value="${(customer.bank_account || '').replace(/"/g, '&quot;')}">
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">地址</label>
+          <input type="text" name="address" class="form-control" value="${(customer.address || '').replace(/"/g, '&quot;')}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">客戶等級</label>
+          <select name="customer_level" class="form-select">
+            <option value="" ${!customer.customer_level ? 'selected' : ''}>-- 未分級 --</option>
+            <option value="A" ${customer.customer_level === 'A' ? 'selected' : ''}>A</option>
+            <option value="B" ${customer.customer_level === 'B' ? 'selected' : ''}>B</option>
+            <option value="C" ${customer.customer_level === 'C' ? 'selected' : ''}>C</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">產業別</label>
+          <input type="text" name="industry" class="form-control" value="${(customer.industry || '').replace(/"/g, '&quot;')}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">往來狀態</label>
+          <select name="status" class="form-select">
+            <option value="往來中" ${customer.status === '往來中' ? 'selected' : ''}>往來中</option>
+            <option value="暫停往來" ${customer.status === '暫停往來' ? 'selected' : ''}>暫停往來</option>
+            <option value="已流失" ${customer.status === '已流失' ? 'selected' : ''}>已流失</option>
+          </select>
+        </div>
         <div class="col-12">
           <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> 更新</button>
         </div>
@@ -94,4 +293,5 @@
     </form>
   </div>
 </div>
+` : ''}
 `}) %>

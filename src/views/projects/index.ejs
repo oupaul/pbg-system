@@ -56,11 +56,14 @@ ${locals.isReadOnly ? '<div class="alert alert-info mb-4"><i class="bi bi-info-c
         <label class="form-label">業務</label>
         <select name="salesperson" class="form-select">
           <option value="">全部</option>
-          ${salespeople.map(s => `<option value="${s.name}" ${filters.salesperson === s.name ? 'selected' : ''}>${s.name}</option>`).join('')}
+          ${salespeople.map(s => {
+            const label = s.name + (s.status && s.status !== 'active' ? ' (離職)' : '');
+            return `<option value="${s.name}" ${filters.salesperson === s.name ? 'selected' : ''}>${label}</option>`;
+          }).join('')}
         </select>
       </div>
       <div class="col-md-2">
-        <label class="form-label">預計開票</label>
+        <label class="form-label">預計開發票月份</label>
         <select name="expected_invoice_year_month" class="form-select">
           <option value="">全部</option>
           ${expectedInvoiceYearMonths.map(ym => '<option value="' + ym + '" ' + (filters.expected_invoice_year_month === ym ? 'selected' : '') + '>' + ym + '</option>').join('')}
@@ -79,6 +82,9 @@ ${locals.isReadOnly ? '<div class="alert alert-info mb-4"><i class="bi bi-info-c
       ${filters.overdue_unpaid ? `
         <input type="hidden" name="overdue_unpaid" value="true">
       ` : ''}
+      ${filters.invoice_year ? `
+        <input type="hidden" name="invoice_year" value="${filters.invoice_year}">
+      ` : ''}
       <div class="col-md-2 d-flex align-items-end">
         <button type="submit" class="btn btn-secondary w-100"><i class="bi bi-search"></i> 搜尋</button>
       </div>
@@ -86,11 +92,33 @@ ${locals.isReadOnly ? '<div class="alert alert-info mb-4"><i class="bi bi-info-c
   </div>
 </div>
 
+<!-- 發票年度篩選 -->
+<div class="card mb-4">
+  <div class="card-body py-2">
+    <div class="d-flex align-items-center gap-2">
+      <span class="text-muted fw-semibold" style="white-space:nowrap"><i class="bi bi-receipt"></i> 發票年度：</span>
+      <select class="form-select form-select-sm" style="width:130px" id="invoiceYearSelect" onchange="onInvoiceYearChange(this)">
+        <option value="">全部</option>
+        ${invoiceYears.map(y => `<option value="${y}" ${filters.invoice_year == y ? 'selected' : ''}>${y} 年</option>`).join('')}
+      </select>
+      <button type="button" class="btn btn-sm btn-outline-info ms-auto" onclick="showInvoiceDetailModal()">
+        <i class="bi bi-list-ul"></i> 查看發票明細
+      </button>
+    </div>
+  </div>
+</div>
+
 ${salespersonStats ? `
-<!-- 專案統計資訊 -->
-<div class="card mb-4 border-primary">
-  <div class="card-header bg-primary text-white">
-    <h5 class="mb-0"><i class="bi bi-calculator"></i> ${userRole === 'salesperson' ? '我的專案統計資訊' : '專案統計資訊'}</h5>
+<!-- 專案統計資訊 / 篩選結果加總 -->
+<div class="card mb-4 ${filters.invoice_year ? 'border-success' : 'border-primary'}">
+  <div class="card-header ${filters.invoice_year ? 'bg-success' : 'bg-primary'} text-white">
+    <h5 class="mb-0">
+      <i class="bi bi-calculator"></i>
+      ${filters.invoice_year
+        ? `${typeof isFilterStatsOnly !== 'undefined' && isFilterStatsOnly ? '篩選結果加總' : (userRole === 'salesperson' ? '我的專案統計資訊' : '專案統計資訊')} <span class="badge bg-white text-success ms-1"><i class="bi bi-receipt"></i> 發票年度：${filters.invoice_year}</span>`
+        : (typeof isFilterStatsOnly !== 'undefined' && isFilterStatsOnly ? '篩選結果加總' : (userRole === 'salesperson' ? '我的專案統計資訊' : '專案統計資訊'))
+      }
+    </h5>
   </div>
   <div class="card-body">
     <div class="row g-3">
@@ -104,12 +132,13 @@ ${salespersonStats ? `
       </div>
       <div class="col-md-2">
         <div class="text-center p-3 bg-light rounded">
-          <div class="text-muted small mb-1">已開立發票金額</div>
+          <div class="text-muted small mb-1">${filters.invoice_year ? `已開立發票（${filters.invoice_year}年）` : '已開立發票金額'}</div>
           <div class="h5 mb-0 text-success">
             $${salespersonStats.totalInvoiced.toLocaleString()}
           </div>
         </div>
       </div>
+      ${filters.invoice_year ? '' : `
       <div class="col-md-2">
         <div class="text-center p-3 bg-light rounded">
           <div class="text-muted small mb-1">未開發票金額</div>
@@ -118,9 +147,10 @@ ${salespersonStats ? `
           </div>
         </div>
       </div>
-      <div class="col-md-2">
+      `}
+      <div class="${filters.invoice_year ? 'col-md-2' : 'col-md-2'}">
         <div class="text-center p-3 bg-light rounded">
-          <div class="text-muted small mb-1">已收款金額</div>
+          <div class="text-muted small mb-1">${filters.invoice_year ? `已收款（${filters.invoice_year}年發票）` : '已收款金額'}</div>
           <div class="h5 mb-0 text-info">
             $${salespersonStats.totalReceived.toLocaleString()}
           </div>
@@ -128,7 +158,7 @@ ${salespersonStats ? `
       </div>
       <div class="col-md-2">
         <div class="text-center p-3 bg-light rounded">
-          <div class="text-muted small mb-1">未收款金額</div>
+          <div class="text-muted small mb-1">${filters.invoice_year ? `未收款（${filters.invoice_year}年發票）` : '未收款金額'}</div>
           <div class="h5 mb-0 ${salespersonStats.totalUnpaid > 0 ? 'text-danger' : 'text-success'}">
             $${salespersonStats.totalUnpaid.toLocaleString()}
           </div>
@@ -165,7 +195,7 @@ ${salespersonStats ? `
             </th>
             <th>
               <a href="?${sortLinks.expected_invoice_year_month}" class="text-white text-decoration-none">
-                預計開票${sortIcons.expected_invoice_year_month}
+                預計開發票月份${sortIcons.expected_invoice_year_month}
               </a>
             </th>
             <th>
@@ -195,7 +225,7 @@ ${salespersonStats ? `
             </th>
             <th class="text-end">
               <a href="?${sortLinks.total_invoiced}" class="text-white text-decoration-none">
-                已開發票${sortIcons.total_invoiced}
+                已開發票${sortIcons.total_invoiced}${filters.invoice_year ? '<br><small class="opacity-75" style="font-size:.7em">(' + filters.invoice_year + '年)</small>' : ''}
               </a>
             </th>
             <th class="text-end">
@@ -205,12 +235,12 @@ ${salespersonStats ? `
             </th>
             <th class="text-end">
               <a href="?${sortLinks.total_received}" class="text-white text-decoration-none">
-                已收款${sortIcons.total_received}
+                已收款${sortIcons.total_received}${filters.invoice_year ? '<br><small class="opacity-75" style="font-size:.7em">(' + filters.invoice_year + '年)</small>' : ''}
               </a>
             </th>
             <th class="text-end">
               <a href="?${sortLinks.unpaid_amount}" class="text-white text-decoration-none">
-                未收款${sortIcons.unpaid_amount}
+                未收款${sortIcons.unpaid_amount}${filters.invoice_year ? '<br><small class="opacity-75" style="font-size:.7em">(' + filters.invoice_year + '年)</small>' : ''}
               </a>
             </th>
             <th>
@@ -222,7 +252,11 @@ ${salespersonStats ? `
         </thead>
         <tbody>
           ${projects.length ? projects.map(p => {
-            const unpaidAmount = (p.total_invoiced || 0) - (p.total_received || 0) - (p.sales_discount || 0);
+            const displayInvoiced = filters.invoice_year ? (p.year_invoiced || 0) : (p.total_invoiced || 0);
+            const displayReceived = filters.invoice_year ? (p.year_received || 0) : (p.total_received || 0);
+            const unpaidAmount = filters.invoice_year
+              ? Math.max(0, p.year_unpaid || 0)
+              : (p.total_invoiced || 0) - (p.total_received || 0) - (p.sales_discount || 0);
             return `
             <tr onclick="location.href='/projects/${p.id}'" style="cursor:pointer">
               <td><code>${p.project_code}</code></td>
@@ -233,9 +267,9 @@ ${salespersonStats ? `
               <td>${p.company_name || '-'}</td>
               <td>${p.project_name}</td>
               <td class="text-end">$${(p.price_with_tax || 0).toLocaleString()}</td>
-              <td class="text-end">$${(p.total_invoiced || 0).toLocaleString()}</td>
+              <td class="text-end">$${displayInvoiced.toLocaleString()}</td>
               <td class="text-end"><span class="text-info">$${((p.price_with_tax || 0) - (p.total_invoiced || 0)).toLocaleString()}</span></td>
-              <td class="text-end">$${(p.total_received || 0).toLocaleString()}</td>
+              <td class="text-end">$${displayReceived.toLocaleString()}</td>
               <td class="text-end"><span class="${unpaidAmount > 0 ? 'text-danger fw-bold' : 'text-muted'}">$${unpaidAmount.toLocaleString()}</span></td>
               <td>
                 <span class="badge bg-${p.status === '已結案' ? 'secondary' : p.status === '取消' ? 'danger' : 'warning'}">${p.status}</span>
@@ -244,14 +278,14 @@ ${salespersonStats ? `
             </tr>
           `;
           }).join('') : '<tr><td colspan="13" class="text-center text-muted py-4">無符合條件的專案</td></tr>'}
-          
+
           ${salespersonStats && projects.length > 0 ? `
           <!-- 統計總計行 -->
           <tr class="table-info fw-bold">
             <td colspan="7" class="text-end"><strong>統計總計：</strong></td>
             <td class="text-end">$${salespersonStats.totalPrice.toLocaleString()}</td>
             <td class="text-end">$${salespersonStats.totalInvoiced.toLocaleString()}</td>
-            <td class="text-end">$${salespersonStats.totalUninvoiced.toLocaleString()}</td>
+            <td class="text-end">${filters.invoice_year ? '-' : '$' + salespersonStats.totalUninvoiced.toLocaleString()}</td>
             <td class="text-end">$${salespersonStats.totalReceived.toLocaleString()}</td>
             <td class="text-end ${salespersonStats.totalUnpaid > 0 ? 'text-danger' : ''}">$${salespersonStats.totalUnpaid.toLocaleString()}</td>
             <td></td>
@@ -265,4 +299,116 @@ ${salespersonStats ? `
     共 ${projects.length} 筆專案
   </div>
 </div>
+
+<!-- 發票明細模態視窗 -->
+<div class="modal fade" id="invoiceDetailModal" tabindex="-1" aria-labelledby="invoiceDetailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="invoiceDetailModalLabel">
+          <i class="bi bi-receipt"></i> 發票明細清單
+          ${filters.invoice_year ? '<span class="badge bg-success ms-2">發票年度：' + filters.invoice_year + '</span>' : ''}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="invoiceDetailBody">
+        <div class="text-center py-4">
+          <div class="spinner-border text-primary" role="status"></div>
+          <p class="mt-2 text-muted">載入中...</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <small class="text-muted me-auto" id="invoiceDetailCount"></small>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function onInvoiceYearChange(select) {
+  const params = new URLSearchParams(window.location.search);
+  if (select.value) {
+    params.set('invoice_year', select.value);
+  } else {
+    params.delete('invoice_year');
+  }
+  window.location.href = '/projects?' + params.toString();
+}
+
+function showInvoiceDetailModal() {
+  const modal = new bootstrap.Modal(document.getElementById('invoiceDetailModal'));
+  const body = document.getElementById('invoiceDetailBody');
+  const countEl = document.getElementById('invoiceDetailCount');
+
+  body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 text-muted">載入中...</p></div>';
+  countEl.textContent = '';
+  modal.show();
+
+  const params = new URLSearchParams(window.location.search);
+  fetch('/projects/invoice-detail?' + params.toString())
+    .then(r => r.json())
+    .then(data => {
+      const fmt = n => '$' + Math.round(n || 0).toLocaleString();
+      if (!data.invoices || data.invoices.length === 0) {
+        body.innerHTML = '<p class="text-center text-muted py-5"><i class="bi bi-inbox fs-3 d-block mb-2"></i>無符合條件的發票明細</p>';
+        return;
+      }
+
+      const rows = data.invoices.map(inv => {
+        const net = (inv.amount_with_tax || 0) - (inv.allowance_amount || 0);
+        const unpaid = net - (inv.paid_amount || 0);
+        return '<tr>' +
+          '<td>' + (inv.invoice_date || '-') + '</td>' +
+          '<td><code>' + (inv.invoice_number || '-') + '</code></td>' +
+          '<td><code>' + inv.project_code + '</code></td>' +
+          '<td class="text-truncate" style="max-width:160px" title="' + inv.project_name + '">' + inv.project_name + '</td>' +
+          '<td>' + (inv.salesperson_name || '-') + '</td>' +
+          '<td class="text-end">' + fmt(inv.amount_with_tax) + '</td>' +
+          '<td class="text-end">' + (inv.allowance_amount ? fmt(inv.allowance_amount) : '-') + '</td>' +
+          '<td class="text-end fw-semibold">' + fmt(net) + '</td>' +
+          '<td class="text-end text-success">' + fmt(inv.paid_amount) + '</td>' +
+          '<td class="text-end ' + (unpaid > 0 ? 'text-danger fw-bold' : 'text-muted') + '">' + fmt(unpaid) + '</td>' +
+          '</tr>';
+      }).join('');
+
+      const t = data.totals;
+      body.innerHTML =
+        '<div class="table-responsive">' +
+        '<table class="table table-sm table-hover table-striped mb-0">' +
+        '<thead class="table-dark sticky-top">' +
+        '<tr>' +
+          '<th>發票日期</th>' +
+          '<th>發票號碼</th>' +
+          '<th>專案編號</th>' +
+          '<th>專案名稱</th>' +
+          '<th>業務</th>' +
+          '<th class="text-end">發票金額(含稅)</th>' +
+          '<th class="text-end">折讓</th>' +
+          '<th class="text-end">淨金額</th>' +
+          '<th class="text-end">已收款</th>' +
+          '<th class="text-end">未收款</th>' +
+        '</tr>' +
+        '</thead>' +
+        '<tbody>' + rows + '</tbody>' +
+        '<tfoot class="table-secondary fw-bold border-top border-2">' +
+        '<tr>' +
+          '<td colspan="5">合計 ' + t.count + ' 筆</td>' +
+          '<td class="text-end">' + fmt(t.totalAmount) + '</td>' +
+          '<td class="text-end">' + (t.totalAllowance ? fmt(t.totalAllowance) : '-') + '</td>' +
+          '<td class="text-end">' + fmt(t.totalNet) + '</td>' +
+          '<td class="text-end">' + fmt(t.totalPaid) + '</td>' +
+          '<td class="text-end ' + (t.totalUnpaid > 0 ? 'text-danger' : '') + '">' + fmt(t.totalUnpaid) + '</td>' +
+        '</tr>' +
+        '</tfoot>' +
+        '</table>' +
+        '</div>';
+
+      countEl.textContent = '共 ' + t.count + ' 筆發票';
+    })
+    .catch(() => {
+      body.innerHTML = '<p class="text-center text-danger py-4"><i class="bi bi-exclamation-triangle"></i> 載入失敗，請重試</p>';
+    });
+}
+</script>
 `}) %>

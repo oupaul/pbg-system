@@ -78,14 +78,14 @@ list_install_dirs() {
     done
 }
 
-# 列出相關的 systemd 服務
+# 列出相關的 systemd 服務（支援多實例部署：不同 port 的服務可能有不同名稱）
 list_services() {
     local services=()
     local index=1
     
     echo "" >&2
     echo "可用的 systemd 服務：" >&2
-    # 掃描所有包含 invoice-bonus 或類似名稱的服務（排除 backup 和 timer）
+    # 1. 掃描 systemctl 列表：包含 invoice-bonus、project-system 等名稱的服務（排除 backup 和 timer）
     while IFS= read -r service; do
         if [ -n "$service" ]; then
             services+=("$service")
@@ -95,6 +95,34 @@ list_services() {
             ((index++))
         fi
     done < <(systemctl list-unit-files --type=service 2>/dev/null | grep -E "(invoice-bonus|invoice.*bonus|project-system|fund-weekly)" | grep -v -E "(backup|timer)" | awk '{print $1}' | sort)
+    
+    # 2. 掃描 /etc/systemd/system/*.service：ExecStart 含 app.js 的服務（多實例可能用不同名稱，如 xxx-3001.service）
+    while IFS= read -r service_file; do
+        if [ -f "$service_file" ]; then
+            local service_name=$(basename "$service_file" .service)
+            # 排除 backup 相關
+            if [[ "$service_name" == *backup* ]]; then
+                continue
+            fi
+            # 檢查是否已在列表中（比對時皆去掉 .service 後綴）
+            local found=0
+            for existing_service in "${services[@]}"; do
+                local existing_base="${existing_service%.service}"
+                if [ "$existing_base" = "$service_name" ]; then
+                    found=1
+                    break
+                fi
+            done
+            # 若 ExecStart 含 app.js 且未在列表中，加入
+            if [ $found -eq 0 ] && grep -q "app.js" "$service_file" 2>/dev/null; then
+                services+=("$service_name")
+                local status=$(systemctl is-active "$service_name" 2>/dev/null || echo "unknown")
+                local enabled=$(systemctl is-enabled "$service_name" 2>/dev/null || echo "unknown")
+                printf "  [%2d] %s (狀態: %s, 啟用: %s)\n" "$index" "$service_name" "$status" "$enabled" >&2
+                ((index++))
+            fi
+        fi
+    done < <(find /etc/systemd/system -maxdepth 1 -name "*.service" 2>/dev/null | sort)
     
     if [ ${#services[@]} -eq 0 ]; then
         echo "  未找到相關服務" >&2
@@ -861,12 +889,31 @@ if [ -d "${PROJECT_DIR}/migrations" ]; then
     npm run migrate:project-customer 2>/dev/null || warning "專案編號+客戶唯一約束遷移失敗（可能已存在）"
     npm run migrate:project-name 2>/dev/null || warning "專案編號+客戶+專案名稱唯一約束遷移失敗（可能已存在）"
     npm run migrate:user-roles 2>/dev/null || warning "使用者角色遷移失敗（可能已存在）"
+    npm run migrate:roles 2>/dev/null || warning "角色管理表遷移失敗（可能已存在）"
+    npm run migrate:remove-user-role-check 2>/dev/null || warning "移除使用者角色 CHECK 約束遷移失敗（可能已存在）"
     npm run migrate:system-settings 2>/dev/null || warning "系統設定表遷移失敗（可能已存在）"
     npm run migrate:project-types 2>/dev/null || warning "專案類型表遷移失敗（可能已存在）"
-          npm run migrate:remove-project-type-check 2>/dev/null || warning "移除專案類型 CHECK 約束遷移失敗（可能已存在）"
-          npm run migrate:sales-discount 2>/dev/null || warning "銷貨折讓欄位遷移失敗（可能已存在）"
-          npm run migrate:costs 2>/dev/null || warning "成本明細表遷移失敗（可能已存在）"
-          npm run migrate:update-total-received 2>/dev/null || warning "更新收款總額計算遷移失敗（可能已存在）"
+    npm run migrate:remove-project-type-check 2>/dev/null || warning "移除專案類型 CHECK 約束遷移失敗（可能已存在）"
+    npm run migrate:sales-discount 2>/dev/null || warning "銷貨折讓欄位遷移失敗（可能已存在）"
+    npm run migrate:costs 2>/dev/null || warning "成本明細表遷移失敗（可能已存在）"
+    npm run migrate:update-total-received 2>/dev/null || warning "更新收款總額計算遷移失敗（可能已存在）"
+    npm run migrate:invoice-expected-payment-date 2>/dev/null || warning "發票預計收款日欄位遷移失敗（可能已存在）"
+    npm run migrate:invoice-status 2>/dev/null || node migrations/migrate_invoice_status.js || warning "發票作廢/折讓遷移失敗（可能已存在）"
+    npm run migrate:soft-delete 2>/dev/null || node migrations/migrate_soft_delete_invoices_payments.js || warning "發票/收款軟刪除遷移失敗（可能已存在）"
+    npm run migrate:partial-allowance 2>/dev/null || node migrations/migrate_invoice_partial_allowance.js || warning "發票部分折讓遷移失敗（可能已存在）"
+    npm run migrate:fix-v-project-summary 2>/dev/null || node migrations/migrate_fix_v_project_summary_invoice_filters.js || warning "v_project_summary 視圖修正失敗（可能已存在）"
+    npm run migrate:project-templates 2>/dev/null || node migrations/migrate_project_templates.js || warning "專案範本遷移失敗（可能已存在）"
+    npm run migrate:project-types-alert 2>/dev/null || node migrations/migrate_project_types_alert_threshold.js || warning "專案類型毛利警示閾值遷移失敗（可能已存在）"
+    npm run migrate:project-types-show-in-dashboard 2>/dev/null || node migrations/migrate_project_types_show_in_dashboard.js || warning "專案類型儀表板顯示遷移失敗（可能已存在）"
+    npm run migrate:project-types-separate-dashboard 2>/dev/null || node migrations/migrate_project_types_show_separate_dashboard.js || warning "專案類型儀表板獨立加總欄位遷移失敗（可能已存在）"
+    npm run migrate:project-attachments 2>/dev/null || node migrations/migrate_project_attachments.js || warning "專案附件表遷移失敗（可能已存在）"
+    npm run migrate:project-attachments-soft-delete 2>/dev/null || node migrations/migrate_project_attachments_soft_delete.js || warning "專案附件軟刪除欄位遷移失敗（可能已存在）"
+    npm run migrate:attachment-cleanup-setting 2>/dev/null || node migrations/migrate_attachment_cleanup_setting.js || warning "附件清理設定遷移失敗（可能已存在）"
+    npm run migrate:report-groups 2>/dev/null || warning "報表群組遷移失敗（可能已存在）"
+    npm run migrate:dashboard-view-mode 2>/dev/null || node migrations/migrate_dashboard_view_mode.js || warning "儀表板檢視模式遷移失敗（可能已存在）"
+    npm run migrate:permission-scope 2>/dev/null || node migrations/migrate_permission_scope.js || warning "RBAC 權限範圍遷移失敗（可能已存在）"
+    npm run migrate:invoice-summary 2>/dev/null || node migrations/migrate_v_invoice_summary.js || warning "發票彙總視圖遷移失敗（可能已存在）"
+    npm run migrate:rename-user-role 2>/dev/null || node migrations/migrate_rename_user_role.js || warning "角色名稱更新失敗（可能已存在）"
     log "✓ 資料庫遷移完成"
 else
     warning "找不到 migrations 目錄，跳過資料庫遷移"
@@ -907,40 +954,7 @@ if command -v sqlite3 >/dev/null 2>&1; then
                 
                 # 更新視圖定義（確保包含新欄位）
                 log "更新 v_project_summary 視圖..."
-                sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" <<'EOF'
-BEGIN TRANSACTION;
-DROP VIEW IF EXISTS v_project_summary;
-CREATE VIEW v_project_summary AS
-SELECT 
-  p.id,
-  p.project_code,
-  p.contract_year,
-  p.contract_month,
-  p.status,
-  p.project_type,
-  p.project_name,
-  p.price_with_tax,
-  p.price_without_tax,
-  p.is_new_customer,
-  p.salesperson_id,
-  p.customer_id,
-  p.expected_invoice_year_month,
-  p.notes,
-  p.created_at,
-  p.updated_at,
-  s.name as salesperson_name,
-  s.status as salesperson_status,
-  c.customer_code,
-  c.tax_id,
-  c.company_name,
-  COALESCE((SELECT SUM(amount_with_tax) FROM invoices WHERE project_id = p.id), 0) as total_invoiced,
-  p.price_with_tax - COALESCE((SELECT SUM(amount_with_tax) FROM invoices WHERE project_id = p.id), 0) as uninvoiced_amount,
-  COALESCE((SELECT SUM(bank_deposit_amount) FROM payments WHERE project_id = p.id), 0) as total_received
-FROM projects p
-LEFT JOIN salespeople s ON p.salesperson_id = s.id
-LEFT JOIN customers c ON p.customer_id = c.id;
-COMMIT;
-EOF
+                npm run migrate:fix-v-project-summary 2>/dev/null || node migrations/migrate_fix_v_project_summary_invoice_filters.js || warning "視圖更新失敗，將於服務啟動後由遷移修正"
                 
                 if [ $? -eq 0 ]; then
                     log "✓ 視圖更新成功"

@@ -63,9 +63,9 @@ function migrateRoles() {
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
       );
 
-      // 一般使用者角色（編輯權限）
+      // 專案管理員角色（編輯權限）
       insertRole.run(
-        'user', '一般使用者', '可以編輯專案、發票、收款等資料',
+        'user', '專案管理員', '可以編輯專案、客戶、業務、發票、收款等所有專案相關資料',
         1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 2
       );
 
@@ -96,7 +96,7 @@ function migrateRoles() {
     console.log('✅ 角色管理資料表遷移完成！');
     console.log('\n系統角色說明：');
     console.log('  - admin (系統管理員): 完整權限');
-    console.log('  - user (一般使用者): 可編輯資料');
+    console.log('  - user (專案管理員): 可編輯專案相關資料');
     console.log('  - salesperson (業務員): 只能查看自己的專案');
     console.log('  - boss (老闆): 可查看所有資料，無編輯權限');
     

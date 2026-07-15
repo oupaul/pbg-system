@@ -1,0 +1,266 @@
+<%- include('../layout', { title: title, body: `
+<div class="row mb-3 align-items-center">
+  <div class="col">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/salespeople">業務管理</a></li>
+        <li class="breadcrumb-item"><a href="/salespeople/${salesperson.id}">${salesperson.name}</a></li>
+        <li class="breadcrumb-item active">整批移轉專案</li>
+      </ol>
+    </nav>
+    <h1 class="h3 mt-2"><i class="bi bi-arrow-left-right"></i> 整批移轉專案</h1>
+  </div>
+</div>
+
+${error ? '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> ' + error + '</div>' : ''}
+
+<div class="alert alert-warning d-flex gap-2">
+  <i class="bi bi-exclamation-triangle-fill fs-5 flex-shrink-0 mt-1"></i>
+  <div>
+    <strong>注意：</strong>此操作將批量更改專案的負責業務，執行後不可自動復原。
+    請確認目標業務正確，並已告知相關同仁。
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- 左欄：移轉設定 -->
+  <div class="col-lg-4">
+    <form id="transferForm" action="/salespeople/${salesperson.id}/transfer-projects" method="POST">
+
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-person-dash"></i> 來源業務</div>
+        <div class="card-body">
+          <div class="d-flex align-items-center gap-2">
+            <span class="fs-5 fw-bold">${salesperson.name}</span>
+            <span class="badge bg-${salesperson.status === 'active' ? 'success' : 'danger'}">
+              ${salesperson.status === 'active' ? '在職' : salesperson.status === 'resigned' ? '離職' : '停用'}
+            </span>
+          </div>
+          ${salesperson.resigned_date ? '<div class="text-muted small mt-1">離職日期：' + salesperson.resigned_date + '</div>' : ''}
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-person-check"></i> 目標業務 <span class="text-danger">*</span></div>
+        <div class="card-body">
+          <select name="to_salesperson_id" id="toSalespersonId" class="form-select" required onchange="updatePreview()">
+            <option value="">-- 請選擇接手業務 --</option>
+            ${activeSalespeople.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('')}
+          </select>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-funnel"></i> 移轉範圍</div>
+        <div class="card-body">
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="radio" name="scope" id="scopeOpen" value="open"
+              checked onchange="updatePreview()">
+            <label class="form-check-label" for="scopeOpen">
+              <strong>僅未結案</strong>
+              <span class="badge bg-warning text-dark ms-1" id="countOpen">-</span>
+              <div class="text-muted small">只移轉 status = 未結案 的專案（建議）</div>
+            </label>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="radio" name="scope" id="scopeAll" value="all"
+              onchange="updatePreview()">
+            <label class="form-check-label" for="scopeAll">
+              <strong>全部專案</strong>
+              <span class="badge bg-secondary ms-1" id="countAll">-</span>
+              <div class="text-muted small">含已結案、取消等所有狀態</div>
+            </label>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="radio" name="scope" id="scopeYear" value="year"
+              onchange="updatePreview()">
+            <label class="form-check-label w-100" for="scopeYear">
+              <strong>指定年度</strong>
+              <span class="badge bg-info ms-1" id="countYear">-</span>
+              <div class="text-muted small">只移轉特定簽約年度的專案</div>
+            </label>
+          </div>
+          <div id="yearSelectWrapper" class="ps-4 mt-2 d-none">
+            <select name="year" id="scopeYearValue" class="form-select form-select-sm" onchange="updatePreview()">
+              <option value="">-- 選擇年度 --</option>
+              ${years.map(y => '<option value="' + y + '">' + y + '年</option>').join('')}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-grid">
+        <button type="submit" id="submitBtn" class="btn btn-danger btn-lg" disabled
+          onclick="return confirmTransfer()">
+          <i class="bi bi-arrow-left-right"></i> 確認執行移轉
+        </button>
+        <a href="/salespeople/${salesperson.id}" class="btn btn-outline-secondary mt-2">
+          <i class="bi bi-x-circle"></i> 取消
+        </a>
+      </div>
+    </form>
+  </div>
+
+  <!-- 右欄：即時預覽 -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span><i class="bi bi-list-ul"></i> 即將移轉的專案預覽</span>
+        <div id="previewSummary" class="text-muted small">請先選擇目標業務與範圍</div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive" style="max-height: 65vh; overflow-y: auto;">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th>專案編號</th>
+                <th>專案名稱</th>
+                <th>類型</th>
+                <th>狀態</th>
+                <th class="text-center">年度</th>
+                <th class="text-end">合約金額</th>
+                <th class="text-end">未開票</th>
+              </tr>
+            </thead>
+            <tbody id="previewTableBody">
+              <tr>
+                <td colspan="7" class="text-center text-muted py-4">
+                  <i class="bi bi-arrow-left-circle me-1"></i>請先設定移轉條件
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card-footer text-muted small" id="previewFooter" style="display:none;">
+        <i class="bi bi-info-circle"></i>
+        未結案專案的發票/收款記錄將保留，僅更改負責業務。
+        移轉後，原本設定為「指定業務」存取的使用者將自動獲得新業務的存取權。
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// 從後端注入所有專案資料（供前端過濾）
+const ALL_PROJECTS = ${JSON.stringify(allProjects.map(p => ({
+  id: p.id,
+  project_code: p.project_code || '',
+  project_name: p.project_name || '',
+  project_type: p.project_type || '',
+  status: p.status || '',
+  contract_year: p.contract_year || '',
+  price_with_tax: p.price_with_tax || 0,
+  total_invoiced: p.total_invoiced || 0,
+  uninvoiced_amount: p.uninvoiced_amount || 0
+}))
+)};
+
+// 初始化計數
+(function initCounts() {
+  document.getElementById('countOpen').textContent =
+    ALL_PROJECTS.filter(p => p.status === '未結案').length;
+  document.getElementById('countAll').textContent = ALL_PROJECTS.length;
+  // year counts will update when year is selected
+})();
+
+function getSelectedScope() {
+  const el = document.querySelector('[name=scope]:checked');
+  return el ? el.value : 'open';
+}
+
+function getSelectedYear() {
+  return document.getElementById('scopeYearValue').value;
+}
+
+function filterProjects() {
+  const scope = getSelectedScope();
+  const year  = getSelectedYear();
+  if (scope === 'open') return ALL_PROJECTS.filter(p => p.status === '未結案');
+  if (scope === 'year') return year ? ALL_PROJECTS.filter(p => String(p.contract_year) === String(year)) : [];
+  return ALL_PROJECTS; // all
+}
+
+function updatePreview() {
+  const yearWrapper = document.getElementById('yearSelectWrapper');
+  const scope = getSelectedScope();
+  yearWrapper.classList.toggle('d-none', scope !== 'year');
+
+  // Update year count badge
+  const yearSel = document.getElementById('scopeYearValue').value;
+  document.getElementById('countYear').textContent =
+    yearSel ? ALL_PROJECTS.filter(p => String(p.contract_year) === String(yearSel)).length : '-';
+
+  const projects = filterProjects();
+  renderTable(projects);
+  updateSubmitState(projects.length);
+}
+
+function renderTable(projects) {
+  const tbody = document.getElementById('previewTableBody');
+  const summary = document.getElementById('previewSummary');
+  const footer  = document.getElementById('previewFooter');
+
+  if (projects.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">此範圍內無符合條件的專案</td></tr>';
+    summary.textContent = '沒有符合條件的專案';
+    footer.style.display = 'none';
+    return;
+  }
+
+  const totalAmount = projects.reduce((s, p) => s + p.price_with_tax, 0);
+  const totalUninvoiced = projects.reduce((s, p) => s + p.uninvoiced_amount, 0);
+  summary.innerHTML =
+    '<strong class="text-dark">' + projects.length + ' 筆</strong>，' +
+    '合計 <strong class="text-primary">$' + Math.round(totalAmount).toLocaleString() + '</strong>，' +
+    '未開票 <strong class="text-warning">$' + Math.round(totalUninvoiced).toLocaleString() + '</strong>';
+
+  const typeColorMap = { '食驗室': 'primary', '純廣': 'success' };
+  const statusColorMap = { '已結案': 'secondary', '取消': 'danger', '未結案': 'warning' };
+
+  tbody.innerHTML = projects.map(p => {
+    const typeColor   = typeColorMap[p.project_type]   || 'info';
+    const statusColor = statusColorMap[p.status]        || 'warning';
+    const uninvClass  = p.uninvoiced_amount > 0 ? 'text-warning' : 'text-muted';
+    const name        = (p.project_name || '-').replace(/</g, '&lt;');
+    return '<tr onclick="window.open(\\'/projects/' + p.id + '\\', \\'_blank\\')" style="cursor:pointer" title="點擊在新頁籤開啟">' +
+      '<td><code>' + p.project_code + '</code></td>' +
+      '<td class="small">' + name + '</td>' +
+      '<td><span class="badge bg-' + typeColor + '">' + p.project_type + '</span></td>' +
+      '<td><span class="badge bg-' + statusColor + '">' + p.status + '</span></td>' +
+      '<td class="text-center">' + p.contract_year + '</td>' +
+      '<td class="text-end">$' + Math.round(p.price_with_tax).toLocaleString() + '</td>' +
+      '<td class="text-end ' + uninvClass + '">' +
+        (p.uninvoiced_amount > 0 ? '$' + Math.round(p.uninvoiced_amount).toLocaleString() : '-') +
+      '</td>' +
+    '</tr>';
+  }).join('');
+
+  footer.style.display = '';
+}
+
+function updateSubmitState(count) {
+  const btn     = document.getElementById('submitBtn');
+  const hasTarget = document.getElementById('toSalespersonId').value !== '';
+  btn.disabled = !(hasTarget && count > 0);
+
+  // Disable "確認移轉" if scope = year but no year selected
+  if (getSelectedScope() === 'year' && !getSelectedYear()) {
+    btn.disabled = true;
+  }
+}
+
+function confirmTransfer() {
+  const projects = filterProjects();
+  const toEl = document.getElementById('toSalespersonId');
+  const toName = toEl.options[toEl.selectedIndex].text;
+  return confirm(
+    '確定要將以下 ' + projects.length + ' 筆專案移轉給「' + toName + '」？\\n\\n' +
+    '此操作無法自動復原，移轉後請至各專案確認資料正確。'
+  );
+}
+
+// 初始化預覽（頁面載入後立即跑一次）
+updatePreview();
+</script>
+` }) %>

@@ -2,7 +2,7 @@
 <div class="row mb-4">
   <div class="col">
     <h1 class="h3">
-      <i class="bi bi-${user ? 'pencil' : 'person-plus'}"></i> 
+      <i class="bi bi-${user ? 'pencil' : 'person-plus'}"></i>
       ${user ? '編輯使用者' : '新增使用者'}
     </h1>
   </div>
@@ -25,7 +25,7 @@ ${error ? `
             <input type="text" class="form-control" value="${user.username}" disabled>
             <small class="text-muted">使用者名稱無法修改</small>
           ` : `
-            <input type="text" name="username" class="form-control" value="${user ? user.username : ''}" required>
+            <input type="text" name="username" class="form-control" value="" required>
           `}
         </div>
 
@@ -37,32 +37,59 @@ ${error ? `
         <div class="col-md-6">
           <label class="form-label">${user ? '新密碼' : '密碼'} ${user ? '' : '<span class="text-danger">*</span>'}</label>
           <input type="password" name="password" class="form-control" ${user ? '' : 'required'} minlength="6">
-          ${user ? `
-            <small class="text-muted">留空則不修改密碼，至少 6 個字元</small>
-          ` : `
-            <small class="text-muted">至少 6 個字元</small>
-          `}
+          ${user ? '<small class="text-muted">留空則不修改密碼，至少 6 個字元</small>' : '<small class="text-muted">至少 6 個字元</small>'}
         </div>
 
         <div class="col-md-6">
           <label class="form-label">角色 <span class="text-danger">*</span></label>
-          <select name="role" class="form-select" id="roleSelect" required onchange="toggleSalespersonField()">
-            ${typeof roles !== 'undefined' && roles.length > 0 ? 
-              roles.map(r => '<option value="' + r.role_key + '"' + (user && user.role === r.role_key ? ' selected' : '') + '>' + r.role_name + '</option>').join('') 
-              : 
-              '<option value="user" ' + (user && user.role === 'user' ? 'selected' : '') + '>一般使用者</option><option value="admin" ' + (user && user.role === 'admin' ? 'selected' : '') + '>管理員</option><option value="salesperson" ' + (user && user.role === 'salesperson' ? 'selected' : '') + '>業務員</option><option value="boss" ' + (user && user.role === 'boss' ? 'selected' : '') + '>老闆</option>'
-            }
+          <select name="role" class="form-select" id="roleSelect" required onchange="onRoleChange()">
+            ${(() => {
+              const roleList = typeof roles !== 'undefined' && roles.length > 0 ? roles : [
+                { role_key: 'user',        role_name: '專案管理員', project_view_scope: 'all' },
+                { role_key: 'admin',       role_name: '管理員',     project_view_scope: 'all' },
+                { role_key: 'salesperson', role_name: '業務員',     project_view_scope: 'own' },
+                { role_key: 'boss',        role_name: '老闆',       project_view_scope: 'all' }
+              ];
+              return roleList.map(r =>
+                '<option value="' + r.role_key + '"' +
+                ' data-scope="' + (r.project_view_scope || 'all') + '"' +
+                (user && user.role === r.role_key ? ' selected' : '') +
+                '>' + r.role_name + '</option>'
+              ).join('');
+            })()}
           </select>
           <small class="text-muted">請從角色管理中設定各角色的權限</small>
         </div>
 
-        <div class="col-md-6" id="salespersonField" style="display: ${user && user.role === 'salesperson' ? 'block' : 'none'};">
+        <!-- 關聯業務員（role = salesperson 時顯示） -->
+        <div class="col-md-6" id="salespersonField" style="display: none;">
           <label class="form-label">關聯業務員 <span class="text-danger">*</span></label>
           <select name="salesperson_id" class="form-select" id="salespersonSelect">
             <option value="">請選擇業務員</option>
-            ${salespeople.map(sp => '<option value="' + sp.id + '"' + (user && user.salesperson_id == sp.id ? ' selected' : '') + '>' + sp.name + '</option>').join('')}
+            ${salespeople.map(sp =>
+              '<option value="' + sp.id + '"' +
+              (user && user.salesperson_id == sp.id ? ' selected' : '') +
+              '>' + sp.name + '</option>'
+            ).join('')}
           </select>
           <small class="text-muted">業務員角色必須關聯一位業務人員</small>
+        </div>
+
+        <!-- 指派可見業務（role.project_view_scope = assigned 時顯示） -->
+        <div class="col-12" id="assignedSalespersonField" style="display: none;">
+          <label class="form-label">可見業務範圍</label>
+          <div class="border rounded p-3" style="max-height: 220px; overflow-y: auto;">
+            ${salespeople.length === 0 ? '<p class="text-muted mb-0">目前沒有業務人員</p>' :
+              salespeople.map(sp => {
+                const checked = (typeof assignedSalespersonIds !== 'undefined' && assignedSalespersonIds.includes(sp.id)) ? 'checked' : '';
+                return '<div class="form-check">' +
+                  '<input class="form-check-input" type="checkbox" name="assigned_salespeople" value="' + sp.id + '" id="sp_' + sp.id + '" ' + checked + '>' +
+                  '<label class="form-check-label" for="sp_' + sp.id + '">' + sp.name + '</label>' +
+                  '</div>';
+              }).join('')
+            }
+          </div>
+          <small class="text-muted">勾選此使用者可以查看哪些業務員的專案</small>
         </div>
 
         ${user ? `
@@ -89,25 +116,34 @@ ${error ? `
 </div>
 
 <script>
-function toggleSalespersonField() {
-  const role = document.getElementById('roleSelect').value;
+function onRoleChange() {
+  const select = document.getElementById('roleSelect');
+  const selectedOption = select.options[select.selectedIndex];
+  const role = select.value;
+  const scope = selectedOption ? selectedOption.getAttribute('data-scope') : 'all';
+
   const salespersonField = document.getElementById('salespersonField');
   const salespersonSelect = document.getElementById('salespersonSelect');
-  
-  if (role === 'salesperson') {
+  const assignedField = document.getElementById('assignedSalespersonField');
+
+  // Show single-salesperson binding only for 'own' scope (salesperson role)
+  if (role === 'salesperson' || scope === 'own') {
     salespersonField.style.display = 'block';
     salespersonSelect.required = true;
   } else {
     salespersonField.style.display = 'none';
     salespersonSelect.required = false;
-    salespersonSelect.value = ''; // 清空選擇
+    salespersonSelect.value = '';
+  }
+
+  // Show multi-salesperson assignment only for 'assigned' scope
+  if (scope === 'assigned') {
+    assignedField.style.display = 'block';
+  } else {
+    assignedField.style.display = 'none';
   }
 }
 
-// 頁面載入時執行一次
-document.addEventListener('DOMContentLoaded', function() {
-  toggleSalespersonField();
-});
+document.addEventListener('DOMContentLoaded', onRoleChange);
 </script>
 ` }) %>
-

@@ -14,12 +14,14 @@ const FIELD_LABELS = {
     id: 'ID', project_code: '專案編號', contract_year: '簽約年度', contract_month: '簽約月份',
     status: '狀態', project_type: '專案類型', salesperson_id: '業務人員', customer_id: '客戶',
     project_name: '專案名稱', price_with_tax: '價格(含稅)', price_without_tax: '價格(未稅)',
-    sales_discount: '銷貨折讓', is_new_customer: '新客戶', expected_invoice_year_month: '預計開票年月',
+    sales_discount: '銷貨折讓', is_new_customer: '新客戶', expected_invoice_year_month: '預計開發票月份',
     notes: '備註', created_at: '建立時間', updated_at: '更新時間'
   },
   invoices: {
     id: 'ID', project_id: '專案', invoice_date: '發票日期', invoice_number: '發票號碼',
     amount_with_tax: '金額(含稅)', expected_payment_date: '預計收款日',
+    status: '狀態', voided_at: '作廢/折讓日期', void_reason: '作廢/折讓原因',
+    replacement_invoice_id: '重開發票ID', original_invoice_id: '原發票ID',
     created_at: '建立時間', updated_at: '更新時間'
   },
   payments: {
@@ -343,6 +345,53 @@ router.get('/statistics', (req, res) => {
     success: true,
     statistics
   });
+});
+
+// 匯出稽核紀錄為 CSV（依目前篩選條件，最多 10000 筆）
+router.get('/export', (req, res) => {
+  const filters = {
+    tableName: req.query.table_name || null,
+    recordId: req.query.record_id ? parseInt(req.query.record_id) : null,
+    action: req.query.action || null,
+    startDate: req.query.start_date || null,
+    endDate: req.query.end_date || null,
+    limit: 10000,
+    offset: 0
+  };
+
+  const logs = AuditLogService.getLogs(filters);
+
+  const csvEscape = (val) => {
+    if (val === null || val === undefined) return '';
+    const s = String(val);
+    if (s.includes('"') || s.includes(',') || s.includes('\n') || s.includes('\r')) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  };
+
+  const actionLabel = (a) => ({ create: '新增', update: '更新', delete: '刪除' }[a] || a);
+  const tableLabel = (t) => (TABLE_LABELS[t] || t);
+
+  const header = ['時間', '操作', '資料表', '記錄ID', '使用者', '舊值', '新值'];
+  const rows = logs.map(log => [
+    log.created_at || '',
+    actionLabel(log.action) || log.action,
+    tableLabel(log.table_name) || log.table_name,
+    log.record_id != null ? log.record_id : '',
+    log.user_info || '',
+    log.old_value || '',
+    log.new_value || ''
+  ]);
+
+  const bom = '\uFEFF';
+  const csv = bom + header.map(csvEscape).join(',') + '\n' +
+    rows.map(row => row.map(csvEscape).join(',')).join('\n');
+
+  const filename = 'audit-logs-' + dayjs().format('YYYY-MM-DD-HHmm') + '.csv';
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
+  res.send(csv);
 });
 
 module.exports = router;

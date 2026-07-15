@@ -3,6 +3,13 @@ const router = express.Router();
 const User = require('../models/User');
 const AuditLogService = require('../services/AuditLogService');
 const { getUserInfo } = require('../utils/authHelper');
+const { loginRateLimiter, resetOnSuccess } = require('../middleware/rateLimiter');
+
+// 只允許相對路徑重新導向，防止 open redirect
+function safeRedirect(redirect) {
+  if (typeof redirect === 'string' && /^\/(?!\/)/.test(redirect)) return redirect;
+  return '/';
+}
 
 // 登入頁面
 router.get('/login', (req, res, next) => {
@@ -14,7 +21,7 @@ router.get('/login', (req, res, next) => {
     
     // 如果已經登入，重定向到首頁或原始請求的頁面
     if (req.session && req.session.user) {
-      const redirect = req.query.redirect || '/';
+      const redirect = safeRedirect(req.query.redirect);
       console.log('[登入] 已登入，重定向到:', redirect);
       return res.redirect(redirect);
     }
@@ -43,13 +50,13 @@ router.get('/login', (req, res, next) => {
 });
 
 // 處理登入
-router.post('/login', async (req, res) => {
+router.post('/login', loginRateLimiter, async (req, res) => {
   console.log('[登入] POST /login 請求');
   console.log('[登入] Request body:', { username: req.body.username, password: '[已隱藏]', redirect: req.body.redirect });
   console.log('[登入] Session ID:', req.sessionID);
   
   const { username, password } = req.body;
-  const redirect = req.body.redirect || '/';
+  const redirect = safeRedirect(req.body.redirect);
 
   if (!username || !password) {
     console.log('[登入] 驗證失敗: 帳號或密碼為空');
@@ -81,6 +88,9 @@ router.post('/login', async (req, res) => {
     console.log('[登入] 帳號已被停用');
     return res.redirect(`/login?error=${encodeURIComponent('帳號已被停用')}&redirect=${encodeURIComponent(redirect)}`);
   }
+
+  // 登入成功 — 清除速率限制計數
+  resetOnSuccess(req.ip || req.connection.remoteAddress || 'unknown');
 
   // 登入成功，設置 session
   console.log('[登入] 登入成功，設置 session');
@@ -122,7 +132,7 @@ router.post('/login', async (req, res) => {
   console.log('[登入] 重定向到:', redirect);
   console.log('[登入] Session 最終狀態:', req.session.user);
 
-  // 重定向到原始請求的頁面或首頁
+  // 重定向到原始請求的頁面或首頁（已驗證為相對路徑）
   res.redirect(redirect);
 });
 

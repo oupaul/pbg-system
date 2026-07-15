@@ -41,14 +41,23 @@ const Role = {
   // 創建角色
   create(data, userId = null) {
     try {
+      const dashboardMode = ['all_and_separate', 'exclude_separate', 'none'].includes(data.dashboard_view_mode)
+        ? data.dashboard_view_mode : 'all_and_separate';
+      const validScopes = ['all', 'assigned', 'own', 'none'];
+      const scopeValue = validScopes.includes(data.project_view_scope)
+        ? data.project_view_scope : 'all';
+
       const result = db.prepare(`
         INSERT INTO roles (
           role_key, role_name, description,
           can_edit, can_delete, can_manage_users, can_manage_roles,
           can_manage_settings, can_backup_restore,
           can_view_all_projects, can_view_own_projects,
+          can_edit_crm,
+          project_view_scope,
+          dashboard_view_mode,
           is_system_role, is_active, display_order
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         data.role_key,
         data.role_name,
@@ -61,6 +70,9 @@ const Role = {
         data.can_backup_restore || 0,
         data.can_view_all_projects !== undefined ? data.can_view_all_projects : 1,
         data.can_view_own_projects !== undefined ? data.can_view_own_projects : 1,
+        data.can_edit_crm !== undefined ? data.can_edit_crm : 1,
+        scopeValue,
+        dashboardMode,
         data.is_system_role || 0,
         data.is_active !== undefined ? data.is_active : 1,
         data.display_order || 0
@@ -144,6 +156,10 @@ const Role = {
         fields.push('can_view_own_projects = ?');
         values.push(data.can_view_own_projects);
       }
+      if (data.can_edit_crm !== undefined) {
+        fields.push('can_edit_crm = ?');
+        values.push(data.can_edit_crm);
+      }
       if (data.is_active !== undefined) {
         fields.push('is_active = ?');
         values.push(data.is_active);
@@ -151,6 +167,19 @@ const Role = {
       if (data.display_order !== undefined) {
         fields.push('display_order = ?');
         values.push(data.display_order);
+      }
+      if (data.dashboard_view_mode !== undefined) {
+        const valid = ['all_and_separate', 'exclude_separate', 'none'].includes(data.dashboard_view_mode)
+          ? data.dashboard_view_mode : 'all_and_separate';
+        fields.push('dashboard_view_mode = ?');
+        values.push(valid);
+      }
+      if (data.project_view_scope !== undefined) {
+        const validScopes = ['all', 'assigned', 'own', 'none'];
+        const scope = validScopes.includes(data.project_view_scope)
+          ? data.project_view_scope : 'all';
+        fields.push('project_view_scope = ?');
+        values.push(scope);
       }
 
       if (fields.length === 0) {
@@ -267,7 +296,8 @@ const Role = {
       can_manage_settings: role.can_manage_settings === 1,
       can_backup_restore: role.can_backup_restore === 1,
       can_view_all_projects: role.can_view_all_projects === 1,
-      can_view_own_projects: role.can_view_own_projects === 1
+      can_view_own_projects: role.can_view_own_projects === 1,
+      can_edit_crm: role.can_edit_crm === 1
     };
   },
 

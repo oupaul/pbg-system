@@ -16,6 +16,7 @@ backups/
 # Configuration files (may contain sensitive info)
 deploy.config.json
 deploy.config.sh
+nas_config.json
 .env
 .env.local
 

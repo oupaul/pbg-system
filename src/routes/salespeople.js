@@ -4,6 +4,8 @@ const Salesperson = require('../models/Salesperson');
 const Project = require('../models/Project');
 const Bonus = require('../models/Bonus');
 const { getUserInfo } = require('../utils/authHelper');
+const { requireEditPermission } = require('../middleware/auth');
+const cache = require('../services/CacheService');
 
 // 業務列表
 router.get('/', (req, res) => {
@@ -125,6 +127,74 @@ router.post('/', (req, res) => {
   }
 });
 
+// 整批移轉專案 - 表單頁
+router.get('/:id/transfer-projects', requireEditPermission, (req, res) => {
+  const salesperson = Salesperson.findById(req.params.id);
+  if (!salesperson) {
+    return res.status(404).render('error', { title: '找不到業務人員', message: '找不到業務人員', error: {} });
+  }
+
+  // 供目標業務下拉（排除自己）
+  const activeSalespeople = Salesperson.findAll(false).filter(s => s.id !== salesperson.id);
+
+  // 全部專案（供前端 JS 動態篩選預覽）
+  const allProjects = Project.findAll({ salesperson: salesperson.name });
+
+  // 可選年度
+  const years = Project.getYears();
+
+  res.render('salespeople/transfer', {
+    title: `移轉專案 - ${salesperson.name}`,
+    salesperson,
+    activeSalespeople,
+    allProjects,
+    years,
+    success: req.query.success ? decodeURIComponent(req.query.success) : null,
+    error: req.query.error   ? decodeURIComponent(req.query.error)   : null
+  });
+});
+
+// 整批移轉專案 - 執行
+router.post('/:id/transfer-projects', requireEditPermission, (req, res) => {
+  const fromId = req.params.id;
+  try {
+    const { to_salesperson_id, scope, year } = req.body;
+
+    if (!to_salesperson_id) {
+      return res.redirect(`/salespeople/${fromId}/transfer-projects?error=` +
+        encodeURIComponent('請選擇目標業務'));
+    }
+    if (!['all', 'open', 'year'].includes(scope)) {
+      return res.redirect(`/salespeople/${fromId}/transfer-projects?error=` +
+        encodeURIComponent('移轉範圍參數無效'));
+    }
+    if (scope === 'year' && !year) {
+      return res.redirect(`/salespeople/${fromId}/transfer-projects?error=` +
+        encodeURIComponent('請選擇要移轉的年度'));
+    }
+
+    const count = Salesperson.transferProjects(
+      fromId,
+      to_salesperson_id,
+      { scope, year: year || null },
+      getUserInfo(req)
+    );
+
+    // 清除儀表板快取
+    cache.delByPrefix('dashboard:');
+
+    const to = Salesperson.findById(to_salesperson_id);
+    const toName = to ? to.name : `#${to_salesperson_id}`;
+    const successMsg = `已成功移轉 ${count} 筆專案給 ${toName}`;
+
+    res.redirect(`/salespeople/${fromId}?success=` + encodeURIComponent(successMsg));
+  } catch (err) {
+    console.error('[移轉專案] 錯誤:', err);
+    res.redirect(`/salespeople/${fromId}/transfer-projects?error=` +
+      encodeURIComponent('移轉失敗：' + err.message));
+  }
+});
+
 // 業務詳情
 router.get('/:id', (req, res) => {
   const salesperson = Salesperson.findById(req.params.id);
@@ -160,7 +230,9 @@ router.get('/:id', (req, res) => {
     bonuses,
     performance,
     years,
-    selectedYear: selectedYear || 'all' // 傳遞給視圖，'all' 表示全部年度
+    selectedYear: selectedYear || 'all',
+    success: req.query.success ? decodeURIComponent(req.query.success) : null,
+    error: req.query.error   ? decodeURIComponent(req.query.error)   : null
   });
 });
 
@@ -171,6 +243,7 @@ router.post('/:id', (req, res) => {
       name: req.body.name,
       status: req.body.status,
       resigned_date: req.body.resigned_date,
+      show_separate_dashboard: req.body.show_separate_dashboard === '1',
       userInfo: getUserInfo(req)
     });
     res.redirect(`/salespeople/${req.params.id}`);

@@ -1,0 +1,135 @@
+<%- include('../layout', { body: `
+<div class="row mb-4">
+  <div class="col">
+    <h1 class="h3"><i class="bi bi-graph-up"></i> 業務績效儀表板</h1>
+  </div>
+  <div class="col-auto">
+    <form class="d-flex" method="get">
+      <select name="year" class="form-select" onchange="this.form.submit()">
+        <option value="all" ${selectedYear === 'all' ? 'selected' : ''}>全部年度</option>
+        ${(years || []).map(y => '<option value="' + y + '" ' + (y == selectedYear ? 'selected' : '') + '>' + y + '</option>').join('')}
+      </select>
+    </form>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="text-muted"><i class="bi bi-bullseye"></i> 洽談中商機</h6>
+        <h4 class="mb-0">${(pipelineSummary?.open_count || 0)} 筆 / $${(pipelineSummary?.open_amount || 0).toLocaleString()}</h4>
+        <a href="/pipelines?status=${encodeURIComponent('洽談中')}" class="small">查看商機列表</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100 ${(pipelineSummary?.won_pending_count || 0) > 0 ? 'border-warning' : ''}">
+      <div class="card-body">
+        <h6 class="text-muted"><i class="bi bi-exclamation-triangle"></i> 已成交待轉入專案</h6>
+        <h4 class="mb-0 ${(pipelineSummary?.won_pending_count || 0) > 0 ? 'text-warning' : ''}">${(pipelineSummary?.won_pending_count || 0)} 筆 / $${(pipelineSummary?.won_pending_amount || 0).toLocaleString()}</h4>
+        ${(pipelineSummary?.won_pending_count || 0) > 0 ? '<a href="/pipelines?status=' + encodeURIComponent('已成交') + '" class="small">提醒財務盡快建立專案</a>' : '<span class="small text-muted">目前無待處理項目</span>'}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="text-muted"><i class="bi bi-graph-up-arrow"></i> 商機潛在總營收</h6>
+        <h4 class="mb-0">$${((pipelineSummary?.open_amount || 0) + (pipelineSummary?.won_pending_amount || 0)).toLocaleString()}</h4>
+        <span class="small text-muted">洽談中 + 已成交待轉入</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+${(performance || []).length > 0 ? `
+<div class="row g-4 mb-4">
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header">已開發票業績占比（圓餅圖）</div>
+      <div class="card-body d-flex align-items-center justify-content-center" style="min-height: 280px;">
+        <canvas id="chartInvoiced" width="300" height="260"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header">各業務獎金比較（長條圖）</div>
+      <div class="card-body" style="min-height: 280px;">
+        <canvas id="chartBonus" height="260"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+` : ''}
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th>業務</th>
+            <th class="text-center">專案數</th>
+            <th class="text-end">專案金額</th>
+            <th class="text-end">已開發票</th>
+            <th class="text-end">未開發票</th>
+            <th class="text-end">已收款</th>
+            <th class="text-end">未收款</th>
+            <th class="text-end">總獎金</th>
+            <th class="text-end">已發放</th>
+            <th class="text-end">待發放</th>
+            <th class="text-center">洽談中商機</th>
+            <th class="text-end">預估金額</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${(performance || []).length ? (performance || []).map(p => '<tr><td><strong>' + p.name + '</strong></td><td class="text-center">' + (p.project_count || 0) + '</td><td class="text-end">$' + (p.total_price || 0).toLocaleString() + '</td><td class="text-end text-success">$' + (p.total_invoiced || 0).toLocaleString() + '</td><td class="text-end">$' + (p.uninvoiced_amount || 0).toLocaleString() + '</td><td class="text-end">$' + (p.total_received || 0).toLocaleString() + '</td><td class="text-end ' + (p.total_unpaid > 0 ? 'text-danger fw-bold' : '') + '">$' + (p.total_unpaid || 0).toLocaleString() + '</td><td class="text-end">$' + (p.total_bonus || 0).toLocaleString() + '</td><td class="text-end text-success">$' + (p.paid_bonus || 0).toLocaleString() + '</td><td class="text-end text-warning">$' + (p.pending_bonus || 0).toLocaleString() + '</td><td class="text-center">' + (p.pipeline_count || 0) + '</td><td class="text-end">$' + (p.pipeline_amount || 0).toLocaleString() + '</td><td><a href="/projects?salesperson=' + encodeURIComponent(p.name) + (selectedYear !== 'all' ? '&year=' + selectedYear : '') + '" class="btn btn-sm btn-outline-primary">專案</a> <a href="/bonuses' + (selectedYear !== 'all' ? '?year=' + selectedYear : '') + '" class="btn btn-sm btn-outline-info">獎金</a></td></tr>').join('') : '<tr><td colspan="13" class="text-center text-muted py-4">尚無資料</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+${(performance || []).length > 0 ? `
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function(){
+  var data = JSON.parse(${JSON.stringify(JSON.stringify(performance || []).replace(new RegExp('<\\\\/script', 'gi'), '<\\/script'))});
+  if (!data || data.length === 0) return;
+  var colors = ['#0d6efd','#198754','#ffc107','#dc3545','#0dcaf0','#6f42c1','#fd7e14','#20c997'];
+  var pieCtx = document.getElementById('chartInvoiced');
+  if (pieCtx) {
+    new Chart(pieCtx, {
+      type: 'pie',
+      data: {
+        labels: data.map(function(d){ return d.name; }),
+        datasets: [{
+          data: data.map(function(d){ return d.total_invoiced || 0; }),
+          backgroundColor: data.map(function(_,i){ return colors[i % colors.length]; })
+        }]
+      },
+      options: { responsive: true, plugins: { legend: { position: 'right' } } }
+    });
+  }
+  var barCtx = document.getElementById('chartBonus');
+  if (barCtx) {
+    new Chart(barCtx, {
+      type: 'bar',
+      data: {
+        labels: data.map(function(d){ return d.name; }),
+        datasets: [
+          { label: '總獎金', data: data.map(function(d){ return d.total_bonus || 0; }), backgroundColor: '#0d6efd' },
+          { label: '已發放', data: data.map(function(d){ return d.paid_bonus || 0; }), backgroundColor: '#198754' },
+          { label: '待發放', data: data.map(function(d){ return d.pending_bonus || 0; }), backgroundColor: '#ffc107' }
+        ]
+      },
+      options: { responsive: true, scales: { x: { stacked: false }, y: { beginAtZero: true } }, plugins: { legend: { position: 'top' } } }
+    });
+  }
+})();
+</script>
+` : ''}
+` }) %>

@@ -1,6 +1,8 @@
 const ExcelJS = require('exceljs');
 const db = require('../models/db');
 const dayjs = require('dayjs');
+const ReceivablesAgingService = require('./ReceivablesAgingService');
+const GrossProfitAnalysisService = require('./GrossProfitAnalysisService');
 
 // 格式化為民國年
 function formatROCDate(dateStr) {
@@ -52,14 +54,18 @@ class ExcelExportService {
     const data = [headers];
 
     for (const project of projects) {
-      // 取得發票明細
-      const invoices = db.prepare(`
-        SELECT * FROM invoices WHERE project_id = ? ORDER BY invoice_date
+      // 取得發票明細（排除軟刪除；有效與作廢均列出，供第一列判斷用）
+      const allInvoices = db.prepare(`
+        SELECT * FROM invoices WHERE project_id = ? AND deleted_at IS NULL ORDER BY invoice_date
       `).all(project.id);
+      // 有效發票：status 為 NULL 或 '有效'（含部分折讓，以認列金額計）
+      const validInvoices = allInvoices.filter(i => !i.status || i.status === '有效');
+      // 非有效發票（作廢、整筆折讓）僅用於附加列展示，不計入金額
+      const invalidInvoices = allInvoices.filter(i => i.status && i.status !== '有效');
 
-      // 取得收款明細
+      // 取得收款明細（排除軟刪除）
       const payments = db.prepare(`
-        SELECT * FROM payments WHERE project_id = ? ORDER BY payment_date
+        SELECT * FROM payments WHERE project_id = ? AND deleted_at IS NULL ORDER BY payment_date
       `).all(project.id);
 
       // 取得獎金明細
@@ -67,9 +73,11 @@ class ExcelExportService {
         SELECT * FROM bonus_calculations WHERE project_id = ?
       `).all(project.id);
 
-      // 計算彙總
-      const totalInvoiced = invoices.reduce((sum, i) => sum + (i.amount_with_tax || 0), 0);
-      const uninvoiced = project.price_with_tax - totalInvoiced;
+      // 計算彙總（僅計有效發票，認列金額 = amount_with_tax - allowance_amount）
+      const totalInvoiced = validInvoices.reduce(
+        (sum, i) => sum + (i.amount_with_tax || 0) - (i.allowance_amount || 0), 0
+      );
+      const uninvoiced = Math.max(0, project.price_with_tax - totalInvoiced);
 
       // 找出各類獎金
       const labBonus = bonuses.find(b => b.bonus_type === '食驗室獎金');
@@ -98,9 +106,9 @@ class ExcelExportService {
         project.company_name,
         project.project_name,
         formatCurrency(project.price_with_tax),
-        invoices[0] ? formatROCDate(invoices[0].invoice_date) : '',
-        invoices[0]?.invoice_number || '',
-        invoices[0] ? formatCurrency(invoices[0].amount_with_tax) : '',
+        validInvoices[0] ? formatROCDate(validInvoices[0].invoice_date) : '',
+        validInvoices[0]?.invoice_number || '',
+        validInvoices[0] ? formatCurrency((validInvoices[0].amount_with_tax || 0) - (validInvoices[0].allowance_amount || 0)) : '',
         formatCurrency(uninvoiced),
         payments[0] ? formatROCDate(payments[0].payment_date) : '',
         payments[0] ? formatCurrency(payments[0].bank_deposit_amount) : '',
@@ -129,20 +137,21 @@ class ExcelExportService {
 
       data.push(firstRow);
 
-      // 額外發票/收款列
-      const maxRows = Math.max(invoices.length, payments.length);
-      for (let i = 1; i < maxRows; i++) {
+      // 額外有效發票列（從第 2 筆起）與收款列（從第 2 筆起）
+      const maxValidRows = Math.max(validInvoices.length, payments.length);
+      for (let i = 1; i < maxValidRows; i++) {
         const extraRow = new Array(39).fill('');
-        extraRow[6] = project.project_code;
-        extraRow[7] = project.customer_code;
-        extraRow[8] = project.tax_id;
-        extraRow[9] = project.company_name;
+        extraRow[6]  = project.project_code;
+        extraRow[7]  = project.customer_code;
+        extraRow[8]  = project.tax_id;
+        extraRow[9]  = project.company_name;
         extraRow[10] = project.project_name;
 
-        if (invoices[i]) {
-          extraRow[12] = formatROCDate(invoices[i].invoice_date);
-          extraRow[13] = invoices[i].invoice_number;
-          extraRow[14] = formatCurrency(invoices[i].amount_with_tax);
+        if (validInvoices[i]) {
+          const inv = validInvoices[i];
+          extraRow[12] = formatROCDate(inv.invoice_date);
+          extraRow[13] = inv.invoice_number || '';
+          extraRow[14] = formatCurrency((inv.amount_with_tax || 0) - (inv.allowance_amount || 0));
         }
 
         if (payments[i]) {
@@ -152,6 +161,20 @@ class ExcelExportService {
         }
 
         data.push(extraRow);
+      }
+
+      // 作廢/整筆折讓發票附加在最後（標記狀態，僅供參考，匯入時不處理）
+      for (const inv of invalidInvoices) {
+        const voidRow = new Array(39).fill('');
+        voidRow[6]  = project.project_code;
+        voidRow[7]  = project.customer_code;
+        voidRow[8]  = project.tax_id;
+        voidRow[9]  = project.company_name;
+        voidRow[10] = project.project_name;
+        voidRow[12] = formatROCDate(inv.invoice_date);
+        voidRow[13] = `[${inv.status}] ${inv.invoice_number || ''}`.trim();
+        voidRow[14] = formatCurrency(inv.amount_with_tax);
+        data.push(voidRow);
       }
     }
 
@@ -255,6 +278,140 @@ class ExcelExportService {
     return workbook;
   }
 
+  // 匯出應收帳款帳齡分析
+  exportReceivablesAging(year = null) {
+    const aging = ReceivablesAgingService.getAgingReport(year);
+
+    const workbook = new ExcelJS.Workbook();
+    const sheetName = year ? `帳齡分析-${year}` : '帳齡分析-全部';
+    const worksheet = workbook.addWorksheet(sheetName);
+
+    const bucketLabels = [
+      { key: 'notYetDue', label: '未到期' },
+      { key: 'days1_30', label: '1-30 天' },
+      { key: 'days31_60', label: '31-60 天' },
+      { key: 'days61_90', label: '61-90 天' },
+      { key: 'over90', label: '90 天以上' },
+      { key: 'noDate', label: '未設預計日' }
+    ];
+
+    const allItems = bucketLabels.flatMap(({ key }) => {
+      const b = aging.buckets[key];
+      return (b?.items || []).map(item => ({ ...item, bucketLabel: aging.buckets[key].label }));
+    });
+
+    worksheet.addRow([year ? `應收帳款帳齡分析 - ${year} 年度` : '應收帳款帳齡分析 - 全部']);
+    worksheet.addRow([`總未收款：$${formatCurrency(aging.total)} (${aging.totalCount} 筆)`]);
+    worksheet.addRow([]);
+
+    const headers = ['帳齡', '專案編號', '專案名稱', '發票號碼', '業務', '未收金額', '預計收款日'];
+    worksheet.addRow(headers);
+
+    for (const item of allItems) {
+      worksheet.addRow([
+        item.bucketLabel || '',
+        item.project_code || '',
+        item.project_name || '',
+        item.invoice_number || '-',
+        item.salesperson_name || '-',
+        formatCurrency(item.amount),
+        item.expected_payment_date ? formatROCDate(item.expected_payment_date) : ''
+      ]);
+    }
+
+    const columnWidths = [12, 18, 35, 18, 15, 14, 14];
+    columnWidths.forEach((w, i) => { worksheet.getColumn(i + 1).width = w; });
+
+    return workbook;
+  }
+
+  // 匯出毛利分析報表（專案明細、依業務彙總、依類型彙總、依群組彙總）
+  exportGrossProfit(year = null, user = null, statusFilter = null) {
+    const byProject = GrossProfitAnalysisService.getAnalysisByProject(year, user, statusFilter);
+    const bySalesperson = GrossProfitAnalysisService.getAnalysisBySalesperson(year, user, statusFilter);
+    const byType = GrossProfitAnalysisService.getAnalysisByType(year, user, statusFilter);
+    const byGroup = GrossProfitAnalysisService.getAnalysisByReportGroup(year, user, statusFilter);
+
+    const workbook = new ExcelJS.Workbook();
+    const yearLabel = year ? `${year} 年度` : '全部年度';
+    const statusLabel = statusFilter === '未結案' ? '（未結案）' : statusFilter === '已結案' ? '（已結案）' : '';
+    const sheetNameSuffix = year ? `-${year}` : '-全部';
+
+    // Sheet 1: 專案明細
+    const wsProject = workbook.addWorksheet(`專案明細${sheetNameSuffix}`);
+    wsProject.addRow(['專案毛利分析 - 專案明細', yearLabel + statusLabel]);
+    wsProject.addRow([]);
+    wsProject.addRow(['專案編號', '客戶', '專案名稱', '類型', '毛利率%', '毛利', '收入（未稅）', '成本', '簽約年度', '狀態']);
+    for (const r of byProject) {
+      wsProject.addRow([
+        r.project_code || '',
+        r.customer_name || '',
+        r.project_name || '',
+        r.project_type || '',
+        r.gross_margin_pct != null ? r.gross_margin_pct : '',
+        formatCurrency(r.gross_profit),
+        formatCurrency(r.revenue),
+        formatCurrency(r.total_cost),
+        r.contract_year || '',
+        r.status || ''
+      ]);
+    }
+    [14, 32, 32, 10, 10, 14, 14, 14, 10, 8].forEach((w, i) => { wsProject.getColumn(i + 1).width = w; });
+
+    // Sheet 2: 依業務彙總
+    const wsSalesperson = workbook.addWorksheet(`依業務彙總${sheetNameSuffix}`);
+    wsSalesperson.addRow(['專案毛利分析 - 依業務彙總', yearLabel + statusLabel]);
+    wsSalesperson.addRow([]);
+    wsSalesperson.addRow(['業務', '專案數', '總收入', '總成本', '總毛利', '毛利率%']);
+    for (const r of bySalesperson) {
+      wsSalesperson.addRow([
+        r.name || '',
+        r.project_count || 0,
+        formatCurrency(r.total_revenue),
+        formatCurrency(r.total_cost),
+        formatCurrency(r.gross_profit),
+        r.gross_margin_pct != null ? r.gross_margin_pct : ''
+      ]);
+    }
+    [15, 10, 14, 14, 14, 10].forEach((w, i) => { wsSalesperson.getColumn(i + 1).width = w; });
+
+    // Sheet 3: 依類型彙總
+    const wsType = workbook.addWorksheet(`依類型彙總${sheetNameSuffix}`);
+    wsType.addRow(['專案毛利分析 - 依類型彙總', yearLabel + statusLabel]);
+    wsType.addRow([]);
+    wsType.addRow(['專案類型', '專案數', '總收入', '總成本', '總毛利', '毛利率%']);
+    for (const r of byType) {
+      wsType.addRow([
+        r.project_type || '',
+        r.project_count || 0,
+        formatCurrency(r.total_revenue),
+        formatCurrency(r.total_cost),
+        formatCurrency(r.gross_profit),
+        r.gross_margin_pct != null ? r.gross_margin_pct : ''
+      ]);
+    }
+    [15, 10, 14, 14, 14, 10].forEach((w, i) => { wsType.getColumn(i + 1).width = w; });
+
+    // Sheet 4: 依群組彙總
+    const wsGroup = workbook.addWorksheet(`依群組彙總${sheetNameSuffix}`);
+    wsGroup.addRow(['專案毛利分析 - 依群組彙總', yearLabel + statusLabel]);
+    wsGroup.addRow([]);
+    wsGroup.addRow(['報表群組', '專案數', '總收入', '總成本', '總毛利', '毛利率%']);
+    for (const r of byGroup) {
+      wsGroup.addRow([
+        r.report_group_name || '未分群',
+        r.project_count || 0,
+        formatCurrency(r.total_revenue),
+        formatCurrency(r.total_cost),
+        formatCurrency(r.gross_profit),
+        r.gross_margin_pct != null ? r.gross_margin_pct : ''
+      ]);
+    }
+    [20, 10, 14, 14, 14, 10].forEach((w, i) => { wsGroup.getColumn(i + 1).width = w; });
+
+    return workbook;
+  }
+
   // 生成範例 Excel 檔案
   generateTemplate() {
     const workbook = new ExcelJS.Workbook();
@@ -276,7 +433,7 @@ class ExcelExportService {
     // 範例資料（食驗室專案）
     const exampleRow1 = [
       2024, '未結案', '食驗室', '王小明', '7月', '新客戶',
-      'CU20240706', '90546191', '90546191', 'XX股份有限公司', 'XX年度食驗室',
+      'CU20240706', 'CU001', '12345678', 'XX股份有限公司', 'XX年度食驗室',
       651000, '113/07/10', 'AB12345678', 651000, 0,
       '113/08/15', 651000, 0, 620000,
       '', '', '', '',
@@ -350,39 +507,56 @@ class ExcelExportService {
     // 凍結標題列
     worksheet.views = [{ state: 'frozen', ySplit: 1 }];
 
+    // 從資料庫讀取目前啟用的專案類型
+    let activeProjectTypes = ['食驗室', '純廣', '專案'];
+    try {
+      const typeRows = db.prepare('SELECT type_name FROM project_types WHERE is_active = 1 ORDER BY display_order, type_name').all();
+      if (typeRows && typeRows.length > 0) {
+        activeProjectTypes = typeRows.map(r => r.type_name);
+      }
+    } catch (e) {
+      // project_types 表不存在時保留預設值
+    }
+    const typeListStr = activeProjectTypes.map(t => `「${t}」`).join('、');
+    const firstType = activeProjectTypes[0] || '食驗室';
+
     // 添加說明工作表
     const infoSheet = workbook.addWorksheet('填寫說明');
     infoSheet.addRow(['欄位說明']);
     infoSheet.addRow(['']);
     infoSheet.addRow(['欄位名稱', '說明', '範例', '必填']);
     infoSheet.addRow(['簽約年度', '西元年', '2024', '是']);
-    infoSheet.addRow(['狀態', '未結案 或 已結案', '未結案', '是']);
-    infoSheet.addRow(['類型', '食驗室 或 純廣 或 專案', '食驗室', '是']);
+    infoSheet.addRow(['狀態', '未結案 或 已結案 或 取消', '未結案', '是']);
+    infoSheet.addRow(['類型', activeProjectTypes.join(' 或 '), firstType, '是']);
     infoSheet.addRow(['業務', '業務人員姓名', '王小明', '是']);
     infoSheet.addRow(['專案月份', '數字或X月格式', '7月', '否']);
     infoSheet.addRow(['新客戶', '新客戶 或 舊客戶', '新客戶', '是']);
     infoSheet.addRow(['專案編號', '專案唯一識別碼', 'CU20240706', '是']);
-    infoSheet.addRow(['客戶編號', '客戶代碼', '90546191', '是']);
-    infoSheet.addRow(['統一編號', '8碼統編', '90546191', '否']);
+    infoSheet.addRow(['客戶編號', '客戶代碼', 'CU001', '是']);
+    infoSheet.addRow(['統一編號', '8碼統編', '12345678', '否']);
     infoSheet.addRow(['公司名稱', '客戶全名', 'XX股份有限公司', '是']);
     infoSheet.addRow(['專案名稱', '專案說明', 'XX年度食驗室', '是']);
     infoSheet.addRow(['價格(含稅)', '合約金額（含稅）', '651000', '是']);
     infoSheet.addRow(['發票日期', '民國年格式：113/07/10', '113/07/10', '否']);
     infoSheet.addRow(['發票號碼', '發票號碼', 'AB12345678', '否']);
     infoSheet.addRow(['開立金額(含稅)', '發票金額', '651000', '否']);
-    infoSheet.addRow(['未開立發票金額', '未開立發票的金額', '0', '否']);
+    infoSheet.addRow(['未開立發票金額', '(匯出計算值，匯入時忽略)', '', '否']);
     infoSheet.addRow(['收款日期', '民國年格式：113/08/15', '113/08/15', '否']);
     infoSheet.addRow(['銀行存款匯入金額', '實際收款金額', '651000', '否']);
     infoSheet.addRow(['收款差異', '收款差異金額', '0', '否']);
     infoSheet.addRow(['價格(未稅)', '合約金額（未稅）', '620000', '是']);
+    infoSheet.addRow(['業績認列月份 ~ 認列業績金額(未稅)', '(匯出計算欄位，匯入時忽略)', '', '否']);
+    infoSheet.addRow(['獎金相關欄位（食驗室/純廣/專案）', '獎金金額與發放日期，依類型填入對應欄位', '', '否']);
+    infoSheet.addRow(['行銷部佔比金額、品牌部佔比金額', '(匯出計算欄位，匯入時忽略)', '', '否']);
     infoSheet.addRow(['']);
     infoSheet.addRow(['注意事項：']);
     infoSheet.addRow(['1. 日期格式請使用民國年格式，例如：113/07/10（西元2024年7月10日）']);
     infoSheet.addRow(['2. 金額欄位請填入數字，不需包含千分位符號']);
-    infoSheet.addRow(['3. 狀態欄位只能填入「未結案」或「已結案」']);
-    infoSheet.addRow(['4. 類型欄位只能填入「食驗室」、「純廣」或「專案」']);
+    infoSheet.addRow([`3. 狀態欄位可填入「未結案」、「已結案」或「取消」，其餘值一律視為「未結案」`]);
+    infoSheet.addRow([`4. 類型欄位只能填入 ${typeListStr}（依系統目前啟用的類型）`]);
     infoSheet.addRow(['5. 新客戶欄位只能填入「新客戶」或「舊客戶」']);
     infoSheet.addRow(['6. 如果有多筆發票或收款，請在下一列填入，專案編號等主資訊欄位需重複填入']);
+    infoSheet.addRow(['7. 標示「匯出計算欄位，匯入時忽略」的欄位填入任何值均無效，系統不會讀取']);
 
     // 設定說明工作表樣式
     const infoHeaderRow = infoSheet.getRow(3);

@@ -13,14 +13,18 @@ const PORT = process.env.PORT || 3000;
 console.log('[啟動] Express 應用程式建立完成，PORT:', PORT);
 
 // 設定檔案上傳
-const upload = multer({ 
+const upload = multer({
   dest: path.join(__dirname, '..', 'uploads'),
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB
 });
 
 // Session 設定
+const sessionSecret = process.env.SESSION_SECRET || require('crypto').randomBytes(32).toString('hex');
+if (!process.env.SESSION_SECRET) {
+  console.warn('[安全警告] SESSION_SECRET 未設定！本次使用臨時隨機金鑰，重啟後所有 session 將失效。正式部署請確認 deploy.sh 已設定此環境變數。');
+}
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'invoice-bonus-system-secret-key-change-in-production',
+  secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -48,7 +52,7 @@ console.log('[啟動] ✓ EJS模板引擎設定完成');
 
 // 載入認證中間件
 console.log('[啟動] 載入認證中間件...');
-const { requireAuth, setUserPermissions } = require('./middleware/auth');
+const { requireAuth, requireImportExport, setUserPermissions } = require('./middleware/auth');
 console.log('[啟動] ✓ 認證中間件載入完成');
 
 // 載入部署配置
@@ -110,7 +114,10 @@ app.use((req, res, next) => {
   // 將閒置登出配置傳遞給所有視圖
   res.locals.idleTimeoutMinutes = getSystemSetting('idle_timeout_minutes', 30);
   res.locals.idleWarningMinutes = getSystemSetting('idle_warning_minutes', 2);
-  
+
+  // 目前路徑，供導覽列標示當前所在頁面使用
+  res.locals.currentPath = req.path;
+
   next();
 });
 
@@ -126,6 +133,8 @@ try {
   console.log('[啟動] ✓ index 路由載入完成');
   const projectRoutes = require('./routes/projects');
   console.log('[啟動] ✓ projects 路由載入完成');
+  const projectTemplateRoutes = require('./routes/projectTemplates');
+  console.log('[啟動] ✓ projectTemplates 路由載入完成');
   const invoiceRoutes = require('./routes/invoices');
   console.log('[啟動] ✓ invoices 路由載入完成');
   const paymentRoutes = require('./routes/payments');
@@ -150,6 +159,8 @@ try {
   console.log('[啟動] ✓ settings 路由載入完成');
   const projectTypesRoutes = require('./routes/projectTypes');
   console.log('[啟動] ✓ projectTypes 路由載入完成');
+  const reportGroupsRoutes = require('./routes/reportGroups');
+  console.log('[啟動] ✓ reportGroups 路由載入完成');
   const recentPaymentsRoutes = require('./routes/recentPayments');
   console.log('[啟動] ✓ recentPayments 路由載入完成');
   const healthRoutes = require('./routes/health');
@@ -158,6 +169,14 @@ try {
   console.log('[啟動] ✓ costs 路由載入完成');
   const roleRoutes = require('./routes/roles');
   console.log('[啟動] ✓ roles 路由載入完成');
+  const salesPerformanceRoutes = require('./routes/salesPerformance');
+  console.log('[啟動] ✓ salesPerformance 路由載入完成');
+  const grossProfitRoutes = require('./routes/grossProfit');
+  console.log('[啟動] ✓ grossProfit 路由載入完成');
+  const pipelineRoutes = require('./routes/pipelines');
+  console.log('[啟動] ✓ pipelines 路由載入完成');
+  const deletionRequestRoutes = require('./routes/deletionRequests');
+  console.log('[啟動] ✓ deletionRequests 路由載入完成');
 
   // 認證路由（不需要登入）- 必須在其他路由之前
   // authRoutes 內部已經定義了 /login 和 /logout 路徑
@@ -165,19 +184,26 @@ try {
 
   // 保護所有其他路由（需要登入）
   app.use('/projects', requireAuth, projectRoutes);
+  app.use('/project-templates', requireAuth, projectTemplateRoutes);
   app.use('/invoices', requireAuth, invoiceRoutes);
   app.use('/payments', requireAuth, paymentRoutes);
   app.use('/costs', requireAuth, costRoutes);
   app.use('/bonuses', requireAuth, bonusRoutes);
   app.use('/salespeople', requireAuth, salespersonRoutes);
   app.use('/customers', requireAuth, customerRoutes);
-  app.use('/import-export', requireAuth, importExportRoutes(upload));
+  app.use('/pipelines', requireAuth, pipelineRoutes);
+  app.use('/deletion-requests', requireAuth, deletionRequestRoutes);
+  app.use('/import-export', requireAuth, requireImportExport, importExportRoutes(upload));
   app.use('/audit-logs', requireAuth, auditLogRoutes);
   app.use('/users', requireAuth, userRoutes);
   app.use('/backup-restore', requireAuth, backupRestoreRoutes);
   app.use('/settings', requireAuth, settingsRoutes);
   app.use('/project-types', requireAuth, projectTypesRoutes);
+  app.use('/report-groups', requireAuth, reportGroupsRoutes);
   app.use('/recent-payments', requireAuth, recentPaymentsRoutes);
+  app.use('/sales-performance', requireAuth, salesPerformanceRoutes);
+  app.use('/gross-profit', requireAuth, grossProfitRoutes);
+  app.use('/search', requireAuth, require('./routes/search'));
   app.use('/health', requireAuth, healthRoutes);
   app.use('/roles', requireAuth, roleRoutes);
   app.use('/api', requireAuth, apiRoutes);
