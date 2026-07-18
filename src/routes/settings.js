@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
+const User = require('../models/User');
 const { requireAuth } = require('../middleware/auth');
 const { getUserInfo } = require('../utils/authHelper');
 const AuditLogService = require('../services/AuditLogService');
@@ -98,6 +99,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
       title: '系統設定',
       settings: settings,
       settingsObj: settingsObj,
+      allUsers: User.findActive(),
       success: req.query.success || '',
       error: req.query.error || ''
     });
@@ -107,6 +109,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
       title: '系統設定',
       settings: [],
       settingsObj: {},
+      allUsers: [],
       success: '',
       error: '載入系統設定失敗：' + err.message
     });

@@ -43,6 +43,13 @@
   const lineTokenIsSet = !!(lineTokenSetting && lineTokenSetting.setting_value);
   const lineSecretIsSet = !!(lineSecretSetting && lineSecretSetting.setting_value);
 
+  // 銷售機會/活動紀錄異動通知收件人
+  const businessEventRecipientsSetting = localSettings.find(s => s.setting_key === 'business_event_notify_user_ids');
+  const businessEventRecipientIds = (businessEventRecipientsSetting && businessEventRecipientsSetting.setting_value
+    ? businessEventRecipientsSetting.setting_value.split(',').map(s => s.trim()).filter(Boolean)
+    : []);
+  const localAllUsers = typeof allUsers !== 'undefined' ? allUsers : [];
+
   const isNotificationEnabled = notificationEnabledValue === 'true';
   const notificationDaysDesc = notificationDaysSetting ? notificationDaysSetting.description : '當月剩餘天數少於或等於此值時開始顯示通知';
   const notificationEnabledDesc = notificationEnabledSetting ? notificationEnabledSetting.description : '是否啟用開票提醒通知功能';
@@ -295,6 +302,26 @@
   bodyHtml += '          <input type="password" class="form-control" id="line_channel_secret" name="line_channel_secret" value="" placeholder="' + (lineSecretIsSet ? '已設定，留空則不變更' : '尚未設定') + '" autocomplete="new-password">';
   bodyHtml += '        </div>';
   bodyHtml += '      </div>';
+  bodyHtml += '      <hr class="my-4">';
+  bodyHtml += '      <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> 儲存設定</button>';
+  bodyHtml += '    </form>';
+  bodyHtml += '  </div>';
+  bodyHtml += '</div>';
+
+  // 銷售機會/活動紀錄異動通知收件人卡片
+  bodyHtml += '<div class="card mt-4">';
+  bodyHtml += '  <div class="card-header bg-info text-white">';
+  bodyHtml += '    <h5 class="mb-0"><i class="bi bi-people"></i> 銷售機會/活動紀錄通知收件人</h5>';
+  bodyHtml += '  </div>';
+  bodyHtml += '  <div class="card-body">';
+  bodyHtml += '    <p class="text-muted small">指定的使用者會在以下事件發生時收到站內通知，若該使用者已填寫 Email 且上方 Email 通知已啟用，也會收到 Email：新增銷售機會、編輯銷售機會、標記成交/流失、轉入專案、客戶新增活動紀錄。</p>';
+  bodyHtml += '    <form method="POST" action="/settings/bulk-update" id="businessEventForm">';
+  bodyHtml += '      <label class="form-label">通知收件人</label>';
+  bodyHtml += '      <input type="hidden" name="business_event_notify_user_ids" value="">';
+  bodyHtml += '      <select name="business_event_notify_user_ids" id="business_event_notify_user_ids" class="form-select select2-dropdown" multiple>';
+  bodyHtml += '        ' + localAllUsers.map(u => '<option value="' + u.id + '" ' + (businessEventRecipientIds.includes(String(u.id)) ? 'selected' : '') + '>' + (u.name || '').replace(/"/g, '&quot;') + '</option>').join('');
+  bodyHtml += '      </select>';
+  bodyHtml += '      <div class="form-text">可複選；不選任何人代表這些事件不會發送通知</div>';
   bodyHtml += '      <hr class="my-4">';
   bodyHtml += '      <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> 儲存設定</button>';
   bodyHtml += '    </form>';

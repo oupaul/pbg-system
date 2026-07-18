@@ -86,6 +86,14 @@ router.post('/', requireCrmEditPermission, (req, res) => {
       notes: req.body.notes,
       userInfo: getUserInfo(req)
     });
+    NotificationService.notifyBusinessWatchers({
+      type: 'pipeline_created',
+      title: `新增銷售機會：${req.body.opportunity_name}`,
+      message: `建立人：${getUserInfo(req)}`,
+      link: `/pipelines/${id}`,
+      related_type: 'pipeline',
+      related_id: id
+    }, req.user.id);
     res.redirect(`/pipelines/${id}`);
   } catch (err) {
     console.error(err);
@@ -147,6 +155,14 @@ router.post('/:id', requireCrmEditPermission, (req, res) => {
       notes: req.body.notes,
       userInfo: getUserInfo(req)
     });
+    NotificationService.notifyBusinessWatchers({
+      type: 'pipeline_updated',
+      title: `銷售機會已更新：${req.body.opportunity_name}`,
+      message: `編輯人：${getUserInfo(req)}`,
+      link: `/pipelines/${req.params.id}`,
+      related_type: 'pipeline',
+      related_id: req.params.id
+    }, req.user.id);
     res.redirect(`/pipelines/${req.params.id}`);
   } catch (err) {
     console.error(err);
@@ -157,10 +173,19 @@ router.post('/:id', requireCrmEditPermission, (req, res) => {
 // 標記成交 / 流失 / 重新開啟（洽談中）
 router.post('/:id/status', requireCrmEditPermission, (req, res) => {
   try {
+    const pipeline = Pipeline.findById(req.params.id);
     Pipeline.setStatus(req.params.id, req.body.status, {
       lost_reason: req.body.lost_reason,
       userInfo: getUserInfo(req)
     });
+    NotificationService.notifyBusinessWatchers({
+      type: 'pipeline_status_changed',
+      title: `銷售機會狀態變更：${pipeline ? pipeline.opportunity_name : ''} → ${req.body.status}`,
+      message: `操作人：${getUserInfo(req)}` + (req.body.lost_reason ? `，流失原因：${req.body.lost_reason}` : ''),
+      link: `/pipelines/${req.params.id}`,
+      related_type: 'pipeline',
+      related_id: req.params.id
+    }, req.user.id);
     res.redirect(`/pipelines/${req.params.id}`);
   } catch (err) {
     console.error(err);
@@ -230,6 +255,14 @@ router.post('/:id/convert', requireEditPermission, (req, res) => {
     });
 
     cache.delByPrefix('dashboard:');
+    NotificationService.notifyBusinessWatchers({
+      type: 'pipeline_converted',
+      title: `銷售機會已轉入專案：${pipeline.opportunity_name}`,
+      message: `專案編號：${req.body.project_code}，操作人：${getUserInfo(req)}`,
+      link: `/projects/${projectId}`,
+      related_type: 'project',
+      related_id: projectId
+    }, req.user.id);
     res.redirect(`/projects/${projectId}`);
   } catch (err) {
     console.error(err);

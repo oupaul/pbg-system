@@ -16,7 +16,9 @@ const LineService = require('./LineService');
 // 僅這些「重要事件」類型會嘗試透過 Email/LINE 發送，一般系統提醒（客戶追蹤、開票提醒）不發送，避免訊息轟炸
 const EXTERNAL_CHANNEL_TYPES = new Set([
   'customer_approval_pending', 'customer_approval_approved', 'customer_approval_rejected',
-  'deletion_request_pending', 'deletion_request_approved', 'deletion_request_rejected'
+  'deletion_request_pending', 'deletion_request_approved', 'deletion_request_rejected',
+  'pipeline_created', 'pipeline_updated', 'pipeline_status_changed', 'pipeline_converted',
+  'activity_created'
 ]);
 
 // 依使用者填寫的 email/line_user_id 發送外部通知；失敗只記錄 log，不影響站內通知本身
@@ -48,7 +50,12 @@ const NOTIFICATION_ICONS = {
   deletion_request_rejected: { icon: 'bi-x-circle', color: 'text-danger' },
   activity_reminder: { icon: 'bi-clock-history', color: 'text-warning' },
   invoice_overdue: { icon: 'bi-exclamation-triangle', color: 'text-danger' },
-  invoice_upcoming: { icon: 'bi-cash-coin', color: 'text-info' }
+  invoice_upcoming: { icon: 'bi-cash-coin', color: 'text-info' },
+  pipeline_created: { icon: 'bi-bullseye', color: 'text-primary' },
+  pipeline_updated: { icon: 'bi-pencil-square', color: 'text-info' },
+  pipeline_status_changed: { icon: 'bi-arrow-repeat', color: 'text-warning' },
+  pipeline_converted: { icon: 'bi-folder-symlink', color: 'text-success' },
+  activity_created: { icon: 'bi-journal-text', color: 'text-info' }
 };
 
 function getNotificationIcon(type) {
@@ -91,6 +98,14 @@ const NotificationService = {
       WHERE r.can_delete = 1 AND u.is_active = 1
     `).all();
     this.notifyUsers(rows.map(r => r.id), payload, excludeUserId);
+  },
+
+  // 通知管理員於系統設定中指定的收件人（銷售機會新增/編輯/狀態變更/轉入專案、客戶活動紀錄新增）
+  notifyBusinessWatchers(payload, excludeUserId = null) {
+    const idsStr = getSystemSetting('business_event_notify_user_ids', '');
+    const ids = idsStr.split(',').map(s => parseInt(s.trim(), 10)).filter(id => !isNaN(id) && id > 0);
+    if (ids.length === 0) return;
+    this.notifyUsers(ids, payload, excludeUserId);
   },
 
   // 依使用者身份產生系統提醒類通知，透過 createIfNotExists 避免同一目標重複建立未讀通知

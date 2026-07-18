@@ -344,7 +344,8 @@ router.get('/:id', (req, res) => {
 // 新增活動紀錄
 router.post('/:id/activities', requireCrmEditPermission, (req, res) => {
   try {
-    if (!Customer.findById(req.params.id)) {
+    const customer = Customer.findById(req.params.id);
+    if (!customer) {
       return res.status(404).render('error', { message: '找不到客戶', error: {} });
     }
 
@@ -355,6 +356,14 @@ router.post('/:id/activities', requireCrmEditPermission, (req, res) => {
       activity_date: req.body.activity_date,
       userInfo: getUserInfo(req)
     });
+    NotificationService.notifyBusinessWatchers({
+      type: 'activity_created',
+      title: `客戶活動紀錄更新：${customer.company_name}`,
+      message: `類型：${req.body.activity_type}，記錄人：${getUserInfo(req)}`,
+      link: `/customers/${req.params.id}`,
+      related_type: 'customer',
+      related_id: req.params.id
+    }, req.user.id);
     res.redirect(`/customers/${req.params.id}`);
   } catch (err) {
     console.error(err);
