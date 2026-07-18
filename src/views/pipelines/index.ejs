@@ -1,3 +1,6 @@
+<%
+  const WIN_PROBABILITY_STAGES = { 10: '初步接洽', 30: '需求分析', 50: '提案報價', 100: '商務談判' };
+%>
 <%- include('../layout', { body: `
 <div class="row mb-4">
   <div class="col">
@@ -36,6 +39,7 @@ ${error ? `
             <th>客戶</th>
             <th>業務</th>
             <th class="text-end">預估金額</th>
+            <th>成交機率</th>
             <th>預計成交月份</th>
             <th>狀態</th>
           </tr>
@@ -49,13 +53,14 @@ ${error ? `
               <td>${p.customer_name || '-'}</td>
               <td>${p.salesperson_name || '-'}</td>
               <td class="text-end">$${(p.estimated_amount || 0).toLocaleString()}</td>
+              <td>${p.win_probability !== null && p.win_probability !== undefined ? (WIN_PROBABILITY_STAGES[p.win_probability] ? WIN_PROBABILITY_STAGES[p.win_probability] + ' ' : '') + p.win_probability + '%' : '-'}</td>
               <td>${p.expected_close_year_month || '-'}</td>
               <td>
                 <span class="badge bg-${p.status === '已成交' ? 'success' : p.status === '已流失' ? 'secondary' : 'warning'}">${p.status}</span>
                 ${p.converted_project_id ? '<span class="badge bg-info ms-1">已轉入專案</span>' : ''}
               </td>
             </tr>
-          `).join('') || '<tr><td colspan="8" class="text-center text-muted py-3">尚無銷售機會</td></tr>'}
+          `).join('') || '<tr><td colspan="9" class="text-center text-muted py-3">尚無銷售機會</td></tr>'}
         </tbody>
       </table>
     </div>

@@ -55,6 +55,7 @@ const MIGRATIONS = [
   'migrate_customer_creation_requests',
   'migrate_notifications',
   'migrate_notification_channels',
+  'migrate_customer_request_pipeline_bundle',
 ];
 
 function run() {

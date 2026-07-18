@@ -169,6 +169,11 @@ router.get('/', (req, res) => {
 router.post('/quick-add', requireCrmEditPermission, (req, res) => {
   try {
     if (!canCreateCustomerDirectly(req.user)) {
+      // 若是在「新增銷售機會」表單中使用快速新增（見 pipelines/form.ejs），
+      // pipeline_data 會帶有使用者已填寫的銷售機會欄位，一併存入同一筆申請，
+      // 核准客戶時會一併建立該銷售機會（見 CustomerCreationRequest.approve）
+      const pipelineData = req.body.pipeline_data || null;
+
       const requestId = CustomerCreationRequest.create({
         customer_code: req.body.customer_code,
         tax_id: req.body.tax_id,
@@ -177,11 +182,22 @@ router.post('/quick-add', requireCrmEditPermission, (req, res) => {
         party_type: req.body.party_type,
         vendor_type: req.body.vendor_type,
         requested_by: req.user.id,
-        requested_by_name: getUserInfo(req)
+        requested_by_name: getUserInfo(req),
+        ...(pipelineData ? {
+          pipeline_opportunity_name: pipelineData.opportunity_name,
+          pipeline_project_type: pipelineData.project_type,
+          pipeline_estimated_amount: pipelineData.estimated_amount,
+          pipeline_win_probability: pipelineData.win_probability,
+          pipeline_expected_close_year_month: pipelineData.expected_close_year_month,
+          pipeline_salesperson_id: pipelineData.salesperson_id,
+          pipeline_notes: pipelineData.notes
+        } : {})
       });
       NotificationService.notifyCustomerApprovers({
         type: 'customer_approval_pending',
-        title: `新客戶/廠商待審核：${req.body.company_name}`,
+        title: pipelineData
+          ? `新客戶/廠商＋銷售機會待審核：${req.body.company_name}`
+          : `新客戶/廠商待審核：${req.body.company_name}`,
         message: `申請人：${getUserInfo(req)}`,
         link: '/customer-approvals',
         related_type: 'customer_creation_request',
@@ -190,7 +206,9 @@ router.post('/quick-add', requireCrmEditPermission, (req, res) => {
       return res.json({
         success: true,
         pending: true,
-        message: '已送出審核申請，待專案管理員或系統管理員核准後才會建立此客戶/廠商'
+        message: pipelineData
+          ? '已送出客戶/廠商與銷售機會審核申請，待專案管理員或系統管理員核准後才會建立'
+          : '已送出審核申請，待專案管理員或系統管理員核准後才會建立此客戶/廠商'
       });
     }
 

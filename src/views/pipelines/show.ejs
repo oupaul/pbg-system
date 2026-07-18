@@ -62,14 +62,6 @@ ${pendingDeletion ? `
   <div class="col-md-3">
     <div class="card">
       <div class="card-body">
-        <h6 class="text-muted">負責人員</h6>
-        <p class="fs-5 mb-0">${pipeline.owner_user_name || '-'}</p>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-3">
-    <div class="card">
-      <div class="card-body">
         <h6 class="text-muted">預估金額</h6>
         <p class="fs-5 mb-0">$${(pipeline.estimated_amount || 0).toLocaleString()}</p>
       </div>

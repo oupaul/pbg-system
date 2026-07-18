@@ -1,8 +1,16 @@
+<%
+  const WIN_PROBABILITY_STAGES = [
+    { pct: 10, label: '初步接洽' },
+    { pct: 30, label: '需求分析' },
+    { pct: 50, label: '提案報價' },
+    { pct: 100, label: '商務談判' }
+  ];
+%>
 <%- include('../layout', { body: `
 <div class="row mb-4">
   <div class="col">
     <h1 class="h3"><i class="bi bi-person-check"></i> 客戶/廠商審核</h1>
-    <p class="text-muted mb-0">業務員等角色新增的客戶/廠商，需在此核准後才會真正建立資料、進入系統。</p>
+    <p class="text-muted mb-0">業務員等角色新增的客戶/廠商（若一併新增銷售機會，也會顯示在此），需在此核准後才會真正建立資料、進入系統。核准前可直接修改申請內容。</p>
   </div>
 </div>
 
@@ -44,6 +52,7 @@ ${success ? `
               <td>
                 <span class="badge bg-${r.party_type === '廠商' ? 'dark' : r.party_type === '兩者皆是' ? 'primary' : 'info'}">${r.party_type}</span>
                 ${r.vendor_type ? '<span class="badge bg-secondary">' + r.vendor_type + '</span>' : ''}
+                ${r.pipeline_opportunity_name ? '<span class="badge bg-warning text-dark d-block mt-1"><i class="bi bi-bullseye"></i> 含銷售機會</span>' : ''}
               </td>
               <td>${(r.company_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
               <td><code>${r.customer_code}</code>${r.tax_id ? ' / ' + r.tax_id : ''}</td>
@@ -53,9 +62,9 @@ ${success ? `
               <td>${r.requested_at}</td>
               <td class="text-end">
                 <div class="d-flex gap-2 justify-content-end">
-                  <form action="/customer-approvals/${r.id}/approve" method="POST" onsubmit="return confirm('確定要核准並建立這筆客戶/廠商資料嗎？')">
-                    <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i> 核准</button>
-                  </form>
+                  <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#editModal${r.id}">
+                    <i class="bi bi-pencil-square"></i> 編輯並核准
+                  </button>
                   <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#rejectModal${r.id}">
                     <i class="bi bi-x-lg"></i> 駁回
                   </button>
@@ -69,6 +78,157 @@ ${success ? `
   </div>
 </div>
 
+${(requests || []).map(r => {
+  const esc = (v) => (v || '').toString().replace(/"/g, '&quot;');
+  const selectedPipelineTypes = r.pipeline_project_type ? r.pipeline_project_type.split(',').map(t => t.trim()) : [];
+  return `
+  <!-- 編輯並核准 Modal -->
+  <div class="modal fade" id="editModal${r.id}" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <form action="/customer-approvals/${r.id}/approve" method="POST" onsubmit="return confirm('確定要核准並建立這筆資料嗎？')">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-pencil-square"></i> 編輯並核准：${(r.company_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <h6 class="text-muted">客戶/廠商資料</h6>
+            <div class="row g-2">
+              <div class="col-md-4">
+                <label class="form-label">類型</label>
+                <select name="party_type" class="form-select">
+                  <option value="客戶" ${r.party_type === '客戶' ? 'selected' : ''}>客戶</option>
+                  <option value="廠商" ${r.party_type === '廠商' ? 'selected' : ''}>廠商</option>
+                  <option value="兩者皆是" ${r.party_type === '兩者皆是' ? 'selected' : ''}>兩者皆是（客戶+廠商）</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">廠商類型</label>
+                <select name="vendor_type" class="form-select">
+                  <option value="">-- 選擇類型 --</option>
+                  <option value="個人" ${r.vendor_type === '個人' ? 'selected' : ''}>個人</option>
+                  <option value="公司" ${r.vendor_type === '公司' ? 'selected' : ''}>公司</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">客戶編號</label>
+                <input type="text" name="customer_code" class="form-control" value="${esc(r.customer_code)}">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">公司名稱</label>
+                <input type="text" name="company_name" class="form-control" value="${esc(r.company_name)}">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">統一編號</label>
+                <input type="text" name="tax_id" class="form-control" maxlength="8" value="${esc(r.tax_id)}">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">接洽人員</label>
+                <select name="owner_salesperson_id" class="form-select">
+                  <option value="">-- 選擇使用者 --</option>
+                  ${(staffUsers || []).map(u => '<option value="' + u.id + '" ' + (r.owner_salesperson_id == u.id ? 'selected' : '') + '>' + esc(u.name) + '</option>').join('')}
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">聯絡人</label>
+                <input type="text" name="contact_name" class="form-control" value="${esc(r.contact_name)}">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">聯絡電話</label>
+                <input type="text" name="contact_phone" class="form-control" value="${esc(r.contact_phone)}">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">聯絡信箱</label>
+                <input type="email" name="contact_email" class="form-control" value="${esc(r.contact_email)}">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">銀行名稱</label>
+                <input type="text" name="bank_name" class="form-control" value="${esc(r.bank_name)}">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">銀行帳號</label>
+                <input type="text" name="bank_account" class="form-control" value="${esc(r.bank_account)}">
+              </div>
+              <div class="col-12">
+                <label class="form-label">地址</label>
+                <input type="text" name="address" class="form-control" value="${esc(r.address)}">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">客戶等級</label>
+                <select name="customer_level" class="form-select">
+                  <option value="" ${!r.customer_level ? 'selected' : ''}>-- 未分級 --</option>
+                  <option value="A" ${r.customer_level === 'A' ? 'selected' : ''}>A</option>
+                  <option value="B" ${r.customer_level === 'B' ? 'selected' : ''}>B</option>
+                  <option value="C" ${r.customer_level === 'C' ? 'selected' : ''}>C</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">產業別</label>
+                <input type="text" name="industry" class="form-control" value="${esc(r.industry)}">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">往來狀態</label>
+                <select name="status" class="form-select">
+                  <option value="往來中" ${r.status === '往來中' ? 'selected' : ''}>往來中</option>
+                  <option value="暫停往來" ${r.status === '暫停往來' ? 'selected' : ''}>暫停往來</option>
+                  <option value="已流失" ${r.status === '已流失' ? 'selected' : ''}>已流失</option>
+                </select>
+              </div>
+            </div>
+
+            ${r.pipeline_opportunity_name ? `
+              <hr>
+              <h6 class="text-muted"><i class="bi bi-bullseye"></i> 銷售機會資料</h6>
+              <div class="row g-2">
+                <div class="col-12">
+                  <label class="form-label">銷售機會名稱</label>
+                  <input type="text" name="pipeline_opportunity_name" class="form-control" value="${esc(r.pipeline_opportunity_name)}">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">預估專案類型（可複選）</label>
+                  <select name="pipeline_project_type" class="form-select" multiple>
+                    ${(projectTypes || []).map(t => '<option value="' + esc(t.type_name) + '" ' + (selectedPipelineTypes.includes(t.type_name) ? 'selected' : '') + '>' + t.type_name + '</option>').join('')}
+                  </select>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">預估金額</label>
+                  <input type="number" name="pipeline_estimated_amount" class="form-control" min="0" step="1" value="${r.pipeline_estimated_amount !== null && r.pipeline_estimated_amount !== undefined ? r.pipeline_estimated_amount : ''}">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">成交機率</label>
+                  <select name="pipeline_win_probability" class="form-select">
+                    ${WIN_PROBABILITY_STAGES.map(s => '<option value="' + s.pct + '" ' + (Number(r.pipeline_win_probability) === s.pct ? 'selected' : '') + '>' + s.label + ' ' + s.pct + '%</option>').join('')}
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">業務人員</label>
+                  <select name="pipeline_salesperson_id" class="form-select">
+                    <option value="">-- 選擇業務 --</option>
+                    ${(salespeople || []).map(sp => '<option value="' + sp.id + '" ' + (r.pipeline_salesperson_id == sp.id ? 'selected' : '') + '>' + esc(sp.name) + '</option>').join('')}
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">預計成交月份（YYYY-MM）</label>
+                  <input type="text" name="pipeline_expected_close_year_month" class="form-control" placeholder="2026-08" value="${esc(r.pipeline_expected_close_year_month)}">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">備註</label>
+                  <textarea name="pipeline_notes" class="form-control" rows="2">${(r.pipeline_notes || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+                </div>
+              </div>
+            ` : ''}
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-success"><i class="bi bi-check-lg"></i> 儲存並核准</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+`;
+}).join('')}
+
 ${(requests || []).map(r => `
   <div class="modal fade" id="rejectModal${r.id}" tabindex="-1">
     <div class="modal-dialog">
@@ -79,7 +239,7 @@ ${(requests || []).map(r => `
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            <p class="mb-2">${(r.company_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}（${r.customer_code}）</p>
+            <p class="mb-2">${(r.company_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}（${r.customer_code}）${r.pipeline_opportunity_name ? '<br><small class="text-muted">銷售機會：' + (r.pipeline_opportunity_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '（一併駁回）</small>' : ''}</p>
             <label class="form-label">駁回原因（選填，會留給申請人參考）</label>
             <textarea name="review_note" class="form-control" rows="3"></textarea>
           </div>
