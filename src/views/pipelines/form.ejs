@@ -210,6 +210,63 @@ document.addEventListener('DOMContentLoaded', function() {
           amountHidden.value = amountSelect.value;
         }
       }
+
+      // 客戶選擇的是「快速新增（待審核）」暫存項目：所有驗證都通過後，
+      // 不提交原本的表單，改成把客戶資料與這筆銷售機會內容一併送出審核
+      const customerSelect = document.getElementById('customer_id');
+      if (customerSelect && window.PENDING_CUSTOMER_VALUE && customerSelect.value === window.PENDING_CUSTOMER_VALUE) {
+        e.preventDefault();
+        if (!window.stagedCustomerData) {
+          alert('客戶資料遺失，請重新使用「快速新增」');
+          return false;
+        }
+
+        const submitBtn = pipelineForm.querySelector('button[type="submit"]');
+        const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 送出中...';
+        }
+
+        const salespersonSelect = document.getElementById('salesperson_id');
+        const notesEl = document.querySelector('textarea[name="notes"]');
+        const pipelineData = {
+          opportunity_name: document.querySelector('input[name="opportunity_name"]').value.trim(),
+          project_type: Array.from(projectTypeSelect.selectedOptions).map(function (o) { return o.value; }).join(','),
+          estimated_amount: amountHidden.value,
+          win_probability: document.querySelector('select[name="win_probability"]').value,
+          expected_close_year_month: hiddenYearMonth.value,
+          salesperson_id: salespersonSelect ? (salespersonSelect.value || null) : null,
+          notes: notesEl ? (notesEl.value || null) : null
+        };
+
+        const payload = Object.assign({}, window.stagedCustomerData, { pipeline_data: pipelineData });
+
+        fetch('/customers/quick-add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+          .then(function (res) { return res.json(); })
+          .then(function (result) {
+            if (result.success) {
+              if (typeof showToast === 'function') {
+                showToast(result.message || '已送出客戶與銷售機會審核申請', 'warning');
+              } else {
+                alert(result.message || '已送出客戶與銷售機會審核申請');
+              }
+              setTimeout(function () { window.location.href = '/pipelines'; }, 800);
+            } else {
+              alert(result.error || '送出失敗');
+              if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnHtml; }
+            }
+          })
+          .catch(function (err) {
+            alert('送出時發生錯誤：' + err.message);
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnHtml; }
+          });
+        return false;
+      }
     });
   }
 });
@@ -273,7 +330,11 @@ ${!pipeline ? `
 </div>
 
 <script>
+window.PENDING_CUSTOMER_VALUE = '__pending_new__';
+window.stagedCustomerData = null;
+
 document.addEventListener('DOMContentLoaded', function() {
+  const canCreateCustomerDirectly = ${canCreateCustomerDirectly ? 'true' : 'false'};
   const quickAddLink = document.getElementById('quickAddCustomerLink');
   const quickAddModal = new bootstrap.Modal(document.getElementById('quickAddCustomerModal'));
   const quickAddForm = document.getElementById('quickAddCustomerForm');
@@ -290,45 +351,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  // 收集目前銷售機會表單已填寫的欄位，供快速新增客戶時一併綁定送審。
-  // 若表單尚未填寫完整（例如使用者只是想先找/建客戶），回傳 null，維持原本「僅送審客戶」的行為，不強制卡關。
-  function gatherPipelineFormDataIfComplete() {
-    const opportunityNameInput = document.querySelector('input[name="opportunity_name"]');
-    const opportunityName = opportunityNameInput ? opportunityNameInput.value.trim() : '';
-    const projectTypeSelect = document.getElementById('project_type');
-    const selectedTypes = projectTypeSelect ? Array.from(projectTypeSelect.selectedOptions).map(o => o.value) : [];
-    const winProbabilitySelect = document.querySelector('select[name="win_probability"]');
-    const winProbability = winProbabilitySelect ? winProbabilitySelect.value : '';
-    const closeYearEl = document.getElementById('closeYear');
-    const closeMonthEl = document.getElementById('closeMonth');
-    const year = closeYearEl ? closeYearEl.value : '';
-    const month = closeMonthEl ? closeMonthEl.value : '';
-    const salespersonSelect = document.getElementById('salesperson_id');
-    const notesEl = document.querySelector('textarea[name="notes"]');
-
-    const amountSelect = document.getElementById('estimatedAmountSelect');
-    const amountOther = document.getElementById('estimatedAmountOther');
-    let estimatedAmount = '';
-    if (amountSelect) {
-      estimatedAmount = amountSelect.value === 'other' ? amountOther.value : amountSelect.value;
-    }
-
-    const isComplete = opportunityName && selectedTypes.length > 0 && winProbability && year && month &&
-      amountSelect && amountSelect.value && (amountSelect.value !== 'other' || (estimatedAmount && Number(estimatedAmount) > 0));
-
-    if (!isComplete) return null;
-
-    return {
-      opportunity_name: opportunityName,
-      project_type: selectedTypes.join(','),
-      estimated_amount: estimatedAmount,
-      win_probability: winProbability,
-      expected_close_year_month: year + '-' + month,
-      salesperson_id: salespersonSelect ? (salespersonSelect.value || null) : null,
-      notes: notesEl ? (notesEl.value || null) : null
-    };
-  }
-
   if (quickAddSubmit) {
     quickAddSubmit.addEventListener('click', async function() {
       const formData = new FormData(quickAddForm);
@@ -339,65 +361,62 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
       }
 
-      quickAddSubmit.disabled = true;
-      quickAddSubmit.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 新增中...';
       quickAddError.classList.add('d-none');
+      const customerData = {
+        customer_code: formData.get('customer_code'),
+        company_name: formData.get('company_name'),
+        tax_id: formData.get('tax_id') || '',
+        party_type: formData.get('party_type'),
+        vendor_type: formData.get('vendor_type') || ''
+      };
 
-      const pipelineData = gatherPipelineFormDataIfComplete();
+      // 管理員/專案管理員：沿用原本行為，直接建立客戶並選用
+      if (canCreateCustomerDirectly) {
+        quickAddSubmit.disabled = true;
+        quickAddSubmit.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 新增中...';
+        try {
+          const response = await fetch('/customers/quick-add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(customerData)
+          });
+          const result = await response.json();
 
-      try {
-        const response = await fetch('/customers/quick-add', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customer_code: formData.get('customer_code'),
-            company_name: formData.get('company_name'),
-            tax_id: formData.get('tax_id') || '',
-            party_type: formData.get('party_type'),
-            vendor_type: formData.get('vendor_type') || '',
-            pipeline_data: pipelineData
-          })
-        });
-
-        const result = await response.json();
-
-        if (result.success && result.pending) {
-          // 非管理員/專案管理員送出的申請，尚未真正建立客戶，無法立即選用
-          quickAddModal.hide();
-          if (pipelineData) {
-            // 銷售機會已隨客戶一併送審，這個頁面已無法繼續（沒有客戶可選），導向列表頁
+          if (result.success) {
+            const customer = result.customer;
+            const displayText = customer.company_name + ' (' + customer.customer_code + ')';
+            const newOption = new Option(displayText, customer.id, true, true);
+            $('#customer_id').append(newOption).trigger('change');
+            quickAddModal.hide();
             if (typeof showToast === 'function') {
-              showToast(result.message || '已送出客戶與銷售機會審核申請', 'warning');
-            } else {
-              alert(result.message || '已送出客戶與銷售機會審核申請');
+              showToast('新增成功：' + customer.company_name, 'success');
             }
-            setTimeout(function () { window.location.href = '/pipelines'; }, 800);
-          } else if (typeof showToast === 'function') {
-            showToast(result.message || '已送出審核申請，待核准後才會建立', 'warning');
           } else {
-            alert(result.message || '已送出審核申請，待核准後才會建立');
+            quickAddError.textContent = result.error || '新增失敗';
+            quickAddError.classList.remove('d-none');
           }
-        } else if (result.success) {
-          const customer = result.customer;
-          const displayText = customer.company_name + ' (' + customer.customer_code + ')';
-          const newOption = new Option(displayText, customer.id, true, true);
-          $('#customer_id').append(newOption).trigger('change');
-
-          quickAddModal.hide();
-          if (typeof showToast === 'function') {
-            showToast('新增成功：' + customer.company_name, 'success');
-          }
-        } else {
-          quickAddError.textContent = result.error || '新增失敗';
+        } catch (error) {
+          console.error('快速新增客戶/廠商錯誤:', error);
+          quickAddError.textContent = '新增時發生錯誤：' + error.message;
           quickAddError.classList.remove('d-none');
+        } finally {
+          quickAddSubmit.disabled = false;
+          quickAddSubmit.innerHTML = '<i class="bi bi-check-lg"></i> 新增並選擇';
         }
-      } catch (error) {
-        console.error('快速新增客戶/廠商錯誤:', error);
-        quickAddError.textContent = '新增時發生錯誤：' + error.message;
-        quickAddError.classList.remove('d-none');
-      } finally {
-        quickAddSubmit.disabled = false;
-        quickAddSubmit.innerHTML = '<i class="bi bi-check-lg"></i> 新增並選擇';
+        return;
+      }
+
+      // 其餘角色：先暫存在這一頁，不呼叫後端；等這筆銷售機會表單送出時，才把客戶與銷售機會內容一併送審
+      window.stagedCustomerData = customerData;
+      const $select = $('#customer_id');
+      $select.find('option[value="' + window.PENDING_CUSTOMER_VALUE + '"]').remove();
+      const label = '（待審核）' + customerData.company_name + ' (' + customerData.customer_code + ')';
+      const newOption = new Option(label, window.PENDING_CUSTOMER_VALUE, true, true);
+      $select.append(newOption).trigger('change');
+
+      quickAddModal.hide();
+      if (typeof showToast === 'function') {
+        showToast('已暫存客戶資料，請完成銷售機會後一併送出審核', 'info');
       }
     });
   }

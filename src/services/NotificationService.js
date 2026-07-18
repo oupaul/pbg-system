@@ -93,6 +93,17 @@ function formatPipelineSummary(pipeline) {
   return lines.join('\n');
 }
 
+// 通知內文用：把客戶活動紀錄的實際內容組成人看得懂的摘要文字，格式比照 formatPipelineSummary
+function formatActivitySummary({ customerName, activityType, activityDate, content }) {
+  const lines = [
+    `客戶：${customerName || '-'}`,
+    `活動類型：${activityType || '-'}`,
+    `活動日期：${activityDate || '-'}`
+  ];
+  if (content) lines.push(`內容：${content}`);
+  return lines.join('\n');
+}
+
 const NotificationService = {
   notify(userId, { type, title, message, link, related_type, related_id }) {
     if (!userId) return null;
@@ -207,3 +218,4 @@ const NotificationService = {
 module.exports = NotificationService;
 module.exports.getNotificationIcon = getNotificationIcon;
 module.exports.formatPipelineSummary = formatPipelineSummary;
+module.exports.formatActivitySummary = formatActivitySummary;

@@ -66,6 +66,8 @@ router.get('/new', requireCrmEditPermission, (req, res) => {
     projectTypes: getActiveProjectTypes(),
     action: '/pipelines',
     presetCustomerId: req.query.customer_id || '',
+    // 決定快速新增客戶時，是否直接建立（admin/user）或先暫存於頁面、待銷售機會一併送出時才送審（其餘角色）
+    canCreateCustomerDirectly: req.user.role === 'admin' || req.user.role === 'user',
     error: req.query.error || ''
   });
 });

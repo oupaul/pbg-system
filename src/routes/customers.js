@@ -359,8 +359,12 @@ router.post('/:id/activities', requireCrmEditPermission, (req, res) => {
     NotificationService.notifyBusinessWatchers({
       type: 'activity_created',
       title: `客戶活動紀錄更新：${customer.company_name}`,
-      message: `客戶：${customer.company_name}\n類型：${req.body.activity_type}\n日期：${req.body.activity_date || '-'}\n記錄人：${getUserInfo(req)}` +
-        (req.body.content ? `\n內容：${req.body.content}` : ''),
+      message: `記錄人：${getUserInfo(req)}\n\n${NotificationService.formatActivitySummary({
+        customerName: customer.company_name,
+        activityType: req.body.activity_type,
+        activityDate: req.body.activity_date,
+        content: req.body.content
+      })}`,
       link: `/customers/${req.params.id}`,
       related_type: 'customer',
       related_id: req.params.id
