@@ -37,12 +37,76 @@ function getTypeColorMap() {
 router.get('/', (req, res) => {
   try {
     const status = req.query.status || '';
-    const pipelines = Pipeline.findAll({ status: status || undefined }, req.user);
+    // 排序參數：預設以成交機率由高到低排序，使用者可點其他欄位改變排序
+    const sortBy = req.query.sortBy || 'win_probability';
+    const sortOrder = req.query.sortOrder || 'DESC';
+
+    let pipelines = Pipeline.findAll({ status: status || undefined }, req.user);
+    if (!Array.isArray(pipelines)) pipelines = [];
+
+    const sortFieldMap = {
+      created_at: 'created_at',
+      updated_at: 'updated_at',
+      opportunity_name: 'opportunity_name',
+      customer_name: 'customer_name',
+      salesperson_name: 'salesperson_name',
+      estimated_amount: 'estimated_amount',
+      win_probability: 'win_probability',
+      expected_close_year_month: 'expected_close_year_month',
+      status: 'status'
+    };
+    const sortField = sortFieldMap[sortBy] || 'win_probability';
+
+    pipelines.sort((a, b) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
+
+      if (aVal == null) aVal = '';
+      if (bVal == null) bVal = '';
+
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortOrder === 'ASC' ? aVal - bVal : bVal - aVal;
+      }
+
+      const aStr = String(aVal);
+      const bStr = String(bVal);
+      return sortOrder === 'ASC' ? aStr.localeCompare(bStr, 'zh-TW') : bStr.localeCompare(aStr, 'zh-TW');
+    });
+
+    // 產生排序連結/圖示的輔助函數（保留目前的狀態篩選條件）
+    const buildQueryString = (newSortBy, newSortOrder) => {
+      const params = new URLSearchParams();
+      if (status) params.append('status', status);
+      params.append('sortBy', newSortBy);
+      params.append('sortOrder', newSortOrder);
+      return params.toString();
+    };
+
+    const getSortLink = (field) => {
+      const newOrder = sortBy === field && sortOrder === 'ASC' ? 'DESC' : 'ASC';
+      return buildQueryString(field, newOrder);
+    };
+
+    const getSortIcon = (field) => {
+      if (sortBy === field) {
+        return sortOrder === 'ASC' ? '<i class="bi bi-arrow-up"></i>' : '<i class="bi bi-arrow-down"></i>';
+      }
+      return '';
+    };
+
+    const sortLinks = {};
+    const sortIcons = {};
+    Object.keys(sortFieldMap).forEach(field => {
+      sortLinks[field] = getSortLink(field);
+      sortIcons[field] = getSortIcon(field);
+    });
 
     res.render('pipelines/index', {
       title: '銷售機會管理',
-      pipelines: pipelines || [],
+      pipelines,
       statusFilter: status,
+      sortLinks,
+      sortIcons,
       typeColorMap: getTypeColorMap(),
       error: req.query.error || ''
     });

@@ -33,15 +33,51 @@ ${error ? `
       <table class="table table-hover mb-0">
         <thead class="table-light">
           <tr>
-            <th>建立日期</th>
-            <th>最後更新日期</th>
-            <th>銷售機會</th>
-            <th>客戶</th>
-            <th>業務</th>
-            <th class="text-end">預估金額</th>
-            <th>成交機率</th>
-            <th>預計成交月份</th>
-            <th>狀態</th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.created_at) || ''}" class="text-dark text-decoration-none">
+                建立日期${(sortIcons && sortIcons.created_at) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.updated_at) || ''}" class="text-dark text-decoration-none">
+                最後更新日期${(sortIcons && sortIcons.updated_at) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.opportunity_name) || ''}" class="text-dark text-decoration-none">
+                銷售機會${(sortIcons && sortIcons.opportunity_name) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.customer_name) || ''}" class="text-dark text-decoration-none">
+                客戶${(sortIcons && sortIcons.customer_name) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.salesperson_name) || ''}" class="text-dark text-decoration-none">
+                業務${(sortIcons && sortIcons.salesperson_name) || ''}
+              </a>
+            </th>
+            <th class="text-end">
+              <a href="?${(sortLinks && sortLinks.estimated_amount) || ''}" class="text-dark text-decoration-none">
+                預估金額${(sortIcons && sortIcons.estimated_amount) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.win_probability) || ''}" class="text-dark text-decoration-none">
+                成交機率${(sortIcons && sortIcons.win_probability) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.expected_close_year_month) || ''}" class="text-dark text-decoration-none">
+                預計成交月份${(sortIcons && sortIcons.expected_close_year_month) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.status) || ''}" class="text-dark text-decoration-none">
+                狀態${(sortIcons && sortIcons.status) || ''}
+              </a>
+            </th>
           </tr>
         </thead>
         <tbody>
