@@ -96,7 +96,7 @@ router.get('/new', requireAuth, requireAdmin, (req, res) => {
 
 // 建立使用者（僅管理員）
 router.post('/', requireAuth, requireAdmin, async (req, res) => {
-  const { username, password, name, role, salesperson_id } = req.body;
+  const { username, password, name, role, salesperson_id, email, line_user_id } = req.body;
   // assigned_salespeople may be a single value or array from multiselect
   const assignedRaw = req.body.assigned_salespeople;
   const assignedIds = assignedRaw
@@ -124,7 +124,9 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
       name,
       role: role || 'user',
       salesperson_id: role === 'salesperson' ? salesperson_id : null,
-      is_active: 1
+      is_active: 1,
+      email: email || null,
+      line_user_id: line_user_id || null
     });
 
     // Save assigned-salesperson access if the role uses 'assigned' scope
@@ -166,7 +168,7 @@ router.get('/:id/edit', requireAuth, requireAdmin, (req, res) => {
 
 // 更新使用者（僅管理員）
 router.post('/:id', requireAuth, requireAdmin, async (req, res) => {
-  const { name, role, password, is_active, salesperson_id } = req.body;
+  const { name, role, password, is_active, salesperson_id, email, line_user_id } = req.body;
   const assignedRaw = req.body.assigned_salespeople;
   const assignedIds = assignedRaw
     ? (Array.isArray(assignedRaw) ? assignedRaw : [assignedRaw]).map(Number).filter(Boolean)
@@ -186,7 +188,9 @@ router.post('/:id', requireAuth, requireAdmin, async (req, res) => {
     name,
     role: role || 'user',
     salesperson_id: role === 'salesperson' ? salesperson_id : null,
-    is_active: is_active === '1' ? 1 : 0
+    is_active: is_active === '1' ? 1 : 0,
+    email: email || null,
+    line_user_id: line_user_id || null
   };
 
   try {

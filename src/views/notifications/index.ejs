@@ -1,0 +1,69 @@
+<%
+  function escapeHtml(str) {
+    return (str || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+%>
+<%- include('../layout', { body: `
+<div class="row mb-4">
+  <div class="col">
+    <h1 class="h3"><i class="bi bi-bell"></i> 通知中心</h1>
+  </div>
+  <div class="col-auto">
+    <form action="/notifications/mark-all-read" method="POST" class="d-inline">
+      <input type="hidden" name="filter" value="${filter}">
+      <button type="submit" class="btn btn-outline-secondary" ${unreadCount === 0 ? 'disabled' : ''}>
+        <i class="bi bi-check2-all"></i> 全部標記已讀
+      </button>
+    </form>
+  </div>
+</div>
+
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <a class="nav-link ${filter === 'all' ? 'active' : ''}" href="/notifications">全部</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link ${filter === 'unread' ? 'active' : ''}" href="/notifications?filter=unread">
+      未讀${unreadCount > 0 ? ' <span class="badge bg-danger">' + unreadCount + '</span>' : ''}
+    </a>
+  </li>
+</ul>
+
+<div class="card">
+  <div class="list-group list-group-flush">
+    ${(notifications || []).length === 0 ? `
+      <div class="text-center text-muted py-5">
+        <i class="bi bi-bell-slash fs-2 d-block mb-2"></i>
+        ${filter === 'unread' ? '目前沒有未讀通知' : '目前沒有任何通知'}
+      </div>
+    ` : notifications.map(n => {
+      const iconInfo = getNotificationIcon(n.type);
+      return `
+      <div class="list-group-item ${n.is_read ? '' : 'bg-light'}">
+        <div class="d-flex align-items-start gap-3">
+          <i class="bi ${iconInfo.icon} ${iconInfo.color} fs-5 mt-1"></i>
+          <div class="flex-grow-1">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <strong>${escapeHtml(n.title)}</strong>
+                ${!n.is_read ? '<span class="badge bg-primary ms-2">未讀</span>' : ''}
+              </div>
+              <small class="text-muted text-nowrap ms-2">${n.created_at}</small>
+            </div>
+            ${n.message ? `<div class="text-muted small mt-1">${escapeHtml(n.message)}</div>` : ''}
+            <div class="mt-2 d-flex gap-2">
+              ${n.link ? `<a href="/notifications/${n.id}/open" class="btn btn-sm btn-outline-primary">查看詳情</a>` : ''}
+              ${!n.is_read ? `
+                <form action="/notifications/${n.id}/read?filter=${filter}" method="POST">
+                  <button type="submit" class="btn btn-sm btn-outline-secondary">標記已讀</button>
+                </form>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    }).join('')}
+  </div>
+</div>
+` }) %>

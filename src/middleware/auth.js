@@ -45,7 +45,7 @@ const requireEditPermission = (req, res, next) => {
   });
 };
 
-// CRM（客戶/潛在商機）編輯權限：獨立於財務相關的 can_edit，
+// CRM（客戶/銷售機會）編輯權限：獨立於財務相關的 can_edit，
 // 業務開發是業務員的基本工作內容，不因專案唯讀限制而連帶受限。
 const requireCrmEditPermission = (req, res, next) => {
   if (!req.user) return res.status(401).json({ error: '未登入' });
@@ -169,6 +169,33 @@ const setUserPermissions = (req, res, next) => {
       } catch {
         res.locals.pendingDeletionCount = 0;
       }
+    }
+
+    // 新客戶/廠商審核：僅系統管理員（admin）與專案管理員（user）能核准，才需要看到待審核數量
+    if (req.user.role === ROLES.ADMIN || req.user.role === ROLES.USER) {
+      try {
+        const db = require('../models/db');
+        const row = db.prepare(`SELECT COUNT(*) as count FROM customer_creation_requests WHERE request_status = 'pending'`).get();
+        res.locals.pendingCustomerApprovalCount = row ? row.count : 0;
+      } catch {
+        res.locals.pendingCustomerApprovalCount = 0;
+      }
+    }
+
+    // 通知中心：僅在 GET 請求時計算（系統提醒的建立採 dedup，重複執行不會產生重複通知，
+    // 限制在 GET 是為了避免每次表單送出的 POST 動作都額外查詢一次）
+    try {
+      const Notification = require('../models/Notification');
+      const NotificationService = require('../services/NotificationService');
+      if (req.method === 'GET') {
+        NotificationService.generateReminderNotifications(req.user);
+      }
+      res.locals.unreadNotificationCount = Notification.countUnread(req.user.id);
+      res.locals.recentNotifications = Notification.findForUser(req.user.id, { limit: 8 });
+      res.locals.getNotificationIcon = NotificationService.getNotificationIcon;
+    } catch {
+      res.locals.unreadNotificationCount = 0;
+      res.locals.recentNotifications = [];
     }
   }
   next();

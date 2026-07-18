@@ -52,6 +52,13 @@ const MIGRATIONS = [
   'migrate_customer_address',
   'migrate_customer_owner_to_user',
   'migrate_pipeline_owner_user',
+  'migrate_customer_creation_requests',
+  'migrate_notifications',
+  'migrate_notification_channels',
+  'migrate_customer_request_pipeline_bundle',
+  'migrate_business_event_notify_recipients',
+  'migrate_smtp_reject_unauthorized',
+  'migrate_system_base_url',
 ];
 
 function run() {

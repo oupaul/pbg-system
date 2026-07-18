@@ -443,7 +443,7 @@ router.get('/', (req, res) => {
     paymentReminder = ReceivablesAgingService.getPaymentReminder(paymentReminderDays, null, salespersonFilter);
   }
 
-  // 客戶追蹤提醒：有負責業務但超過設定天數沒有活動紀錄的客戶
+  // 客戶追蹤提醒：有客戶關係負責人但超過設定天數沒有活動紀錄的客戶
   // admin/user 可見全部；salesperson 僅見自己負責的客戶
   let activityReminders = [];
   if (req.user && (req.user.role === 'admin' || req.user.role === 'user' || req.user.role === 'salesperson')) {

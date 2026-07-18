@@ -6,10 +6,10 @@ const DeletionRequest = require('../models/DeletionRequest');
 const Project = require('../models/Project');
 const Salesperson = require('../models/Salesperson');
 const Customer = require('../models/Customer');
-const User = require('../models/User');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireEditPermission, requireCrmEditPermission } = require('../middleware/auth');
 const cache = require('../services/CacheService');
+const NotificationService = require('../services/NotificationService');
 
 function getActiveProjectTypes() {
   try {
@@ -23,50 +23,127 @@ function getActiveProjectTypes() {
   }
 }
 
-// 潛在商機列表
+// 類型顏色對照表（比照 projects/gross-profit 頁面的做法，來源為專案類型管理設定的 badge_color）
+function getTypeColorMap() {
+  const typeColorMap = {};
+  try {
+    const types = db.prepare('SELECT type_name, badge_color FROM project_types').all();
+    types.forEach(t => { if (t.badge_color) typeColorMap[t.type_name] = t.badge_color; });
+  } catch (e) { /* ignore */ }
+  return typeColorMap;
+}
+
+// 銷售機會列表
 router.get('/', (req, res) => {
   try {
     const status = req.query.status || '';
-    const pipelines = Pipeline.findAll({ status: status || undefined }, req.user);
+    // 排序參數：預設以成交機率由高到低排序，使用者可點其他欄位改變排序
+    const sortBy = req.query.sortBy || 'win_probability';
+    const sortOrder = req.query.sortOrder || 'DESC';
+
+    let pipelines = Pipeline.findAll({ status: status || undefined }, req.user);
+    if (!Array.isArray(pipelines)) pipelines = [];
+
+    const sortFieldMap = {
+      created_at: 'created_at',
+      updated_at: 'updated_at',
+      opportunity_name: 'opportunity_name',
+      customer_name: 'customer_name',
+      salesperson_name: 'salesperson_name',
+      estimated_amount: 'estimated_amount',
+      win_probability: 'win_probability',
+      expected_close_year_month: 'expected_close_year_month',
+      status: 'status'
+    };
+    const sortField = sortFieldMap[sortBy] || 'win_probability';
+
+    pipelines.sort((a, b) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
+
+      if (aVal == null) aVal = '';
+      if (bVal == null) bVal = '';
+
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortOrder === 'ASC' ? aVal - bVal : bVal - aVal;
+      }
+
+      const aStr = String(aVal);
+      const bStr = String(bVal);
+      return sortOrder === 'ASC' ? aStr.localeCompare(bStr, 'zh-TW') : bStr.localeCompare(aStr, 'zh-TW');
+    });
+
+    // 產生排序連結/圖示的輔助函數（保留目前的狀態篩選條件）
+    const buildQueryString = (newSortBy, newSortOrder) => {
+      const params = new URLSearchParams();
+      if (status) params.append('status', status);
+      params.append('sortBy', newSortBy);
+      params.append('sortOrder', newSortOrder);
+      return params.toString();
+    };
+
+    const getSortLink = (field) => {
+      const newOrder = sortBy === field && sortOrder === 'ASC' ? 'DESC' : 'ASC';
+      return buildQueryString(field, newOrder);
+    };
+
+    const getSortIcon = (field) => {
+      if (sortBy === field) {
+        return sortOrder === 'ASC' ? '<i class="bi bi-arrow-up"></i>' : '<i class="bi bi-arrow-down"></i>';
+      }
+      return '';
+    };
+
+    const sortLinks = {};
+    const sortIcons = {};
+    Object.keys(sortFieldMap).forEach(field => {
+      sortLinks[field] = getSortLink(field);
+      sortIcons[field] = getSortIcon(field);
+    });
 
     res.render('pipelines/index', {
-      title: '潛在商機',
-      pipelines: pipelines || [],
+      title: '銷售機會管理',
+      pipelines,
       statusFilter: status,
+      sortLinks,
+      sortIcons,
+      typeColorMap: getTypeColorMap(),
       error: req.query.error || ''
     });
   } catch (err) {
-    console.error('潛在商機列表錯誤:', err);
+    console.error('銷售機會列表錯誤:', err);
     res.status(500).render('error', {
       title: '系統錯誤',
-      message: '載入潛在商機列表時發生錯誤',
+      message: '載入銷售機會列表時發生錯誤',
       error: process.env.NODE_ENV === 'development' ? err : {}
     });
   }
 });
 
-// 新增商機表單
+// 新增銷售機會表單
 router.get('/new', requireCrmEditPermission, (req, res) => {
   res.render('pipelines/form', {
-    title: '新增潛在商機',
+    title: '新增銷售機會',
     pipeline: null,
     salespeople: Salesperson.findAll(),
-    staffUsers: User.findActive(),
     customers: Customer.findAll(),
     projectTypes: getActiveProjectTypes(),
     action: '/pipelines',
     presetCustomerId: req.query.customer_id || '',
+    // 決定快速新增客戶時，是否直接建立（admin/user）或先暫存於頁面、待銷售機會一併送出時才送審（其餘角色）
+    canCreateCustomerDirectly: req.user.role === 'admin' || req.user.role === 'user',
     error: req.query.error || ''
   });
 });
 
-// 建立商機
+// 建立銷售機會
 router.post('/', requireCrmEditPermission, (req, res) => {
   try {
     const id = Pipeline.create({
       customer_id: req.body.customer_id,
       salesperson_id: req.body.salesperson_id || null,
-      owner_user_id: req.body.owner_user_id || null,
+      // 負責人員固定為建立者本人（表單已移除此欄位），確保商機至少對建立者自己可見
+      owner_user_id: req.user.id,
       opportunity_name: req.body.opportunity_name,
       project_type: req.body.project_type || null,
       estimated_amount: req.body.estimated_amount,
@@ -75,6 +152,15 @@ router.post('/', requireCrmEditPermission, (req, res) => {
       notes: req.body.notes,
       userInfo: getUserInfo(req)
     });
+    const createdPipeline = Pipeline.findById(id);
+    NotificationService.notifyBusinessWatchers({
+      type: 'pipeline_created',
+      title: `新增銷售機會：${req.body.opportunity_name}`,
+      message: `建立人：${getUserInfo(req)}\n\n${NotificationService.formatPipelineSummary(createdPipeline)}`,
+      link: `/pipelines/${id}`,
+      related_type: 'pipeline',
+      related_id: id
+    }, req.user.id);
     res.redirect(`/pipelines/${id}`);
   } catch (err) {
     console.error(err);
@@ -82,11 +168,11 @@ router.post('/', requireCrmEditPermission, (req, res) => {
   }
 });
 
-// 商機詳情
+// 銷售機會詳情
 router.get('/:id', (req, res) => {
   const pipeline = Pipeline.findById(req.params.id);
   if (!pipeline) {
-    return res.status(404).render('error', { title: '找不到商機', message: '找不到此潛在商機', error: {} });
+    return res.status(404).render('error', { title: '找不到銷售機會', message: '找不到此銷售機會', error: {} });
   }
 
   const convertedProject = pipeline.converted_project_id ? Project.findById(pipeline.converted_project_id) : null;
@@ -97,23 +183,23 @@ router.get('/:id', (req, res) => {
     pipeline,
     convertedProject,
     pendingDeletion,
+    typeColorMap: getTypeColorMap(),
     error: req.query.error || '',
     success: req.query.success || ''
   });
 });
 
-// 編輯商機表單
+// 編輯銷售機會表單
 router.get('/:id/edit', requireCrmEditPermission, (req, res) => {
   const pipeline = Pipeline.findById(req.params.id);
   if (!pipeline) {
-    return res.status(404).render('error', { title: '找不到商機', message: '找不到此潛在商機', error: {} });
+    return res.status(404).render('error', { title: '找不到銷售機會', message: '找不到此銷售機會', error: {} });
   }
 
   res.render('pipelines/form', {
-    title: '編輯潛在商機',
+    title: '編輯銷售機會',
     pipeline,
     salespeople: Salesperson.findAll(),
-    staffUsers: User.findActive(),
     customers: Customer.findAll(),
     projectTypes: getActiveProjectTypes(),
     action: `/pipelines/${pipeline.id}`,
@@ -122,12 +208,12 @@ router.get('/:id/edit', requireCrmEditPermission, (req, res) => {
   });
 });
 
-// 更新商機
+// 更新銷售機會
 router.post('/:id', requireCrmEditPermission, (req, res) => {
   try {
     Pipeline.update(req.params.id, {
       salesperson_id: req.body.salesperson_id || null,
-      owner_user_id: req.body.owner_user_id || null,
+      // owner_user_id 不再由表單提供（欄位已移除），維持原值不變
       opportunity_name: req.body.opportunity_name,
       project_type: req.body.project_type || null,
       estimated_amount: req.body.estimated_amount,
@@ -136,6 +222,15 @@ router.post('/:id', requireCrmEditPermission, (req, res) => {
       notes: req.body.notes,
       userInfo: getUserInfo(req)
     });
+    const updatedPipeline = Pipeline.findById(req.params.id);
+    NotificationService.notifyBusinessWatchers({
+      type: 'pipeline_updated',
+      title: `銷售機會已更新：${req.body.opportunity_name}`,
+      message: `編輯人：${getUserInfo(req)}\n\n${NotificationService.formatPipelineSummary(updatedPipeline)}`,
+      link: `/pipelines/${req.params.id}`,
+      related_type: 'pipeline',
+      related_id: req.params.id
+    }, req.user.id);
     res.redirect(`/pipelines/${req.params.id}`);
   } catch (err) {
     console.error(err);
@@ -146,10 +241,20 @@ router.post('/:id', requireCrmEditPermission, (req, res) => {
 // 標記成交 / 流失 / 重新開啟（洽談中）
 router.post('/:id/status', requireCrmEditPermission, (req, res) => {
   try {
+    const pipeline = Pipeline.findById(req.params.id);
     Pipeline.setStatus(req.params.id, req.body.status, {
       lost_reason: req.body.lost_reason,
       userInfo: getUserInfo(req)
     });
+    NotificationService.notifyBusinessWatchers({
+      type: 'pipeline_status_changed',
+      title: `銷售機會狀態變更：${pipeline ? pipeline.opportunity_name : ''} → ${req.body.status}`,
+      message: `操作人：${getUserInfo(req)}` + (req.body.lost_reason ? `，流失原因：${req.body.lost_reason}` : '') +
+        `\n\n${NotificationService.formatPipelineSummary(pipeline)}`,
+      link: `/pipelines/${req.params.id}`,
+      related_type: 'pipeline',
+      related_id: req.params.id
+    }, req.user.id);
     res.redirect(`/pipelines/${req.params.id}`);
   } catch (err) {
     console.error(err);
@@ -161,13 +266,13 @@ router.post('/:id/status', requireCrmEditPermission, (req, res) => {
 router.get('/:id/convert', requireEditPermission, (req, res) => {
   const pipeline = Pipeline.findById(req.params.id);
   if (!pipeline) {
-    return res.status(404).render('error', { title: '找不到商機', message: '找不到此潛在商機', error: {} });
+    return res.status(404).render('error', { title: '找不到銷售機會', message: '找不到此銷售機會', error: {} });
   }
   if (pipeline.status !== '已成交') {
-    return res.redirect(`/pipelines/${pipeline.id}?error=` + encodeURIComponent('僅「已成交」的商機可以轉入專案'));
+    return res.redirect(`/pipelines/${pipeline.id}?error=` + encodeURIComponent('僅「已成交」的銷售機會可以轉入專案'));
   }
   if (pipeline.converted_project_id) {
-    return res.redirect(`/pipelines/${pipeline.id}?error=` + encodeURIComponent('此商機已轉入專案'));
+    return res.redirect(`/pipelines/${pipeline.id}?error=` + encodeURIComponent('此銷售機會已轉入專案'));
   }
 
   res.render('pipelines/convert', {
@@ -182,7 +287,7 @@ router.get('/:id/convert', requireEditPermission, (req, res) => {
 router.post('/:id/convert', requireEditPermission, (req, res) => {
   const pipeline = Pipeline.findById(req.params.id);
   if (!pipeline) {
-    return res.status(404).render('error', { title: '找不到商機', message: '找不到此潛在商機', error: {} });
+    return res.status(404).render('error', { title: '找不到銷售機會', message: '找不到此銷售機會', error: {} });
   }
 
   try {
@@ -219,6 +324,14 @@ router.post('/:id/convert', requireEditPermission, (req, res) => {
     });
 
     cache.delByPrefix('dashboard:');
+    NotificationService.notifyBusinessWatchers({
+      type: 'pipeline_converted',
+      title: `銷售機會已轉入專案：${pipeline.opportunity_name}`,
+      message: `專案編號：${req.body.project_code}，操作人：${getUserInfo(req)}\n\n${NotificationService.formatPipelineSummary(pipeline)}`,
+      link: `/projects/${projectId}`,
+      related_type: 'project',
+      related_id: projectId
+    }, req.user.id);
     res.redirect(`/projects/${projectId}`);
   } catch (err) {
     console.error(err);
@@ -231,12 +344,12 @@ router.post('/:id/convert', requireEditPermission, (req, res) => {
   }
 });
 
-// 刪除商機（軟刪除，已轉入專案者不可刪除）
+// 刪除銷售機會（軟刪除，已轉入專案者不可刪除）
 // 有 can_delete 權限者直接刪除；否則送出刪除申請，待管理員核准後才真正刪除
 router.post('/:id/delete', requireCrmEditPermission, (req, res) => {
   const pipeline = Pipeline.findById(req.params.id);
   if (!pipeline) {
-    return res.status(404).render('error', { title: '找不到商機', message: '找不到此潛在商機', error: {} });
+    return res.status(404).render('error', { title: '找不到銷售機會', message: '找不到此銷售機會', error: {} });
   }
 
   try {
@@ -247,16 +360,24 @@ router.post('/:id/delete', requireCrmEditPermission, (req, res) => {
 
     const existing = DeletionRequest.findPendingByTarget('pipeline', pipeline.id);
     if (existing) {
-      return res.redirect(`/pipelines/${pipeline.id}?error=` + encodeURIComponent('此商機已送出過刪除申請，待審核中'));
+      return res.redirect(`/pipelines/${pipeline.id}?error=` + encodeURIComponent('此銷售機會已送出過刪除申請，待審核中'));
     }
 
-    DeletionRequest.create({
+    const requestId = DeletionRequest.create({
       target_type: 'pipeline',
       target_id: pipeline.id,
       target_summary: `${pipeline.opportunity_name}（客戶：${pipeline.customer_name || '-'}）`,
       requested_by: req.user.id,
       requested_by_name: getUserInfo(req)
     });
+    NotificationService.notifyDeletionApprovers({
+      type: 'deletion_request_pending',
+      title: `刪除申請待審核：${pipeline.opportunity_name}`,
+      message: `申請人：${getUserInfo(req)}`,
+      link: '/deletion-requests',
+      related_type: 'deletion_request',
+      related_id: requestId
+    }, req.user.id);
     res.redirect(`/pipelines/${pipeline.id}?success=` + encodeURIComponent('已送出刪除申請，待管理員審核後才會真正刪除'));
   } catch (err) {
     console.error(err);

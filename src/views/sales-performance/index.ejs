@@ -17,9 +17,9 @@
   <div class="col-md-4">
     <div class="card h-100">
       <div class="card-body">
-        <h6 class="text-muted"><i class="bi bi-bullseye"></i> 洽談中商機</h6>
+        <h6 class="text-muted"><i class="bi bi-bullseye"></i> 洽談中銷售機會</h6>
         <h4 class="mb-0">${(pipelineSummary?.open_count || 0)} 筆 / $${(pipelineSummary?.open_amount || 0).toLocaleString()}</h4>
-        <a href="/pipelines?status=${encodeURIComponent('洽談中')}" class="small">查看商機列表</a>
+        <a href="/pipelines?status=${encodeURIComponent('洽談中')}" class="small">查看銷售機會列表</a>
       </div>
     </div>
   </div>
@@ -35,7 +35,7 @@
   <div class="col-md-4">
     <div class="card h-100">
       <div class="card-body">
-        <h6 class="text-muted"><i class="bi bi-graph-up-arrow"></i> 商機潛在總營收</h6>
+        <h6 class="text-muted"><i class="bi bi-graph-up-arrow"></i> 銷售機會潛在總營收</h6>
         <h4 class="mb-0">$${((pipelineSummary?.open_amount || 0) + (pipelineSummary?.won_pending_amount || 0)).toLocaleString()}</h4>
         <span class="small text-muted">洽談中 + 已成交待轉入</span>
       </div>
@@ -80,7 +80,7 @@ ${(performance || []).length > 0 ? `
             <th class="text-end">總獎金</th>
             <th class="text-end">已發放</th>
             <th class="text-end">待發放</th>
-            <th class="text-center">洽談中商機</th>
+            <th class="text-center">洽談中銷售機會</th>
             <th class="text-end">預估金額</th>
             <th></th>
           </tr>

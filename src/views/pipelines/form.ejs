@@ -3,7 +3,7 @@
   <div class="col">
     <h1 class="h3">
       <i class="bi bi-${pipeline ? 'pencil' : 'plus-lg'}"></i>
-      ${pipeline ? '編輯潛在商機' : '新增潛在商機'}
+      ${pipeline ? '編輯銷售機會' : '新增銷售機會'}
     </h1>
   </div>
 </div>
@@ -47,51 +47,96 @@ ${error ? `
             }).join('')}
           </select>
         </div>
-        <div class="col-md-6">
-          <label class="form-label">負責人員（使用者）</label>
-          <select name="owner_user_id" id="owner_user_id" class="form-select select2-dropdown">
-            <option value="">-- 選擇使用者 --</option>
-            ${(staffUsers || []).map(u => {
-              const selected = pipeline && pipeline.owner_user_id == u.id ? 'selected' : '';
-              const name = (u.name || '').replace(/"/g, '&quot;');
-              return '<option value="' + u.id + '" ' + selected + '>' + name + '</option>';
-            }).join('')}
-          </select>
-        </div>
-
         <div class="col-12">
-          <label class="form-label">商機名稱 <span class="text-danger">*</span></label>
+          <label class="form-label">銷售機會名稱 <span class="text-danger">*</span></label>
           <input type="text" name="opportunity_name" class="form-control" value="${pipeline ? (pipeline.opportunity_name || '').replace(/"/g, '&quot;') : ''}" required>
         </div>
 
-        <div class="col-md-4">
-          <label class="form-label">預估專案類型</label>
-          <select name="project_type" class="form-select">
-            <option value="">-- 選擇類型 --</option>
-            ${projectTypes.map(type => {
-              const selected = pipeline && pipeline.project_type === type.type_name ? 'selected' : '';
-              return '<option value="' + type.type_name + '" ' + selected + '>' + type.type_name + '</option>';
+        <div class="col-md-6">
+          <label class="form-label">預估專案類型（可複選） <span class="text-danger">*</span></label>
+          ${projectTypes.length ? `
+            <select name="project_type" id="project_type" class="form-select select2-dropdown" multiple required>
+              ${projectTypes.map(type => {
+                const selectedTypes = pipeline && pipeline.project_type ? pipeline.project_type.split(',').map(t => t.trim()) : [];
+                const selected = selectedTypes.includes(type.type_name) ? 'selected' : '';
+                const safeName = (type.type_name || '').replace(/"/g, '&quot;');
+                return '<option value="' + safeName + '" ' + selected + '>' + type.type_name + '</option>';
+              }).join('')}
+            </select>
+          ` : '<div class="border rounded p-2"><span class="text-muted small">尚無可選類型，請先於「專案類型管理」新增</span></div>'}
+          <small class="form-text text-muted">可複選，至少選擇一項</small>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">預估金額</label>
+          ${(() => {
+            const FIXED_AMOUNTS = [100000, 300000, 500000];
+            const existingAmount = pipeline && pipeline.estimated_amount !== null && pipeline.estimated_amount !== undefined ? Number(pipeline.estimated_amount) : null;
+            const isFixed = existingAmount !== null && FIXED_AMOUNTS.includes(existingAmount);
+            const isOther = existingAmount !== null && !isFixed;
+            return `
+              <select class="form-select mb-2" id="estimatedAmountSelect">
+                <option value="">-- 請選擇 --</option>
+                <option value="100000" ${existingAmount === 100000 ? 'selected' : ''}>10萬</option>
+                <option value="300000" ${existingAmount === 300000 ? 'selected' : ''}>30萬</option>
+                <option value="500000" ${existingAmount === 500000 ? 'selected' : ''}>50萬</option>
+                <option value="other" ${isOther ? 'selected' : ''}>其他金額（自行輸入）</option>
+              </select>
+              <input type="number" id="estimatedAmountOther" class="form-control ${isOther ? '' : 'd-none'}" placeholder="請輸入金額" step="1" min="0" value="${isOther ? existingAmount : ''}">
+              <input type="hidden" name="estimated_amount" id="estimatedAmountHidden" value="${existingAmount !== null ? existingAmount : ''}">
+            `;
+          })()}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">成交機率 <span class="text-danger">*</span></label>
+          <select name="win_probability" class="form-select" required>
+            <option value="">-- 選擇機率 --</option>
+            ${[
+              { pct: 10, label: '初步接洽' },
+              { pct: 30, label: '需求分析' },
+              { pct: 50, label: '提案報價' },
+              { pct: 100, label: '商務談判' }
+            ].map(stage => {
+              const selected = pipeline && pipeline.win_probability !== null && pipeline.win_probability !== undefined && Number(pipeline.win_probability) === stage.pct ? 'selected' : '';
+              return '<option value="' + stage.pct + '" ' + selected + '>' + stage.label + ' ' + stage.pct + '%</option>';
             }).join('')}
           </select>
         </div>
-        <div class="col-md-4">
-          <label class="form-label">預估金額</label>
-          <div class="input-group">
-            <span class="input-group-text">$</span>
-            <input type="number" name="estimated_amount" class="form-control" value="${pipeline ? (pipeline.estimated_amount || 0) : 0}" step="1" min="0">
-          </div>
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">預計成交月份</label>
-          <input type="month" name="expected_close_year_month" class="form-control" value="${pipeline ? (pipeline.expected_close_year_month || '') : ''}">
-        </div>
 
-        <div class="col-md-4">
-          <label class="form-label">成交機率</label>
-          <div class="input-group">
-            <input type="number" name="win_probability" class="form-control" value="${pipeline && pipeline.win_probability !== null && pipeline.win_probability !== undefined ? pipeline.win_probability : ''}" min="0" max="100">
-            <span class="input-group-text">%</span>
+        <div class="col-md-6">
+          <label class="form-label">預計成交月份 <span class="text-danger">*</span></label>
+          <div class="row g-2">
+            <div class="col-auto">
+              <select class="form-select" id="closeYear">
+                <option value="">--年--</option>
+                ${(() => {
+                  const currentYear = new Date().getFullYear();
+                  const existing = pipeline ? (pipeline.expected_close_year_month || '') : '';
+                  const selectedYear = existing ? existing.split('-')[0] : '';
+                  let options = '';
+                  for (let y = currentYear - 1; y <= currentYear + 3; y++) {
+                    options += '<option value="' + y + '"' + (String(selectedYear) === String(y) ? ' selected' : '') + '>' + y + '年</option>';
+                  }
+                  return options;
+                })()}
+              </select>
+            </div>
+            <div class="col-auto">
+              <select class="form-select" id="closeMonth">
+                <option value="">--月--</option>
+                ${(() => {
+                  const existing = pipeline ? (pipeline.expected_close_year_month || '') : '';
+                  const selectedMonth = existing ? existing.split('-')[1] : '';
+                  let options = '';
+                  for (let m = 1; m <= 12; m++) {
+                    const monthStr = String(m).padStart(2, '0');
+                    options += '<option value="' + monthStr + '"' + (selectedMonth === monthStr ? ' selected' : '') + '>' + m + '月</option>';
+                  }
+                  return options;
+                })()}
+              </select>
+            </div>
           </div>
+          <input type="hidden" name="expected_close_year_month" id="expectedCloseYearMonth" value="${pipeline ? (pipeline.expected_close_year_month || '') : ''}">
         </div>
 
         <div class="col-12">
@@ -113,6 +158,119 @@ ${error ? `
     </form>
   </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const closeYear = document.getElementById('closeYear');
+  const closeMonth = document.getElementById('closeMonth');
+  const hiddenYearMonth = document.getElementById('expectedCloseYearMonth');
+  const pipelineForm = document.querySelector('form[action="${action}"]');
+
+  const amountSelect = document.getElementById('estimatedAmountSelect');
+  const amountOther = document.getElementById('estimatedAmountOther');
+  const amountHidden = document.getElementById('estimatedAmountHidden');
+  if (amountSelect) {
+    amountSelect.addEventListener('change', function () {
+      amountOther.classList.toggle('d-none', this.value !== 'other');
+    });
+  }
+
+  if (pipelineForm) {
+    pipelineForm.addEventListener('submit', function(e) {
+      const year = closeYear.value;
+      const month = closeMonth.value;
+      if (!year || !month) {
+        e.preventDefault();
+        alert('請選擇完整的預計成交年份與月份');
+        return false;
+      }
+      hiddenYearMonth.value = year + '-' + month;
+
+      const projectTypeSelect = document.getElementById('project_type');
+      if (projectTypeSelect && projectTypeSelect.selectedOptions.length === 0) {
+        e.preventDefault();
+        alert('請至少選擇一項預估專案類型');
+        return false;
+      }
+
+      if (amountSelect) {
+        if (!amountSelect.value) {
+          e.preventDefault();
+          alert('請選擇預估金額');
+          return false;
+        }
+        if (amountSelect.value === 'other') {
+          if (!amountOther.value || Number(amountOther.value) <= 0) {
+            e.preventDefault();
+            alert('請輸入其他預估金額');
+            return false;
+          }
+          amountHidden.value = amountOther.value;
+        } else {
+          amountHidden.value = amountSelect.value;
+        }
+      }
+
+      // 客戶選擇的是「快速新增（待審核）」暫存項目：所有驗證都通過後，
+      // 不提交原本的表單，改成把客戶資料與這筆銷售機會內容一併送出審核
+      const customerSelect = document.getElementById('customer_id');
+      if (customerSelect && window.PENDING_CUSTOMER_VALUE && customerSelect.value === window.PENDING_CUSTOMER_VALUE) {
+        e.preventDefault();
+        if (!window.stagedCustomerData) {
+          alert('客戶資料遺失，請重新使用「快速新增」');
+          return false;
+        }
+
+        const submitBtn = pipelineForm.querySelector('button[type="submit"]');
+        const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 送出中...';
+        }
+
+        const salespersonSelect = document.getElementById('salesperson_id');
+        const notesEl = document.querySelector('textarea[name="notes"]');
+        const pipelineData = {
+          opportunity_name: document.querySelector('input[name="opportunity_name"]').value.trim(),
+          project_type: Array.from(projectTypeSelect.selectedOptions).map(function (o) { return o.value; }).join(','),
+          estimated_amount: amountHidden.value,
+          win_probability: document.querySelector('select[name="win_probability"]').value,
+          expected_close_year_month: hiddenYearMonth.value,
+          salesperson_id: salespersonSelect ? (salespersonSelect.value || null) : null,
+          notes: notesEl ? (notesEl.value || null) : null
+        };
+
+        const payload = Object.assign({}, window.stagedCustomerData, { pipeline_data: pipelineData });
+
+        fetch('/customers/quick-add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+          .then(function (res) { return res.json(); })
+          .then(function (result) {
+            if (result.success) {
+              if (typeof showToast === 'function') {
+                showToast(result.message || '已送出客戶與銷售機會審核申請', 'warning');
+              } else {
+                alert(result.message || '已送出客戶與銷售機會審核申請');
+              }
+              setTimeout(function () { window.location.href = '/pipelines'; }, 800);
+            } else {
+              alert(result.error || '送出失敗');
+              if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnHtml; }
+            }
+          })
+          .catch(function (err) {
+            alert('送出時發生錯誤：' + err.message);
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnHtml; }
+          });
+        return false;
+      }
+    });
+  }
+});
+</script>
 
 ${!pipeline ? `
 <!-- 快速新增客戶/廠商 Modal -->
@@ -172,7 +330,11 @@ ${!pipeline ? `
 </div>
 
 <script>
+window.PENDING_CUSTOMER_VALUE = '__pending_new__';
+window.stagedCustomerData = null;
+
 document.addEventListener('DOMContentLoaded', function() {
+  const canCreateCustomerDirectly = ${canCreateCustomerDirectly ? 'true' : 'false'};
   const quickAddLink = document.getElementById('quickAddCustomerLink');
   const quickAddModal = new bootstrap.Modal(document.getElementById('quickAddCustomerModal'));
   const quickAddForm = document.getElementById('quickAddCustomerForm');
@@ -199,46 +361,62 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
       }
 
-      quickAddSubmit.disabled = true;
-      quickAddSubmit.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 新增中...';
       quickAddError.classList.add('d-none');
+      const customerData = {
+        customer_code: formData.get('customer_code'),
+        company_name: formData.get('company_name'),
+        tax_id: formData.get('tax_id') || '',
+        party_type: formData.get('party_type'),
+        vendor_type: formData.get('vendor_type') || ''
+      };
 
-      try {
-        const response = await fetch('/customers/quick-add', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customer_code: formData.get('customer_code'),
-            company_name: formData.get('company_name'),
-            tax_id: formData.get('tax_id') || '',
-            party_type: formData.get('party_type'),
-            vendor_type: formData.get('vendor_type') || ''
-          })
-        });
+      // 管理員/專案管理員：沿用原本行為，直接建立客戶並選用
+      if (canCreateCustomerDirectly) {
+        quickAddSubmit.disabled = true;
+        quickAddSubmit.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 新增中...';
+        try {
+          const response = await fetch('/customers/quick-add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(customerData)
+          });
+          const result = await response.json();
 
-        const result = await response.json();
-
-        if (result.success) {
-          const customer = result.customer;
-          const displayText = customer.company_name + ' (' + customer.customer_code + ')';
-          const newOption = new Option(displayText, customer.id, true, true);
-          $('#customer_id').append(newOption).trigger('change');
-
-          quickAddModal.hide();
-          if (typeof showToast === 'function') {
-            showToast('新增成功：' + customer.company_name, 'success');
+          if (result.success) {
+            const customer = result.customer;
+            const displayText = customer.company_name + ' (' + customer.customer_code + ')';
+            const newOption = new Option(displayText, customer.id, true, true);
+            $('#customer_id').append(newOption).trigger('change');
+            quickAddModal.hide();
+            if (typeof showToast === 'function') {
+              showToast('新增成功：' + customer.company_name, 'success');
+            }
+          } else {
+            quickAddError.textContent = result.error || '新增失敗';
+            quickAddError.classList.remove('d-none');
           }
-        } else {
-          quickAddError.textContent = result.error || '新增失敗';
+        } catch (error) {
+          console.error('快速新增客戶/廠商錯誤:', error);
+          quickAddError.textContent = '新增時發生錯誤：' + error.message;
           quickAddError.classList.remove('d-none');
+        } finally {
+          quickAddSubmit.disabled = false;
+          quickAddSubmit.innerHTML = '<i class="bi bi-check-lg"></i> 新增並選擇';
         }
-      } catch (error) {
-        console.error('快速新增客戶/廠商錯誤:', error);
-        quickAddError.textContent = '新增時發生錯誤：' + error.message;
-        quickAddError.classList.remove('d-none');
-      } finally {
-        quickAddSubmit.disabled = false;
-        quickAddSubmit.innerHTML = '<i class="bi bi-check-lg"></i> 新增並選擇';
+        return;
+      }
+
+      // 其餘角色：先暫存在這一頁，不呼叫後端；等這筆銷售機會表單送出時，才把客戶與銷售機會內容一併送審
+      window.stagedCustomerData = customerData;
+      const $select = $('#customer_id');
+      $select.find('option[value="' + window.PENDING_CUSTOMER_VALUE + '"]').remove();
+      const label = '（待審核）' + customerData.company_name + ' (' + customerData.customer_code + ')';
+      const newOption = new Option(label, window.PENDING_CUSTOMER_VALUE, true, true);
+      $select.append(newOption).trigger('change');
+
+      quickAddModal.hide();
+      if (typeof showToast === 'function') {
+        showToast('已暫存客戶資料，請完成銷售機會後一併送出審核', 'info');
       }
     });
   }

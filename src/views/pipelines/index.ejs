@@ -1,10 +1,13 @@
+<%
+  const WIN_PROBABILITY_STAGES = { 10: '初步接洽', 30: '需求分析', 50: '提案報價', 100: '商務談判' };
+%>
 <%- include('../layout', { body: `
 <div class="row mb-4">
   <div class="col">
-    <h1 class="h3"><i class="bi bi-bullseye"></i> 潛在商機</h1>
+    <h1 class="h3"><i class="bi bi-bullseye"></i> 銷售機會管理</h1>
   </div>
   <div class="col-auto">
-    ${locals.canEditCrm ? '<a href="/pipelines/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 新增商機</a>' : ''}
+    ${locals.canEditCrm ? '<a href="/pipelines/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 新增銷售機會</a>' : ''}
   </div>
 </div>
 
@@ -30,28 +33,70 @@ ${error ? `
       <table class="table table-hover mb-0">
         <thead class="table-light">
           <tr>
-            <th>商機名稱</th>
-            <th>客戶</th>
-            <th>業務</th>
-            <th class="text-end">預估金額</th>
-            <th>預計成交月份</th>
-            <th>狀態</th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.created_at) || ''}" class="text-dark text-decoration-none">
+                建立日期${(sortIcons && sortIcons.created_at) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.updated_at) || ''}" class="text-dark text-decoration-none">
+                最後更新日期${(sortIcons && sortIcons.updated_at) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.opportunity_name) || ''}" class="text-dark text-decoration-none">
+                銷售機會${(sortIcons && sortIcons.opportunity_name) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.customer_name) || ''}" class="text-dark text-decoration-none">
+                客戶${(sortIcons && sortIcons.customer_name) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.salesperson_name) || ''}" class="text-dark text-decoration-none">
+                業務${(sortIcons && sortIcons.salesperson_name) || ''}
+              </a>
+            </th>
+            <th class="text-end">
+              <a href="?${(sortLinks && sortLinks.estimated_amount) || ''}" class="text-dark text-decoration-none">
+                預估金額${(sortIcons && sortIcons.estimated_amount) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.win_probability) || ''}" class="text-dark text-decoration-none">
+                成交機率${(sortIcons && sortIcons.win_probability) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.expected_close_year_month) || ''}" class="text-dark text-decoration-none">
+                預計成交月份${(sortIcons && sortIcons.expected_close_year_month) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.status) || ''}" class="text-dark text-decoration-none">
+                狀態${(sortIcons && sortIcons.status) || ''}
+              </a>
+            </th>
           </tr>
         </thead>
         <tbody>
           ${pipelines.map(p => `
             <tr onclick="location.href='/pipelines/${p.id}'" style="cursor:pointer">
+              <td>${(p.created_at || '').slice(0, 10) || '-'}</td>
+              <td>${(p.updated_at || '').slice(0, 10) || '-'}</td>
               <td>${p.opportunity_name}</td>
               <td>${p.customer_name || '-'}</td>
               <td>${p.salesperson_name || '-'}</td>
               <td class="text-end">$${(p.estimated_amount || 0).toLocaleString()}</td>
+              <td>${p.win_probability !== null && p.win_probability !== undefined ? (WIN_PROBABILITY_STAGES[p.win_probability] ? WIN_PROBABILITY_STAGES[p.win_probability] + ' ' : '') + p.win_probability + '%' : '-'}</td>
               <td>${p.expected_close_year_month || '-'}</td>
               <td>
                 <span class="badge bg-${p.status === '已成交' ? 'success' : p.status === '已流失' ? 'secondary' : 'warning'}">${p.status}</span>
                 ${p.converted_project_id ? '<span class="badge bg-info ms-1">已轉入專案</span>' : ''}
               </td>
             </tr>
-          `).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">尚無潛在商機</td></tr>'}
+          `).join('') || '<tr><td colspan="9" class="text-center text-muted py-3">尚無銷售機會</td></tr>'}
         </tbody>
       </table>
     </div>

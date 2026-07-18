@@ -1,5 +1,6 @@
 const db = require('./db');
 const AuditLogService = require('../services/AuditLogService');
+const { PROJECT_VIEW_SCOPE, ROLES } = require('../constants');
 
 // 正規化客戶/廠商身份欄位：vendor_type 僅在具備廠商身份（廠商/兩者皆是）時才有意義
 function normalizePartyFields(data) {
@@ -9,9 +10,35 @@ function normalizePartyFields(data) {
   return { partyType, vendorType };
 }
 
+// 與 Project.js/Pipeline.js 相同的權限範圍過濾邏輯，供客戶列表的「專案金額加總」欄位使用：
+// 只加總使用者有權限查看金額的專案，避免透過列表加總洩漏無權限查看專案的金額
+// （比照客戶詳情頁「金額鎖定」的精神，但業務員姓名本身不算敏感資訊，仍全部顯示）
+function buildProjectAmountScopeCase(user) {
+  if (!user) return { sql: '1=1', params: [] };
+  const scope = user.project_view_scope ||
+    (user.role === ROLES.SALESPERSON ? PROJECT_VIEW_SCOPE.OWN : PROJECT_VIEW_SCOPE.ALL);
+
+  if (scope === PROJECT_VIEW_SCOPE.ALL) return { sql: '1=1', params: [] };
+  if (scope === PROJECT_VIEW_SCOPE.NONE) return { sql: '1=0', params: [] };
+  if (scope === PROJECT_VIEW_SCOPE.OWN) {
+    if (!user.salesperson_id) return { sql: '1=0', params: [] };
+    return { sql: 'p.salesperson_id = ?', params: [user.salesperson_id] };
+  }
+  if (scope === PROJECT_VIEW_SCOPE.ASSIGNED) {
+    let ids = [];
+    try {
+      ids = db.prepare('SELECT salesperson_id FROM user_salesperson_access WHERE user_id = ?').all(user.id).map(r => r.salesperson_id);
+    } catch { /* ignore */ }
+    if (ids.length === 0) return { sql: '1=0', params: [] };
+    return { sql: `p.salesperson_id IN (${ids.map(() => '?').join(',')})`, params: ids };
+  }
+  return { sql: '1=0', params: [] };
+}
+
 const Customer = {
   // 取得所有客戶（客戶/廠商資料對所有使用者開放，僅專案才需要依權限範圍過濾；可選擇依往來狀態/客戶廠商身份/廠商類型篩選）
-  findAll(filters = {}) {
+  // user：用於「專案金額加總」欄位依角色權限範圍過濾金額（比照客戶詳情頁的做法，件數不過濾、金額才過濾）
+  findAll(filters = {}, user = null) {
     const statusCond = filters.status ? ' AND c.status = ?' : '';
     const statusParams = filters.status ? [filters.status] : [];
     // party_type = '兩者皆是' 的資料同時具備客戶與廠商身份，篩選「客戶」或「廠商」時都要包含進來
@@ -19,15 +46,20 @@ const Customer = {
     const partyParams = filters.party_type ? [filters.party_type] : [];
     const vendorCond = filters.vendor_type ? ' AND c.vendor_type = ?' : '';
     const vendorParams = filters.vendor_type ? [filters.vendor_type] : [];
+    const amountScope = buildProjectAmountScopeCase(user);
     return db.prepare(`
-      SELECT c.*, COUNT(p.id) as project_count, u.name as owner_salesperson_name
+      SELECT c.*, COUNT(DISTINCT p.id) as project_count,
+        SUM(CASE WHEN ${amountScope.sql} THEN p.price_with_tax ELSE 0 END) as total_project_amount,
+        GROUP_CONCAT(DISTINCT sp.name) as salesperson_names,
+        u.name as owner_salesperson_name
       FROM customers c
       LEFT JOIN projects p ON c.id = p.customer_id
+      LEFT JOIN salespeople sp ON p.salesperson_id = sp.id
       LEFT JOIN users u ON c.owner_salesperson_id = u.id
       WHERE 1=1${statusCond}${partyCond}${vendorCond}
       GROUP BY c.id
       ORDER BY c.company_name
-    `).all(...statusParams, ...partyParams, ...vendorParams);
+    `).all(...amountScope.params, ...statusParams, ...partyParams, ...vendorParams);
   },
 
   // 依ID取得
@@ -51,9 +83,9 @@ const Customer = {
   },
 
   // 關鍵字搜尋（搜尋客戶編號、統一編號、公司名稱、聯絡人，可選擇依往來狀態/客戶廠商身份篩選）
-  search(keyword, filters = {}) {
+  search(keyword, filters = {}, user = null) {
     if (!keyword || keyword.trim() === '') {
-      return this.findAll(filters);
+      return this.findAll(filters, user);
     }
 
     const searchTerm = `%${keyword.trim()}%`;
@@ -63,16 +95,21 @@ const Customer = {
     const partyParams = filters.party_type ? [filters.party_type] : [];
     const vendorCond = filters.vendor_type ? ' AND c.vendor_type = ?' : '';
     const vendorParams = filters.vendor_type ? [filters.vendor_type] : [];
+    const amountScope = buildProjectAmountScopeCase(user);
     return db.prepare(`
-      SELECT c.*, COUNT(p.id) as project_count, u.name as owner_salesperson_name
+      SELECT c.*, COUNT(DISTINCT p.id) as project_count,
+        SUM(CASE WHEN ${amountScope.sql} THEN p.price_with_tax ELSE 0 END) as total_project_amount,
+        GROUP_CONCAT(DISTINCT sp.name) as salesperson_names,
+        u.name as owner_salesperson_name
       FROM customers c
       LEFT JOIN projects p ON c.id = p.customer_id
+      LEFT JOIN salespeople sp ON p.salesperson_id = sp.id
       LEFT JOIN users u ON c.owner_salesperson_id = u.id
       WHERE 1=1${statusCond}${partyCond}${vendorCond}
         AND (c.customer_code LIKE ? OR c.tax_id LIKE ? OR c.company_name LIKE ? OR c.contact_name LIKE ?)
       GROUP BY c.id
       ORDER BY c.company_name
-    `).all(...statusParams, ...partyParams, ...vendorParams, searchTerm, searchTerm, searchTerm, searchTerm);
+    `).all(...amountScope.params, ...statusParams, ...partyParams, ...vendorParams, searchTerm, searchTerm, searchTerm, searchTerm);
   },
 
   // 新增客戶

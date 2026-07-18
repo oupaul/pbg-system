@@ -101,6 +101,18 @@ ${error ? `
             </select>
           </div>
         ` : ''}
+
+        <div class="col-md-6">
+          <label class="form-label"><i class="bi bi-envelope"></i> Email</label>
+          <input type="email" name="email" class="form-control" value="${(user && user.email) || ''}" placeholder="user@example.com">
+          <small class="text-muted">填寫後，重要事件（審核送出/核准/駁回）通知會寄送到此信箱（需管理員於系統設定啟用 Email 通知）</small>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label"><i class="bi bi-line"></i> LINE User ID</label>
+          <input type="text" name="line_user_id" class="form-control" value="${(user && user.line_user_id) || ''}" placeholder="U4af4980629...">
+          <small class="text-muted">請先加官方帳號好友並傳送任意訊息，機器人會自動回覆此使用者的 LINE User ID</small>
+        </div>
       </div>
 
       <div class="mt-4">

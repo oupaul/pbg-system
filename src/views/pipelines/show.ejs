@@ -1,9 +1,13 @@
+<%
+  // 成交機率固定對應銷售階段名稱，供顯示用
+  const WIN_PROBABILITY_STAGES = { 10: '初步接洽', 30: '需求分析', 50: '提案報價', 100: '商務談判' };
+%>
 <%- include('../layout', { body: `
 <div class="row mb-4">
   <div class="col">
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb mb-0">
-        <li class="breadcrumb-item"><a href="/pipelines">潛在商機</a></li>
+        <li class="breadcrumb-item"><a href="/pipelines">銷售機會管理</a></li>
         <li class="breadcrumb-item active">${pipeline.opportunity_name}</li>
       </ol>
     </nav>
@@ -58,14 +62,6 @@ ${pendingDeletion ? `
   <div class="col-md-3">
     <div class="card">
       <div class="card-body">
-        <h6 class="text-muted">負責人員</h6>
-        <p class="fs-5 mb-0">${pipeline.owner_user_name || '-'}</p>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-3">
-    <div class="card">
-      <div class="card-body">
         <h6 class="text-muted">預估金額</h6>
         <p class="fs-5 mb-0">$${(pipeline.estimated_amount || 0).toLocaleString()}</p>
       </div>
@@ -74,8 +70,19 @@ ${pendingDeletion ? `
   <div class="col-md-3">
     <div class="card">
       <div class="card-body">
+        <h6 class="text-muted">預估專案類型</h6>
+        <p class="fs-5 mb-0">${(pipeline.project_type || '').split(',').map(t => t.trim()).filter(Boolean).map(t => {
+          const typeColor = (typeof typeColorMap !== 'undefined' && typeColorMap[t]) ? typeColorMap[t] : 'info';
+          return '<span class="badge bg-' + typeColor + ' me-1">' + t + '</span>';
+        }).join('') || '-'}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
         <h6 class="text-muted">預計成交月份 / 機率</h6>
-        <p class="fs-5 mb-0">${pipeline.expected_close_year_month || '-'} ${pipeline.win_probability !== null && pipeline.win_probability !== undefined ? '(' + pipeline.win_probability + '%)' : ''}</p>
+        <p class="fs-5 mb-0">${pipeline.expected_close_year_month || '-'} ${pipeline.win_probability !== null && pipeline.win_probability !== undefined ? '(' + (WIN_PROBABILITY_STAGES[pipeline.win_probability] ? WIN_PROBABILITY_STAGES[pipeline.win_probability] + ' ' : '') + pipeline.win_probability + '%)' : ''}</p>
       </div>
     </div>
   </div>
@@ -92,7 +99,7 @@ ${pipeline.converted_project_id ? `
 <div class="card mb-4 border-info">
   <div class="card-header bg-info text-white"><i class="bi bi-folder-check"></i> 已轉入專案</div>
   <div class="card-body">
-    <p class="mb-2">此商機已於 ${pipeline.converted_at} 轉入專案：</p>
+    <p class="mb-2">此銷售機會已於 ${pipeline.converted_at} 轉入專案：</p>
     <a href="/projects/${convertedProject ? convertedProject.id : pipeline.converted_project_id}" class="btn btn-primary">
       <i class="bi bi-folder"></i> ${convertedProject ? convertedProject.project_code + ' - ' + convertedProject.project_name : '查看專案'}
     </a>
@@ -129,7 +136,7 @@ ${locals.canEditCrm && !pipeline.converted_project_id ? `
     ${pendingDeletion ? `
       <span class="btn btn-outline-secondary disabled ms-auto"><i class="bi bi-hourglass-split"></i> 刪除申請審核中</span>
     ` : `
-      <form action="/pipelines/${pipeline.id}/delete" method="POST" class="ms-auto" onsubmit="return confirm('${locals.canDelete ? "確定要刪除此潛在商機？" : "確定要送出刪除申請嗎？將由管理員審核後才會真正刪除。"}')">
+      <form action="/pipelines/${pipeline.id}/delete" method="POST" class="ms-auto" onsubmit="return confirm('${locals.canDelete ? "確定要刪除此銷售機會？" : "確定要送出刪除申請嗎？將由管理員審核後才會真正刪除。"}')">
         <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash"></i> ${locals.canDelete ? '刪除' : '申請刪除'}</button>
       </form>
     `}
@@ -139,7 +146,7 @@ ${locals.canEditCrm && !pipeline.converted_project_id ? `
 <div class="modal fade" id="lostReasonModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
-      <form action="/pipelines/${pipeline.id}/status" method="POST">
+      <form action="/pipelines/${pipeline.id}/status" method="POST" id="lostReasonForm">
         <input type="hidden" name="status" value="已流失">
         <div class="modal-header">
           <h5 class="modal-title">標記流失</h5>
@@ -147,7 +154,15 @@ ${locals.canEditCrm && !pipeline.converted_project_id ? `
         </div>
         <div class="modal-body">
           <label class="form-label">流失原因</label>
-          <textarea name="lost_reason" class="form-control" rows="3"></textarea>
+          <select class="form-select mb-2" id="lostReasonSelect">
+            <option value="">-- 請選擇 --</option>
+            <option value="價格太高">價格太高</option>
+            <option value="功能不符">功能不符</option>
+            <option value="對手贏得">對手贏得</option>
+            <option value="其他">其他（填寫原因）</option>
+          </select>
+          <input type="text" id="lostReasonOther" class="form-control d-none" placeholder="請填寫原因">
+          <input type="hidden" name="lost_reason" id="lostReasonHidden">
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
@@ -157,6 +172,45 @@ ${locals.canEditCrm && !pipeline.converted_project_id ? `
     </div>
   </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const lostReasonSelect = document.getElementById('lostReasonSelect');
+  const lostReasonOther = document.getElementById('lostReasonOther');
+  const lostReasonHidden = document.getElementById('lostReasonHidden');
+  const lostReasonForm = document.getElementById('lostReasonForm');
+
+  if (lostReasonSelect) {
+    lostReasonSelect.addEventListener('change', function() {
+      const isOther = lostReasonSelect.value === '其他';
+      lostReasonOther.classList.toggle('d-none', !isOther);
+      if (!isOther) lostReasonOther.value = '';
+    });
+  }
+
+  if (lostReasonForm) {
+    lostReasonForm.addEventListener('submit', function(e) {
+      const selected = lostReasonSelect.value;
+      if (!selected) {
+        e.preventDefault();
+        alert('請選擇流失原因');
+        return false;
+      }
+      if (selected === '其他') {
+        const otherText = lostReasonOther.value.trim();
+        if (!otherText) {
+          e.preventDefault();
+          alert('請填寫其他原因');
+          return false;
+        }
+        lostReasonHidden.value = '其他：' + otherText;
+      } else {
+        lostReasonHidden.value = selected;
+      }
+    });
+  }
+});
+</script>
 ` : ''}
 
 ${pipeline.status === '已流失' && pipeline.lost_reason ? `

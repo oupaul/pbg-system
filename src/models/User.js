@@ -132,24 +132,31 @@ const User = {
     }
   },
 
-  // 取得啟用中的使用者（供「接洽人員」等下拉選單使用）
+  // 取得啟用中的使用者（供通知收件人等下拉選單使用）
   findActive() {
     return db.prepare(`SELECT id, name FROM users WHERE is_active = 1 ORDER BY name`).all();
+  },
+
+  // 取得啟用中且非系統管理員的使用者（供「客戶關係負責人（使用者）」下拉選單使用，系統管理員不應被指派為客戶關係負責人）
+  findActiveNonAdmin() {
+    return db.prepare(`SELECT id, name FROM users WHERE is_active = 1 AND role != 'admin' ORDER BY name`).all();
   },
 
   // 創建用戶
   async create(data) {
     const passwordHash = await this.hashPassword(data.password);
     const result = db.prepare(`
-      INSERT INTO users (username, password_hash, name, role, salesperson_id, is_active)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO users (username, password_hash, name, role, salesperson_id, is_active, email, line_user_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       data.username,
       passwordHash,
       data.name,
       data.role || 'user',
       data.salesperson_id || null,
-      data.is_active !== undefined ? data.is_active : 1
+      data.is_active !== undefined ? data.is_active : 1,
+      data.email || null,
+      data.line_user_id || null
     );
     return result.lastInsertRowid;
   },
@@ -175,6 +182,14 @@ const User = {
       if (data.is_active !== undefined) {
         fields.push('is_active = ?');
         values.push(data.is_active);
+      }
+      if (data.email !== undefined) {
+        fields.push('email = ?');
+        values.push(data.email || null);
+      }
+      if (data.line_user_id !== undefined) {
+        fields.push('line_user_id = ?');
+        values.push(data.line_user_id || null);
       }
       if (data.password !== undefined) {
         fields.push('password_hash = ?');

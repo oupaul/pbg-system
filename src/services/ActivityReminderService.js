@@ -1,13 +1,13 @@
 /**
  * 客戶追蹤提醒服務
- * 找出已指派負責業務、但超過設定天數沒有活動紀錄（拜訪/電話/客訴...）的客戶
+ * 找出已指派客戶關係負責人、但超過設定天數沒有活動紀錄（拜訪/電話/客訴...）的客戶
  */
 const db = require('../models/db');
 
 const ActivityReminderService = {
   /**
    * @param {number} reminderDays - 超過幾天沒有活動紀錄視為需要追蹤
-   * @param {number|null} ownerUserId - 僅回傳該接洽人員（使用者）負責的客戶，null 為全部
+   * @param {number|null} ownerUserId - 僅回傳該客戶關係負責人（使用者）負責的客戶，null 為全部
    * @returns {Array}
    */
   getOverdueCustomers(reminderDays = 14, ownerUserId = null) {
