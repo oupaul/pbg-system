@@ -1,3 +1,8 @@
+<%
+  function escapeHtml(str) {
+    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+%>
 <%- include('../layout', { body: `
 <div class="row mb-4">
   <div class="col">
@@ -15,7 +20,7 @@
 
 ${error ? `
   <div class="alert alert-danger alert-dismissible fade show" role="alert">
-    <i class="bi bi-exclamation-triangle"></i> ${error}
+    <i class="bi bi-exclamation-triangle"></i> ${escapeHtml(error)}
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
   </div>
 ` : ''}

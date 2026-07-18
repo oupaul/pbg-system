@@ -2,8 +2,9 @@
   // 在 EJS 中處理邏輯
   // 確保變數存在，如果不存在則使用預設值
   const localSettings = typeof settings !== 'undefined' ? settings : [];
-  const localError = typeof error !== 'undefined' ? error : '';
-  const localSuccess = typeof success !== 'undefined' ? success : '';
+  const escapeHtml = str => (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const localError = escapeHtml(typeof error !== 'undefined' ? error : '');
+  const localSuccess = escapeHtml(typeof success !== 'undefined' ? success : '');
   
   const notificationDaysSetting = localSettings.find(s => s.setting_key === 'invoice_notification_days_before_month_end');
   const notificationEnabledSetting = localSettings.find(s => s.setting_key === 'invoice_notification_enabled');
