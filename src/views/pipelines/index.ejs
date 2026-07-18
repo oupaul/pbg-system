@@ -1,5 +1,9 @@
 <%
   const WIN_PROBABILITY_STAGES = { 10: '初步接洽', 30: '需求分析', 50: '提案報價', 100: '商務談判' };
+  // 商機名稱、客戶/業務姓名皆為自由文字欄位，輸出前需跳脫，避免儲存型 XSS
+  function escapeHtml(str) {
+    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
 %>
 <%- include('../layout', { body: `
 <div class="row mb-4">
@@ -85,9 +89,9 @@ ${error ? `
             <tr onclick="location.href='/pipelines/${p.id}'" style="cursor:pointer">
               <td>${(p.created_at || '').slice(0, 10) || '-'}</td>
               <td>${(p.updated_at || '').slice(0, 10) || '-'}</td>
-              <td>${p.opportunity_name}</td>
-              <td>${p.customer_name || '-'}</td>
-              <td>${p.salesperson_name || '-'}</td>
+              <td>${escapeHtml(p.opportunity_name)}</td>
+              <td>${escapeHtml(p.customer_name) || '-'}</td>
+              <td>${escapeHtml(p.salesperson_name) || '-'}</td>
               <td class="text-end">$${(p.estimated_amount || 0).toLocaleString()}</td>
               <td>${p.win_probability !== null && p.win_probability !== undefined ? (WIN_PROBABILITY_STAGES[p.win_probability] ? WIN_PROBABILITY_STAGES[p.win_probability] + ' ' : '') + p.win_probability + '%' : '-'}</td>
               <td>${p.expected_close_year_month || '-'}</td>

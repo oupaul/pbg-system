@@ -1,16 +1,22 @@
+<%
+  // 公司名稱、客戶編號、商機名稱皆為自由文字欄位，輸出前需跳脫，避免儲存型 XSS
+  function escapeHtml(str) {
+    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+%>
 <%- include('../layout', { body: `
 <div class="row mb-4">
   <div class="col">
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb mb-0">
         <li class="breadcrumb-item"><a href="/customers">客戶與廠商管理</a></li>
-        <li class="breadcrumb-item active">${customer.company_name}</li>
+        <li class="breadcrumb-item active">${escapeHtml(customer.company_name)}</li>
       </ol>
     </nav>
     <h1 class="h3 mt-2">
-      ${customer.company_name}
+      ${escapeHtml(customer.company_name)}
       <span class="badge bg-${customer.party_type === '廠商' ? 'dark' : customer.party_type === '兩者皆是' ? 'primary' : 'info'} align-middle">${customer.party_type || '客戶'}</span>
-      ${customer.vendor_type ? '<span class="badge bg-secondary align-middle">' + customer.vendor_type + '</span>' : ''}
+      ${customer.vendor_type ? '<span class="badge bg-secondary align-middle">' + escapeHtml(customer.vendor_type) + '</span>' : ''}
       ${customer.customer_level ? '<span class="badge bg-' + (customer.customer_level === 'A' ? 'success' : customer.customer_level === 'B' ? 'warning' : 'secondary') + ' align-middle">' + customer.customer_level + '級</span>' : ''}
       <span class="badge bg-${customer.status === '往來中' ? 'success' : customer.status === '暫停往來' ? 'warning' : 'secondary'} align-middle">${customer.status || '往來中'}</span>
     </h1>
@@ -37,7 +43,7 @@ ${success ? `
     <div class="card">
       <div class="card-body">
         <h6 class="text-muted">客戶編號</h6>
-        <p class="fs-5 mb-0"><code>${customer.customer_code}</code></p>
+        <p class="fs-5 mb-0"><code>${escapeHtml(customer.customer_code)}</code></p>
       </div>
     </div>
   </div>
@@ -136,8 +142,8 @@ ${success ? `
         <tbody>
           ${pipelines.map(p => `
             <tr onclick="location.href='/pipelines/${p.id}'" style="cursor:pointer">
-              <td>${p.opportunity_name}</td>
-              <td>${p.salesperson_name || '-'}</td>
+              <td>${escapeHtml(p.opportunity_name)}</td>
+              <td>${escapeHtml(p.salesperson_name) || '-'}</td>
               <td class="text-end">$${(p.estimated_amount || 0).toLocaleString()}</td>
               <td>${p.expected_close_year_month || '-'}</td>
               <td><span class="badge bg-${p.status === '已成交' ? 'success' : p.status === '已流失' ? 'secondary' : 'warning'}">${p.status}</span></td>
@@ -187,7 +193,7 @@ ${success ? `
           <div>
             <span class="badge bg-${a.activity_type === '客訴' ? 'danger' : a.activity_type === '拜訪' ? 'primary' : a.activity_type === '電話' ? 'info' : 'secondary'} me-2">${a.activity_type}</span>
             <span>${a.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
-            <div class="text-muted small mt-1">${a.activity_date} · ${a.created_by || 'system'}${a.opportunity_name ? ' · 商機：' + a.opportunity_name : ''}</div>
+            <div class="text-muted small mt-1">${a.activity_date} · ${escapeHtml(a.created_by) || 'system'}${a.opportunity_name ? ' · 商機：' + escapeHtml(a.opportunity_name) : ''}</div>
           </div>
           ${deleteControl}
         </li>
@@ -221,7 +227,7 @@ ${locals.canEditCrm ? `
         </div>
         <div class="col-md-4">
           <label class="form-label">客戶編號</label>
-          <input type="text" name="customer_code" class="form-control" value="${customer.customer_code}" required>
+          <input type="text" name="customer_code" class="form-control" value="${(customer.customer_code || '').replace(/"/g, '&quot;')}" required>
         </div>
         <div class="col-md-4">
           <label class="form-label">統一編號</label>
@@ -229,7 +235,7 @@ ${locals.canEditCrm ? `
         </div>
         <div class="col-md-4">
           <label class="form-label">公司名稱</label>
-          <input type="text" name="company_name" class="form-control" value="${customer.company_name}" required>
+          <input type="text" name="company_name" class="form-control" value="${(customer.company_name || '').replace(/"/g, '&quot;')}" required>
         </div>
         <div class="col-md-4">
           <label class="form-label">客戶關係負責人（使用者）</label>

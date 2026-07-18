@@ -4,7 +4,7 @@
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb mb-0">
         <li class="breadcrumb-item"><a href="/pipelines">銷售機會管理</a></li>
-        <li class="breadcrumb-item"><a href="/pipelines/${pipeline.id}">${pipeline.opportunity_name}</a></li>
+        <li class="breadcrumb-item"><a href="/pipelines/${pipeline.id}">${(pipeline.opportunity_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</a></li>
         <li class="breadcrumb-item active">轉入專案</li>
       </ol>
     </nav>

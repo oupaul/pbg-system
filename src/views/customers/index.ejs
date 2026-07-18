@@ -14,6 +14,10 @@
       .join('&');
     return '/customers' + (qs ? '?' + qs : '');
   }
+  // 客戶編號、公司名稱皆為自由文字欄位，輸出前需跳脫，避免儲存型 XSS
+  function escapeHtml(str) {
+    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
 %>
 <%- include('../layout', { body: `
 <div class="row mb-4">
@@ -71,7 +75,7 @@ ${typeof success !== 'undefined' && success ? `
             name="search" 
             class="form-control" 
             placeholder="搜尋客戶編號、統一編號或公司名稱..." 
-            value="${(typeof searchKeyword !== 'undefined' ? searchKeyword : '') || ''}"
+            value="${((typeof searchKeyword !== 'undefined' ? searchKeyword : '') || '').replace(/"/g, '&quot;')}"
             autocomplete="off"
           >
         </div>
@@ -89,12 +93,12 @@ ${typeof success !== 'undefined' && success ? `
         </div>
       </div>
       ${(typeof searchKeyword !== 'undefined' && searchKeyword && req && req.query) ? `
-        <input type="hidden" name="sortBy" value="${req.query.sortBy || 'company_name'}">
-        <input type="hidden" name="sortOrder" value="${req.query.sortOrder || 'ASC'}">
+        <input type="hidden" name="sortBy" value="${(req.query.sortBy || 'company_name').replace(/"/g, '&quot;')}">
+        <input type="hidden" name="sortOrder" value="${(req.query.sortOrder || 'ASC').replace(/"/g, '&quot;')}">
       ` : ''}
-      ${statusFilter ? '<input type="hidden" name="status" value="' + statusFilter + '">' : ''}
-      ${partyTypeFilter ? '<input type="hidden" name="party_type" value="' + partyTypeFilter + '">' : ''}
-      ${vendorTypeFilter ? '<input type="hidden" name="vendor_type" value="' + vendorTypeFilter + '">' : ''}
+      ${statusFilter ? '<input type="hidden" name="status" value="' + statusFilter.replace(/"/g, '&quot;') + '">' : ''}
+      ${partyTypeFilter ? '<input type="hidden" name="party_type" value="' + partyTypeFilter.replace(/"/g, '&quot;') + '">' : ''}
+      ${vendorTypeFilter ? '<input type="hidden" name="vendor_type" value="' + vendorTypeFilter.replace(/"/g, '&quot;') + '">' : ''}
     </form>
   </div>
 </div>
@@ -161,22 +165,22 @@ ${typeof success !== 'undefined' && success ? `
           ${(!customers || customers.length === 0) ? `
             <tr>
               <td colspan="10" class="text-center text-muted py-3">
-                ${(typeof searchKeyword !== 'undefined' && searchKeyword) ? `找不到符合「<strong>${searchKeyword}</strong>」的客戶` : '尚無客戶'}
+                ${(typeof searchKeyword !== 'undefined' && searchKeyword) ? `找不到符合「<strong>${escapeHtml(searchKeyword)}</strong>」的客戶` : '尚無客戶'}
               </td>
             </tr>
           ` : (customers || []).map(c => `
             <tr onclick="location.href='/customers/${c.id}'" style="cursor:pointer">
-              <td><code>${c.customer_code || ''}</code></td>
-              <td>${c.tax_id || '-'}</td>
-              <td style="white-space: nowrap;"><strong>${c.company_name || ''}</strong></td>
+              <td><code>${escapeHtml(c.customer_code) || ''}</code></td>
+              <td>${escapeHtml(c.tax_id) || '-'}</td>
+              <td style="white-space: nowrap;"><strong>${escapeHtml(c.company_name) || ''}</strong></td>
               <td class="text-center">${c.project_count || 0}</td>
               <td class="text-end">$${(c.total_project_amount || 0).toLocaleString()}</td>
               <td>
                 <span class="badge bg-${c.party_type === '廠商' ? 'dark' : c.party_type === '兩者皆是' ? 'primary' : 'info'}">${c.party_type || '客戶'}</span>
-                ${c.vendor_type ? '<span class="badge bg-secondary">' + c.vendor_type + '</span>' : ''}
+                ${c.vendor_type ? '<span class="badge bg-secondary">' + escapeHtml(c.vendor_type) + '</span>' : ''}
               </td>
-              <td>${c.owner_salesperson_name || '-'}</td>
-              <td>${c.salesperson_names || '-'}</td>
+              <td>${escapeHtml(c.owner_salesperson_name) || '-'}</td>
+              <td>${escapeHtml(c.salesperson_names) || '-'}</td>
               <td class="text-center">${c.customer_level ? '<span class="badge bg-' + (c.customer_level === 'A' ? 'success' : c.customer_level === 'B' ? 'warning' : 'secondary') + '">' + c.customer_level + '</span>' : '-'}</td>
               <td><span class="badge bg-${c.status === '往來中' ? 'success' : c.status === '暫停往來' ? 'warning' : 'secondary'}">${c.status || '往來中'}</span></td>
             </tr>
@@ -186,7 +190,7 @@ ${typeof success !== 'undefined' && success ? `
     </div>
   </div>
   <div class="card-footer text-muted">
-    ${(typeof searchKeyword !== 'undefined' && searchKeyword) ? `搜尋「<strong>${searchKeyword}</strong>」結果：共 ${(customers || []).length} 筆` : `共 ${(customers || []).length} 筆`}
+    ${(typeof searchKeyword !== 'undefined' && searchKeyword) ? `搜尋「<strong>${escapeHtml(searchKeyword)}</strong>」結果：共 ${(customers || []).length} 筆` : `共 ${(customers || []).length} 筆`}
   </div>
 </div>
 

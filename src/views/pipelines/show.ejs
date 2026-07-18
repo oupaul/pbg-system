@@ -1,6 +1,10 @@
 <%
   // 成交機率固定對應銷售階段名稱，供顯示用
   const WIN_PROBABILITY_STAGES = { 10: '初步接洽', 30: '需求分析', 50: '提案報價', 100: '商務談判' };
+  // 商機名稱、客戶/業務姓名皆為自由文字欄位，輸出前需跳脫，避免儲存型 XSS
+  function escapeHtml(str) {
+    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
 %>
 <%- include('../layout', { body: `
 <div class="row mb-4">
@@ -8,11 +12,11 @@
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb mb-0">
         <li class="breadcrumb-item"><a href="/pipelines">銷售機會管理</a></li>
-        <li class="breadcrumb-item active">${pipeline.opportunity_name}</li>
+        <li class="breadcrumb-item active">${escapeHtml(pipeline.opportunity_name)}</li>
       </ol>
     </nav>
     <h1 class="h3 mt-2">
-      ${pipeline.opportunity_name}
+      ${escapeHtml(pipeline.opportunity_name)}
       <span class="badge bg-${pipeline.status === '已成交' ? 'success' : pipeline.status === '已流失' ? 'secondary' : 'warning'} align-middle">${pipeline.status}</span>
       ${pipeline.converted_project_id ? '<span class="badge bg-info align-middle">已轉入專案</span>' : ''}
     </h1>
@@ -47,7 +51,7 @@ ${pendingDeletion ? `
     <div class="card">
       <div class="card-body">
         <h6 class="text-muted">客戶</h6>
-        <p class="fs-5 mb-0"><a href="/customers/${pipeline.customer_id}">${pipeline.customer_name || '-'}</a></p>
+        <p class="fs-5 mb-0"><a href="/customers/${pipeline.customer_id}">${escapeHtml(pipeline.customer_name) || '-'}</a></p>
       </div>
     </div>
   </div>
@@ -55,7 +59,7 @@ ${pendingDeletion ? `
     <div class="card">
       <div class="card-body">
         <h6 class="text-muted">業務人員</h6>
-        <p class="fs-5 mb-0">${pipeline.salesperson_name || '-'}</p>
+        <p class="fs-5 mb-0">${escapeHtml(pipeline.salesperson_name) || '-'}</p>
       </div>
     </div>
   </div>
