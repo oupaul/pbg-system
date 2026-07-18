@@ -64,34 +64,71 @@ ${error ? `
           <input type="text" name="opportunity_name" class="form-control" value="${pipeline ? (pipeline.opportunity_name || '').replace(/"/g, '&quot;') : ''}" required>
         </div>
 
-        <div class="col-md-4">
-          <label class="form-label">預估專案類型</label>
-          <select name="project_type" class="form-select">
-            <option value="">-- 選擇類型 --</option>
-            ${projectTypes.map(type => {
-              const selected = pipeline && pipeline.project_type === type.type_name ? 'selected' : '';
-              return '<option value="' + type.type_name + '" ' + selected + '>' + type.type_name + '</option>';
-            }).join('')}
-          </select>
+        <div class="col-md-6">
+          <label class="form-label">預估專案類型 <span class="text-danger">*</span></label>
+          <div class="border rounded p-2">
+            ${projectTypes.length ? projectTypes.map(type => {
+              const selectedTypes = pipeline && pipeline.project_type ? pipeline.project_type.split(',').map(t => t.trim()) : [];
+              const checked = selectedTypes.includes(type.type_name) ? 'checked' : '';
+              const safeName = (type.type_name || '').replace(/"/g, '&quot;');
+              return '<div class="form-check form-check-inline"><input class="form-check-input pipeline-project-type" type="checkbox" name="project_type" value="' + safeName + '" id="ptype_' + type.id + '" ' + checked + '><label class="form-check-label" for="ptype_' + type.id + '">' + type.type_name + '</label></div>';
+            }).join('') : '<span class="text-muted small">尚無可選類型，請先於「專案類型管理」新增</span>'}
+          </div>
+          <small class="form-text text-muted">可複選，至少選擇一項</small>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
           <label class="form-label">預估金額</label>
           <div class="input-group">
             <span class="input-group-text">$</span>
             <input type="number" name="estimated_amount" class="form-control" value="${pipeline ? (pipeline.estimated_amount || 0) : 0}" step="1" min="0">
           </div>
         </div>
-        <div class="col-md-4">
-          <label class="form-label">預計成交月份</label>
-          <input type="month" name="expected_close_year_month" class="form-control" value="${pipeline ? (pipeline.expected_close_year_month || '') : ''}">
+        <div class="col-md-3">
+          <label class="form-label">成交機率 <span class="text-danger">*</span></label>
+          <select name="win_probability" class="form-select" required>
+            <option value="">-- 選擇機率 --</option>
+            ${[10, 30, 50, 70, 90, 100].map(pct => {
+              const selected = pipeline && pipeline.win_probability !== null && pipeline.win_probability !== undefined && Number(pipeline.win_probability) === pct ? 'selected' : '';
+              return '<option value="' + pct + '" ' + selected + '>' + pct + '%</option>';
+            }).join('')}
+          </select>
         </div>
 
-        <div class="col-md-4">
-          <label class="form-label">成交機率</label>
-          <div class="input-group">
-            <input type="number" name="win_probability" class="form-control" value="${pipeline && pipeline.win_probability !== null && pipeline.win_probability !== undefined ? pipeline.win_probability : ''}" min="0" max="100">
-            <span class="input-group-text">%</span>
+        <div class="col-md-6">
+          <label class="form-label">預計成交月份 <span class="text-danger">*</span></label>
+          <div class="row g-2">
+            <div class="col-auto">
+              <select class="form-select" id="closeYear">
+                <option value="">--年--</option>
+                ${(() => {
+                  const currentYear = new Date().getFullYear();
+                  const existing = pipeline ? (pipeline.expected_close_year_month || '') : '';
+                  const selectedYear = existing ? existing.split('-')[0] : '';
+                  let options = '';
+                  for (let y = currentYear - 1; y <= currentYear + 3; y++) {
+                    options += '<option value="' + y + '"' + (String(selectedYear) === String(y) ? ' selected' : '') + '>' + y + '年</option>';
+                  }
+                  return options;
+                })()}
+              </select>
+            </div>
+            <div class="col-auto">
+              <select class="form-select" id="closeMonth">
+                <option value="">--月--</option>
+                ${(() => {
+                  const existing = pipeline ? (pipeline.expected_close_year_month || '') : '';
+                  const selectedMonth = existing ? existing.split('-')[1] : '';
+                  let options = '';
+                  for (let m = 1; m <= 12; m++) {
+                    const monthStr = String(m).padStart(2, '0');
+                    options += '<option value="' + monthStr + '"' + (selectedMonth === monthStr ? ' selected' : '') + '>' + m + '月</option>';
+                  }
+                  return options;
+                })()}
+              </select>
+            </div>
           </div>
+          <input type="hidden" name="expected_close_year_month" id="expectedCloseYearMonth" value="${pipeline ? (pipeline.expected_close_year_month || '') : ''}">
         </div>
 
         <div class="col-12">
@@ -113,6 +150,35 @@ ${error ? `
     </form>
   </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const closeYear = document.getElementById('closeYear');
+  const closeMonth = document.getElementById('closeMonth');
+  const hiddenYearMonth = document.getElementById('expectedCloseYearMonth');
+  const pipelineForm = document.querySelector('form[action="${action}"]');
+
+  if (pipelineForm) {
+    pipelineForm.addEventListener('submit', function(e) {
+      const year = closeYear.value;
+      const month = closeMonth.value;
+      if (!year || !month) {
+        e.preventDefault();
+        alert('請選擇完整的預計成交年份與月份');
+        return false;
+      }
+      hiddenYearMonth.value = year + '-' + month;
+
+      const anyTypeChecked = document.querySelectorAll('.pipeline-project-type:checked').length > 0;
+      if (!anyTypeChecked) {
+        e.preventDefault();
+        alert('請至少選擇一項預估專案類型');
+        return false;
+      }
+    });
+  }
+});
+</script>
 
 ${!pipeline ? `
 <!-- 快速新增客戶/廠商 Modal -->
@@ -218,7 +284,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const result = await response.json();
 
-        if (result.success) {
+        if (result.success && result.pending) {
+          // 非管理員/專案管理員送出的申請，尚未真正建立客戶，無法立即選用
+          quickAddModal.hide();
+          if (typeof showToast === 'function') {
+            showToast(result.message || '已送出審核申請，待核准後才會建立', 'warning');
+          } else {
+            alert(result.message || '已送出審核申請，待核准後才會建立');
+          }
+        } else if (result.success) {
           const customer = result.customer;
           const displayText = customer.company_name + ' (' + customer.customer_code + ')';
           const newOption = new Option(displayText, customer.id, true, true);

@@ -74,6 +74,17 @@ ${pendingDeletion ? `
   <div class="col-md-3">
     <div class="card">
       <div class="card-body">
+        <h6 class="text-muted">預估專案類型</h6>
+        <p class="fs-5 mb-0">${(pipeline.project_type || '').split(',').map(t => t.trim()).filter(Boolean).map(t => {
+          const typeColor = (typeof typeColorMap !== 'undefined' && typeColorMap[t]) ? typeColorMap[t] : 'info';
+          return '<span class="badge bg-' + typeColor + ' me-1">' + t + '</span>';
+        }).join('') || '-'}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
         <h6 class="text-muted">預計成交月份 / 機率</h6>
         <p class="fs-5 mb-0">${pipeline.expected_close_year_month || '-'} ${pipeline.win_probability !== null && pipeline.win_probability !== undefined ? '(' + pipeline.win_probability + '%)' : ''}</p>
       </div>

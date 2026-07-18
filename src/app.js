@@ -177,6 +177,8 @@ try {
   console.log('[啟動] ✓ pipelines 路由載入完成');
   const deletionRequestRoutes = require('./routes/deletionRequests');
   console.log('[啟動] ✓ deletionRequests 路由載入完成');
+  const customerApprovalRoutes = require('./routes/customerApprovals');
+  console.log('[啟動] ✓ customerApprovals 路由載入完成');
 
   // 認證路由（不需要登入）- 必須在其他路由之前
   // authRoutes 內部已經定義了 /login 和 /logout 路徑
@@ -193,6 +195,7 @@ try {
   app.use('/customers', requireAuth, customerRoutes);
   app.use('/pipelines', requireAuth, pipelineRoutes);
   app.use('/deletion-requests', requireAuth, deletionRequestRoutes);
+  app.use('/customer-approvals', requireAuth, customerApprovalRoutes);
   app.use('/import-export', requireAuth, requireImportExport, importExportRoutes(upload));
   app.use('/audit-logs', requireAuth, auditLogRoutes);
   app.use('/users', requireAuth, userRoutes);

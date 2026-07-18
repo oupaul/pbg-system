@@ -3,6 +3,17 @@ const AuditLogService = require('../services/AuditLogService');
 const Project = require('./Project');
 const { PROJECT_VIEW_SCOPE, ROLES } = require('../constants');
 
+// 預估專案類型支援複選：checkbox 同名欄位在 express (qs extended) 底下，
+// 勾選多個時 req.body.project_type 會是陣列，勾選一個時是字串，都正規化成逗號分隔字串儲存
+function normalizeProjectTypes(value) {
+  if (Array.isArray(value)) {
+    const cleaned = value.map(v => String(v).trim()).filter(Boolean);
+    return cleaned.length ? cleaned.join(',') : null;
+  }
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  return null;
+}
+
 // 與 Project.js 相同的權限範圍過濾邏輯，Pipeline 沿用同一套角色設定
 function getAssignedSalespersonIds(userId) {
   try {
@@ -25,19 +36,23 @@ const Pipeline = {
       const scope = user.project_view_scope ||
         (user.role === ROLES.SALESPERSON ? PROJECT_VIEW_SCOPE.OWN : PROJECT_VIEW_SCOPE.ALL);
 
+      // 除了依業務員範圍過濾外，商機的「負責人員」本人一律看得到自己在追蹤的商機，
+      // 避免商機沒有指定業務人員（salesperson_id 為 NULL）時，連建立者/負責人員自己都看不到
       if (scope === PROJECT_VIEW_SCOPE.OWN && user.salesperson_id) {
-        conditions += ` AND p.salesperson_id = ?`;
-        params.push(user.salesperson_id);
+        conditions += ` AND (p.salesperson_id = ? OR p.owner_user_id = ?)`;
+        params.push(user.salesperson_id, user.id);
       } else if (scope === PROJECT_VIEW_SCOPE.ASSIGNED) {
         const ids = getAssignedSalespersonIds(user.id);
         if (ids.length > 0) {
-          conditions += ` AND p.salesperson_id IN (${ids.map(() => '?').join(',')})`;
-          params.push(...ids);
+          conditions += ` AND (p.salesperson_id IN (${ids.map(() => '?').join(',')}) OR p.owner_user_id = ?)`;
+          params.push(...ids, user.id);
         } else {
-          conditions += ` AND 1=0`;
+          conditions += ` AND p.owner_user_id = ?`;
+          params.push(user.id);
         }
       } else if (scope === PROJECT_VIEW_SCOPE.NONE) {
-        conditions += ` AND 1=0`;
+        conditions += ` AND p.owner_user_id = ?`;
+        params.push(user.id);
       }
     }
 
@@ -81,6 +96,11 @@ const Pipeline = {
   create(data) {
     if (!data.customer_id) throw new Error('客戶為必填欄位');
     if (!data.opportunity_name || !data.opportunity_name.trim()) throw new Error('商機名稱為必填欄位');
+    if (!normalizeProjectTypes(data.project_type)) throw new Error('預估專案類型為必填欄位，請至少選擇一項');
+    if (data.win_probability === undefined || data.win_probability === null || data.win_probability === '') {
+      throw new Error('成交機率為必填欄位');
+    }
+    if (!data.expected_close_year_month) throw new Error('預計成交月份為必填欄位');
 
     const stmt = db.prepare(`
       INSERT INTO pipelines (
@@ -94,7 +114,7 @@ const Pipeline = {
       data.salesperson_id ? parseInt(data.salesperson_id) : null,
       data.owner_user_id ? parseInt(data.owner_user_id) : null,
       data.opportunity_name.trim(),
-      data.project_type || null,
+      normalizeProjectTypes(data.project_type),
       data.estimated_amount !== undefined && data.estimated_amount !== null ? parseFloat(data.estimated_amount) : 0,
       data.win_probability !== undefined && data.win_probability !== null && data.win_probability !== ''
         ? parseInt(data.win_probability) : null,
@@ -111,6 +131,17 @@ const Pipeline = {
     const oldRecord = this.findById(id);
     if (!oldRecord) return false;
 
+    // 這三項欄位由表單一次整包送出（非部分更新），視為必填欄位驗證
+    if (data.project_type !== undefined && !normalizeProjectTypes(data.project_type)) {
+      throw new Error('預估專案類型為必填欄位，請至少選擇一項');
+    }
+    if (data.win_probability !== undefined && (data.win_probability === null || data.win_probability === '')) {
+      throw new Error('成交機率為必填欄位');
+    }
+    if (data.expected_close_year_month !== undefined && !data.expected_close_year_month) {
+      throw new Error('預計成交月份為必填欄位');
+    }
+
     const fields = [];
     const values = [];
 
@@ -119,7 +150,7 @@ const Pipeline = {
     if (data.salesperson_id !== undefined) setField('salesperson_id', data.salesperson_id ? parseInt(data.salesperson_id) : null);
     if (data.owner_user_id !== undefined) setField('owner_user_id', data.owner_user_id ? parseInt(data.owner_user_id) : null);
     if (data.opportunity_name !== undefined) setField('opportunity_name', data.opportunity_name.trim());
-    if (data.project_type !== undefined) setField('project_type', data.project_type || null);
+    if (data.project_type !== undefined) setField('project_type', normalizeProjectTypes(data.project_type));
     if (data.estimated_amount !== undefined) setField('estimated_amount', parseFloat(data.estimated_amount) || 0);
     if (data.win_probability !== undefined) {
       setField('win_probability', data.win_probability !== '' && data.win_probability !== null ? parseInt(data.win_probability) : null);

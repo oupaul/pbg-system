@@ -42,10 +42,15 @@ ${error ? `
           <label class="form-label">專案類型 <span class="text-danger">*</span></label>
           <select name="project_type" class="form-select" required>
             <option value="">-- 選擇類型 --</option>
-            ${projectTypes.map(type => {
-              const selected = pipeline.project_type === type.type_name ? 'selected' : '';
-              return '<option value="' + type.type_name + '" ' + selected + '>' + type.type_name + '</option>';
-            }).join('')}
+            ${(() => {
+              // 商機的「預估專案類型」可能是逗號分隔的複選值，轉入專案時仍只能選一個實際類型，
+              // 若估計類型中恰好只包含一項可選類型則預選，多項則交由使用者自行確認選擇
+              const estimatedTypes = (pipeline.project_type || '').split(',').map(t => t.trim()).filter(Boolean);
+              return projectTypes.map(type => {
+                const selected = estimatedTypes.length === 1 && estimatedTypes[0] === type.type_name ? 'selected' : '';
+                return '<option value="' + type.type_name + '" ' + selected + '>' + type.type_name + '</option>';
+              }).join('');
+            })()}
           </select>
         </div>
 

@@ -5,10 +5,17 @@ const Project = require('../models/Project');
 const Pipeline = require('../models/Pipeline');
 const Activity = require('../models/Activity');
 const DeletionRequest = require('../models/DeletionRequest');
+const CustomerCreationRequest = require('../models/CustomerCreationRequest');
 const User = require('../models/User');
 const db = require('../models/db');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireCrmEditPermission } = require('../middleware/auth');
+
+// 新增客戶/廠商是否需要送審：僅系統管理員（admin）與專案管理員（user）可直接建立，
+// 其餘角色（業務員、自訂角色等）一律先送審，核准後才會真正進入系統
+function canCreateCustomerDirectly(user) {
+  return !!(user && (user.role === 'admin' || user.role === 'user'));
+}
 
 // 客戶列表
 router.get('/', (req, res) => {
@@ -27,8 +34,8 @@ router.get('/', (req, res) => {
 
     // 客戶/廠商資料對所有登入者開放（僅專案依權限範圍過濾），根據是否有搜尋關鍵字決定使用哪個方法
     let customers = searchKeyword
-      ? Customer.search(searchKeyword, { status: statusFilter, party_type: partyTypeFilter, vendor_type: vendorTypeFilter })
-      : Customer.findAll({ status: statusFilter, party_type: partyTypeFilter, vendor_type: vendorTypeFilter });
+      ? Customer.search(searchKeyword, { status: statusFilter, party_type: partyTypeFilter, vendor_type: vendorTypeFilter }, req.user)
+      : Customer.findAll({ status: statusFilter, party_type: partyTypeFilter, vendor_type: vendorTypeFilter }, req.user);
     
     // 確保 customers 是陣列
     if (!Array.isArray(customers)) {
@@ -41,6 +48,8 @@ router.get('/', (req, res) => {
       'tax_id': 'tax_id',
       'company_name': 'company_name',
       'project_count': 'project_count',
+      'total_project_amount': 'total_project_amount',
+      'salesperson_names': 'salesperson_names',
       'party_type': 'party_type',
       'owner_salesperson_name': 'owner_salesperson_name',
       'customer_level': 'customer_level',
@@ -108,6 +117,8 @@ router.get('/', (req, res) => {
       tax_id: getSortLink('tax_id'),
       company_name: getSortLink('company_name'),
       project_count: getSortLink('project_count'),
+      total_project_amount: getSortLink('total_project_amount'),
+      salesperson_names: getSortLink('salesperson_names'),
       party_type: getSortLink('party_type'),
       owner_salesperson_name: getSortLink('owner_salesperson_name'),
       customer_level: getSortLink('customer_level'),
@@ -119,6 +130,8 @@ router.get('/', (req, res) => {
       tax_id: getSortIcon('tax_id'),
       company_name: getSortIcon('company_name'),
       project_count: getSortIcon('project_count'),
+      total_project_amount: getSortIcon('total_project_amount'),
+      salesperson_names: getSortIcon('salesperson_names'),
       party_type: getSortIcon('party_type'),
       owner_salesperson_name: getSortIcon('owner_salesperson_name'),
       customer_level: getSortIcon('customer_level'),
@@ -136,7 +149,8 @@ router.get('/', (req, res) => {
       vendorTypeFilter,
       staffUsers: User.findActive(),
       req: req,
-      error: req.query.error || ''
+      error: req.query.error || '',
+      success: req.query.success || ''
     });
   } catch (err) {
     console.error('客戶列表錯誤:', err);
@@ -150,8 +164,27 @@ router.get('/', (req, res) => {
 });
 
 // 快速新增客戶/廠商（API，返回 JSON）
-router.post('/quick-add', (req, res) => {
+// 非管理員/專案管理員送出的申請不會直接建立客戶，而是進入審核佇列
+router.post('/quick-add', requireCrmEditPermission, (req, res) => {
   try {
+    if (!canCreateCustomerDirectly(req.user)) {
+      CustomerCreationRequest.create({
+        customer_code: req.body.customer_code,
+        tax_id: req.body.tax_id,
+        company_name: req.body.company_name,
+        is_new_customer: req.body.is_new_customer === '1',
+        party_type: req.body.party_type,
+        vendor_type: req.body.vendor_type,
+        requested_by: req.user.id,
+        requested_by_name: getUserInfo(req)
+      });
+      return res.json({
+        success: true,
+        pending: true,
+        message: '已送出審核申請，待專案管理員或系統管理員核准後才會建立此客戶/廠商'
+      });
+    }
+
     const customerId = Customer.create({
       customer_code: req.body.customer_code,
       tax_id: req.body.tax_id,
@@ -186,9 +219,10 @@ router.post('/quick-add', (req, res) => {
 });
 
 // 新增客戶（傳統表單提交）
+// 非管理員/專案管理員送出的申請不會直接建立客戶，而是進入審核佇列，待核准後才會真正進入系統
 router.post('/', requireCrmEditPermission, (req, res) => {
   try {
-    Customer.create({
+    const customerData = {
       customer_code: req.body.customer_code,
       tax_id: req.body.tax_id,
       company_name: req.body.company_name,
@@ -204,9 +238,19 @@ router.post('/', requireCrmEditPermission, (req, res) => {
       vendor_type: req.body.vendor_type,
       bank_name: req.body.bank_name,
       bank_account: req.body.bank_account,
-      address: req.body.address,
-      userInfo: getUserInfo(req)
-    });
+      address: req.body.address
+    };
+
+    if (!canCreateCustomerDirectly(req.user)) {
+      CustomerCreationRequest.create({
+        ...customerData,
+        requested_by: req.user.id,
+        requested_by_name: getUserInfo(req)
+      });
+      return res.redirect('/customers?success=' + encodeURIComponent('已送出新增申請，待專案管理員或系統管理員核准後才會建立此客戶/廠商'));
+    }
+
+    Customer.create({ ...customerData, userInfo: getUserInfo(req) });
     res.redirect('/customers');
   } catch (err) {
     console.error(err);

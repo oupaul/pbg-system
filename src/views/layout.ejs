@@ -69,6 +69,17 @@
           </li>
           <% } %>
 
+          <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user')) { %>
+          <li class="nav-item">
+            <a class="nav-link <%= navActive('/customer-approvals') %>" href="/customer-approvals">
+              <i class="bi bi-person-check"></i> 客戶審核
+              <% if (typeof pendingCustomerApprovalCount !== 'undefined' && pendingCustomerApprovalCount > 0) { %>
+                <span class="badge bg-danger"><%= pendingCustomerApprovalCount %></span>
+              <% } %>
+            </a>
+          </li>
+          <% } %>
+
           <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user' || user.role === 'boss')) { %>
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle <%= navGroupActive(['/bonuses', '/sales-performance', '/salespeople', '/recent-payments']) %>" href="#" id="salesGroupDropdown" role="button" data-bs-toggle="dropdown">

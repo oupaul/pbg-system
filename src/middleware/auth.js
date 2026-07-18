@@ -170,6 +170,17 @@ const setUserPermissions = (req, res, next) => {
         res.locals.pendingDeletionCount = 0;
       }
     }
+
+    // 新客戶/廠商審核：僅系統管理員（admin）與專案管理員（user）能核准，才需要看到待審核數量
+    if (req.user.role === ROLES.ADMIN || req.user.role === ROLES.USER) {
+      try {
+        const db = require('../models/db');
+        const row = db.prepare(`SELECT COUNT(*) as count FROM customer_creation_requests WHERE request_status = 'pending'`).get();
+        res.locals.pendingCustomerApprovalCount = row ? row.count : 0;
+      } catch {
+        res.locals.pendingCustomerApprovalCount = 0;
+      }
+    }
   }
   next();
 };

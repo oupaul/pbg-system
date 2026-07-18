@@ -23,6 +23,16 @@ function getActiveProjectTypes() {
   }
 }
 
+// 類型顏色對照表（比照 projects/gross-profit 頁面的做法，來源為專案類型管理設定的 badge_color）
+function getTypeColorMap() {
+  const typeColorMap = {};
+  try {
+    const types = db.prepare('SELECT type_name, badge_color FROM project_types').all();
+    types.forEach(t => { if (t.badge_color) typeColorMap[t.type_name] = t.badge_color; });
+  } catch (e) { /* ignore */ }
+  return typeColorMap;
+}
+
 // 潛在商機列表
 router.get('/', (req, res) => {
   try {
@@ -33,6 +43,7 @@ router.get('/', (req, res) => {
       title: '潛在商機',
       pipelines: pipelines || [],
       statusFilter: status,
+      typeColorMap: getTypeColorMap(),
       error: req.query.error || ''
     });
   } catch (err) {
@@ -66,7 +77,8 @@ router.post('/', requireCrmEditPermission, (req, res) => {
     const id = Pipeline.create({
       customer_id: req.body.customer_id,
       salesperson_id: req.body.salesperson_id || null,
-      owner_user_id: req.body.owner_user_id || null,
+      // 未指定負責人員時，預設為建立者本人，確保商機至少對建立者自己可見
+      owner_user_id: req.body.owner_user_id || req.user.id,
       opportunity_name: req.body.opportunity_name,
       project_type: req.body.project_type || null,
       estimated_amount: req.body.estimated_amount,
@@ -97,6 +109,7 @@ router.get('/:id', (req, res) => {
     pipeline,
     convertedProject,
     pendingDeletion,
+    typeColorMap: getTypeColorMap(),
     error: req.query.error || '',
     success: req.query.success || ''
   });

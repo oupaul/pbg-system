@@ -36,6 +36,13 @@ ${error ? `
   </div>
 ` : ''}
 
+${typeof success !== 'undefined' && success ? `
+  <div class="alert alert-success alert-dismissible fade show" role="alert">
+    <i class="bi bi-check-circle"></i> ${success}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
 <div class="mb-3 party-type-tree">
   <div class="tree-row">
     <a href="${buildFilterLink({ party_type: '', vendor_type: '' })}" class="btn btn-sm ${!partyTypeFilter ? 'btn-primary' : 'btn-outline-primary'}">全部類型</a>
@@ -108,7 +115,7 @@ ${error ? `
                 統一編號${(sortIcons && sortIcons.tax_id) || ''}
               </a>
             </th>
-            <th>
+            <th style="width: 180px;">
               <a href="?${(sortLinks && sortLinks.company_name) || ''}" class="text-white text-decoration-none">
                 公司名稱${(sortIcons && sortIcons.company_name) || ''}
               </a>
@@ -116,6 +123,11 @@ ${error ? `
             <th class="text-center">
               <a href="?${(sortLinks && sortLinks.project_count) || ''}" class="text-white text-decoration-none">
                 專案數${(sortIcons && sortIcons.project_count) || ''}
+              </a>
+            </th>
+            <th class="text-end">
+              <a href="?${(sortLinks && sortLinks.total_project_amount) || ''}" class="text-white text-decoration-none">
+                專案金額${(sortIcons && sortIcons.total_project_amount) || ''}
               </a>
             </th>
             <th>
@@ -126,6 +138,11 @@ ${error ? `
             <th>
               <a href="?${(sortLinks && sortLinks.owner_salesperson_name) || ''}" class="text-white text-decoration-none">
                 接洽人員${(sortIcons && sortIcons.owner_salesperson_name) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.salesperson_names) || ''}" class="text-white text-decoration-none">
+                所屬業務人員${(sortIcons && sortIcons.salesperson_names) || ''}
               </a>
             </th>
             <th class="text-center">
@@ -143,7 +160,7 @@ ${error ? `
         <tbody>
           ${(!customers || customers.length === 0) ? `
             <tr>
-              <td colspan="8" class="text-center text-muted py-3">
+              <td colspan="10" class="text-center text-muted py-3">
                 ${(typeof searchKeyword !== 'undefined' && searchKeyword) ? `找不到符合「<strong>${searchKeyword}</strong>」的客戶` : '尚無客戶'}
               </td>
             </tr>
@@ -151,13 +168,15 @@ ${error ? `
             <tr onclick="location.href='/customers/${c.id}'" style="cursor:pointer">
               <td><code>${c.customer_code || ''}</code></td>
               <td>${c.tax_id || '-'}</td>
-              <td><strong>${c.company_name || ''}</strong></td>
+              <td style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${(c.company_name || '').replace(/"/g, '&quot;')}"><strong>${c.company_name || ''}</strong></td>
               <td class="text-center">${c.project_count || 0}</td>
+              <td class="text-end">$${(c.total_project_amount || 0).toLocaleString()}</td>
               <td>
                 <span class="badge bg-${c.party_type === '廠商' ? 'dark' : c.party_type === '兩者皆是' ? 'primary' : 'info'}">${c.party_type || '客戶'}</span>
                 ${c.vendor_type ? '<span class="badge bg-secondary">' + c.vendor_type + '</span>' : ''}
               </td>
               <td>${c.owner_salesperson_name || '-'}</td>
+              <td>${c.salesperson_names || '-'}</td>
               <td class="text-center">${c.customer_level ? '<span class="badge bg-' + (c.customer_level === 'A' ? 'success' : c.customer_level === 'B' ? 'warning' : 'secondary') + '">' + c.customer_level + '</span>' : '-'}</td>
               <td><span class="badge bg-${c.status === '往來中' ? 'success' : c.status === '暫停往來' ? 'warning' : 'secondary'}">${c.status || '往來中'}</span></td>
             </tr>

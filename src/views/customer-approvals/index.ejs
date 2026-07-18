@@ -1,0 +1,95 @@
+<%- include('../layout', { body: `
+<div class="row mb-4">
+  <div class="col">
+    <h1 class="h3"><i class="bi bi-person-check"></i> 客戶/廠商審核</h1>
+    <p class="text-muted mb-0">業務員等角色新增的客戶/廠商，需在此核准後才會真正建立資料、進入系統。</p>
+  </div>
+</div>
+
+${error ? `
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle"></i> ${error}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+${success ? `
+  <div class="alert alert-success alert-dismissible fade show" role="alert">
+    <i class="bi bi-check-circle"></i> ${success}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th>類型</th>
+            <th>公司名稱</th>
+            <th>客戶編號 / 統編</th>
+            <th>接洽人員</th>
+            <th>聯絡人</th>
+            <th>申請人</th>
+            <th>申請時間</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${(requests || []).length === 0 ? `
+            <tr><td colspan="8" class="text-center text-muted py-4">目前沒有待審核的新客戶/廠商申請</td></tr>
+          ` : requests.map(r => `
+            <tr>
+              <td>
+                <span class="badge bg-${r.party_type === '廠商' ? 'dark' : r.party_type === '兩者皆是' ? 'primary' : 'info'}">${r.party_type}</span>
+                ${r.vendor_type ? '<span class="badge bg-secondary">' + r.vendor_type + '</span>' : ''}
+              </td>
+              <td>${(r.company_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
+              <td><code>${r.customer_code}</code>${r.tax_id ? ' / ' + r.tax_id : ''}</td>
+              <td>${r.owner_salesperson_name || '-'}</td>
+              <td>${r.contact_name || '-'}</td>
+              <td>${r.requested_by_name || '-'}</td>
+              <td>${r.requested_at}</td>
+              <td class="text-end">
+                <div class="d-flex gap-2 justify-content-end">
+                  <form action="/customer-approvals/${r.id}/approve" method="POST" onsubmit="return confirm('確定要核准並建立這筆客戶/廠商資料嗎？')">
+                    <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i> 核准</button>
+                  </form>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#rejectModal${r.id}">
+                    <i class="bi bi-x-lg"></i> 駁回
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+${(requests || []).map(r => `
+  <div class="modal fade" id="rejectModal${r.id}" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form action="/customer-approvals/${r.id}/reject" method="POST">
+          <div class="modal-header">
+            <h5 class="modal-title">駁回新增申請</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-2">${(r.company_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}（${r.customer_code}）</p>
+            <label class="form-label">駁回原因（選填，會留給申請人參考）</label>
+            <textarea name="review_note" class="form-control" rows="3"></textarea>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-danger">確定駁回</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+`).join('')}
+` }) %>
