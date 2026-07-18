@@ -10,6 +10,7 @@ const User = require('../models/User');
 const db = require('../models/db');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireCrmEditPermission } = require('../middleware/auth');
+const NotificationService = require('../services/NotificationService');
 
 // 新增客戶/廠商是否需要送審：僅系統管理員（admin）與專案管理員（user）可直接建立，
 // 其餘角色（業務員、自訂角色等）一律先送審，核准後才會真正進入系統
@@ -168,7 +169,7 @@ router.get('/', (req, res) => {
 router.post('/quick-add', requireCrmEditPermission, (req, res) => {
   try {
     if (!canCreateCustomerDirectly(req.user)) {
-      CustomerCreationRequest.create({
+      const requestId = CustomerCreationRequest.create({
         customer_code: req.body.customer_code,
         tax_id: req.body.tax_id,
         company_name: req.body.company_name,
@@ -178,6 +179,14 @@ router.post('/quick-add', requireCrmEditPermission, (req, res) => {
         requested_by: req.user.id,
         requested_by_name: getUserInfo(req)
       });
+      NotificationService.notifyCustomerApprovers({
+        type: 'customer_approval_pending',
+        title: `新客戶/廠商待審核：${req.body.company_name}`,
+        message: `申請人：${getUserInfo(req)}`,
+        link: '/customer-approvals',
+        related_type: 'customer_creation_request',
+        related_id: requestId
+      }, req.user.id);
       return res.json({
         success: true,
         pending: true,
@@ -242,11 +251,19 @@ router.post('/', requireCrmEditPermission, (req, res) => {
     };
 
     if (!canCreateCustomerDirectly(req.user)) {
-      CustomerCreationRequest.create({
+      const requestId = CustomerCreationRequest.create({
         ...customerData,
         requested_by: req.user.id,
         requested_by_name: getUserInfo(req)
       });
+      NotificationService.notifyCustomerApprovers({
+        type: 'customer_approval_pending',
+        title: `新客戶/廠商待審核：${customerData.company_name}`,
+        message: `申請人：${getUserInfo(req)}`,
+        link: '/customer-approvals',
+        related_type: 'customer_creation_request',
+        related_id: requestId
+      }, req.user.id);
       return res.redirect('/customers?success=' + encodeURIComponent('已送出新增申請，待專案管理員或系統管理員核准後才會建立此客戶/廠商'));
     }
 
@@ -350,13 +367,21 @@ router.post('/:id/activities/:activityId/delete', requireCrmEditPermission, (req
       return res.redirect(`/customers/${req.params.id}?error=` + encodeURIComponent('此活動紀錄已送出過刪除申請，待審核中'));
     }
 
-    DeletionRequest.create({
+    const requestId = DeletionRequest.create({
       target_type: 'activity',
       target_id: activity.id,
       target_summary: `${activity.activity_type}：${activity.content}`,
       requested_by: req.user.id,
       requested_by_name: getUserInfo(req)
     });
+    NotificationService.notifyDeletionApprovers({
+      type: 'deletion_request_pending',
+      title: `刪除申請待審核：${activity.activity_type}`,
+      message: `申請人：${getUserInfo(req)}`,
+      link: '/deletion-requests',
+      related_type: 'deletion_request',
+      related_id: requestId
+    }, req.user.id);
     res.redirect(`/customers/${req.params.id}?success=` + encodeURIComponent('已送出刪除申請，待管理員審核後才會真正刪除'));
   } catch (err) {
     console.error(err);

@@ -53,6 +53,7 @@ const MIGRATIONS = [
   'migrate_customer_owner_to_user',
   'migrate_pipeline_owner_user',
   'migrate_customer_creation_requests',
+  'migrate_notifications',
 ];
 
 function run() {

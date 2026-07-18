@@ -121,6 +121,45 @@
         <% if (typeof user !== 'undefined' && user) { %>
           <ul class="navbar-nav">
             <li class="nav-item dropdown">
+              <a class="nav-link position-relative" href="#" id="notificationDropdown" role="button" data-bs-toggle="dropdown">
+                <i class="bi bi-bell fs-5"></i>
+                <% if (typeof unreadNotificationCount !== 'undefined' && unreadNotificationCount > 0) { %>
+                  <span class="badge bg-danger position-absolute top-0 start-100 translate-middle rounded-pill" style="font-size: 0.6rem;">
+                    <%= unreadNotificationCount > 99 ? '99+' : unreadNotificationCount %>
+                  </span>
+                <% } %>
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end" style="width: 360px; max-height: 420px; overflow-y: auto;">
+                <li class="d-flex justify-content-between align-items-center px-3 py-1">
+                  <h6 class="dropdown-header p-0 m-0">通知</h6>
+                  <% if (typeof unreadNotificationCount !== 'undefined' && unreadNotificationCount > 0) { %>
+                    <form action="/notifications/mark-all-read" method="POST" class="m-0">
+                      <button type="submit" class="btn btn-link btn-sm p-0">全部標記已讀</button>
+                    </form>
+                  <% } %>
+                </li>
+                <li><hr class="dropdown-divider m-0"></li>
+                <% if (typeof recentNotifications === 'undefined' || recentNotifications.length === 0) { %>
+                  <li><div class="text-center text-muted py-4 small">目前沒有通知</div></li>
+                <% } else { %>
+                  <% recentNotifications.forEach(function(n) { %>
+                    <% const iconInfo = typeof getNotificationIcon === 'function' ? getNotificationIcon(n.type) : { icon: 'bi-bell', color: 'text-secondary' }; %>
+                    <li>
+                      <a class="dropdown-item d-flex gap-2 py-2 <%= n.is_read ? '' : 'bg-light' %>" href="/notifications/<%= n.id %>/open">
+                        <i class="bi <%= iconInfo.icon %> <%= iconInfo.color %> mt-1"></i>
+                        <span class="flex-grow-1 text-wrap">
+                          <span class="d-block small fw-<%= n.is_read ? 'normal' : 'bold' %>"><%= n.title %></span>
+                          <span class="d-block text-muted" style="font-size: 0.75rem;"><%= n.created_at %></span>
+                        </span>
+                      </a>
+                    </li>
+                  <% }); %>
+                <% } %>
+                <li><hr class="dropdown-divider m-0"></li>
+                <li><a class="dropdown-item text-center small" href="/notifications">查看全部通知</a></li>
+              </ul>
+            </li>
+            <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
                 <i class="bi bi-person-circle"></i> <%= user.name || user.username %>
               </a>

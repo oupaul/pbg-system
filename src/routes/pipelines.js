@@ -10,6 +10,7 @@ const User = require('../models/User');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireEditPermission, requireCrmEditPermission } = require('../middleware/auth');
 const cache = require('../services/CacheService');
+const NotificationService = require('../services/NotificationService');
 
 function getActiveProjectTypes() {
   try {
@@ -263,13 +264,21 @@ router.post('/:id/delete', requireCrmEditPermission, (req, res) => {
       return res.redirect(`/pipelines/${pipeline.id}?error=` + encodeURIComponent('此銷售機會已送出過刪除申請，待審核中'));
     }
 
-    DeletionRequest.create({
+    const requestId = DeletionRequest.create({
       target_type: 'pipeline',
       target_id: pipeline.id,
       target_summary: `${pipeline.opportunity_name}（客戶：${pipeline.customer_name || '-'}）`,
       requested_by: req.user.id,
       requested_by_name: getUserInfo(req)
     });
+    NotificationService.notifyDeletionApprovers({
+      type: 'deletion_request_pending',
+      title: `刪除申請待審核：${pipeline.opportunity_name}`,
+      message: `申請人：${getUserInfo(req)}`,
+      link: '/deletion-requests',
+      related_type: 'deletion_request',
+      related_id: requestId
+    }, req.user.id);
     res.redirect(`/pipelines/${pipeline.id}?success=` + encodeURIComponent('已送出刪除申請，待管理員審核後才會真正刪除'));
   } catch (err) {
     console.error(err);

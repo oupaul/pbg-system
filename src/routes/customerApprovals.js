@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const CustomerCreationRequest = require('../models/CustomerCreationRequest');
+const NotificationService = require('../services/NotificationService');
 
 // 新客戶/廠商審核：僅系統管理員（admin）與專案管理員（user）可使用
 const requireCustomerApprovalPermission = (req, res, next) => {
@@ -33,7 +34,18 @@ router.get('/', requireCustomerApprovalPermission, (req, res) => {
 // 核准：真正建立客戶/廠商資料
 router.post('/:id/approve', requireCustomerApprovalPermission, (req, res) => {
   try {
-    CustomerCreationRequest.approve(req.params.id, req.user);
+    const request = CustomerCreationRequest.findById(req.params.id);
+    const customerId = CustomerCreationRequest.approve(req.params.id, req.user);
+    if (request) {
+      NotificationService.notify(request.requested_by, {
+        type: 'customer_approval_approved',
+        title: `審核通過：${request.company_name}`,
+        message: `審核人：${req.user.name || req.user.username}`,
+        link: `/customers/${customerId}`,
+        related_type: 'customer',
+        related_id: customerId
+      });
+    }
     res.redirect('/customer-approvals?success=' + encodeURIComponent('已核准，客戶/廠商資料已建立'));
   } catch (err) {
     console.error(err);
@@ -44,7 +56,18 @@ router.post('/:id/approve', requireCustomerApprovalPermission, (req, res) => {
 // 駁回：不會建立客戶/廠商資料
 router.post('/:id/reject', requireCustomerApprovalPermission, (req, res) => {
   try {
+    const request = CustomerCreationRequest.findById(req.params.id);
     CustomerCreationRequest.reject(req.params.id, req.user, req.body.review_note);
+    if (request) {
+      NotificationService.notify(request.requested_by, {
+        type: 'customer_approval_rejected',
+        title: `審核駁回：${request.company_name}`,
+        message: req.body.review_note ? `駁回原因：${req.body.review_note}` : `審核人：${req.user.name || req.user.username}`,
+        link: '/customers',
+        related_type: 'customer_creation_request',
+        related_id: request.id
+      });
+    }
     res.redirect('/customer-approvals?success=' + encodeURIComponent('已駁回此申請'));
   } catch (err) {
     console.error(err);

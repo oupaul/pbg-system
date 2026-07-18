@@ -181,6 +181,22 @@ const setUserPermissions = (req, res, next) => {
         res.locals.pendingCustomerApprovalCount = 0;
       }
     }
+
+    // 通知中心：僅在 GET 請求時計算（系統提醒的建立採 dedup，重複執行不會產生重複通知，
+    // 限制在 GET 是為了避免每次表單送出的 POST 動作都額外查詢一次）
+    try {
+      const Notification = require('../models/Notification');
+      const NotificationService = require('../services/NotificationService');
+      if (req.method === 'GET') {
+        NotificationService.generateReminderNotifications(req.user);
+      }
+      res.locals.unreadNotificationCount = Notification.countUnread(req.user.id);
+      res.locals.recentNotifications = Notification.findForUser(req.user.id, { limit: 8 });
+      res.locals.getNotificationIcon = NotificationService.getNotificationIcon;
+    } catch {
+      res.locals.unreadNotificationCount = 0;
+      res.locals.recentNotifications = [];
+    }
   }
   next();
 };
