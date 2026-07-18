@@ -58,6 +58,7 @@ const MIGRATIONS = [
   'migrate_customer_request_pipeline_bundle',
   'migrate_business_event_notify_recipients',
   'migrate_smtp_reject_unauthorized',
+  'migrate_system_base_url',
 ];
 
 function run() {

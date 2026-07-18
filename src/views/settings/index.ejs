@@ -45,6 +45,10 @@
   const lineTokenIsSet = !!(lineTokenSetting && lineTokenSetting.setting_value);
   const lineSecretIsSet = !!(lineSecretSetting && lineSecretSetting.setting_value);
 
+  // 系統網址設定（用於組出 Email/LINE 通知中的完整連結，以及 LINE Webhook URL 提示）
+  const systemBaseUrlSetting = localSettings.find(s => s.setting_key === 'system_base_url');
+  const systemBaseUrlValue = systemBaseUrlSetting ? systemBaseUrlSetting.setting_value : '';
+
   // 銷售機會/活動紀錄異動通知收件人
   const businessEventRecipientsSetting = localSettings.find(s => s.setting_key === 'business_event_notify_user_ids');
   const businessEventRecipientIds = (businessEventRecipientsSetting && businessEventRecipientsSetting.setting_value
@@ -78,6 +82,21 @@
   }
 
   bodyHtml += '<div class="card">';
+  bodyHtml += '  <div class="card-header bg-dark text-white">';
+  bodyHtml += '    <h5 class="mb-0"><i class="bi bi-globe"></i> 系統網址設定</h5>';
+  bodyHtml += '  </div>';
+  bodyHtml += '  <div class="card-body">';
+  bodyHtml += '    <form method="POST" action="/settings/bulk-update">';
+  bodyHtml += '      <label for="system_base_url" class="form-label"><strong>系統對外網址</strong></label>';
+  bodyHtml += '      <input type="text" class="form-control" id="system_base_url" name="system_base_url" value="' + systemBaseUrlValue + '" placeholder="https://pbg.example.com">';
+  bodyHtml += '      <div class="form-text">請填寫使用者實際存取此系統的網址（結尾不要加斜線）。設定後，Email/LINE 通知中的「請登入系統查看」才會顯示完整可點擊的網址，而不是只有頁面路徑；未設定時維持顯示相對路徑。</div>';
+  bodyHtml += '      <hr class="my-4">';
+  bodyHtml += '      <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> 儲存設定</button>';
+  bodyHtml += '    </form>';
+  bodyHtml += '  </div>';
+  bodyHtml += '</div>';
+
+  bodyHtml += '<div class="card mt-4">';
   bodyHtml += '  <div class="card-header bg-primary text-white">';
   bodyHtml += '    <h5 class="mb-0"><i class="bi bi-bell"></i> 開票提醒通知設定</h5>';
   bodyHtml += '  </div>';
@@ -295,7 +314,7 @@
   bodyHtml += '        <i class="bi bi-info-circle"></i> <strong>設定步驟：</strong>';
   bodyHtml += '        <ol class="mb-0">';
   bodyHtml += '          <li>於 <a href="https://developers.line.biz/console/" target="_blank" rel="noopener">LINE Developers Console</a> 建立 Messaging API Channel</li>';
-  bodyHtml += '          <li>將 Webhook URL 設定為：<code>' + (typeof siteBaseUrl !== 'undefined' && siteBaseUrl ? siteBaseUrl : 'https://您的網域') + '/webhooks/line</code></li>';
+  bodyHtml += '          <li>將 Webhook URL 設定為：<code>' + (systemBaseUrlValue || 'https://您的網域') + '/webhooks/line</code></li>';
   bodyHtml += '          <li>複製 Channel Access Token 與 Channel Secret 填入下方欄位</li>';
   bodyHtml += '          <li>使用者以 LINE 加官方帳號好友後傳送任意訊息，機器人會自動回覆該使用者的 LINE User ID，請將此 ID 填入該使用者的「使用者管理」資料中</li>';
   bodyHtml += '        </ol>';

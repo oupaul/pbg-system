@@ -39,6 +39,14 @@ function buildTransporter(config) {
   });
 }
 
+// 把通知內的相對路徑（例如 /pipelines/5）組成完整可點擊網址；尚未設定系統網址時，維持原本的相對路徑
+function buildFullLink(link) {
+  if (!link) return '';
+  const baseUrl = getSetting('system_base_url', '').trim().replace(/\/+$/, '');
+  if (!baseUrl) return link;
+  return baseUrl + (link.startsWith('/') ? link : '/' + link);
+}
+
 // "unable to get local issuer certificate" 等憑證鏈錯誤，補充可行動的提示
 function describeError(err) {
   const msg = err.message || String(err);
@@ -81,7 +89,8 @@ const EmailService = {
 
   async sendNotificationEmail(user, notification) {
     if (!user || !user.email) return false;
-    const body = [notification.message, notification.link ? `請登入系統查看：${notification.link}` : ''].filter(Boolean).join('\n\n');
+    const fullLink = buildFullLink(notification.link);
+    const body = [notification.message, fullLink ? `請登入系統查看：${fullLink}` : ''].filter(Boolean).join('\n\n');
     return this.sendMail(user.email, `[${deployConfig.siteName}] ${notification.title}`, body);
   },
 

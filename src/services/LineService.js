@@ -16,6 +16,14 @@ function getSetting(key, defaultValue) {
   }
 }
 
+// 把通知內的相對路徑（例如 /pipelines/5）組成完整可點擊網址；尚未設定系統網址時，維持原本的相對路徑
+function buildFullLink(link) {
+  if (!link) return '';
+  const baseUrl = getSetting('system_base_url', '').trim().replace(/\/+$/, '');
+  if (!baseUrl) return link;
+  return baseUrl + (link.startsWith('/') ? link : '/' + link);
+}
+
 function getConfig() {
   return {
     enabled: getSetting('line_notification_enabled', 'false') === 'true',
@@ -90,7 +98,8 @@ const LineService = {
   },
 
   async sendNotification(lineUserId, notification) {
-    const body = [notification.title, notification.message, notification.link ? `請登入系統查看：${notification.link}` : '']
+    const fullLink = buildFullLink(notification.link);
+    const body = [notification.title, notification.message, fullLink ? `請登入系統查看：${fullLink}` : '']
       .filter(Boolean).join('\n');
     return this.pushMessage(lineUserId, body);
   }
