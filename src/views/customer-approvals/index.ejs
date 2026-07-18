@@ -37,7 +37,7 @@ ${success ? `
             <th>類型</th>
             <th>公司名稱</th>
             <th>客戶編號 / 統編</th>
-            <th>接洽人員</th>
+            <th>負責業務</th>
             <th>聯絡人</th>
             <th>申請人</th>
             <th>申請時間</th>
@@ -123,7 +123,7 @@ ${(requests || []).map(r => {
                 <input type="text" name="tax_id" class="form-control" maxlength="8" value="${esc(r.tax_id)}">
               </div>
               <div class="col-md-6">
-                <label class="form-label">接洽人員</label>
+                <label class="form-label">負責業務（使用者）</label>
                 <select name="owner_salesperson_id" class="form-select">
                   <option value="">-- 選擇使用者 --</option>
                   ${(staffUsers || []).map(u => '<option value="' + u.id + '" ' + (r.owner_salesperson_id == u.id ? 'selected' : '') + '>' + esc(u.name) + '</option>').join('')}

@@ -148,7 +148,7 @@ router.get('/', (req, res) => {
       statusFilter,
       partyTypeFilter,
       vendorTypeFilter,
-      staffUsers: User.findActive(),
+      staffUsers: User.findActiveNonAdmin(),
       req: req,
       error: req.query.error || '',
       success: req.query.success || ''
@@ -335,7 +335,7 @@ router.get('/:id', (req, res) => {
     pipelines,
     activities,
     pendingActivityDeletionIds,
-    staffUsers: User.findActive(),
+    staffUsers: User.findActiveNonAdmin(),
     error: req.query.error || '',
     success: req.query.success || ''
   });

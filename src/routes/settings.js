@@ -5,6 +5,7 @@ const User = require('../models/User');
 const { requireAuth } = require('../middleware/auth');
 const { getUserInfo } = require('../utils/authHelper');
 const AuditLogService = require('../services/AuditLogService');
+const EmailService = require('../services/EmailService');
 
 // 輔助函數：檢查是否為管理員
 function requireAdmin(req, res, next) {
@@ -260,6 +261,19 @@ router.post('/bulk-update', requireAuth, requireAdmin, (req, res) => {
     console.error('批量更新設定失敗:', err);
     res.redirect('/settings?error=' + encodeURIComponent('批量更新失敗：' + err.message));
   }
+});
+
+// 測試發送 Email（僅管理員）：用表單目前的值（不一定已存檔）實際寄一封測試信，回傳結果供畫面顯示
+router.post('/test-email', requireAuth, requireAdmin, async (req, res) => {
+  const result = await EmailService.sendTestMail(req.body.to, {
+    host: req.body.smtp_host,
+    port: req.body.smtp_port,
+    secure: req.body.smtp_secure,
+    user: req.body.smtp_user,
+    password: req.body.smtp_password,
+    from: req.body.smtp_from
+  });
+  res.json(result);
 });
 
 // 匯出輔助函數供其他模組使用

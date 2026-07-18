@@ -59,7 +59,7 @@ router.get('/', requireCustomerApprovalPermission, (req, res) => {
     title: '客戶/廠商審核',
     requests,
     salespeople: Salesperson.findAll(),
-    staffUsers: User.findActive(),
+    staffUsers: User.findActiveNonAdmin(),
     projectTypes: getActiveProjectTypes(),
     error: req.query.error || '',
     success: req.query.success || ''

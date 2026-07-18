@@ -69,6 +69,37 @@ const EmailService = {
     if (!user || !user.email) return false;
     const body = [notification.message, notification.link ? `請登入系統查看：${notification.link}` : ''].filter(Boolean).join('\n\n');
     return this.sendMail(user.email, `[業績獎金系統] ${notification.title}`, body);
+  },
+
+  // 供系統設定頁「測試發送」使用：刻意不檢查 email_notification_enabled，
+  // 讓管理員可以在正式啟用前先驗證 SMTP 主機/帳密是否正確。
+  // overrides 讓畫面可以直接用「目前表單上還沒儲存的值」測試，不必先存檔；
+  // 密碼欄位因為畫面上永遠顯示空白（避免外洩已存的密碼），留空時 fallback 回資料庫已存的密碼。
+  async sendTestMail(to, overrides = {}) {
+    if (!to) return { success: false, message: '請輸入收件人 Email' };
+    const saved = getConfig();
+    const config = {
+      host: overrides.host || saved.host,
+      port: overrides.port ? (parseInt(overrides.port, 10) || 587) : saved.port,
+      secure: overrides.secure !== undefined ? (overrides.secure === 'true' || overrides.secure === true) : saved.secure,
+      user: overrides.user || saved.user,
+      password: overrides.password || saved.password,
+      from: overrides.from || saved.from
+    };
+    if (!config.host) return { success: false, message: '尚未設定 SMTP 主機，請先填寫下方欄位' };
+
+    try {
+      const transporter = buildTransporter(config);
+      await transporter.sendMail({
+        from: config.from || config.user,
+        to,
+        subject: '[業績獎金系統] 測試郵件',
+        text: '這是一封測試郵件，用來確認 SMTP 設定是否正確。若您收到此信，代表 Email 通知功能設定成功。'
+      });
+      return { success: true, message: '測試郵件已成功寄出，請確認收件匣（含垃圾郵件）' };
+    } catch (err) {
+      return { success: false, message: '寄送失敗：' + err.message };
+    }
   }
 };
 
