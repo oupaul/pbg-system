@@ -10,6 +10,33 @@
 const db = require('../models/db');
 const Notification = require('../models/Notification');
 const ActivityReminderService = require('./ActivityReminderService');
+const EmailService = require('./EmailService');
+const LineService = require('./LineService');
+
+// 僅這些「重要事件」類型會嘗試透過 Email/LINE 發送，一般系統提醒（客戶追蹤、開票提醒）不發送，避免訊息轟炸
+const EXTERNAL_CHANNEL_TYPES = new Set([
+  'customer_approval_pending', 'customer_approval_approved', 'customer_approval_rejected',
+  'deletion_request_pending', 'deletion_request_approved', 'deletion_request_rejected'
+]);
+
+// 依使用者填寫的 email/line_user_id 發送外部通知；失敗只記錄 log，不影響站內通知本身
+function dispatchExternalChannels(userId, type, title, message, link) {
+  if (!EXTERNAL_CHANNEL_TYPES.has(type)) return;
+  try {
+    const row = db.prepare('SELECT email, line_user_id FROM users WHERE id = ?').get(userId);
+    if (!row) return;
+    if (row.email) {
+      EmailService.sendNotificationEmail({ email: row.email }, { title, message, link }).catch(err => {
+        console.error('[NotificationService] Email 發送失敗:', err.message);
+      });
+    }
+    if (row.line_user_id) {
+      LineService.sendNotification(row.line_user_id, { title, message, link }).catch(err => {
+        console.error('[NotificationService] LINE 發送失敗:', err.message);
+      });
+    }
+  } catch (e) { /* 外部通知發送失敗不應影響站內通知 */ }
+}
 
 // 通知類型 -> 圖示與顏色（導覽列鈴鐺下拉選單與 /notifications 頁面共用）
 const NOTIFICATION_ICONS = {
@@ -40,7 +67,9 @@ function getSystemSetting(key, defaultValue) {
 const NotificationService = {
   notify(userId, { type, title, message, link, related_type, related_id }) {
     if (!userId) return null;
-    return Notification.create({ user_id: userId, type, title, message, link, related_type, related_id });
+    const id = Notification.create({ user_id: userId, type, title, message, link, related_type, related_id });
+    dispatchExternalChannels(userId, type, title, message, link);
+    return id;
   },
 
   notifyUsers(userIds, payload, excludeUserId = null) {

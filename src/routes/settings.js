@@ -179,17 +179,23 @@ router.post('/update', requireAuth, requireAdmin, (req, res) => {
   }
 });
 
+// 這些設定為密碼／存取權杖類機敏資料，表單為避免外洩不會回填實際值，
+// 因此留空必須視為「不變更」，絕不能覆蓋成空字串（否則每次儲存其他欄位都會把已設定的密碼洗掉）
+const PRESERVE_IF_EMPTY_KEYS = new Set(['smtp_password', 'line_channel_access_token', 'line_channel_secret']);
+
 // 批量更新設定（僅管理員）
 router.post('/bulk-update', requireAuth, requireAdmin, (req, res) => {
   try {
     const updates = req.body;
     let updateCount = 0;
     const errors = [];
-    
+
     for (const [key, value] of Object.entries(updates)) {
       // 跳過非設定欄位
       if (key === '_method' || key === 'submit') continue;
-      
+      // 機敏欄位留空表示不變更，略過（保留資料庫既有值）
+      if (PRESERVE_IF_EMPTY_KEYS.has(key) && (!value || String(value).trim() === '')) continue;
+
       try {
         // 獲取設定的類型
         const setting = db.prepare('SELECT setting_type FROM system_settings WHERE setting_key = ?').get(key);

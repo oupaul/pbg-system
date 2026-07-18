@@ -17,6 +17,21 @@ router.get('/', (req, res) => {
   });
 });
 
+// 輪詢端點：導覽列鈴鐺定期呼叫，取得目前未讀數與最新通知（JSON）
+router.get('/poll', (req, res) => {
+  const recent = Notification.findForUser(req.user.id, { limit: 8 });
+  res.json({
+    unreadCount: Notification.countUnread(req.user.id),
+    notifications: recent.map(n => ({
+      id: n.id,
+      title: n.title,
+      created_at: n.created_at,
+      is_read: !!n.is_read,
+      ...getNotificationIcon(n.type)
+    }))
+  });
+});
+
 // 點擊通知：標記已讀後導向原始連結
 router.get('/:id/open', (req, res) => {
   const notification = Notification.findById(req.params.id);

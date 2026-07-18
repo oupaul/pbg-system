@@ -141,15 +141,17 @@ const User = {
   async create(data) {
     const passwordHash = await this.hashPassword(data.password);
     const result = db.prepare(`
-      INSERT INTO users (username, password_hash, name, role, salesperson_id, is_active)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO users (username, password_hash, name, role, salesperson_id, is_active, email, line_user_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       data.username,
       passwordHash,
       data.name,
       data.role || 'user',
       data.salesperson_id || null,
-      data.is_active !== undefined ? data.is_active : 1
+      data.is_active !== undefined ? data.is_active : 1,
+      data.email || null,
+      data.line_user_id || null
     );
     return result.lastInsertRowid;
   },
@@ -175,6 +177,14 @@ const User = {
       if (data.is_active !== undefined) {
         fields.push('is_active = ?');
         values.push(data.is_active);
+      }
+      if (data.email !== undefined) {
+        fields.push('email = ?');
+        values.push(data.email || null);
+      }
+      if (data.line_user_id !== undefined) {
+        fields.push('line_user_id = ?');
+        values.push(data.line_user_id || null);
       }
       if (data.password !== undefined) {
         fields.push('password_hash = ?');

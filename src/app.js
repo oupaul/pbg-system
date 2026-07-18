@@ -36,7 +36,8 @@ app.use(session({
 console.log('[啟動] Session 配置完成');
 
 // 中間件
-app.use(express.json());
+// verify callback 保留原始 body（Buffer），LINE Webhook 簽章驗證需要用到
+app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -181,10 +182,15 @@ try {
   console.log('[啟動] ✓ customerApprovals 路由載入完成');
   const notificationRoutes = require('./routes/notifications');
   console.log('[啟動] ✓ notifications 路由載入完成');
+  const lineWebhookRoutes = require('./routes/lineWebhook');
+  console.log('[啟動] ✓ lineWebhook 路由載入完成');
 
   // 認證路由（不需要登入）- 必須在其他路由之前
   // authRoutes 內部已經定義了 /login 和 /logout 路徑
   app.use(authRoutes);
+
+  // LINE Webhook（不需要登入，由 LINE 平台呼叫，改用簽章驗證）
+  app.use('/webhooks/line', lineWebhookRoutes);
 
   // 保護所有其他路由（需要登入）
   app.use('/projects', requireAuth, projectRoutes);

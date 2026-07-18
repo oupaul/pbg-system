@@ -16,7 +16,33 @@
   const idleTimeoutValue = idleTimeoutSetting ? idleTimeoutSetting.setting_value : '30';
   const idleWarningValue = idleWarningSetting ? idleWarningSetting.setting_value : '2';
   const attachmentCleanupValue = attachmentCleanupSetting ? attachmentCleanupSetting.setting_value : '30';
-  
+
+  // Email 通知設定
+  const emailEnabledSetting = localSettings.find(s => s.setting_key === 'email_notification_enabled');
+  const smtpHostSetting = localSettings.find(s => s.setting_key === 'smtp_host');
+  const smtpPortSetting = localSettings.find(s => s.setting_key === 'smtp_port');
+  const smtpSecureSetting = localSettings.find(s => s.setting_key === 'smtp_secure');
+  const smtpUserSetting = localSettings.find(s => s.setting_key === 'smtp_user');
+  const smtpPasswordSetting = localSettings.find(s => s.setting_key === 'smtp_password');
+  const smtpFromSetting = localSettings.find(s => s.setting_key === 'smtp_from');
+
+  const isEmailEnabled = emailEnabledSetting ? emailEnabledSetting.setting_value === 'true' : false;
+  const smtpHostValue = smtpHostSetting ? smtpHostSetting.setting_value : '';
+  const smtpPortValue = smtpPortSetting ? smtpPortSetting.setting_value : '587';
+  const isSmtpSecure = smtpSecureSetting ? smtpSecureSetting.setting_value === 'true' : false;
+  const smtpUserValue = smtpUserSetting ? smtpUserSetting.setting_value : '';
+  const smtpPasswordIsSet = !!(smtpPasswordSetting && smtpPasswordSetting.setting_value);
+  const smtpFromValue = smtpFromSetting ? smtpFromSetting.setting_value : '';
+
+  // LINE 通知設定
+  const lineEnabledSetting = localSettings.find(s => s.setting_key === 'line_notification_enabled');
+  const lineTokenSetting = localSettings.find(s => s.setting_key === 'line_channel_access_token');
+  const lineSecretSetting = localSettings.find(s => s.setting_key === 'line_channel_secret');
+
+  const isLineEnabled = lineEnabledSetting ? lineEnabledSetting.setting_value === 'true' : false;
+  const lineTokenIsSet = !!(lineTokenSetting && lineTokenSetting.setting_value);
+  const lineSecretIsSet = !!(lineSecretSetting && lineSecretSetting.setting_value);
+
   const isNotificationEnabled = notificationEnabledValue === 'true';
   const notificationDaysDesc = notificationDaysSetting ? notificationDaysSetting.description : '當月剩餘天數少於或等於此值時開始顯示通知';
   const notificationEnabledDesc = notificationEnabledSetting ? notificationEnabledSetting.description : '是否啟用開票提醒通知功能';
@@ -182,7 +208,99 @@
   bodyHtml += '    </form>';
   bodyHtml += '  </div>';
   bodyHtml += '</div>';
-  
+
+  // Email 通知設定卡片
+  bodyHtml += '<div class="card mt-4">';
+  bodyHtml += '  <div class="card-header bg-primary text-white">';
+  bodyHtml += '    <h5 class="mb-0"><i class="bi bi-envelope"></i> Email 通知設定</h5>';
+  bodyHtml += '  </div>';
+  bodyHtml += '  <div class="card-body">';
+  bodyHtml += '    <p class="text-muted small">僅重要事件（審核送出/核准/駁回）會發送 Email，一般提醒（客戶追蹤、開票提醒）不會發送。收件位址取自使用者資料中的 Email 欄位。</p>';
+  bodyHtml += '    <form method="POST" action="/settings/bulk-update" id="emailSettingsForm">';
+  bodyHtml += '      <div class="row g-3">';
+  bodyHtml += '        <div class="col-md-6">';
+  bodyHtml += '          <label class="form-label"><i class="bi bi-toggle-on"></i> <strong>Email 通知狀態</strong></label>';
+  bodyHtml += '          <div class="form-check form-switch">';
+  bodyHtml += '            <input class="form-check-input" type="checkbox" id="email_notification_enabled" name="email_notification_enabled" value="true" ' + (isEmailEnabled ? 'checked' : '') + '>';
+  bodyHtml += '            <label class="form-check-label" for="email_notification_enabled">' + (isEmailEnabled ? '已啟用' : '已停用') + '</label>';
+  bodyHtml += '          </div>';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="col-md-6">';
+  bodyHtml += '          <label for="smtp_from" class="form-label">寄件人顯示位址</label>';
+  bodyHtml += '          <input type="text" class="form-control" id="smtp_from" name="smtp_from" value="' + smtpFromValue + '" placeholder="業績獎金系統 &lt;noreply@example.com&gt;">';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="col-md-6">';
+  bodyHtml += '          <label for="smtp_host" class="form-label">SMTP 主機</label>';
+  bodyHtml += '          <input type="text" class="form-control" id="smtp_host" name="smtp_host" value="' + smtpHostValue + '" placeholder="smtp.gmail.com">';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="col-md-3">';
+  bodyHtml += '          <label for="smtp_port" class="form-label">埠號</label>';
+  bodyHtml += '          <input type="number" class="form-control" id="smtp_port" name="smtp_port" value="' + smtpPortValue + '">';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="col-md-3">';
+  bodyHtml += '          <label class="form-label d-block">使用 SSL</label>';
+  bodyHtml += '          <div class="form-check form-switch mt-2">';
+  bodyHtml += '            <input class="form-check-input" type="checkbox" id="smtp_secure" name="smtp_secure" value="true" ' + (isSmtpSecure ? 'checked' : '') + '>';
+  bodyHtml += '            <label class="form-check-label" for="smtp_secure">465 埠通常開啟</label>';
+  bodyHtml += '          </div>';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="col-md-6">';
+  bodyHtml += '          <label for="smtp_user" class="form-label">SMTP 帳號</label>';
+  bodyHtml += '          <input type="text" class="form-control" id="smtp_user" name="smtp_user" value="' + smtpUserValue + '">';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="col-md-6">';
+  bodyHtml += '          <label for="smtp_password" class="form-label">SMTP 密碼 / App Password</label>';
+  bodyHtml += '          <input type="password" class="form-control" id="smtp_password" name="smtp_password" value="" placeholder="' + (smtpPasswordIsSet ? '已設定，留空則不變更' : '尚未設定') + '" autocomplete="new-password">';
+  bodyHtml += '        </div>';
+  bodyHtml += '      </div>';
+  bodyHtml += '      <hr class="my-4">';
+  bodyHtml += '      <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> 儲存設定</button>';
+  bodyHtml += '    </form>';
+  bodyHtml += '  </div>';
+  bodyHtml += '</div>';
+
+  // LINE 通知設定卡片
+  bodyHtml += '<div class="card mt-4">';
+  bodyHtml += '  <div class="card-header bg-success text-white">';
+  bodyHtml += '    <h5 class="mb-0"><i class="bi bi-line"></i> LINE 通知設定</h5>';
+  bodyHtml += '  </div>';
+  bodyHtml += '  <div class="card-body">';
+  bodyHtml += '    <p class="text-muted small">透過 LINE Messaging API 發送，僅重要事件（審核送出/核准/駁回）會發送。使用者需先在使用者資料中填入自己的 LINE User ID 才能收到通知。</p>';
+  bodyHtml += '    <div class="alert alert-info">';
+  bodyHtml += '      <small>';
+  bodyHtml += '        <i class="bi bi-info-circle"></i> <strong>設定步驟：</strong>';
+  bodyHtml += '        <ol class="mb-0">';
+  bodyHtml += '          <li>於 <a href="https://developers.line.biz/console/" target="_blank" rel="noopener">LINE Developers Console</a> 建立 Messaging API Channel</li>';
+  bodyHtml += '          <li>將 Webhook URL 設定為：<code>' + (typeof siteBaseUrl !== 'undefined' && siteBaseUrl ? siteBaseUrl : 'https://您的網域') + '/webhooks/line</code></li>';
+  bodyHtml += '          <li>複製 Channel Access Token 與 Channel Secret 填入下方欄位</li>';
+  bodyHtml += '          <li>使用者以 LINE 加官方帳號好友後傳送任意訊息，機器人會自動回覆該使用者的 LINE User ID，請將此 ID 填入該使用者的「使用者管理」資料中</li>';
+  bodyHtml += '        </ol>';
+  bodyHtml += '      </small>';
+  bodyHtml += '    </div>';
+  bodyHtml += '    <form method="POST" action="/settings/bulk-update" id="lineSettingsForm">';
+  bodyHtml += '      <div class="row g-3">';
+  bodyHtml += '        <div class="col-md-6">';
+  bodyHtml += '          <label class="form-label"><i class="bi bi-toggle-on"></i> <strong>LINE 通知狀態</strong></label>';
+  bodyHtml += '          <div class="form-check form-switch">';
+  bodyHtml += '            <input class="form-check-input" type="checkbox" id="line_notification_enabled" name="line_notification_enabled" value="true" ' + (isLineEnabled ? 'checked' : '') + '>';
+  bodyHtml += '            <label class="form-check-label" for="line_notification_enabled">' + (isLineEnabled ? '已啟用' : '已停用') + '</label>';
+  bodyHtml += '          </div>';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="col-12">';
+  bodyHtml += '          <label for="line_channel_access_token" class="form-label">Channel Access Token</label>';
+  bodyHtml += '          <input type="password" class="form-control" id="line_channel_access_token" name="line_channel_access_token" value="" placeholder="' + (lineTokenIsSet ? '已設定，留空則不變更' : '尚未設定') + '" autocomplete="new-password">';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="col-12">';
+  bodyHtml += '          <label for="line_channel_secret" class="form-label">Channel Secret</label>';
+  bodyHtml += '          <input type="password" class="form-control" id="line_channel_secret" name="line_channel_secret" value="" placeholder="' + (lineSecretIsSet ? '已設定，留空則不變更' : '尚未設定') + '" autocomplete="new-password">';
+  bodyHtml += '        </div>';
+  bodyHtml += '      </div>';
+  bodyHtml += '      <hr class="my-4">';
+  bodyHtml += '      <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> 儲存設定</button>';
+  bodyHtml += '    </form>';
+  bodyHtml += '  </div>';
+  bodyHtml += '</div>';
+
   bodyHtml += '<div class="card mt-4">';
   bodyHtml += '  <div class="card-header bg-light">';
   bodyHtml += '    <h5 class="mb-0"><i class="bi bi-question-circle"></i> 設定說明</h5>';
@@ -253,6 +371,38 @@
   bodyHtml += '      }';
   bodyHtml += '    });';
   bodyHtml += '  }';
+  bodyHtml += '';
+  bodyHtml += '  // 通用處理：switch 開關 checkbox（未勾選時補送 false）與空白密碼/token 欄位（留空則不覆蓋既有值）';
+  bodyHtml += '  function wireSwitchForm(formId, checkboxIds, secretIds) {';
+  bodyHtml += '    const form = document.getElementById(formId);';
+  bodyHtml += '    if (!form) return;';
+  bodyHtml += '    checkboxIds.forEach(function (id) {';
+  bodyHtml += '      const cb = document.getElementById(id);';
+  bodyHtml += '      if (!cb) return;';
+  bodyHtml += '      cb.addEventListener("change", function () {';
+  bodyHtml += '        const label = this.nextElementSibling;';
+  bodyHtml += '        if (label && label.tagName === "LABEL") label.textContent = this.checked ? "已啟用" : "已停用";';
+  bodyHtml += '      });';
+  bodyHtml += '    });';
+  bodyHtml += '    form.addEventListener("submit", function () {';
+  bodyHtml += '      checkboxIds.forEach(function (id) {';
+  bodyHtml += '        const cb = document.getElementById(id);';
+  bodyHtml += '        if (cb && !cb.checked) {';
+  bodyHtml += '          const hidden = document.createElement("input");';
+  bodyHtml += '          hidden.type = "hidden";';
+  bodyHtml += '          hidden.name = cb.name;';
+  bodyHtml += '          hidden.value = "false";';
+  bodyHtml += '          form.appendChild(hidden);';
+  bodyHtml += '        }';
+  bodyHtml += '      });';
+  bodyHtml += '      (secretIds || []).forEach(function (id) {';
+  bodyHtml += '        const input = document.getElementById(id);';
+  bodyHtml += '        if (input && input.value.trim() === "") input.disabled = true;';
+  bodyHtml += '      });';
+  bodyHtml += '    });';
+  bodyHtml += '  }';
+  bodyHtml += '  wireSwitchForm("emailSettingsForm", ["email_notification_enabled", "smtp_secure"], ["smtp_password"]);';
+  bodyHtml += '  wireSwitchForm("lineSettingsForm", ["line_notification_enabled"], ["line_channel_access_token", "line_channel_secret"]);';
   bodyHtml += '});';
   bodyHtml += '</script>';
 %>
