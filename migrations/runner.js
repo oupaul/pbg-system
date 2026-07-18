@@ -57,6 +57,7 @@ const MIGRATIONS = [
   'migrate_notification_channels',
   'migrate_customer_request_pipeline_bundle',
   'migrate_business_event_notify_recipients',
+  'migrate_smtp_reject_unauthorized',
 ];
 
 function run() {

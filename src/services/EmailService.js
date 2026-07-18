@@ -21,7 +21,8 @@ function getConfig() {
     secure: getSetting('smtp_secure', 'false') === 'true',
     user: getSetting('smtp_user', ''),
     password: getSetting('smtp_password', ''),
-    from: getSetting('smtp_from', '')
+    from: getSetting('smtp_from', ''),
+    rejectUnauthorized: getSetting('smtp_reject_unauthorized', 'true') === 'true'
   };
 }
 
@@ -30,8 +31,20 @@ function buildTransporter(config) {
     host: config.host,
     port: config.port,
     secure: config.secure,
-    auth: config.user ? { user: config.user, pass: config.password } : undefined
+    auth: config.user ? { user: config.user, pass: config.password } : undefined,
+    // 內部/自架郵件伺服器常用自簽憑證，預設仍驗證憑證（安全預設），
+    // 管理員可在系統設定明確關閉以排除 "unable to get local issuer certificate" 錯誤
+    tls: { rejectUnauthorized: config.rejectUnauthorized !== false }
   });
+}
+
+// "unable to get local issuer certificate" 等憑證鏈錯誤，補充可行動的提示
+function describeError(err) {
+  const msg = err.message || String(err);
+  if (/certificate|CERT_|self.signed/i.test(msg)) {
+    return msg + '（憑證驗證失敗，若確定是內部/自架郵件伺服器且可信任，可在下方停用「驗證 SMTP 憑證」後再試一次）';
+  }
+  return msg;
 }
 
 const EmailService = {
@@ -60,7 +73,7 @@ const EmailService = {
       });
       return true;
     } catch (err) {
-      console.error('[EmailService] 寄送失敗:', err.message);
+      console.error('[EmailService] 寄送失敗:', describeError(err));
       return false;
     }
   },
@@ -84,7 +97,10 @@ const EmailService = {
       secure: overrides.secure !== undefined ? (overrides.secure === 'true' || overrides.secure === true) : saved.secure,
       user: overrides.user || saved.user,
       password: overrides.password || saved.password,
-      from: overrides.from || saved.from
+      from: overrides.from || saved.from,
+      rejectUnauthorized: overrides.rejectUnauthorized !== undefined
+        ? (overrides.rejectUnauthorized === 'true' || overrides.rejectUnauthorized === true)
+        : saved.rejectUnauthorized
     };
     if (!config.host) return { success: false, message: '尚未設定 SMTP 主機，請先填寫下方欄位' };
 
@@ -98,7 +114,7 @@ const EmailService = {
       });
       return { success: true, message: '測試郵件已成功寄出，請確認收件匣（含垃圾郵件）' };
     } catch (err) {
-      return { success: false, message: '寄送失敗：' + err.message };
+      return { success: false, message: '寄送失敗：' + describeError(err) };
     }
   }
 };

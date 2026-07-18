@@ -25,6 +25,7 @@
   const smtpUserSetting = localSettings.find(s => s.setting_key === 'smtp_user');
   const smtpPasswordSetting = localSettings.find(s => s.setting_key === 'smtp_password');
   const smtpFromSetting = localSettings.find(s => s.setting_key === 'smtp_from');
+  const smtpRejectUnauthorizedSetting = localSettings.find(s => s.setting_key === 'smtp_reject_unauthorized');
 
   const isEmailEnabled = emailEnabledSetting ? emailEnabledSetting.setting_value === 'true' : false;
   const smtpHostValue = smtpHostSetting ? smtpHostSetting.setting_value : '';
@@ -33,6 +34,7 @@
   const smtpUserValue = smtpUserSetting ? smtpUserSetting.setting_value : '';
   const smtpPasswordIsSet = !!(smtpPasswordSetting && smtpPasswordSetting.setting_value);
   const smtpFromValue = smtpFromSetting ? smtpFromSetting.setting_value : '';
+  const isSmtpRejectUnauthorized = smtpRejectUnauthorizedSetting ? smtpRejectUnauthorizedSetting.setting_value === 'true' : true;
 
   // LINE 通知設定
   const lineEnabledSetting = localSettings.find(s => s.setting_key === 'line_notification_enabled');
@@ -259,6 +261,13 @@
   bodyHtml += '          <label for="smtp_password" class="form-label">SMTP 密碼 / App Password</label>';
   bodyHtml += '          <input type="password" class="form-control" id="smtp_password" name="smtp_password" value="" placeholder="' + (smtpPasswordIsSet ? '已設定，留空則不變更' : '尚未設定') + '" autocomplete="new-password">';
   bodyHtml += '        </div>';
+  bodyHtml += '        <div class="col-12">';
+  bodyHtml += '          <div class="form-check form-switch">';
+  bodyHtml += '            <input class="form-check-input" type="checkbox" id="smtp_reject_unauthorized" name="smtp_reject_unauthorized" value="true" ' + (isSmtpRejectUnauthorized ? 'checked' : '') + '>';
+  bodyHtml += '            <label class="form-check-label" for="smtp_reject_unauthorized">驗證 SMTP 憑證</label>';
+  bodyHtml += '          </div>';
+  bodyHtml += '          <div class="form-text">若寄送失敗訊息包含「unable to get local issuer certificate」，通常是內部/自架郵件伺服器使用自簽憑證造成。<strong>確認該伺服器可信任後</strong>再關閉此選項；一般公開 SMTP 服務（Gmail、Outlook 等）請保持開啟。</div>';
+  bodyHtml += '        </div>';
   bodyHtml += '      </div>';
   bodyHtml += '      <hr class="my-4">';
   bodyHtml += '      <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> 儲存設定</button>';
@@ -407,10 +416,10 @@
   bodyHtml += '    });';
   bodyHtml += '  }';
   bodyHtml += '';
-  bodyHtml += '  function wireSwitchForm(formId, checkboxIds, secretIds) {';
+  bodyHtml += '  function wireSwitchForm(formId, checkboxIds, secretIds, labelToggleIds) {';
   bodyHtml += '    const form = document.getElementById(formId);';
   bodyHtml += '    if (!form) return;';
-  bodyHtml += '    checkboxIds.forEach(function (id) {';
+  bodyHtml += '    (labelToggleIds || []).forEach(function (id) {';
   bodyHtml += '      const cb = document.getElementById(id);';
   bodyHtml += '      if (!cb) return;';
   bodyHtml += '      cb.addEventListener("change", function () {';
@@ -435,8 +444,8 @@
   bodyHtml += '      });';
   bodyHtml += '    });';
   bodyHtml += '  }';
-  bodyHtml += '  wireSwitchForm("emailSettingsForm", ["email_notification_enabled", "smtp_secure"], ["smtp_password"]);';
-  bodyHtml += '  wireSwitchForm("lineSettingsForm", ["line_notification_enabled"], ["line_channel_access_token", "line_channel_secret"]);';
+  bodyHtml += '  wireSwitchForm("emailSettingsForm", ["email_notification_enabled", "smtp_secure", "smtp_reject_unauthorized"], ["smtp_password"], ["email_notification_enabled"]);';
+  bodyHtml += '  wireSwitchForm("lineSettingsForm", ["line_notification_enabled"], ["line_channel_access_token", "line_channel_secret"], ["line_notification_enabled"]);';
   bodyHtml += '';
   bodyHtml += '  const testEmailBtn = document.getElementById("testEmailBtn");';
   bodyHtml += '  if (testEmailBtn) {';
@@ -462,7 +471,8 @@
   bodyHtml += '          smtp_secure: document.getElementById("smtp_secure").checked,';
   bodyHtml += '          smtp_user: document.getElementById("smtp_user").value,';
   bodyHtml += '          smtp_password: document.getElementById("smtp_password").value,';
-  bodyHtml += '          smtp_from: document.getElementById("smtp_from").value';
+  bodyHtml += '          smtp_from: document.getElementById("smtp_from").value,';
+  bodyHtml += '          smtp_reject_unauthorized: document.getElementById("smtp_reject_unauthorized").checked';
   bodyHtml += '        })';
   bodyHtml += '      })';
   bodyHtml += '        .then(function (res) { return res.json(); })';

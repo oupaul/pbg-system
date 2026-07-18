@@ -271,7 +271,8 @@ router.post('/test-email', requireAuth, requireAdmin, async (req, res) => {
     secure: req.body.smtp_secure,
     user: req.body.smtp_user,
     password: req.body.smtp_password,
-    from: req.body.smtp_from
+    from: req.body.smtp_from,
+    rejectUnauthorized: req.body.smtp_reject_unauthorized
   });
   res.json(result);
 });

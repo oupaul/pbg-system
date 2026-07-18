@@ -137,7 +137,7 @@ const User = {
     return db.prepare(`SELECT id, name FROM users WHERE is_active = 1 ORDER BY name`).all();
   },
 
-  // 取得啟用中且非系統管理員的使用者（供「負責業務（使用者）」下拉選單使用，系統管理員不應被指派為客戶負責業務）
+  // 取得啟用中且非系統管理員的使用者（供「客戶關係負責人（使用者）」下拉選單使用，系統管理員不應被指派為客戶關係負責人）
   findActiveNonAdmin() {
     return db.prepare(`SELECT id, name FROM users WHERE is_active = 1 AND role != 'admin' ORDER BY name`).all();
   },

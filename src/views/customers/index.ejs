@@ -137,7 +137,7 @@ ${typeof success !== 'undefined' && success ? `
             </th>
             <th>
               <a href="?${(sortLinks && sortLinks.owner_salesperson_name) || ''}" class="text-white text-decoration-none">
-                負責業務${(sortIcons && sortIcons.owner_salesperson_name) || ''}
+                客戶關係負責人${(sortIcons && sortIcons.owner_salesperson_name) || ''}
               </a>
             </th>
             <th>
@@ -230,7 +230,7 @@ ${typeof success !== 'undefined' && success ? `
           </div>
           <hr>
           <div class="mb-3">
-            <label class="form-label">負責業務（使用者）</label>
+            <label class="form-label">客戶關係負責人（使用者）</label>
             <select name="owner_salesperson_id" class="form-select">
               <option value="">-- 選擇使用者 --</option>
               ${(staffUsers || []).map(u => '<option value="' + u.id + '">' + (u.name || '').replace(/"/g, '&quot;') + '</option>').join('')}
