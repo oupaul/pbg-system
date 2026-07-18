@@ -277,7 +277,7 @@ router.get('/:id', (req, res) => {
     closed_count: projects.filter(p => p.status === '已結案').length
   };
 
-  // 潛在商機（依角色權限範圍過濾）
+  // 銷售機會（依角色權限範圍過濾）
   const pipelines = Pipeline.findAll({ customer_id: customer.id }, req.user);
 
   // 活動時間軸

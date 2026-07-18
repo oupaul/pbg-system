@@ -45,7 +45,7 @@ const requireEditPermission = (req, res, next) => {
   });
 };
 
-// CRM（客戶/潛在商機）編輯權限：獨立於財務相關的 can_edit，
+// CRM（客戶/銷售機會）編輯權限：獨立於財務相關的 can_edit，
 // 業務開發是業務員的基本工作內容，不因專案唯讀限制而連帶受限。
 const requireCrmEditPermission = (req, res, next) => {
   if (!req.user) return res.status(401).json({ error: '未登入' });

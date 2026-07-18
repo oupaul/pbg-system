@@ -115,7 +115,7 @@ ${typeof success !== 'undefined' && success ? `
                 統一編號${(sortIcons && sortIcons.tax_id) || ''}
               </a>
             </th>
-            <th style="width: 180px;">
+            <th style="white-space: nowrap;">
               <a href="?${(sortLinks && sortLinks.company_name) || ''}" class="text-white text-decoration-none">
                 公司名稱${(sortIcons && sortIcons.company_name) || ''}
               </a>
@@ -168,7 +168,7 @@ ${typeof success !== 'undefined' && success ? `
             <tr onclick="location.href='/customers/${c.id}'" style="cursor:pointer">
               <td><code>${c.customer_code || ''}</code></td>
               <td>${c.tax_id || '-'}</td>
-              <td style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${(c.company_name || '').replace(/"/g, '&quot;')}"><strong>${c.company_name || ''}</strong></td>
+              <td style="white-space: nowrap;"><strong>${c.company_name || ''}</strong></td>
               <td class="text-center">${c.project_count || 0}</td>
               <td class="text-end">$${(c.total_project_amount || 0).toLocaleString()}</td>
               <td>

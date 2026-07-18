@@ -27,7 +27,7 @@ function getAssignedSalespersonIds(userId) {
 }
 
 const Pipeline = {
-  // 取得潛在商機列表（依角色權限範圍過濾，並可依狀態/客戶篩選）
+  // 取得銷售機會列表（依角色權限範圍過濾，並可依狀態/客戶篩選）
   findAll(filters = {}, user = null) {
     let conditions = `WHERE p.deleted_at IS NULL`;
     const params = [];

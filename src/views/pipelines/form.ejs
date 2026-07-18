@@ -3,7 +3,7 @@
   <div class="col">
     <h1 class="h3">
       <i class="bi bi-${pipeline ? 'pencil' : 'plus-lg'}"></i>
-      ${pipeline ? '編輯潛在商機' : '新增潛在商機'}
+      ${pipeline ? '編輯銷售機會' : '新增銷售機會'}
     </h1>
   </div>
 </div>
@@ -60,7 +60,7 @@ ${error ? `
         </div>
 
         <div class="col-12">
-          <label class="form-label">商機名稱 <span class="text-danger">*</span></label>
+          <label class="form-label">銷售機會名稱 <span class="text-danger">*</span></label>
           <input type="text" name="opportunity_name" class="form-control" value="${pipeline ? (pipeline.opportunity_name || '').replace(/"/g, '&quot;') : ''}" required>
         </div>
 
@@ -87,9 +87,14 @@ ${error ? `
           <label class="form-label">成交機率 <span class="text-danger">*</span></label>
           <select name="win_probability" class="form-select" required>
             <option value="">-- 選擇機率 --</option>
-            ${[10, 30, 50, 70, 90, 100].map(pct => {
-              const selected = pipeline && pipeline.win_probability !== null && pipeline.win_probability !== undefined && Number(pipeline.win_probability) === pct ? 'selected' : '';
-              return '<option value="' + pct + '" ' + selected + '>' + pct + '%</option>';
+            ${[
+              { pct: 10, label: '初步接洽' },
+              { pct: 30, label: '需求分析' },
+              { pct: 50, label: '提案報價' },
+              { pct: 100, label: '商務談判' }
+            ].map(stage => {
+              const selected = pipeline && pipeline.win_probability !== null && pipeline.win_probability !== undefined && Number(pipeline.win_probability) === stage.pct ? 'selected' : '';
+              return '<option value="' + stage.pct + '" ' + selected + '>' + stage.label + ' ' + stage.pct + '%</option>';
             }).join('')}
           </select>
         </div>

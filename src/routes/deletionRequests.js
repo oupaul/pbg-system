@@ -5,7 +5,7 @@ const Activity = require('../models/Activity');
 const { requireDeletePermission } = require('../middleware/auth');
 
 const TARGET_LABELS = {
-  pipeline: '潛在商機',
+  pipeline: '銷售機會',
   activity: '活動紀錄'
 };
 
