@@ -29,12 +29,15 @@ function migrateUserRoles() {
       console.log('✓ salesperson_id 欄位已存在');
     }
 
-    // 檢查是否需要更新 role CHECK 約束
+    // 檢查是否需要移除舊的 role CHECK 約束（僅允許 admin/user）。
+    // 角色本身改由 roles 表管理（含後續新增的自訂角色），users.role 不應再用寫死的清單限制，
+    // 否則遇到既有資料已有 CHECK 清單以外角色值（例如透過角色管理新增的自訂角色）時，遷移會直接失敗。
     const schemaResult = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get();
     const currentSchema = schemaResult?.sql || '';
-    
-    if (!currentSchema.includes('salesperson') || !currentSchema.includes('boss')) {
-      console.log('更新 users 表結構以支援新角色...');
+    const hasRestrictiveCheck = currentSchema.includes('CHECK') && currentSchema.includes('role IN');
+
+    if (hasRestrictiveCheck) {
+      console.log('偵測到舊的 role CHECK 約束，更新 users 表結構...');
       
       // 開始事務
       db.exec('BEGIN TRANSACTION');
@@ -47,7 +50,7 @@ function migrateUserRoles() {
             username TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
             name TEXT NOT NULL,
-            role TEXT DEFAULT 'user' CHECK(role IN ('admin', 'user', 'salesperson', 'boss')),
+            role TEXT DEFAULT 'user',
             salesperson_id INTEGER,
             is_active INTEGER DEFAULT 1,
             created_at TEXT DEFAULT (datetime('now', 'localtime')),
@@ -95,7 +98,7 @@ function migrateUserRoles() {
         throw err;
       }
     } else {
-      console.log('✓ users 表已支援新角色');
+      console.log('✓ users.role 已無限制性 CHECK 約束，無需遷移');
     }
 
     // 重新啟用外鍵約束
