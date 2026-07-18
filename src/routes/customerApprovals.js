@@ -3,6 +3,7 @@ const router = express.Router();
 const CustomerCreationRequest = require('../models/CustomerCreationRequest');
 const Salesperson = require('../models/Salesperson');
 const User = require('../models/User');
+const Pipeline = require('../models/Pipeline');
 const db = require('../models/db');
 const NotificationService = require('../services/NotificationService');
 
@@ -77,11 +78,12 @@ router.post('/:id/approve', requireCustomerApprovalPermission, (req, res) => {
     const request = CustomerCreationRequest.findById(req.params.id);
     const { customerId, pipelineId } = CustomerCreationRequest.approve(req.params.id, req.user);
     if (request) {
+      const approvedPipeline = pipelineId ? Pipeline.findById(pipelineId) : null;
       NotificationService.notify(request.requested_by, {
         type: 'customer_approval_approved',
         title: `審核通過：${request.company_name}`,
-        message: pipelineId
-          ? `審核人：${req.user.name || req.user.username}（含銷售機會：${request.pipeline_opportunity_name}）`
+        message: approvedPipeline
+          ? `審核人：${req.user.name || req.user.username}\n\n${NotificationService.formatPipelineSummary(approvedPipeline)}`
           : `審核人：${req.user.name || req.user.username}`,
         link: pipelineId ? `/pipelines/${pipelineId}` : `/customers/${customerId}`,
         related_type: pipelineId ? 'pipeline' : 'customer',

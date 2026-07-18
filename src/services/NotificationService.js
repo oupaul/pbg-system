@@ -71,6 +71,28 @@ function getSystemSetting(key, defaultValue) {
   }
 }
 
+const WIN_PROBABILITY_STAGES = { 10: '初步接洽', 30: '需求分析', 50: '提案報價', 100: '商務談判' };
+
+// 通知內文用：把銷售機會的實際內容組成人看得懂的摘要文字（客戶、金額、機率、預計成交月份等）
+function formatPipelineSummary(pipeline) {
+  if (!pipeline) return '';
+  const stageLabel = WIN_PROBABILITY_STAGES[pipeline.win_probability];
+  const probText = pipeline.win_probability !== null && pipeline.win_probability !== undefined
+    ? (stageLabel ? `${stageLabel} ${pipeline.win_probability}%` : `${pipeline.win_probability}%`)
+    : '-';
+  const lines = [
+    `客戶：${pipeline.customer_name || '-'}`,
+    `銷售機會名稱：${pipeline.opportunity_name || '-'}`,
+    `預估專案類型：${pipeline.project_type || '-'}`,
+    `預估金額：$${(pipeline.estimated_amount || 0).toLocaleString()}`,
+    `成交機率：${probText}`,
+    `預計成交月份：${pipeline.expected_close_year_month || '-'}`,
+    `業務人員：${pipeline.salesperson_name || '-'}`
+  ];
+  if (pipeline.notes) lines.push(`備註：${pipeline.notes}`);
+  return lines.join('\n');
+}
+
 const NotificationService = {
   notify(userId, { type, title, message, link, related_type, related_id }) {
     if (!userId) return null;
@@ -184,3 +206,4 @@ const NotificationService = {
 
 module.exports = NotificationService;
 module.exports.getNotificationIcon = getNotificationIcon;
+module.exports.formatPipelineSummary = formatPipelineSummary;

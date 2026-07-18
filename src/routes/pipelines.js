@@ -86,10 +86,11 @@ router.post('/', requireCrmEditPermission, (req, res) => {
       notes: req.body.notes,
       userInfo: getUserInfo(req)
     });
+    const createdPipeline = Pipeline.findById(id);
     NotificationService.notifyBusinessWatchers({
       type: 'pipeline_created',
       title: `新增銷售機會：${req.body.opportunity_name}`,
-      message: `建立人：${getUserInfo(req)}`,
+      message: `建立人：${getUserInfo(req)}\n\n${NotificationService.formatPipelineSummary(createdPipeline)}`,
       link: `/pipelines/${id}`,
       related_type: 'pipeline',
       related_id: id
@@ -155,10 +156,11 @@ router.post('/:id', requireCrmEditPermission, (req, res) => {
       notes: req.body.notes,
       userInfo: getUserInfo(req)
     });
+    const updatedPipeline = Pipeline.findById(req.params.id);
     NotificationService.notifyBusinessWatchers({
       type: 'pipeline_updated',
       title: `銷售機會已更新：${req.body.opportunity_name}`,
-      message: `編輯人：${getUserInfo(req)}`,
+      message: `編輯人：${getUserInfo(req)}\n\n${NotificationService.formatPipelineSummary(updatedPipeline)}`,
       link: `/pipelines/${req.params.id}`,
       related_type: 'pipeline',
       related_id: req.params.id
@@ -181,7 +183,8 @@ router.post('/:id/status', requireCrmEditPermission, (req, res) => {
     NotificationService.notifyBusinessWatchers({
       type: 'pipeline_status_changed',
       title: `銷售機會狀態變更：${pipeline ? pipeline.opportunity_name : ''} → ${req.body.status}`,
-      message: `操作人：${getUserInfo(req)}` + (req.body.lost_reason ? `，流失原因：${req.body.lost_reason}` : ''),
+      message: `操作人：${getUserInfo(req)}` + (req.body.lost_reason ? `，流失原因：${req.body.lost_reason}` : '') +
+        `\n\n${NotificationService.formatPipelineSummary(pipeline)}`,
       link: `/pipelines/${req.params.id}`,
       related_type: 'pipeline',
       related_id: req.params.id
@@ -258,7 +261,7 @@ router.post('/:id/convert', requireEditPermission, (req, res) => {
     NotificationService.notifyBusinessWatchers({
       type: 'pipeline_converted',
       title: `銷售機會已轉入專案：${pipeline.opportunity_name}`,
-      message: `專案編號：${req.body.project_code}，操作人：${getUserInfo(req)}`,
+      message: `專案編號：${req.body.project_code}，操作人：${getUserInfo(req)}\n\n${NotificationService.formatPipelineSummary(pipeline)}`,
       link: `/projects/${projectId}`,
       related_type: 'project',
       related_id: projectId

@@ -3,6 +3,7 @@
  */
 const nodemailer = require('nodemailer');
 const db = require('../models/db');
+const deployConfig = require('../config/deploy');
 
 function getSetting(key, defaultValue) {
   try {
@@ -81,7 +82,7 @@ const EmailService = {
   async sendNotificationEmail(user, notification) {
     if (!user || !user.email) return false;
     const body = [notification.message, notification.link ? `請登入系統查看：${notification.link}` : ''].filter(Boolean).join('\n\n');
-    return this.sendMail(user.email, `[業績獎金系統] ${notification.title}`, body);
+    return this.sendMail(user.email, `[${deployConfig.siteName}] ${notification.title}`, body);
   },
 
   // 供系統設定頁「測試發送」使用：刻意不檢查 email_notification_enabled，
@@ -109,7 +110,7 @@ const EmailService = {
       await transporter.sendMail({
         from: config.from || config.user,
         to,
-        subject: '[業績獎金系統] 測試郵件',
+        subject: `[${deployConfig.siteName}] 測試郵件`,
         text: '這是一封測試郵件，用來確認 SMTP 設定是否正確。若您收到此信，代表 Email 通知功能設定成功。'
       });
       return { success: true, message: '測試郵件已成功寄出，請確認收件匣（含垃圾郵件）' };
