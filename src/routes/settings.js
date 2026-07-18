@@ -155,24 +155,31 @@ router.post('/update', requireAuth, requireAdmin, (req, res) => {
           return res.redirect('/settings?error=' + encodeURIComponent('警告提前時間必須在 1-10 分鐘之間'));
         }
       }
+
+      // 特別驗證客戶追蹤提醒天數：必須在 1-90 天之間
+      if (setting_key === 'activity_reminder_days') {
+        if (num < 1 || num > 90) {
+          return res.redirect('/settings?error=' + encodeURIComponent('客戶追蹤提醒天數必須在 1-90 天之間'));
+        }
+      }
     } else if (setting_type === 'boolean') {
       validatedValue = setting_value === 'true' || setting_value === '1' || setting_value === 'on';
     }
-    
+
     // 獲取舊值用於審計日誌
     const oldSetting = db.prepare('SELECT * FROM system_settings WHERE setting_key = ?').get(setting_key);
     const oldValue = oldSetting ? oldSetting.setting_value : null;
-    
+
     // 更新設定
     const success = updateSystemSetting(setting_key, validatedValue, setting_type);
-    
+
     if (success) {
       // 記錄審計日誌
-      AuditLogService.logUpdate('system_settings', setting_key, 
-        { setting_value: oldValue }, 
-        { setting_value: String(validatedValue) }, 
+      AuditLogService.logUpdate('system_settings', setting_key,
+        { setting_value: oldValue },
+        { setting_value: String(validatedValue) },
         getUserInfo(req));
-      
+
       res.redirect('/settings?success=' + encodeURIComponent('設定已成功更新'));
     } else {
       res.redirect('/settings?error=' + encodeURIComponent('更新設定失敗'));
@@ -238,6 +245,14 @@ router.post('/bulk-update', requireAuth, requireAdmin, (req, res) => {
           if (key === 'idle_warning_minutes') {
             if (num < 1 || num > 10) {
               errors.push('警告提前時間必須在 1-10 分鐘之間');
+              continue;
+            }
+          }
+
+          // 特別驗證客戶追蹤提醒天數
+          if (key === 'activity_reminder_days') {
+            if (num < 1 || num > 90) {
+              errors.push('客戶追蹤提醒天數必須在 1-90 天之間');
               continue;
             }
           }

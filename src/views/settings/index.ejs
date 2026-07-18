@@ -10,12 +10,14 @@
   const idleTimeoutSetting = localSettings.find(s => s.setting_key === 'idle_timeout_minutes');
   const idleWarningSetting = localSettings.find(s => s.setting_key === 'idle_warning_minutes');
   const attachmentCleanupSetting = localSettings.find(s => s.setting_key === 'attachment_cleanup_retention_days');
-  
+  const activityReminderDaysSetting = localSettings.find(s => s.setting_key === 'activity_reminder_days');
+
   const notificationDaysValue = notificationDaysSetting ? notificationDaysSetting.setting_value : '6';
   const notificationEnabledValue = notificationEnabledSetting ? notificationEnabledSetting.setting_value : 'true';
   const idleTimeoutValue = idleTimeoutSetting ? idleTimeoutSetting.setting_value : '30';
   const idleWarningValue = idleWarningSetting ? idleWarningSetting.setting_value : '2';
   const attachmentCleanupValue = attachmentCleanupSetting ? attachmentCleanupSetting.setting_value : '30';
+  const activityReminderDaysValue = activityReminderDaysSetting ? activityReminderDaysSetting.setting_value : '14';
 
   // Email 通知設定
   const emailEnabledSetting = localSettings.find(s => s.setting_key === 'email_notification_enabled');
@@ -147,7 +149,28 @@
   bodyHtml += '    </form>';
   bodyHtml += '  </div>';
   bodyHtml += '</div>';
-  
+
+  // 客戶追蹤提醒設定卡片
+  bodyHtml += '<div class="card mt-4">';
+  bodyHtml += '  <div class="card-header bg-primary text-white">';
+  bodyHtml += '    <h5 class="mb-0"><i class="bi bi-person-lines-fill"></i> 客戶追蹤提醒設定</h5>';
+  bodyHtml += '  </div>';
+  bodyHtml += '  <div class="card-body">';
+  bodyHtml += '    <form method="POST" action="/settings/bulk-update">';
+  bodyHtml += '      <label for="activity_reminder_days" class="form-label">';
+  bodyHtml += '        <i class="bi bi-calendar-event"></i> <strong>逾期天數</strong>';
+  bodyHtml += '      </label>';
+  bodyHtml += '      <div class="input-group" style="max-width: 260px;">';
+  bodyHtml += '        <input type="number" class="form-control" id="activity_reminder_days" name="activity_reminder_days" value="' + activityReminderDaysValue + '" min="1" max="90" required>';
+  bodyHtml += '        <span class="input-group-text">天</span>';
+  bodyHtml += '      </div>';
+  bodyHtml += '      <div class="form-text">客戶已指派「客戶關係負責人」時，若超過此天數沒有新增任何活動紀錄（拜訪/電話/客訴/其他），就會在首頁儀表板的「客戶追蹤提醒」與導覽列通知中心產生提醒。</div>';
+  bodyHtml += '      <hr class="my-4">';
+  bodyHtml += '      <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> 儲存設定</button>';
+  bodyHtml += '    </form>';
+  bodyHtml += '  </div>';
+  bodyHtml += '</div>';
+
   // 閒置登出設定卡片
   bodyHtml += '<div class="card mt-4">';
   bodyHtml += '  <div class="card-header bg-primary text-white">';
