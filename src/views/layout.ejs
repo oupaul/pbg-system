@@ -39,17 +39,6 @@
             <a class="nav-link <%= navActive('/') %>" href="/"><i class="bi bi-house"></i> 首頁</a>
           </li>
           <% } %>
-          <li class="nav-item">
-            <a class="nav-link <%= navActive('/projects') %>" href="/projects"><i class="bi bi-folder"></i> 專案管理</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link <%= navActive('/search') %>" href="/search"><i class="bi bi-search"></i> 搜尋</a>
-          </li>
-          <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user' || user.salesperson_id)) { %>
-          <li class="nav-item">
-            <a class="nav-link <%= navActive('/gross-profit') %>" href="/gross-profit"><i class="bi bi-pie-chart"></i> 毛利分析</a>
-          </li>
-          <% } %>
           <% if (typeof canEditCrm !== 'undefined' && canEditCrm) { %>
           <li class="nav-item">
             <a class="nav-link <%= navActive('/customers') %>" href="/customers"><i class="bi bi-building"></i> 客戶/廠商</a>
@@ -58,6 +47,17 @@
             <a class="nav-link <%= navActive('/pipelines') %>" href="/pipelines"><i class="bi bi-bullseye"></i> 銷售機會管理</a>
           </li>
           <% } %>
+          <li class="nav-item">
+            <a class="nav-link <%= navActive('/projects') %>" href="/projects"><i class="bi bi-folder"></i> 專案管理</a>
+          </li>
+          <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user' || user.salesperson_id)) { %>
+          <li class="nav-item">
+            <a class="nav-link <%= navActive('/gross-profit') %>" href="/gross-profit"><i class="bi bi-pie-chart"></i> 毛利分析</a>
+          </li>
+          <% } %>
+          <li class="nav-item">
+            <a class="nav-link <%= navActive('/search') %>" href="/search"><i class="bi bi-search"></i> 搜尋</a>
+          </li>
           <% if (typeof canDelete !== 'undefined' && canDelete) { %>
           <li class="nav-item">
             <a class="nav-link <%= navActive('/deletion-requests') %>" href="/deletion-requests">
