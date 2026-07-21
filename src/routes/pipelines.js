@@ -33,6 +33,55 @@ function getTypeColorMap() {
   return typeColorMap;
 }
 
+const WIN_PROBABILITY_STAGES = { 10: '初步接洽', 30: '需求分析', 50: '提案報價', 100: '商務談判' };
+
+// 銷售機會列表統計：預估金額總計、依成交機率分類加總、依預計成交月份加總
+// 統計範圍與目前列表一致（套用同一組狀態篩選後的結果）
+function buildPipelineSummary(pipelines) {
+  const totalEstimatedAmount = pipelines.reduce((sum, p) => sum + (p.estimated_amount || 0), 0);
+
+  // 依實際出現過的成交機率分類（不只固定的 10/30/50/100 四階段，避免舊資料或例外值被漏算，
+  // 導致加總分類的合計與「預估金額總計」對不起來）
+  const probabilityGroups = new Map();
+  pipelines.forEach(p => {
+    const key = p.win_probability !== null && p.win_probability !== undefined ? p.win_probability : null;
+    if (!probabilityGroups.has(key)) probabilityGroups.set(key, { amount: 0, count: 0 });
+    const g = probabilityGroups.get(key);
+    g.amount += (p.estimated_amount || 0);
+    g.count += 1;
+  });
+  const byProbability = [...probabilityGroups.entries()]
+    .map(([pct, v]) => ({
+      pct,
+      label: pct !== null ? (WIN_PROBABILITY_STAGES[pct] || '') : '未設定',
+      amount: v.amount,
+      count: v.count
+    }))
+    .sort((a, b) => {
+      if (a.pct === null) return 1;
+      if (b.pct === null) return -1;
+      return b.pct - a.pct;
+    });
+
+  const monthGroups = new Map();
+  pipelines.forEach(p => {
+    const key = p.expected_close_year_month || '未設定';
+    if (!monthGroups.has(key)) monthGroups.set(key, { amount: 0, count: 0 });
+    const g = monthGroups.get(key);
+    g.amount += (p.estimated_amount || 0);
+    g.count += 1;
+  });
+  const byMonth = [...monthGroups.entries()]
+    .map(([month, v]) => ({ month, amount: v.amount, count: v.count }))
+    .sort((a, b) => {
+      if (a.month === '未設定') return 1;
+      if (b.month === '未設定') return -1;
+      return a.month.localeCompare(b.month);
+    });
+
+  return { totalEstimatedAmount, totalCount: pipelines.length, byProbability, byMonth };
+}
+
 // 銷售機會列表
 router.get('/', (req, res) => {
   try {
@@ -108,6 +157,7 @@ router.get('/', (req, res) => {
       sortLinks,
       sortIcons,
       typeColorMap: getTypeColorMap(),
+      summary: buildPipelineSummary(pipelines),
       error: req.query.error || ''
     });
   } catch (err) {
