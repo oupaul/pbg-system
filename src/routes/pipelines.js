@@ -79,7 +79,24 @@ function buildPipelineSummary(pipelines) {
       return a.month.localeCompare(b.month);
     });
 
-  return { totalEstimatedAmount, totalCount: pipelines.length, byProbability, byMonth };
+  // 依業務分類加總（列表現在對所有人開放，方便一眼看出各業務手上商機的分布）
+  const salespersonGroups = new Map();
+  pipelines.forEach(p => {
+    const key = p.salesperson_name || '未指定';
+    if (!salespersonGroups.has(key)) salespersonGroups.set(key, { amount: 0, count: 0 });
+    const g = salespersonGroups.get(key);
+    g.amount += (p.estimated_amount || 0);
+    g.count += 1;
+  });
+  const bySalesperson = [...salespersonGroups.entries()]
+    .map(([salesperson, v]) => ({ salesperson, amount: v.amount, count: v.count }))
+    .sort((a, b) => {
+      if (a.salesperson === '未指定') return 1;
+      if (b.salesperson === '未指定') return -1;
+      return b.amount - a.amount;
+    });
+
+  return { totalEstimatedAmount, totalCount: pipelines.length, byProbability, byMonth, bySalesperson };
 }
 
 // 銷售機會列表

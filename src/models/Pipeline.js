@@ -1,7 +1,6 @@
 const db = require('./db');
 const AuditLogService = require('../services/AuditLogService');
 const Project = require('./Project');
-const { PROJECT_VIEW_SCOPE, ROLES } = require('../constants');
 
 // 預估專案類型支援複選：checkbox 同名欄位在 express (qs extended) 底下，
 // 勾選多個時 req.body.project_type 會是陣列，勾選一個時是字串，都正規化成逗號分隔字串儲存
@@ -14,47 +13,12 @@ function normalizeProjectTypes(value) {
   return null;
 }
 
-// 與 Project.js 相同的權限範圍過濾邏輯，Pipeline 沿用同一套角色設定
-function getAssignedSalespersonIds(userId) {
-  try {
-    const rows = db.prepare(
-      'SELECT salesperson_id FROM user_salesperson_access WHERE user_id = ?'
-    ).all(userId);
-    return rows.map(r => r.salesperson_id);
-  } catch {
-    return [];
-  }
-}
-
 const Pipeline = {
-  // 取得銷售機會列表（依角色權限範圍過濾，並可依狀態/客戶篩選）
+  // 取得銷售機會列表：對所有登入者開放（比照客戶/廠商列表的做法），業務開發資訊由團隊互相可見，
+  // 不像正式專案的財務金額需要依角色權限範圍過濾；可依狀態/客戶篩選
   findAll(filters = {}, user = null) {
     let conditions = `WHERE p.deleted_at IS NULL`;
     const params = [];
-
-    if (user) {
-      const scope = user.project_view_scope ||
-        (user.role === ROLES.SALESPERSON ? PROJECT_VIEW_SCOPE.OWN : PROJECT_VIEW_SCOPE.ALL);
-
-      // 除了依業務員範圍過濾外，商機的「負責人員」本人一律看得到自己在追蹤的商機，
-      // 避免商機沒有指定業務人員（salesperson_id 為 NULL）時，連建立者/負責人員自己都看不到
-      if (scope === PROJECT_VIEW_SCOPE.OWN && user.salesperson_id) {
-        conditions += ` AND (p.salesperson_id = ? OR p.owner_user_id = ?)`;
-        params.push(user.salesperson_id, user.id);
-      } else if (scope === PROJECT_VIEW_SCOPE.ASSIGNED) {
-        const ids = getAssignedSalespersonIds(user.id);
-        if (ids.length > 0) {
-          conditions += ` AND (p.salesperson_id IN (${ids.map(() => '?').join(',')}) OR p.owner_user_id = ?)`;
-          params.push(...ids, user.id);
-        } else {
-          conditions += ` AND p.owner_user_id = ?`;
-          params.push(user.id);
-        }
-      } else if (scope === PROJECT_VIEW_SCOPE.NONE) {
-        conditions += ` AND p.owner_user_id = ?`;
-        params.push(user.id);
-      }
-    }
 
     if (filters.status) {
       conditions += ` AND p.status = ?`;

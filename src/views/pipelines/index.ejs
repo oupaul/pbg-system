@@ -62,28 +62,59 @@ ${error ? `
   </div>
 </div>
 
-<div class="card mb-3">
-  <div class="card-header"><i class="bi bi-calendar-range"></i> 依預計成交月份加總</div>
-  <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table table-sm table-hover mb-0">
-        <thead class="table-light">
-          <tr>
-            <th>預計成交月份</th>
-            <th class="text-center">筆數</th>
-            <th class="text-end">預估金額</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${(summary.byMonth || []).length === 0 ? '<tr><td colspan="3" class="text-center text-muted py-3">尚無資料</td></tr>' : (summary.byMonth || []).map(g => `
-            <tr>
-              <td>${escapeHtml(g.month)}</td>
-              <td class="text-center">${g.count || 0}</td>
-              <td class="text-end">$${(g.amount || 0).toLocaleString()}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+<div class="row g-3 mb-3">
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-calendar-range"></i> 依預計成交月份加總</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>預計成交月份</th>
+                <th class="text-center">筆數</th>
+                <th class="text-end">預估金額</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(summary.byMonth || []).length === 0 ? '<tr><td colspan="3" class="text-center text-muted py-3">尚無資料</td></tr>' : (summary.byMonth || []).map(g => `
+                <tr>
+                  <td>${escapeHtml(g.month)}</td>
+                  <td class="text-center">${g.count || 0}</td>
+                  <td class="text-end">$${(g.amount || 0).toLocaleString()}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-person-badge"></i> 依業務分類加總</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>業務</th>
+                <th class="text-center">筆數</th>
+                <th class="text-end">預估金額</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(summary.bySalesperson || []).length === 0 ? '<tr><td colspan="3" class="text-center text-muted py-3">尚無資料</td></tr>' : (summary.bySalesperson || []).map(g => `
+                <tr>
+                  <td>${escapeHtml(g.salesperson)}</td>
+                  <td class="text-center">${g.count || 0}</td>
+                  <td class="text-end">$${(g.amount || 0).toLocaleString()}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 </div>
