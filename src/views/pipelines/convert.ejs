@@ -1,10 +1,15 @@
+<%
+  function escapeHtml(str) {
+    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+%>
 <%- include('../layout', { body: `
 <div class="row mb-4">
   <div class="col">
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb mb-0">
         <li class="breadcrumb-item"><a href="/pipelines">銷售機會管理</a></li>
-        <li class="breadcrumb-item"><a href="/pipelines/${pipeline.id}">${pipeline.opportunity_name}</a></li>
+        <li class="breadcrumb-item"><a href="/pipelines/${pipeline.id}">${(pipeline.opportunity_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</a></li>
         <li class="breadcrumb-item active">轉入專案</li>
       </ol>
     </nav>
@@ -15,7 +20,7 @@
 
 ${error ? `
   <div class="alert alert-danger alert-dismissible fade show" role="alert">
-    <i class="bi bi-exclamation-triangle"></i> ${error}
+    <i class="bi bi-exclamation-triangle"></i> ${escapeHtml(error)}
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
   </div>
 ` : ''}
