@@ -56,7 +56,7 @@ const Customer = {
       LEFT JOIN projects p ON c.id = p.customer_id
       LEFT JOIN salespeople sp ON p.salesperson_id = sp.id
       LEFT JOIN users u ON c.owner_salesperson_id = u.id
-      WHERE 1=1${statusCond}${partyCond}${vendorCond}
+      WHERE c.deleted_at IS NULL${statusCond}${partyCond}${vendorCond}
       GROUP BY c.id
       ORDER BY c.company_name
     `).all(...amountScope.params, ...statusParams, ...partyParams, ...vendorParams);
@@ -68,7 +68,7 @@ const Customer = {
       SELECT c.*, u.name as owner_salesperson_name
       FROM customers c
       LEFT JOIN users u ON c.owner_salesperson_id = u.id
-      WHERE c.id = ?
+      WHERE c.id = ? AND c.deleted_at IS NULL
     `).get(id);
   },
 
@@ -105,7 +105,7 @@ const Customer = {
       LEFT JOIN projects p ON c.id = p.customer_id
       LEFT JOIN salespeople sp ON p.salesperson_id = sp.id
       LEFT JOIN users u ON c.owner_salesperson_id = u.id
-      WHERE 1=1${statusCond}${partyCond}${vendorCond}
+      WHERE c.deleted_at IS NULL${statusCond}${partyCond}${vendorCond}
         AND (c.customer_code LIKE ? OR c.tax_id LIKE ? OR c.company_name LIKE ? OR c.contact_name LIKE ?)
       GROUP BY c.id
       ORDER BY c.company_name
@@ -367,6 +367,17 @@ const Customer = {
     }
     
     return result.changes > 0;
+  },
+
+  // 軟刪除客戶/廠商（僅標記 deleted_at，關聯的專案/銷售機會/活動紀錄仍完整保留，
+  // 相關頁面的 JOIN 依然能正確顯示客戶名稱；僅列表/查詢會過濾掉已刪除的客戶）
+  softDelete(id, userInfo) {
+    const oldRecord = this.findById(id);
+    if (!oldRecord) return false;
+
+    db.prepare(`UPDATE customers SET deleted_at = datetime('now', 'localtime') WHERE id = ?`).run(id);
+    AuditLogService.logDelete('customers', id, oldRecord, userInfo);
+    return true;
   },
 
   // 取得或建立客戶

@@ -7,7 +7,8 @@ const NotificationService = require('../services/NotificationService');
 
 const TARGET_LABELS = {
   pipeline: '銷售機會',
-  activity: '活動紀錄'
+  activity: '活動紀錄',
+  customer: '客戶/廠商'
 };
 
 // 依申請的目標類型組出可點擊回原始資料的連結
@@ -18,6 +19,9 @@ function buildTargetLink(request) {
   if (request.target_type === 'activity') {
     const activity = Activity.findById(request.target_id);
     return activity ? `/customers/${activity.customer_id}` : null;
+  }
+  if (request.target_type === 'customer') {
+    return `/customers/${request.target_id}`;
   }
   return null;
 }

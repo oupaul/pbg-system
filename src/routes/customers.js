@@ -421,6 +421,47 @@ router.post('/:id/activities/:activityId/delete', requireCrmEditPermission, (req
   }
 });
 
+// 刪除客戶/廠商
+// 有 can_delete 權限者直接刪除；否則送出刪除申請，待管理員核准後才真正刪除
+router.post('/:id/delete', requireCrmEditPermission, (req, res) => {
+  try {
+    const customer = Customer.findById(req.params.id);
+    if (!customer) {
+      return res.status(404).render('error', { message: '找不到客戶', error: {} });
+    }
+
+    if (req.user.canDelete) {
+      Customer.softDelete(req.params.id, getUserInfo(req));
+      return res.redirect('/customers?success=' + encodeURIComponent('已刪除此客戶/廠商'));
+    }
+
+    const existing = DeletionRequest.findPendingByTarget('customer', customer.id);
+    if (existing) {
+      return res.redirect(`/customers/${req.params.id}?error=` + encodeURIComponent('此客戶/廠商已送出過刪除申請，待審核中'));
+    }
+
+    const requestId = DeletionRequest.create({
+      target_type: 'customer',
+      target_id: customer.id,
+      target_summary: `${customer.company_name}（${customer.customer_code}）`,
+      requested_by: req.user.id,
+      requested_by_name: getUserInfo(req)
+    });
+    NotificationService.notifyDeletionApprovers({
+      type: 'deletion_request_pending',
+      title: `刪除申請待審核：${customer.company_name}`,
+      message: `申請人：${getUserInfo(req)}`,
+      link: '/deletion-requests',
+      related_type: 'deletion_request',
+      related_id: requestId
+    }, req.user.id);
+    res.redirect(`/customers/${req.params.id}?success=` + encodeURIComponent('已送出刪除申請，待管理員審核後才會真正刪除'));
+  } catch (err) {
+    console.error(err);
+    res.redirect(`/customers/${req.params.id}?error=` + encodeURIComponent(err.message));
+  }
+});
+
 // 更新客戶
 router.post('/:id', requireCrmEditPermission, (req, res) => {
   try {
