@@ -71,10 +71,26 @@ const User = {
   // 更新最後登入時間
   updateLastLogin(id) {
     db.prepare(`
-      UPDATE users 
+      UPDATE users
       SET last_login = datetime('now', 'localtime')
       WHERE id = ?
     `).run(id);
+  },
+
+  // 更新最後活動時間（每次已登入請求時呼叫，用於判斷「目前線上」）
+  updateLastActive(id) {
+    db.prepare(`UPDATE users SET last_active_at = datetime('now', 'localtime') WHERE id = ?`).run(id);
+  },
+
+  // 取得最近 N 分鐘內有活動的啟用中使用者（視為「目前線上」）
+  findOnline(minutes) {
+    return db.prepare(`
+      SELECT id, username, name, role
+      FROM users
+      WHERE is_active = 1 AND last_active_at IS NOT NULL
+        AND last_active_at >= datetime('now', 'localtime', ?)
+      ORDER BY name
+    `).all(`-${minutes} minutes`);
   },
 
   // 更新密碼（使用 update 方法，確保一致性）

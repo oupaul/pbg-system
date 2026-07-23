@@ -12,6 +12,8 @@ const Notification = require('../models/Notification');
 const ActivityReminderService = require('./ActivityReminderService');
 const EmailService = require('./EmailService');
 const LineService = require('./LineService');
+const User = require('../models/User');
+const { ONLINE_THRESHOLD_MINUTES } = require('../constants');
 
 // 僅這些「重要事件」類型會嘗試透過 Email/LINE 發送，一般系統提醒（客戶追蹤、開票提醒）不發送，避免訊息轟炸
 const EXTERNAL_CHANNEL_TYPES = new Set([
@@ -55,7 +57,8 @@ const NOTIFICATION_ICONS = {
   pipeline_updated: { icon: 'bi-pencil-square', color: 'text-info' },
   pipeline_status_changed: { icon: 'bi-arrow-repeat', color: 'text-warning' },
   pipeline_converted: { icon: 'bi-folder-symlink', color: 'text-success' },
-  activity_created: { icon: 'bi-journal-text', color: 'text-info' }
+  activity_created: { icon: 'bi-journal-text', color: 'text-info' },
+  broadcast_message: { icon: 'bi-megaphone', color: 'text-primary' }
 };
 
 function getNotificationIcon(type) {
@@ -131,6 +134,18 @@ const NotificationService = {
       WHERE r.can_delete = 1 AND u.is_active = 1
     `).all();
     this.notifyUsers(rows.map(r => r.id), payload, excludeUserId);
+  },
+
+  // 廣播訊息給目前線上的使用者（最近 ONLINE_THRESHOLD_MINUTES 分鐘內有活動者），回傳實際送達人數
+  broadcastToOnlineUsers(message, sender) {
+    const online = User.findOnline(ONLINE_THRESHOLD_MINUTES).filter(u => u.id !== sender.id);
+    this.notifyUsers(online.map(u => u.id), {
+      type: 'broadcast_message',
+      title: '系統廣播訊息',
+      message,
+      link: '/notifications'
+    });
+    return online.length;
   },
 
   // 通知管理員於系統設定中指定的收件人（銷售機會新增/編輯/狀態變更/轉入專案、客戶活動紀錄新增）

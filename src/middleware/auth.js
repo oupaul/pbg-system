@@ -134,6 +134,11 @@ const requireAdmin = (req, res, next) => {
 
 const setUserPermissions = (req, res, next) => {
   if (req.user) {
+    try {
+      const User = require('../models/User');
+      User.updateLastActive(req.user.id);
+    } catch { /* 更新線上狀態失敗不應影響正常請求 */ }
+
     const role = getRolePermissions(req.user.role);
 
     req.user.canEdit = role ? !!role.can_edit : req.user.role === ROLES.ADMIN || req.user.role === ROLES.USER;

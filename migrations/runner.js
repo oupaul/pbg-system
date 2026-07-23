@@ -59,6 +59,7 @@ const MIGRATIONS = [
   'migrate_business_event_notify_recipients',
   'migrate_smtp_reject_unauthorized',
   'migrate_system_base_url',
+  'migrate_users_last_active',
 ];
 
 function run() {

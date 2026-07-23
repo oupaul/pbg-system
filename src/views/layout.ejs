@@ -98,7 +98,7 @@
 
           <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user')) { %>
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle <%= navGroupActive(['/project-templates', '/import-export', '/audit-logs', '/project-types', '/report-groups', '/roles', '/settings', '/backup-restore', '/health']) %>" href="#" id="systemGroupDropdown" role="button" data-bs-toggle="dropdown">
+            <a class="nav-link dropdown-toggle <%= navGroupActive(['/project-templates', '/import-export', '/audit-logs', '/project-types', '/report-groups', '/roles', '/settings', '/backup-restore', '/health', '/notifications/broadcast']) %>" href="#" id="systemGroupDropdown" role="button" data-bs-toggle="dropdown">
               <i class="bi bi-gear-wide-connected"></i> 系統設定
             </a>
             <ul class="dropdown-menu">
@@ -113,6 +113,8 @@
               <li><a class="dropdown-item <%= navActive('/settings') %>" href="/settings"><i class="bi bi-gear"></i> 系統設定</a></li>
               <li><a class="dropdown-item <%= navActive('/backup-restore') %>" href="/backup-restore"><i class="bi bi-archive"></i> 備份還原</a></li>
               <li><a class="dropdown-item <%= navActive('/health') %>" href="/health"><i class="bi bi-heart-pulse"></i> 系統健康</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item <%= navActive('/notifications/broadcast') %>" href="/notifications/broadcast"><i class="bi bi-megaphone"></i> 廣播通知</a></li>
               <% } %>
             </ul>
           </li>
