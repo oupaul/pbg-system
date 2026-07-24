@@ -297,6 +297,12 @@ ${locals.canEditCrm ? `
         </div>
       </div>
     </form>
+    <hr>
+    <form action="/customers/${customer.id}/delete" method="POST" onsubmit="return confirm('${locals.canDelete ? '確定要刪除此客戶/廠商？相關的專案、銷售機會、活動紀錄不會被刪除，仍會保留原有紀錄。' : '確定要送出刪除申請嗎？將由管理員審核後才會真正刪除。'}')">
+      <button type="submit" class="btn btn-outline-${locals.canDelete ? 'danger' : 'warning'} btn-sm">
+        <i class="bi bi-trash"></i> ${locals.canDelete ? '刪除此客戶/廠商' : '申請刪除此客戶/廠商'}
+      </button>
+    </form>
   </div>
 </div>
 ` : ''}
