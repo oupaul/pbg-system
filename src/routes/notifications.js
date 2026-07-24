@@ -1,7 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const Notification = require('../models/Notification');
-const { getNotificationIcon } = require('../services/NotificationService');
+const NotificationService = require('../services/NotificationService');
+const User = require('../models/User');
+const { getNotificationIcon } = NotificationService;
+const { ONLINE_THRESHOLD_MINUTES } = require('../constants');
+
+// 廣播訊息：僅系統管理員可使用
+function requireAdmin(req, res, next) {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).render('error', {
+      title: '權限不足',
+      message: '只有管理員可以使用廣播通知功能',
+      error: {}
+    });
+  }
+  next();
+}
 
 // 通知中心：僅顯示、操作自己的通知
 router.get('/', (req, res) => {
@@ -30,6 +45,29 @@ router.get('/poll', (req, res) => {
       ...getNotificationIcon(n.type)
     }))
   });
+});
+
+// 廣播通知：顯示發送表單與目前線上人數
+router.get('/broadcast', requireAdmin, (req, res) => {
+  const online = User.findOnline(ONLINE_THRESHOLD_MINUTES).filter(u => u.id !== req.user.id);
+  res.render('notifications/broadcast', {
+    title: '廣播通知',
+    onlineUsers: online,
+    onlineThresholdMinutes: ONLINE_THRESHOLD_MINUTES,
+    error: req.query.error || '',
+    success: req.query.success || ''
+  });
+});
+
+// 廣播通知：發送給目前線上使用者
+router.post('/broadcast', requireAdmin, (req, res) => {
+  const message = (req.body.message || '').trim();
+  if (!message) {
+    return res.redirect('/notifications/broadcast?error=' + encodeURIComponent('請輸入通知內容'));
+  }
+
+  const count = NotificationService.broadcastToOnlineUsers(message, req.user);
+  res.redirect('/notifications/broadcast?success=' + encodeURIComponent(`已發送給 ${count} 位線上使用者`));
 });
 
 // 點擊通知：標記已讀後導向原始連結

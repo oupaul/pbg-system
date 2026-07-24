@@ -1,0 +1,68 @@
+<%
+  function escapeHtml(str) {
+    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  const localError = escapeHtml(typeof error !== 'undefined' ? error : '');
+  const localSuccess = escapeHtml(typeof success !== 'undefined' ? success : '');
+%>
+<%- include('../layout', { body: `
+<div class="row mb-4">
+  <div class="col">
+    <h1 class="h3"><i class="bi bi-megaphone"></i> 廣播通知</h1>
+    <p class="text-muted mb-0">發送即時通知給目前線上的使用者（最近 ${onlineThresholdMinutes} 分鐘內有使用系統者）</p>
+  </div>
+</div>
+
+${localError ? `
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+  <i class="bi bi-exclamation-circle"></i> ${localError}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>` : ''}
+${localSuccess ? `
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  <i class="bi bi-check-circle"></i> ${localSuccess}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>` : ''}
+
+<div class="row">
+  <div class="col-md-7">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0">發送新訊息</h5>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="/notifications/broadcast">
+          <div class="mb-3">
+            <label for="message" class="form-label">通知內容</label>
+            <textarea class="form-control" id="message" name="message" rows="4" required placeholder="輸入要發送給所有線上使用者的訊息..."></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary" ${onlineUsers.length === 0 ? 'disabled' : ''}>
+            <i class="bi bi-send"></i> 發送給 ${onlineUsers.length} 位線上使用者
+          </button>
+          ${onlineUsers.length === 0 ? '<div class="form-text text-warning">目前沒有其他線上使用者</div>' : ''}
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-5">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0">目前線上（${onlineUsers.length}）</h5>
+      </div>
+      <div class="list-group list-group-flush">
+        ${onlineUsers.length === 0 ? `
+          <div class="text-center text-muted py-4">
+            <i class="bi bi-person-x fs-3 d-block mb-2"></i>
+            目前沒有其他線上使用者
+          </div>
+        ` : onlineUsers.map(u => `
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-circle-fill text-success small me-2"></i>${escapeHtml(u.name)}</span>
+            <span class="text-muted small">${escapeHtml(u.username)}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  </div>
+</div>
+` }) %>

@@ -61,6 +61,7 @@ const MIGRATIONS = [
   'migrate_system_base_url',
   'migrate_customer_soft_delete',
   'migrate_deletion_requests_remove_target_type_check',
+  'migrate_users_last_active',
 ];
 
 function run() {
