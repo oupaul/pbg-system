@@ -39,7 +39,9 @@ router.get('/poll', (req, res) => {
     unreadCount: Notification.countUnread(req.user.id),
     notifications: recent.map(n => ({
       id: n.id,
+      type: n.type,
       title: n.title,
+      message: n.message,
       created_at: n.created_at,
       is_read: !!n.is_read,
       ...getNotificationIcon(n.type)
