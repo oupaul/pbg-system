@@ -1,5 +1,10 @@
 <%
   const WIN_PROBABILITY_STAGES = { 10: '初步接洽', 30: '需求分析', 50: '提案報價', 100: '商務談判' };
+  const STATUS_CARD_STYLE = {
+    '洽談中': { bg: 'bg-warning', icon: 'bi-hourglass-split' },
+    '已成交': { bg: 'bg-success', icon: 'bi-check-circle' },
+    '已流失': { bg: 'bg-secondary', icon: 'bi-x-circle' }
+  };
   // 商機名稱、客戶/業務姓名皆為自由文字欄位，輸出前需跳脫，避免儲存型 XSS
   function escapeHtml(str) {
     return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -33,16 +38,21 @@ ${error ? `
 </div>
 
 <div class="row g-3 mb-3">
-  <div class="col-md-3">
-    <div class="card h-100 bg-primary text-white">
-      <div class="card-body text-center">
-        <h6 class="mb-1"><i class="bi bi-cash-stack"></i> 預估金額總計</h6>
-        <h3 class="mb-0">$${(summary.totalEstimatedAmount || 0).toLocaleString()}</h3>
-        <small>共 ${summary.totalCount || 0} 筆</small>
+  ${(summary.byStatus || []).map(g => `
+    <div class="col-md-4">
+      <div class="card h-100 ${(STATUS_CARD_STYLE[g.status] || {}).bg || 'bg-primary'} text-white">
+        <div class="card-body text-center">
+          <h6 class="mb-1"><i class="bi ${(STATUS_CARD_STYLE[g.status] || {}).icon || 'bi-cash-stack'}"></i> ${escapeHtml(g.status)}預估金額</h6>
+          <h3 class="mb-0">$${(g.amount || 0).toLocaleString()}</h3>
+          <small>共 ${g.count || 0} 筆</small>
+        </div>
       </div>
     </div>
-  </div>
-  <div class="col-md-9">
+  `).join('')}
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-12">
     <div class="card h-100">
       <div class="card-header"><i class="bi bi-percent"></i> 依成交機率加總</div>
       <div class="card-body">

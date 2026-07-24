@@ -35,10 +35,19 @@ function getTypeColorMap() {
 
 const WIN_PROBABILITY_STAGES = { 10: '初步接洽', 30: '需求分析', 50: '提案報價', 100: '商務談判' };
 
-// 銷售機會列表統計：預估金額總計、依成交機率分類加總、依預計成交月份加總
+const PIPELINE_STATUSES = ['洽談中', '已成交', '已流失'];
+
+// 銷售機會列表統計：依狀態分別加總（洽談中/已成交/已流失）、依成交機率分類加總、依預計成交月份加總
 // 統計範圍與目前列表一致（套用同一組狀態篩選後的結果）
 function buildPipelineSummary(pipelines) {
-  const totalEstimatedAmount = pipelines.reduce((sum, p) => sum + (p.estimated_amount || 0), 0);
+  const statusGroups = new Map(PIPELINE_STATUSES.map(s => [s, { amount: 0, count: 0 }]));
+  pipelines.forEach(p => {
+    if (!statusGroups.has(p.status)) statusGroups.set(p.status, { amount: 0, count: 0 });
+    const g = statusGroups.get(p.status);
+    g.amount += (p.estimated_amount || 0);
+    g.count += 1;
+  });
+  const byStatus = [...statusGroups.entries()].map(([status, v]) => ({ status, amount: v.amount, count: v.count }));
 
   // 依實際出現過的成交機率分類（不只固定的 10/30/50/100 四階段，避免舊資料或例外值被漏算，
   // 導致加總分類的合計與「預估金額總計」對不起來）
@@ -96,7 +105,7 @@ function buildPipelineSummary(pipelines) {
       return b.amount - a.amount;
     });
 
-  return { totalEstimatedAmount, totalCount: pipelines.length, byProbability, byMonth, bySalesperson };
+  return { byStatus, totalCount: pipelines.length, byProbability, byMonth, bySalesperson };
 }
 
 // 銷售機會列表
