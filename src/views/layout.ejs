@@ -251,13 +251,72 @@
         }).join('');
       }
 
+      // 廣播通知：以彈出視窗顯示，讓使用者更容易注意到（比只更新鈴鐺明顯），
+      // 已顯示過的通知 ID 記錄在 localStorage，避免每次輪詢重複彈出同一則
+      const SHOWN_BROADCAST_KEY = 'shownBroadcastNotificationIds';
+      function getShownBroadcastIds() {
+        try { return JSON.parse(localStorage.getItem(SHOWN_BROADCAST_KEY) || '[]'); } catch (e) { return []; }
+      }
+      function markBroadcastShown(id) {
+        const ids = getShownBroadcastIds();
+        ids.push(id);
+        try { localStorage.setItem(SHOWN_BROADCAST_KEY, JSON.stringify(ids.slice(-50))); } catch (e) { /* ignore */ }
+      }
+
+      function showBroadcastModal(n) {
+        let modalEl = document.getElementById('broadcastNotificationModal');
+        if (!modalEl) {
+          modalEl = document.createElement('div');
+          modalEl.id = 'broadcastNotificationModal';
+          modalEl.className = 'modal fade';
+          modalEl.tabIndex = -1;
+          modalEl.innerHTML =
+            '<div class="modal-dialog modal-dialog-centered">' +
+              '<div class="modal-content">' +
+                '<div class="modal-header bg-primary text-white">' +
+                  '<h5 class="modal-title"><i class="bi bi-megaphone"></i> <span data-role="title"></span></h5>' +
+                '</div>' +
+                '<div class="modal-body" data-role="message" style="white-space: pre-wrap;"></div>' +
+                '<div class="modal-footer">' +
+                  '<button type="button" class="btn btn-primary" data-bs-dismiss="modal">我知道了</button>' +
+                '</div>' +
+              '</div>' +
+            '</div>';
+          document.body.appendChild(modalEl);
+        }
+        modalEl.querySelector('[data-role="title"]').textContent = n.title || '系統廣播訊息';
+        modalEl.querySelector('[data-role="message"]').textContent = n.message || '';
+
+        const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false });
+        modalEl.addEventListener('hidden.bs.modal', function onHide() {
+          modalEl.removeEventListener('hidden.bs.modal', onHide);
+          fetch('/notifications/' + n.id + '/read', { method: 'POST' }).catch(function () { /* ignore */ });
+        }, { once: true });
+        bsModal.show();
+      }
+
+      function handleBroadcasts(notifications) {
+        const shown = getShownBroadcastIds();
+        const toShow = (notifications || []).filter(function (n) {
+          return n.type === 'broadcast_message' && !n.is_read && shown.indexOf(n.id) === -1;
+        });
+        if (toShow.length === 0) return;
+        markBroadcastShown(toShow[0].id);
+        showBroadcastModal(toShow[0]);
+      }
+
       function poll() {
         fetch('/notifications/poll', { headers: { Accept: 'application/json' } })
           .then(function (res) { return res.ok ? res.json() : null; })
-          .then(function (data) { if (data) render(data); })
+          .then(function (data) {
+            if (!data) return;
+            render(data);
+            handleBroadcasts(data.notifications);
+          })
           .catch(function () { /* 輪詢失敗不影響其他功能，靜默略過 */ });
       }
 
+      poll();
       setInterval(poll, POLL_INTERVAL_MS);
     })();
   </script>
