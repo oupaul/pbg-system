@@ -17,6 +17,17 @@ const Activity = {
     return db.prepare(`SELECT * FROM activities WHERE id = ? AND deleted_at IS NULL`).get(id);
   },
 
+  // 取得銷售機會的活動時間軸（含客戶名稱，供頁面上顯示/組通知內文用）
+  findByPipeline(pipelineId) {
+    return db.prepare(`
+      SELECT a.*, c.company_name AS customer_name
+      FROM activities a
+      LEFT JOIN customers c ON a.customer_id = c.id
+      WHERE a.pipeline_id = ? AND a.deleted_at IS NULL
+      ORDER BY a.activity_date DESC, a.id DESC
+    `).all(pipelineId);
+  },
+
   create(data) {
     if (!data.customer_id) throw new Error('客戶為必填欄位');
     if (!data.content || !data.content.trim()) throw new Error('活動內容為必填欄位');
