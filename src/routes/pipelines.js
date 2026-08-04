@@ -6,6 +6,7 @@ const DeletionRequest = require('../models/DeletionRequest');
 const Project = require('../models/Project');
 const Salesperson = require('../models/Salesperson');
 const Customer = require('../models/Customer');
+const Activity = require('../models/Activity');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireEditPermission, requireCrmEditPermission } = require('../middleware/auth');
 const cache = require('../services/CacheService');
@@ -254,15 +255,110 @@ router.get('/:id', (req, res) => {
   const convertedProject = pipeline.converted_project_id ? Project.findById(pipeline.converted_project_id) : null;
   const pendingDeletion = DeletionRequest.findPendingByTarget('pipeline', pipeline.id);
 
+  // 活動時間軸（拜訪/電話/客訴等紀錄，取代原本全部塞在備註欄位的做法）
+  const activities = Activity.findByPipeline(pipeline.id);
+
+  // 活動紀錄的待審核刪除申請（比照 customers.js 的做法，避免逐筆查詢）
+  const pendingActivityDeletionIds = activities.length
+    ? db.prepare(`
+        SELECT target_id FROM deletion_requests
+        WHERE target_type = 'activity' AND status = 'pending'
+          AND target_id IN (${activities.map(() => '?').join(',')})
+      `).all(...activities.map(a => a.id)).map(r => r.target_id)
+    : [];
+
   res.render('pipelines/show', {
     title: pipeline.opportunity_name,
     pipeline,
     convertedProject,
     pendingDeletion,
+    activities,
+    pendingActivityDeletionIds,
     typeColorMap: getTypeColorMap(),
     error: req.query.error || '',
     success: req.query.success || ''
   });
+});
+
+// 新增活動紀錄（掛在銷售機會底下，同時記錄客戶，讓客戶頁的活動時間軸也能看到並標示所屬商機）
+router.post('/:id/activities', requireCrmEditPermission, (req, res) => {
+  const pipeline = Pipeline.findById(req.params.id);
+  if (!pipeline) {
+    return res.status(404).render('error', { title: '找不到銷售機會', message: '找不到此銷售機會', error: {} });
+  }
+
+  try {
+    Activity.create({
+      customer_id: pipeline.customer_id,
+      pipeline_id: pipeline.id,
+      activity_type: req.body.activity_type,
+      content: req.body.content,
+      activity_date: req.body.activity_date,
+      userInfo: getUserInfo(req)
+    });
+    NotificationService.notifyBusinessWatchers({
+      type: 'activity_created',
+      title: `銷售機會活動紀錄更新：${pipeline.opportunity_name}`,
+      message: `記錄人：${getUserInfo(req)}\n\n${NotificationService.formatActivitySummary({
+        customerName: pipeline.customer_name,
+        activityType: req.body.activity_type,
+        activityDate: req.body.activity_date,
+        content: req.body.content
+      })}`,
+      link: `/pipelines/${req.params.id}`,
+      related_type: 'pipeline',
+      related_id: req.params.id
+    }, req.user.id);
+    res.redirect(`/pipelines/${req.params.id}`);
+  } catch (err) {
+    console.error(err);
+    res.redirect(`/pipelines/${req.params.id}?error=` + encodeURIComponent(err.message));
+  }
+});
+
+// 刪除活動紀錄
+// 有 can_delete 權限者直接刪除；否則送出刪除申請，待管理員核准後才真正刪除
+router.post('/:id/activities/:activityId/delete', requireCrmEditPermission, (req, res) => {
+  try {
+    if (!Pipeline.findById(req.params.id)) {
+      return res.status(404).render('error', { title: '找不到銷售機會', message: '找不到此銷售機會', error: {} });
+    }
+
+    if (req.user.canDelete) {
+      Activity.softDelete(req.params.activityId, getUserInfo(req));
+      return res.redirect(`/pipelines/${req.params.id}`);
+    }
+
+    const activity = Activity.findById(req.params.activityId);
+    if (!activity) {
+      return res.redirect(`/pipelines/${req.params.id}?error=` + encodeURIComponent('找不到此活動紀錄'));
+    }
+
+    const existing = DeletionRequest.findPendingByTarget('activity', activity.id);
+    if (existing) {
+      return res.redirect(`/pipelines/${req.params.id}?error=` + encodeURIComponent('此活動紀錄已送出過刪除申請，待審核中'));
+    }
+
+    const requestId = DeletionRequest.create({
+      target_type: 'activity',
+      target_id: activity.id,
+      target_summary: `${activity.activity_type}：${activity.content}`,
+      requested_by: req.user.id,
+      requested_by_name: getUserInfo(req)
+    });
+    NotificationService.notifyDeletionApprovers({
+      type: 'deletion_request_pending',
+      title: `刪除申請待審核：${activity.activity_type}`,
+      message: `申請人：${getUserInfo(req)}`,
+      link: '/deletion-requests',
+      related_type: 'deletion_request',
+      related_id: requestId
+    }, req.user.id);
+    res.redirect(`/pipelines/${req.params.id}?success=` + encodeURIComponent('已送出刪除申請，待管理員審核後才會真正刪除'));
+  } catch (err) {
+    console.error(err);
+    res.redirect(`/pipelines/${req.params.id}?error=` + encodeURIComponent(err.message));
+  }
 });
 
 // 編輯銷售機會表單
