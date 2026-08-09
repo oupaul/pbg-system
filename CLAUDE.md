@@ -59,6 +59,18 @@ Node.js + Express + SQLite（`better-sqlite3`）的發票／業績獎金／CRM �
 
 要修正這個必須連動改好幾個既有 migration 的視圖重建邏輯，風險遠高於上面三項，這次刻意不動，維持 `deploy.sh` 原本的 ad-hoc 寫法（它本身邏輯是安全、冪等的，只是架構上不理想）。之後如果要處理，需要先完整盤點所有會重建 `v_project_summary` 的 migration，一次改齊。
 
+## 登入紀錄地區判斷（GeoLite2）
+
+`src/services/GeoIpService.js` 用 MaxMind GeoLite2 的離線資料庫把登入 IP 轉成國碼，顯示在「登入紀錄」頁面。這個資料庫**不隨 repo 提供**（授權與檔案大小考量，見 `.gitignore` 的 `data/` 規則），需要手動下載：
+
+1. 到 [MaxMind](https://www.maxmind.com/en/geolite2/signup) 註冊免費帳號，取得 license key
+2. 下載 `GeoLite2-Country.mmdb`，放到 `data/GeoLite2-Country.mmdb`
+3. 重啟服務即可生效
+
+沒有這個檔案不會影響登入或其他功能，只是地區欄位一律顯示「-」（`GeoIpService` 有防呆，找不到檔案只會警告一次，不會每次登入都重試/報錯）。**這個資料庫本身沒有自動更新機制**，MaxMind 的 IP 對照資料會隨時間過時，需要自己定期重新下載覆蓋。
+
+畫面上只顯示 ISO 國碼轉成的國旗 emoji（`countryCodeToFlag()`，純用代碼機械轉換），刻意不使用資料庫內建的地名字串——地緣政治相關的地名命名可能有爭議，用代碼可以完全避開這個問題。
+
 ## Docker／Compose
 
 Repo 目前**沒有任何 Dockerfile 或 compose.yaml**，部署完全走 systemd + VM。若有人要求「整理 Docker Compose 設定」，先確認清楚：這是要新建一套僅供本機開發/測試用的容器環境（不影響現有 systemd 部署方式），還是誤以為 repo 已經有相關設定——不要在沒問清楚的情況下憑空生出一套容器化部署。

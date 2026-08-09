@@ -25,7 +25,8 @@
 | 樣板引擎 | EJS 3（見下方「樣板寫法」說明，同專案混用兩種風格） |
 | 資料庫 | SQLite（`better-sqlite3`，同步 API），單一檔案 `data/invoice_bonus.db` |
 | Session | `express-session`（伺服器端 session，非 JWT） |
-| 密碼雜湊 | argon2（新密碼）／bcrypt（相容舊資料）／sha256（更舊資料相容） |
+| 密碼雜湊 | argon2id（唯一機制）。原本還有 bcrypt／sha256 兩種舊格式相容分支，已於某次 session 移除 `bcrypt` 依賴（確認正式環境全部帳號皆已是 argon2id 後才動手）：全新安裝的預設管理員帳號也改用 argon2id 建立（`migrations/migrate.js`），`src/models/User.js` 的 bcrypt 驗證分支已刪除；sha256 驗證分支仍保留（登入時偵測到會自動升級成 argon2id） |
+| IP 地理位置 | `maxmind`（MaxMind GeoLite2 離線資料庫，選用，見 7.1） |
 | Email | nodemailer，通用 SMTP（非綁定特定服務商） |
 | LINE 通知 | LINE Messaging API（webhook + push） |
 | Excel 匯入匯出 | exceljs |
@@ -33,7 +34,7 @@
 | 檔案上傳 | multer |
 | 日期處理 | dayjs |
 | 開發工具 | nodemon（`npm run dev`，**注意：正式啟動 `npm start` 用純 `node`，不會自動重載**） |
-| 測試 | jest（設定存在，實際覆蓋率待確認） |
+| 測試 | jest（已加進 `devDependencies` 並可正常執行 `npm test`；目前專案內沒有任何測試檔案，`--passWithNoTests` 讓指令不會因此報錯，實際覆蓋率是 0） |
 
 ## 3. 專案目錄結構
 
@@ -62,7 +63,7 @@ deploy.sh / setup.sh / update.sh / backup.sh / restore.sh / uninstall.sh / setup
 2. **少數頁面**（`layout.ejs`、`settings/index.ejs`、`reportGroups/index.ejs`、`projectTypes/index.ejs` 等）：用純 `<% %>` + `bodyHtml +=` 字串拼接建構整頁 HTML。
 3. **`auth/login.ejs`、`backup-restore/index.ejs`**：用標準 EJS `<%= %>` 標籤（**這個會自動 escape**，是全站唯一真正安全預設的寫法）。
 
-> 本次 session 才剛修過一輪全站的 XSS（詳見第 8 節），寫技術文件時如果要提到「輸出安全」，這個混用现況是重點素材。
+> 全站曾修過一輪 XSS（PR #6 `fix/crm-xss-escaping`，儲存型/反射型都有，橫跨 CRM 與全站多數功能模組），寫技術文件時如果要提到「輸出安全」，這個混用現況是重點素材。
 
 ## 4. 資料庫結構
 
@@ -93,6 +94,7 @@ deploy.sh / setup.sh / update.sh / backup.sh / restore.sh / uninstall.sh / setup
 | `notifications` | 站內通知中心 |
 | `system_settings` | 全站設定 key-value（型別：string/number/boolean/json） |
 | `system_logs` | 稽核紀錄 |
+| `login_history` | 登入紀錄：每次成功登入的時間、IP、User-Agent、地區國碼（`country_code`，選用，見 7.1） |
 | `schema_migrations` | migration 執行紀錄（runner.js 用來判斷哪些要跑） |
 
 **SQL Views（跨表彙總，供列表/儀表板查詢用）**：`v_project_summary`、`v_invoice_summary`、`v_bonus_summary`
@@ -134,7 +136,8 @@ deploy.sh / setup.sh / update.sh / backup.sh / restore.sh / uninstall.sh / setup
 - **使用者管理**（`routes/users.js`、`models/User.js`）：綁定業務員、指定業務員存取範圍（`user_salesperson_access`）、Email/LINE 通知欄位
 - **權限範圍**（`project_view_scope`）：`ALL`（全部）／`OWN`（僅自己負責）／`ASSIGNED`（指定業務員）／`NONE`，套用在專案、客戶、銷售機會金額的可見範圍
 - **系統設定**（`routes/settings.js`）：開票提醒天數、閒置自動登出、附件清理保留天數、客戶追蹤提醒天數、Email/LINE 設定、通知收件人、系統對外網址
-- **稽核紀錄**（`routes/auditLogs.js`、`AuditLogService`）：關鍵操作的異動紀錄與匯出
+- **稽核紀錄**（`routes/auditLogs.js`、`AuditLogService`）：關鍵操作的異動紀錄與匯出——注意這條路由只掛 `requireAuth`，**沒有** `requireAdmin`，任何登入者都能看
+- **登入紀錄**（`routes/loginHistory.js`、`models/LoginHistory.js`）：每次成功登入記錄時間/IP/User-Agent/地區，僅管理員可查詢（`requireAdmin`，跟稽核紀錄的開放程度不同，因為含 IP 較敏感）；IP/User-Agent 是使用者可控的自由文字（尤其 User-Agent 直接來自 HTTP 標頭），在路由層先跳脫過才傳給畫面
 - **系統健康檢查**（`routes/health.js`）
 
 ### 5.5 其他輔助模組
@@ -163,6 +166,8 @@ uninstall.sh          # 自動備份後移除
 
 - 執行環境：Ubuntu 24.04 LTS（推薦）、Node.js 20.x、512MB 記憶體/1GB 硬碟以上
 - 服務以 systemd 管理；`deploy.config.json`（gitignored）存放每個部署環境客製化的站名/port 等，由 `src/config/deploy.js` 讀取
+- **正式環境一律透過 Nginx 反向代理**（`proxy_pass http://127.0.0.1:3000`，範例設定見 `Nginx上傳大小限制修復說明.md`）。`src/app.js` 已設定 `app.set('trust proxy', 1)`，只信任這一層代理傳來的 `X-Forwarded-For`——若日後部署拓樸多一層代理（例如前面再加 CDN/負載平衡），這個數字要跟著調整，否則 `req.ip` 又會失準
+- `update.sh`／`deploy.sh` 已加強：更新前顯示明確版本來源（commit hash，不只是不可靠的 `package.json` version）並要求確認、GH_TOKEN 不再明文寫進暫存 clone 的 `.git/config`、migration 失敗會停止部署（不會帶著不完整 schema 啟動服務）、`kill -9` 前會先驗證程序是本專案的 `app.js` 才殺、部署後自動打 `scripts/health-check.sh`（`GET /login`）驗證服務真的有回應、`npm audit fix`（不含 `--force`）預設自動執行。**仍然沒有自動回滾機制**，失敗只會停下來給資訊
 
 ### 7.1 環境變數與密鑰管理
 
@@ -172,19 +177,22 @@ uninstall.sh          # 自動備份後移除
 - SMTP／LINE 憑證**不是環境變數**：存在 SQLite 的 `system_settings` 資料表，透過「系統設定」頁面（`routes/settings.js`）維護、`EmailService`/`LineService` 讀取，目前為明文儲存
 - `nas_config.json` 明確不儲存密碼（程式內有註解說明），NAS 備份的認證方式實際只有 SSH key（`ssh -o BatchMode=yes`），沒有實作額外的密碼類環境變數
 - 專案未安裝 `dotenv`，`.env`（若存在）不會被自動載入；新增的 `.env.example` 僅作文件用途
+- 登入紀錄的地區判斷用 MaxMind GeoLite2 離線資料庫（`data/GeoLite2-Country.mmdb`），**不隨 repo 提供**（授權與檔案大小考量），需自行到 MaxMind 註冊免費帳號下載，放到指定路徑即可生效；沒有這個檔案不影響任何功能，只是地區欄位顯示「-」。這個資料庫**沒有自動更新機制**，需要自行定期重新下載
 
 ## 8. 目前開發狀態（撰寫文件時的時間點資訊）
 
-- **分支**：`main`（正式）、`develop`（開發整合，目前與 main 內容一致）、`fix/crm-xss-escaping`（本次 session 建立，領先 develop 2 個 commit，**尚未合併**）
-- **最新已合併內容（develop/main）**：完整 CRM 前端流程（客戶審核、銷售機會、活動紀錄、通知中心、Email/LINE、系統網址設定、客戶追蹤提醒設定、銷售機會列表排序），對應 PR #5（已合併），另有 `migrate_user_roles.js` 的相容性修正
-- **`fix/crm-xss-escaping` 分支內容（未合併）**：
-  1. 銷售機會/客戶頁面的儲存型 XSS 修正（`opportunity_name`、`customer_name`、`salesperson_name`、`customer_code`、`company_name` 等自由文字欄位輸出未跳脫）
-  2. 全站 `?error=`/`?success=` 反射型 XSS 修正（19 個檔案，橫跨全系統多數功能模組，非僅 CRM）
-- **文件現況**：`README.md` 已刻意簡化為純部署手冊（不含功能說明）；另有 40+ 份各功能的獨立說明文件（`*.md`，多為過去逐一功能上線時所寫，未系統化整理，也沒有涵蓋本次 CRM 擴充與這次的安全性修正）；本次 session 已補寫一份 `CRM銷售機會與客戶管理功能說明.md`
+- **分支**：`main`（正式，目前落後 `develop` 約 39 個 commit，尚未晉升到最新狀態）、`develop`（開發整合，目前最新）、`chore/claude-code-hardening`（本次一系列 session 的工作分支，PR #14 已合併大部分內容進 `develop`，但分支上還有 1 個新 commit 尚待另開 PR 合併）
+- **最新已合併進 `develop` 的內容（PR #14）**：
+  1. `CLAUDE.md`／`.env.example`／`docs/internal/system-architecture-context.md`（本文件）等內部文件，記錄給 Claude Code 用的操作邊界與架構資訊
+  2. `update.sh`／`deploy.sh` 強化：見第 7 節列出的項目（版本來源確認、GH_TOKEN 傳遞方式、migration 失敗處理、kill -9 驗證、健康檢查、npm audit fix 預設行為）
+  3. 移除 `bcrypt` 依賴（見第 2 節「密碼雜湊」），一併解決 `tar`/`@mapbox/node-pre-gyp` 危急等級安全性漏洞
+  4. 新增「登入紀錄」功能（`login_history` 表、`routes/loginHistory.js`，見第 5.4 節）
+- **`chore/claude-code-hardening` 分支上尚未合併的內容**（下一個 PR）：登入紀錄加地區判斷（MaxMind GeoLite2，見 7.1）、修正 `src/app.js` 缺少 `trust proxy` 設定的問題——這個 bug 修正前，正式環境（透過 Nginx 反代）記錄到的 `req.ip` 實際上一直是 Nginx 自己的位址，不是使用者真實 IP，連帶影響登入速率限制（所有使用者在限流邏輯裡形同共用一個 IP 額度）
+- **文件現況**：`README.md` 已刻意簡化為純部署手冊（不含功能說明），這次新增了「本機測試 vs VM 測試」一節；另有 40+ 份各功能的獨立說明文件（`*.md`，多為過去逐一功能上線時所寫，未系統化整理）
 
 ## 9. 撰寫技術文件時建議涵蓋/留意的重點
 
 - 系統整體定位與模組地圖（第 5 節）是主幹，建議文件先建立「發票獎金核心」vs「CRM 前端流程」兩大主軸再往下細分
-- 樣板寫法混用（第 3 節）與最近的 XSS 修正（第 8 節）是「程式碼品質/安全」章節的好素材
-- migration 機制與已知的新舊 schema 落差（第 4 節）是「維運/升級注意事項」章節的好素材
+- 樣板寫法混用與 XSS（第 3 節）、`trust proxy`／登入速率限制的修正（第 7、8 節）是「程式碼品質/安全」章節的好素材
+- migration 機制與已知的新舊 schema 落差（第 4 節）、`update.sh`/`deploy.sh` 這次補的幾項安全網（第 7 節）是「維運/升級注意事項」章節的好素材
 - 現有 40+ 份散落文件內容可以整併引用，避免重新造輪子；`README.md` 保持精簡是刻意決策，不建議把功能說明塞回去
