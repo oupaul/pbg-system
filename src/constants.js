@@ -49,6 +49,9 @@ const DASHBOARD_VIEW_MODE = {
   NONE: 'none'
 };
 
+// 判定「線上」的門檻：最近 N 分鐘內有請求活動即視為線上
+const ONLINE_THRESHOLD_MINUTES = 10;
+
 module.exports = {
   ROLES,
   PROJECT_VIEW_SCOPE,
@@ -57,5 +60,6 @@ module.exports = {
   PAYMENT_DIFF_TYPE,
   BONUS_STATUS,
   SALESPERSON_STATUS,
-  DASHBOARD_VIEW_MODE
+  DASHBOARD_VIEW_MODE,
+  ONLINE_THRESHOLD_MINUTES
 };

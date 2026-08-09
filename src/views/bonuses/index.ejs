@@ -1,3 +1,8 @@
+<%
+  function escapeHtml(str) {
+    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+%>
 <%- include('../layout', { body: `
 <div class="row mb-4">
   <div class="col">
@@ -12,8 +17,8 @@
   </div>
 </div>
 
-${error ? '<div class="alert alert-danger alert-dismissible fade show" role="alert"><i class="bi bi-exclamation-triangle"></i> ' + error + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>' : ''}
-${success ? '<div class="alert alert-success alert-dismissible fade show" role="alert"><i class="bi bi-check-circle"></i> ' + success + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>' : ''}
+${error ? '<div class="alert alert-danger alert-dismissible fade show" role="alert"><i class="bi bi-exclamation-triangle"></i> ' + escapeHtml(error) + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>' : ''}
+${success ? '<div class="alert alert-success alert-dismissible fade show" role="alert"><i class="bi bi-check-circle"></i> ' + escapeHtml(success) + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>' : ''}
 
 <!-- 獎金統計卡片 -->
 <div class="row g-4 mb-4">

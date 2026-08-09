@@ -1,7 +1,8 @@
 <%
   const localGroups = typeof groups !== 'undefined' ? groups : [];
-  const localError = typeof error !== 'undefined' ? error : '';
-  const localSuccess = typeof success !== 'undefined' ? success : '';
+  const escapeHtml = str => (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const localError = escapeHtml(typeof error !== 'undefined' ? error : '');
+  const localSuccess = escapeHtml(typeof success !== 'undefined' ? success : '');
   let bodyHtml = '<div class="d-flex justify-content-between align-items-center mb-4">';
   bodyHtml += '  <h2><i class="bi bi-collection"></i> 報表群組管理</h2>';
   bodyHtml += '  <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">';

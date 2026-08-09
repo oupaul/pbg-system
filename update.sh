@@ -12,8 +12,18 @@
 #   export GH_TOKEN=github_pat_xxxxxxxxxxxx   # 或 ghp_xxxxxxxxxxxx
 #   bash <(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
 #     https://raw.githubusercontent.com/oupaul/pbg-system/develop/update.sh)
+#
+# GH_TOKEN 只會以 git 單次呼叫的 extra header 傳遞，不會寫進暫存 clone
+# 的 .git/config，暫存目錄結束時一律清除（含失敗中止的情況）。
+#
+# 預設會在同步程式碼前顯示目前/最新版本與 commit，並要求手動確認
+# （建議先執行 sudo <安裝目錄>/backup.sh 確認有最新備份）。
+# 全自動情境（例如排程）可設定 SKIP_UPDATE_CONFIRM=1 略過此確認。
+#
+# deploy.sh 執行失敗、或部署後健康檢查未通過，本腳本會停止並印出後續
+# 排查方式，不會自動嘗試回滾或刪除任何資料。
 
-set -e
+set -euo pipefail
 
 GITHUB_USER="oupaul"
 GITHUB_REPO="pbg-system"
@@ -50,10 +60,10 @@ detect_install_dir() {
     local unit
     unit=$(find /etc/systemd/system -maxdepth 1 -name "*.service" 2>/dev/null \
            | xargs grep -l "app.js" 2>/dev/null \
-           | grep -v backup | head -1)
+           | grep -v backup | head -1 || true)
     if [ -n "$unit" ]; then
         local app_path
-        app_path=$(grep "ExecStart" "$unit" | grep -oP '(?<= )/[^ ]+/src/app\.js' | head -1)
+        app_path=$(grep "ExecStart" "$unit" | grep -oP '(?<= )/[^ ]+/src/app\.js' | head -1 || true)
         if [ -n "$app_path" ]; then
             dirname "$(dirname "$app_path")"
             return 0
@@ -62,10 +72,10 @@ detect_install_dir() {
 
     # 方法2：從 deploy.config.sh 搜尋
     local config
-    config=$(find /opt -maxdepth 2 -name "deploy.config.sh" 2>/dev/null | head -1)
+    config=$(find /opt -maxdepth 2 -name "deploy.config.sh" 2>/dev/null | head -1 || true)
     if [ -n "$config" ]; then
         local dir
-        dir=$(grep "^INSTALL_DIR=" "$config" 2>/dev/null | head -1 | cut -d'=' -f2 | tr -d '"')
+        dir=$(grep "^INSTALL_DIR=" "$config" 2>/dev/null | head -1 | cut -d'=' -f2 | tr -d '"' || true)
         if [ -n "$dir" ] && [ -d "$dir" ]; then
             echo "$dir"
             return 0
@@ -100,29 +110,51 @@ if ! command -v git &>/dev/null; then
     apt-get update -qq && apt-get install -y -qq git || error "git 安裝失敗"
 fi
 
-# 組合 git clone URL（支援 PAT）
-if [ -n "$GH_TOKEN" ]; then
-    GIT_URL="https://${GH_TOKEN}@github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
+# 準備 git 認證（GH_TOKEN 僅透過單次呼叫的 extra header 傳遞，
+# 不寫入任何 .git/config，避免明文憑證留在磁碟上）
+GIT_URL="https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
+GIT_AUTH_ARGS=()
+if [ -n "${GH_TOKEN:-}" ]; then
+    GIT_AUTH_ARGS=(-c "http.extraHeader=Authorization: Bearer ${GH_TOKEN}")
     log "使用 GH_TOKEN 進行認證"
-else
-    GIT_URL="https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
 fi
 
-# 下載最新版本到暫存目錄
+# 下載最新版本到暫存目錄（無論成功或失敗都會自動清理）
 TMP="/tmp/pbg-update-$$"
+trap 'rm -rf "$TMP"' EXIT
+
 log "從 GitHub 下載最新版本（branch: ${BRANCH}）..."
-if ! git clone --depth=1 -b "$BRANCH" "$GIT_URL" "$TMP" 2>&1; then
+if ! git "${GIT_AUTH_ARGS[@]}" clone --depth=1 -b "$BRANCH" "$GIT_URL" "$TMP" 2>&1; then
     error "下載失敗。請確認：
   - 網路可存取 github.com
   - 若為私有 Repo，請設定 GH_TOKEN：export GH_TOKEN=ghp_xxxxxxxxxxxx"
 fi
 log "✓ 下載完成"
 
-# 顯示版本資訊
+# 顯示明確的版本來源（package.json 的 version 欄位不一定隨 tag 更新，
+# 因此同時顯示實際 commit hash 作為可信來源）
 NEW_VERSION=$(grep '"version"' "$TMP/package.json" 2>/dev/null | head -1 | grep -oP '[\d.]+' | head -1 || echo "未知")
 OLD_VERSION=$(grep '"version"' "$INSTALL_DIR/package.json" 2>/dev/null | head -1 | grep -oP '[\d.]+' | head -1 || echo "未知")
-info "目前版本：v${OLD_VERSION}  →  最新版本：v${NEW_VERSION}"
+NEW_COMMIT=$(git -C "$TMP" rev-parse --short HEAD 2>/dev/null || echo "未知")
 echo ""
+info "來源：https://github.com/${GITHUB_USER}/${GITHUB_REPO} @ ${BRANCH} (${NEW_COMMIT})"
+info "版本欄位：v${OLD_VERSION} → v${NEW_VERSION}（此欄位可能過時，實際內容以上方 commit 為準）"
+echo ""
+
+# ── 更新前確認（備份提醒）───────────────────────────────────────
+if [ -z "${SKIP_UPDATE_CONFIRM:-}" ]; then
+    warning "即將停止服務、同步程式碼，並執行資料庫 migration。"
+    warning "deploy.sh 會在 migration 前自動備份資料庫，但程式碼本身沒有自動回滾機制。"
+    warning "建議先手動執行一次：sudo ${INSTALL_DIR}/backup.sh"
+    read -p "$(echo -e ${YELLOW}確定要繼續更新嗎？${NC}) [y/N]: " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        log "已取消更新，未做任何變更"
+        exit 0
+    fi
+else
+    info "SKIP_UPDATE_CONFIRM=1，略過更新前確認"
+fi
 
 # ── 同步程式碼（保留資料、上傳檔案、設定）─────────────────────
 log "同步程式碼到 ${INSTALL_DIR}..."
@@ -162,13 +194,35 @@ fi
 
 log "✓ 程式碼同步完成"
 
-# 清理暫存
-rm -rf "$TMP"
-log "✓ 暫存目錄已清理"
-
 # ── 執行增量部署（更新模式）─────────────────────────────────────
 log "啟動部署腳本（增量更新模式）..."
 echo ""
 cd "${INSTALL_DIR}"
 chmod +x deploy.sh
-exec sudo SKIP_BACKUP_PROMPT=1 bash deploy.sh
+
+if ! sudo SKIP_BACKUP_PROMPT=1 bash deploy.sh; then
+    error "deploy.sh 執行失敗，更新已停止。請檢查上方輸出。
+  - 資料庫備份（若有建立）：${INSTALL_DIR}/data/invoice_bonus.db.backup-*
+  - 程式碼本身沒有自動回滾機制，如需恢復舊版本，需重新從舊的 tag/commit 手動部署
+  - 服務日誌：sudo journalctl -u <service-name> -n 50"
+fi
+
+# ── 部署後健康檢查 ─────────────────────────────────────────────
+log "部署腳本執行完成，開始部署後健康檢查..."
+HEALTH_PORT=$(node -e "try{console.log(require('${INSTALL_DIR}/deploy.config.json').port||3000)}catch(e){console.log(3000)}" 2>/dev/null || echo "3000")
+
+if [ -f "${INSTALL_DIR}/scripts/health-check.sh" ]; then
+    if bash "${INSTALL_DIR}/scripts/health-check.sh" "$HEALTH_PORT"; then
+        log "✓ 健康檢查通過，更新完成"
+    else
+        error "健康檢查失敗：deploy.sh 回報成功，但服務未能在時限內正常回應（port ${HEALTH_PORT}）。
+  請立即檢查：
+    sudo systemctl status <service-name>
+    sudo journalctl -u <service-name> -n 50
+  資料庫備份（若有建立）：${INSTALL_DIR}/data/invoice_bonus.db.backup-*
+  本腳本不會自動回滾，請視情況手動處理。"
+    fi
+else
+    warning "找不到 scripts/health-check.sh，略過部署後健康檢查"
+    log "更新流程完成（未經健康檢查驗證）"
+fi

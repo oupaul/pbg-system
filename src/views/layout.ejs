@@ -39,31 +39,42 @@
             <a class="nav-link <%= navActive('/') %>" href="/"><i class="bi bi-house"></i> 首頁</a>
           </li>
           <% } %>
+          <% if (typeof canEditCrm !== 'undefined' && canEditCrm) { %>
           <li class="nav-item">
-            <a class="nav-link <%= navActive('/projects') %>" href="/projects"><i class="bi bi-folder"></i> 專案管理</a>
+            <a class="nav-link <%= navActive('/customers') %>" href="/customers"><i class="bi bi-building"></i> 客戶/廠商</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link <%= navActive('/search') %>" href="/search"><i class="bi bi-search"></i> 搜尋</a>
+            <a class="nav-link <%= navActive('/pipelines') %>" href="/pipelines"><i class="bi bi-bullseye"></i> 銷售機會管理</a>
+          </li>
+          <% } %>
+          <li class="nav-item">
+            <a class="nav-link <%= navActive('/projects') %>" href="/projects"><i class="bi bi-folder"></i> 專案管理</a>
           </li>
           <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user' || user.salesperson_id)) { %>
           <li class="nav-item">
             <a class="nav-link <%= navActive('/gross-profit') %>" href="/gross-profit"><i class="bi bi-pie-chart"></i> 毛利分析</a>
           </li>
           <% } %>
-          <% if (typeof canEditCrm !== 'undefined' && canEditCrm) { %>
           <li class="nav-item">
-            <a class="nav-link <%= navActive('/customers') %>" href="/customers"><i class="bi bi-building"></i> 客戶/廠商</a>
+            <a class="nav-link <%= navActive('/search') %>" href="/search"><i class="bi bi-search"></i> 搜尋</a>
           </li>
-          <li class="nav-item">
-            <a class="nav-link <%= navActive('/pipelines') %>" href="/pipelines"><i class="bi bi-bullseye"></i> 潛在商機</a>
-          </li>
-          <% } %>
           <% if (typeof canDelete !== 'undefined' && canDelete) { %>
           <li class="nav-item">
             <a class="nav-link <%= navActive('/deletion-requests') %>" href="/deletion-requests">
               <i class="bi bi-shield-check"></i> 刪除審核
               <% if (typeof pendingDeletionCount !== 'undefined' && pendingDeletionCount > 0) { %>
                 <span class="badge bg-danger"><%= pendingDeletionCount %></span>
+              <% } %>
+            </a>
+          </li>
+          <% } %>
+
+          <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user')) { %>
+          <li class="nav-item">
+            <a class="nav-link <%= navActive('/customer-approvals') %>" href="/customer-approvals">
+              <i class="bi bi-person-check"></i> 客戶審核
+              <% if (typeof pendingCustomerApprovalCount !== 'undefined' && pendingCustomerApprovalCount > 0) { %>
+                <span class="badge bg-danger"><%= pendingCustomerApprovalCount %></span>
               <% } %>
             </a>
           </li>
@@ -87,7 +98,7 @@
 
           <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user')) { %>
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle <%= navGroupActive(['/project-templates', '/import-export', '/audit-logs', '/project-types', '/report-groups', '/roles', '/settings', '/backup-restore', '/health']) %>" href="#" id="systemGroupDropdown" role="button" data-bs-toggle="dropdown">
+            <a class="nav-link dropdown-toggle <%= navGroupActive(['/project-templates', '/import-export', '/audit-logs', '/project-types', '/report-groups', '/roles', '/settings', '/backup-restore', '/health', '/login-history', '/notifications/broadcast']) %>" href="#" id="systemGroupDropdown" role="button" data-bs-toggle="dropdown">
               <i class="bi bi-gear-wide-connected"></i> 系統設定
             </a>
             <ul class="dropdown-menu">
@@ -102,6 +113,9 @@
               <li><a class="dropdown-item <%= navActive('/settings') %>" href="/settings"><i class="bi bi-gear"></i> 系統設定</a></li>
               <li><a class="dropdown-item <%= navActive('/backup-restore') %>" href="/backup-restore"><i class="bi bi-archive"></i> 備份還原</a></li>
               <li><a class="dropdown-item <%= navActive('/health') %>" href="/health"><i class="bi bi-heart-pulse"></i> 系統健康</a></li>
+              <li><a class="dropdown-item <%= navActive('/login-history') %>" href="/login-history"><i class="bi bi-box-arrow-in-right"></i> 登入紀錄</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item <%= navActive('/notifications/broadcast') %>" href="/notifications/broadcast"><i class="bi bi-megaphone"></i> 廣播通知</a></li>
               <% } %>
             </ul>
           </li>
@@ -109,6 +123,42 @@
         </ul>
         <% if (typeof user !== 'undefined' && user) { %>
           <ul class="navbar-nav">
+            <li class="nav-item dropdown">
+              <a class="nav-link position-relative" href="#" id="notificationDropdown" role="button" data-bs-toggle="dropdown">
+                <i class="bi bi-bell fs-5"></i>
+                <% const initialUnread = typeof unreadNotificationCount !== 'undefined' ? unreadNotificationCount : 0; %>
+                <span id="notificationBadge" class="badge bg-danger position-absolute top-0 start-100 translate-middle rounded-pill" style="font-size: 0.6rem; <%= initialUnread > 0 ? '' : 'display: none;' %>">
+                  <%= initialUnread > 99 ? '99+' : initialUnread %>
+                </span>
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end" style="width: 360px; max-height: 420px; overflow-y: auto;">
+                <li class="d-flex justify-content-between align-items-center px-3 py-1">
+                  <h6 class="dropdown-header p-0 m-0">通知</h6>
+                  <form action="/notifications/mark-all-read" method="POST" class="m-0" id="notificationMarkAllForm" style="<%= initialUnread > 0 ? '' : 'display: none;' %>">
+                    <button type="submit" class="btn btn-link btn-sm p-0">全部標記已讀</button>
+                  </form>
+                </li>
+                <li><hr class="dropdown-divider m-0"></li>
+                <li id="notificationListContainer">
+                  <% if (typeof recentNotifications === 'undefined' || recentNotifications.length === 0) { %>
+                    <div class="text-center text-muted py-4 small">目前沒有通知</div>
+                  <% } else { %>
+                    <% recentNotifications.forEach(function(n) { %>
+                      <% const iconInfo = typeof getNotificationIcon === 'function' ? getNotificationIcon(n.type) : { icon: 'bi-bell', color: 'text-secondary' }; %>
+                      <a class="dropdown-item d-flex gap-2 py-2 <%= n.is_read ? '' : 'bg-light' %>" href="/notifications/<%= n.id %>/open">
+                        <i class="bi <%= iconInfo.icon %> <%= iconInfo.color %> mt-1"></i>
+                        <span class="flex-grow-1 text-wrap">
+                          <span class="d-block small fw-<%= n.is_read ? 'normal' : 'bold' %>"><%= n.title %></span>
+                          <span class="d-block text-muted" style="font-size: 0.75rem;"><%= n.created_at %></span>
+                        </span>
+                      </a>
+                    <% }); %>
+                  <% } %>
+                </li>
+                <li><hr class="dropdown-divider m-0"></li>
+                <li><a class="dropdown-item text-center small" href="/notifications">查看全部通知</a></li>
+              </ul>
+            </li>
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
                 <i class="bi bi-person-circle"></i> <%= user.name || user.username %>
@@ -167,6 +217,109 @@
       timeoutMinutes: <%= typeof idleTimeoutMinutes !== 'undefined' ? idleTimeoutMinutes : 30 %>,
       warningMinutes: <%= typeof idleWarningMinutes !== 'undefined' ? idleWarningMinutes : 2 %>
     };
+  </script>
+  <script>
+    // 通知中心：定期輪詢未讀數與最新通知，自動更新導覽列鈴鐺（不需重新整理頁面）
+    (function () {
+      const POLL_INTERVAL_MS = 25000;
+      const badge = document.getElementById('notificationBadge');
+      const markAllForm = document.getElementById('notificationMarkAllForm');
+      const listContainer = document.getElementById('notificationListContainer');
+      if (!badge || !listContainer) return;
+
+      function escapeHtml(str) {
+        return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      }
+
+      function render(data) {
+        const unread = data.unreadCount || 0;
+        badge.style.display = unread > 0 ? '' : 'none';
+        badge.textContent = unread > 99 ? '99+' : String(unread);
+        if (markAllForm) markAllForm.style.display = unread > 0 ? '' : 'none';
+
+        const notifications = data.notifications || [];
+        if (notifications.length === 0) {
+          listContainer.innerHTML = '<div class="text-center text-muted py-4 small">目前沒有通知</div>';
+          return;
+        }
+        listContainer.innerHTML = notifications.map(function (n) {
+          return '<a class="dropdown-item d-flex gap-2 py-2 ' + (n.is_read ? '' : 'bg-light') + '" href="/notifications/' + n.id + '/open">' +
+            '<i class="bi ' + escapeHtml(n.icon) + ' ' + escapeHtml(n.color) + ' mt-1"></i>' +
+            '<span class="flex-grow-1 text-wrap">' +
+            '<span class="d-block small fw-' + (n.is_read ? 'normal' : 'bold') + '">' + escapeHtml(n.title) + '</span>' +
+            '<span class="d-block text-muted" style="font-size: 0.75rem;">' + escapeHtml(n.created_at) + '</span>' +
+            '</span></a>';
+        }).join('');
+      }
+
+      // 廣播通知：以彈出視窗顯示，讓使用者更容易注意到（比只更新鈴鐺明顯），
+      // 已顯示過的通知 ID 記錄在 localStorage，避免每次輪詢重複彈出同一則
+      const SHOWN_BROADCAST_KEY = 'shownBroadcastNotificationIds';
+      function getShownBroadcastIds() {
+        try { return JSON.parse(localStorage.getItem(SHOWN_BROADCAST_KEY) || '[]'); } catch (e) { return []; }
+      }
+      function markBroadcastShown(id) {
+        const ids = getShownBroadcastIds();
+        ids.push(id);
+        try { localStorage.setItem(SHOWN_BROADCAST_KEY, JSON.stringify(ids.slice(-50))); } catch (e) { /* ignore */ }
+      }
+
+      function showBroadcastModal(n) {
+        let modalEl = document.getElementById('broadcastNotificationModal');
+        if (!modalEl) {
+          modalEl = document.createElement('div');
+          modalEl.id = 'broadcastNotificationModal';
+          modalEl.className = 'modal fade';
+          modalEl.tabIndex = -1;
+          modalEl.innerHTML =
+            '<div class="modal-dialog modal-dialog-centered">' +
+              '<div class="modal-content">' +
+                '<div class="modal-header bg-primary text-white">' +
+                  '<h5 class="modal-title"><i class="bi bi-megaphone"></i> <span data-role="title"></span></h5>' +
+                '</div>' +
+                '<div class="modal-body" data-role="message" style="white-space: pre-wrap;"></div>' +
+                '<div class="modal-footer">' +
+                  '<button type="button" class="btn btn-primary" data-bs-dismiss="modal">我知道了</button>' +
+                '</div>' +
+              '</div>' +
+            '</div>';
+          document.body.appendChild(modalEl);
+        }
+        modalEl.querySelector('[data-role="title"]').textContent = n.title || '系統廣播訊息';
+        modalEl.querySelector('[data-role="message"]').textContent = n.message || '';
+
+        const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false });
+        modalEl.addEventListener('hidden.bs.modal', function onHide() {
+          modalEl.removeEventListener('hidden.bs.modal', onHide);
+          fetch('/notifications/' + n.id + '/read', { method: 'POST' }).catch(function () { /* ignore */ });
+        }, { once: true });
+        bsModal.show();
+      }
+
+      function handleBroadcasts(notifications) {
+        const shown = getShownBroadcastIds();
+        const toShow = (notifications || []).filter(function (n) {
+          return n.type === 'broadcast_message' && !n.is_read && shown.indexOf(n.id) === -1;
+        });
+        if (toShow.length === 0) return;
+        markBroadcastShown(toShow[0].id);
+        showBroadcastModal(toShow[0]);
+      }
+
+      function poll() {
+        fetch('/notifications/poll', { headers: { Accept: 'application/json' } })
+          .then(function (res) { return res.ok ? res.json() : null; })
+          .then(function (data) {
+            if (!data) return;
+            render(data);
+            handleBroadcasts(data.notifications);
+          })
+          .catch(function () { /* 輪詢失敗不影響其他功能，靜默略過 */ });
+      }
+
+      poll();
+      setInterval(poll, POLL_INTERVAL_MS);
+    })();
   </script>
   <% } %>
   <script src="/js/main.js"></script>

@@ -2,11 +2,13 @@ const db = require('./db');
 const AuditLogService = require('../services/AuditLogService');
 const Pipeline = require('./Pipeline');
 const Activity = require('./Activity');
+const Customer = require('./Customer');
 
 // target_type -> 實際執行軟刪除的 model 方法
 const DELETE_HANDLERS = {
   pipeline: (id, userInfo) => Pipeline.softDelete(id, userInfo),
-  activity: (id, userInfo) => Activity.softDelete(id, userInfo)
+  activity: (id, userInfo) => Activity.softDelete(id, userInfo),
+  customer: (id, userInfo) => Customer.softDelete(id, userInfo)
 };
 
 const DeletionRequest = {

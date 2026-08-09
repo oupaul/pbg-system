@@ -33,17 +33,6 @@ const User = {
       return hash === passwordHash;
     }
     
-    // 如果是 bcrypt 格式（以 $2a$, $2b$, $2y$ 開頭）
-    if (passwordHash && (passwordHash.startsWith('$2a$') || passwordHash.startsWith('$2b$') || passwordHash.startsWith('$2y$'))) {
-      try {
-        const bcrypt = require('bcrypt');
-        return bcrypt.compareSync(password, passwordHash);
-      } catch (err) {
-        console.error('[User.verifyPassword] bcrypt 驗證錯誤:', err);
-        return false;
-      }
-    }
-    
     // 使用 argon2id 驗證
     try {
       return await argon2.verify(passwordHash, password);
@@ -71,10 +60,26 @@ const User = {
   // 更新最後登入時間
   updateLastLogin(id) {
     db.prepare(`
-      UPDATE users 
+      UPDATE users
       SET last_login = datetime('now', 'localtime')
       WHERE id = ?
     `).run(id);
+  },
+
+  // 更新最後活動時間（每次已登入請求時呼叫，用於判斷「目前線上」）
+  updateLastActive(id) {
+    db.prepare(`UPDATE users SET last_active_at = datetime('now', 'localtime') WHERE id = ?`).run(id);
+  },
+
+  // 取得最近 N 分鐘內有活動的啟用中使用者（視為「目前線上」）
+  findOnline(minutes) {
+    return db.prepare(`
+      SELECT id, username, name, role
+      FROM users
+      WHERE is_active = 1 AND last_active_at IS NOT NULL
+        AND last_active_at >= datetime('now', 'localtime', ?)
+      ORDER BY name
+    `).all(`-${minutes} minutes`);
   },
 
   // 更新密碼（使用 update 方法，確保一致性）
@@ -132,24 +137,31 @@ const User = {
     }
   },
 
-  // 取得啟用中的使用者（供「接洽人員」等下拉選單使用）
+  // 取得啟用中的使用者（供通知收件人等下拉選單使用）
   findActive() {
     return db.prepare(`SELECT id, name FROM users WHERE is_active = 1 ORDER BY name`).all();
+  },
+
+  // 取得啟用中且非系統管理員的使用者（供「客戶關係負責人（使用者）」下拉選單使用，系統管理員不應被指派為客戶關係負責人）
+  findActiveNonAdmin() {
+    return db.prepare(`SELECT id, name FROM users WHERE is_active = 1 AND role != 'admin' ORDER BY name`).all();
   },
 
   // 創建用戶
   async create(data) {
     const passwordHash = await this.hashPassword(data.password);
     const result = db.prepare(`
-      INSERT INTO users (username, password_hash, name, role, salesperson_id, is_active)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO users (username, password_hash, name, role, salesperson_id, is_active, email, line_user_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       data.username,
       passwordHash,
       data.name,
       data.role || 'user',
       data.salesperson_id || null,
-      data.is_active !== undefined ? data.is_active : 1
+      data.is_active !== undefined ? data.is_active : 1,
+      data.email || null,
+      data.line_user_id || null
     );
     return result.lastInsertRowid;
   },
@@ -175,6 +187,14 @@ const User = {
       if (data.is_active !== undefined) {
         fields.push('is_active = ?');
         values.push(data.is_active);
+      }
+      if (data.email !== undefined) {
+        fields.push('email = ?');
+        values.push(data.email || null);
+      }
+      if (data.line_user_id !== undefined) {
+        fields.push('line_user_id = ?');
+        values.push(data.line_user_id || null);
       }
       if (data.password !== undefined) {
         fields.push('password_hash = ?');

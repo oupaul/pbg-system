@@ -1,8 +1,9 @@
 <% 
   // 確保變數存在
   const localTypes = typeof types !== 'undefined' ? types : [];
-  const localError = typeof error !== 'undefined' ? error : '';
-  const localSuccess = typeof success !== 'undefined' ? success : '';
+  const escapeHtml = str => (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const localError = escapeHtml(typeof error !== 'undefined' ? error : '');
+  const localSuccess = escapeHtml(typeof success !== 'undefined' ? success : '');
   
   const badgeColors = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark'];
   

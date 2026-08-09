@@ -1,5 +1,21 @@
 # 工具腳本
 
+## health-check.sh
+
+確認服務是否正常回應：對 `GET /login`（唯一不需要登入即可存取的固定回應頁面）發送請求，預期回傳 HTTP 200。`update.sh` 會在部署完成後自動呼叫，也可以隨時手動執行來驗證服務狀態。
+
+### 使用方法
+
+```bash
+scripts/health-check.sh <PORT> [MAX_RETRIES] [RETRY_DELAY_SECONDS]
+
+# 範例
+scripts/health-check.sh 3000
+scripts/health-check.sh 3000 20 5
+```
+
+失敗（逾時仍未回傳 200）時會以非 0 狀態碼結束，不會嘗試修復或重啟服務。
+
 ## check_password_hash.js
 
 檢查系統中所有用戶的密碼雜湊格式，確認是否已使用 Argon2id 加密方式。

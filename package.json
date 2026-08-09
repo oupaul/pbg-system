@@ -38,13 +38,15 @@
     "migrate:permission-scope": "node migrations/migrate_permission_scope.js",
     "migrate:invoice-summary": "node migrations/migrate_v_invoice_summary.js",
     "migrate:rename-user-role": "node migrations/migrate_rename_user_role.js",
+    "migrate:login-history": "node migrations/migrate_login_history.js",
+    "migrate:login-history-geoip": "node migrations/migrate_login_history_geoip.js",
     "cleanup:attachments": "node scripts/cleanup-deleted-attachments.js",
     "seed": "node migrations/seed.js",
     "test:expected-invoice": "node test_expected_invoice_update.js",
     "check:expected-invoice": "node check_expected_invoice_field.js",
     "check:password-hash": "node scripts/check_password_hash.js",
     "upgrade:passwords": "node scripts/upgrade_passwords.js",
-    "test": "jest"
+    "test": "jest --passWithNoTests"
   },
   "keywords": [
     "invoice",
@@ -56,17 +58,19 @@
   "license": "MIT",
   "dependencies": {
     "argon2": "^0.40.1",
-    "bcrypt": "^5.1.1",
-    "better-sqlite3": "^11.8.1",
+    "better-sqlite3": "^11.10.0",
     "dayjs": "^1.11.13",
     "ejs": "^3.1.10",
     "exceljs": "^4.4.0",
     "express": "^4.21.0",
     "express-session": "^1.18.2",
+    "maxmind": "^5.0.7",
     "multer": "^1.4.5-lts.1",
+    "nodemailer": "^9.0.3",
     "pdfkit": "^0.15.0"
   },
   "devDependencies": {
+    "jest": "^30.4.2",
     "nodemon": "^3.1.7"
   }
 }

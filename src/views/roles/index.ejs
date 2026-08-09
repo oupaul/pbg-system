@@ -1,3 +1,8 @@
+<%
+  function escapeHtml(str) {
+    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+%>
 <%- include('../layout', { body: `
 <div class="container-fluid mt-4">
   <!-- 頁面標題 -->
@@ -16,13 +21,13 @@
   <!-- 成功/錯誤訊息 -->
   ${success ? `
     <div class="alert alert-success alert-dismissible fade show" role="alert">
-      <i class="bi bi-check-circle"></i> ${success}
+      <i class="bi bi-check-circle"></i> ${escapeHtml(success)}
       <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
   ` : ''}
   ${error ? `
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
-      <i class="bi bi-exclamation-triangle"></i> ${error}
+      <i class="bi bi-exclamation-triangle"></i> ${escapeHtml(error)}
       <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
   ` : ''}

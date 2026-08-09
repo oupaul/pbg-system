@@ -1,3 +1,8 @@
+<%
+  function escapeHtml(str) {
+    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+%>
 <%- include('../layout', { title: salesperson.name, body: `
 <div class="row mb-4">
   <div class="col">
@@ -23,8 +28,8 @@
   </div>
 </div>
 
-${typeof success !== 'undefined' && success ? '<div class="alert alert-success alert-dismissible fade show mb-4"><i class="bi bi-check-circle"></i> ' + success + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>' : ''}
-${typeof error   !== 'undefined' && error   ? '<div class="alert alert-danger  alert-dismissible fade show mb-4"><i class="bi bi-exclamation-triangle"></i> ' + error + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>' : ''}
+${typeof success !== 'undefined' && success ? '<div class="alert alert-success alert-dismissible fade show mb-4"><i class="bi bi-check-circle"></i> ' + escapeHtml(success) + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>' : ''}
+${typeof error   !== 'undefined' && error   ? '<div class="alert alert-danger  alert-dismissible fade show mb-4"><i class="bi bi-exclamation-triangle"></i> ' + escapeHtml(error) + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>' : ''}
 
 <div class="row g-4 mb-4">
   <div class="col-md-3">

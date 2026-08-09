@@ -14,7 +14,7 @@ const SalesPerformanceService = {
     const yearCondition = year ? 'AND p.contract_year = ?' : '';
     const params = year ? [year] : [];
 
-    // 洽談中商機預估營收（先彙總成一列一業務，避免與 projects join 交叉相乘）
+    // 洽談中銷售機會預估營收（先彙總成一列一業務，避免與 projects join 交叉相乘）
     const pipelineYearCondition = year ? "AND substr(pl.expected_close_year_month, 1, 4) = ?" : '';
     const pipelineParams = year ? [String(year)] : [];
 
@@ -95,7 +95,7 @@ const SalesPerformanceService = {
   },
 
   /**
-   * 取得全公司潛在商機總覽：洽談中預估營收、已成交但尚未轉入專案的商機（提醒財務盡快處理）
+   * 取得全公司銷售機會總覽：洽談中預估營收、已成交但尚未轉入專案的銷售機會（提醒財務盡快處理）
    * @returns {{open_count:number, open_amount:number, won_pending_count:number, won_pending_amount:number}}
    */
   getPipelineSummary() {

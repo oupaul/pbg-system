@@ -1,16 +1,28 @@
+<%
+  const WIN_PROBABILITY_STAGES = { 10: '初步接洽', 30: '需求分析', 50: '提案報價', 100: '商務談判' };
+  const STATUS_CARD_STYLE = {
+    '洽談中': { bg: 'bg-warning', icon: 'bi-hourglass-split' },
+    '已成交': { bg: 'bg-success', icon: 'bi-check-circle' },
+    '已流失': { bg: 'bg-secondary', icon: 'bi-x-circle' }
+  };
+  // 商機名稱、客戶/業務姓名皆為自由文字欄位，輸出前需跳脫，避免儲存型 XSS
+  function escapeHtml(str) {
+    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+%>
 <%- include('../layout', { body: `
 <div class="row mb-4">
   <div class="col">
-    <h1 class="h3"><i class="bi bi-bullseye"></i> 潛在商機</h1>
+    <h1 class="h3"><i class="bi bi-bullseye"></i> 銷售機會管理</h1>
   </div>
   <div class="col-auto">
-    ${locals.canEditCrm ? '<a href="/pipelines/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 新增商機</a>' : ''}
+    ${locals.canEditCrm ? '<a href="/pipelines/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 新增銷售機會</a>' : ''}
   </div>
 </div>
 
 ${error ? `
   <div class="alert alert-danger alert-dismissible fade show" role="alert">
-    <i class="bi bi-exclamation-triangle"></i> ${error}
+    <i class="bi bi-exclamation-triangle"></i> ${escapeHtml(error)}
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
   </div>
 ` : ''}
@@ -22,6 +34,99 @@ ${error ? `
     <a href="/pipelines?status=${encodeURIComponent('已成交')}" class="btn btn-sm ${statusFilter === '已成交' ? 'btn-success' : 'btn-outline-success'}">已成交</a>
     <a href="/pipelines?status=${encodeURIComponent('已流失')}" class="btn btn-sm ${statusFilter === '已流失' ? 'btn-secondary' : 'btn-outline-secondary'}">已流失</a>
   </div>
+  <small class="text-muted ms-2">以下統計數字皆依目前篩選條件計算</small>
+</div>
+
+<div class="row g-3 mb-3">
+  ${(summary.byStatus || []).map(g => `
+    <div class="col-md-4">
+      <div class="card h-100 ${(STATUS_CARD_STYLE[g.status] || {}).bg || 'bg-primary'} text-white">
+        <div class="card-body text-center">
+          <h6 class="mb-1"><i class="bi ${(STATUS_CARD_STYLE[g.status] || {}).icon || 'bi-cash-stack'}"></i> ${escapeHtml(g.status)}預估金額</h6>
+          <h3 class="mb-0">$${(g.amount || 0).toLocaleString()}</h3>
+          <small>共 ${g.count || 0} 筆</small>
+        </div>
+      </div>
+    </div>
+  `).join('')}
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-12">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-percent"></i> 依成交機率加總</div>
+      <div class="card-body">
+        <div class="row g-2 text-center">
+          ${(summary.byProbability || []).map(g => `
+            <div class="col">
+              <div class="border rounded p-2 h-100">
+                <div class="small text-muted">${g.label ? g.label + ' ' : ''}${g.pct !== null ? g.pct + '%' : ''}</div>
+                <div class="fw-bold">$${(g.amount || 0).toLocaleString()}</div>
+                <div class="small text-muted">${g.count || 0} 筆</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-calendar-range"></i> 依預計成交月份加總</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>預計成交月份</th>
+                <th class="text-center">筆數</th>
+                <th class="text-end">預估金額</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(summary.byMonth || []).length === 0 ? '<tr><td colspan="3" class="text-center text-muted py-3">尚無資料</td></tr>' : (summary.byMonth || []).map(g => `
+                <tr>
+                  <td>${escapeHtml(g.month)}</td>
+                  <td class="text-center">${g.count || 0}</td>
+                  <td class="text-end">$${(g.amount || 0).toLocaleString()}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-person-badge"></i> 依業務分類加總</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>業務</th>
+                <th class="text-center">筆數</th>
+                <th class="text-end">預估金額</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(summary.bySalesperson || []).length === 0 ? '<tr><td colspan="3" class="text-center text-muted py-3">尚無資料</td></tr>' : (summary.bySalesperson || []).map(g => `
+                <tr>
+                  <td>${escapeHtml(g.salesperson)}</td>
+                  <td class="text-center">${g.count || 0}</td>
+                  <td class="text-end">$${(g.amount || 0).toLocaleString()}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="card">
@@ -30,28 +135,70 @@ ${error ? `
       <table class="table table-hover mb-0">
         <thead class="table-light">
           <tr>
-            <th>商機名稱</th>
-            <th>客戶</th>
-            <th>業務</th>
-            <th class="text-end">預估金額</th>
-            <th>預計成交月份</th>
-            <th>狀態</th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.created_at) || ''}" class="text-dark text-decoration-none">
+                建立日期${(sortIcons && sortIcons.created_at) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.updated_at) || ''}" class="text-dark text-decoration-none">
+                最後更新日期${(sortIcons && sortIcons.updated_at) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.opportunity_name) || ''}" class="text-dark text-decoration-none">
+                銷售機會${(sortIcons && sortIcons.opportunity_name) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.customer_name) || ''}" class="text-dark text-decoration-none">
+                客戶${(sortIcons && sortIcons.customer_name) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.salesperson_name) || ''}" class="text-dark text-decoration-none">
+                業務${(sortIcons && sortIcons.salesperson_name) || ''}
+              </a>
+            </th>
+            <th class="text-end">
+              <a href="?${(sortLinks && sortLinks.estimated_amount) || ''}" class="text-dark text-decoration-none">
+                預估金額${(sortIcons && sortIcons.estimated_amount) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.win_probability) || ''}" class="text-dark text-decoration-none">
+                成交機率${(sortIcons && sortIcons.win_probability) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.expected_close_year_month) || ''}" class="text-dark text-decoration-none">
+                預計成交月份${(sortIcons && sortIcons.expected_close_year_month) || ''}
+              </a>
+            </th>
+            <th>
+              <a href="?${(sortLinks && sortLinks.status) || ''}" class="text-dark text-decoration-none">
+                狀態${(sortIcons && sortIcons.status) || ''}
+              </a>
+            </th>
           </tr>
         </thead>
         <tbody>
           ${pipelines.map(p => `
             <tr onclick="location.href='/pipelines/${p.id}'" style="cursor:pointer">
-              <td>${p.opportunity_name}</td>
-              <td>${p.customer_name || '-'}</td>
-              <td>${p.salesperson_name || '-'}</td>
+              <td>${(p.created_at || '').slice(0, 10) || '-'}</td>
+              <td>${(p.updated_at || '').slice(0, 10) || '-'}</td>
+              <td>${escapeHtml(p.opportunity_name)}</td>
+              <td>${escapeHtml(p.customer_name) || '-'}</td>
+              <td>${escapeHtml(p.salesperson_name) || '-'}</td>
               <td class="text-end">$${(p.estimated_amount || 0).toLocaleString()}</td>
+              <td>${p.win_probability !== null && p.win_probability !== undefined ? (WIN_PROBABILITY_STAGES[p.win_probability] ? WIN_PROBABILITY_STAGES[p.win_probability] + ' ' : '') + p.win_probability + '%' : '-'}</td>
               <td>${p.expected_close_year_month || '-'}</td>
               <td>
                 <span class="badge bg-${p.status === '已成交' ? 'success' : p.status === '已流失' ? 'secondary' : 'warning'}">${p.status}</span>
                 ${p.converted_project_id ? '<span class="badge bg-info ms-1">已轉入專案</span>' : ''}
               </td>
             </tr>
-          `).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">尚無潛在商機</td></tr>'}
+          `).join('') || '<tr><td colspan="9" class="text-center text-muted py-3">尚無銷售機會</td></tr>'}
         </tbody>
       </table>
     </div>

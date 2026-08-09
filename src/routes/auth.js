@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
+const LoginHistory = require('../models/LoginHistory');
+const GeoIpService = require('../services/GeoIpService');
 const AuditLogService = require('../services/AuditLogService');
 const { getUserInfo } = require('../utils/authHelper');
 const { loginRateLimiter, resetOnSuccess } = require('../middleware/rateLimiter');
@@ -92,6 +94,15 @@ router.post('/login', loginRateLimiter, async (req, res) => {
   // 登入成功 — 清除速率限制計數
   resetOnSuccess(req.ip || req.connection.remoteAddress || 'unknown');
 
+  // 記錄登入紀錄（失敗不影響登入流程本身）
+  try {
+    const loginIp = req.ip || req.connection.remoteAddress || 'unknown';
+    const countryCode = await GeoIpService.lookupCountryCode(loginIp);
+    LoginHistory.record(user.id, loginIp, req.get('User-Agent'), countryCode);
+  } catch (err) {
+    console.error('[登入] 記錄登入紀錄失敗:', err);
+  }
+
   // 登入成功，設置 session
   console.log('[登入] 登入成功，設置 session');
   
@@ -109,13 +120,11 @@ router.post('/login', loginRateLimiter, async (req, res) => {
   
   console.log('[登入] Session 設置完成，用戶:', req.session.user);
 
-  // 如果密碼是舊的 SHA256 或 bcrypt 格式，自動升級為 argon2id
+  // 如果密碼是舊的 SHA256 格式，自動升級為 argon2id
   const isOldSHA256 = user.password_hash && user.password_hash.length === 64 && /^[a-f0-9]{64}$/i.test(user.password_hash);
-  const isOldBcrypt = user.password_hash && (user.password_hash.startsWith('$2a$') || user.password_hash.startsWith('$2b$') || user.password_hash.startsWith('$2y$'));
-  
-  if (isOldSHA256 || isOldBcrypt) {
-    const formatName = isOldSHA256 ? 'SHA256' : 'bcrypt';
-    console.log(`[登入] 檢測到舊的 ${formatName} 密碼格式，正在升級為 argon2id...`);
+
+  if (isOldSHA256) {
+    console.log('[登入] 檢測到舊的 SHA256 密碼格式，正在升級為 argon2id...');
     try {
       await User.updatePassword(user.id, password);
       console.log(`[登入] 密碼已成功升級為 argon2id`);

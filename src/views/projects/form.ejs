@@ -241,19 +241,23 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         const result = await response.json();
-        
-        if (result.success) {
+
+        if (result.success && result.pending) {
+          // 非管理員/專案管理員送出的申請，尚未真正建立客戶，無法立即選用
+          quickAddModal.hide();
+          showToast(result.message || '已送出審核申請，待核准後才會建立', 'warning');
+        } else if (result.success) {
           // 新增成功，添加到 Select2 並選擇
           const customer = result.customer;
           const displayText = customer.company_name + ' (' + customer.customer_code + ')';
-          
+
           // 使用 jQuery 添加新選項並選擇
           const newOption = new Option(displayText, customer.id, true, true);
           $('#customer_id').append(newOption).trigger('change');
-          
+
           // 關閉 Modal
           quickAddModal.hide();
-          
+
           // 顯示成功提示
           showToast('客戶新增成功：' + customer.company_name, 'success');
         } else {

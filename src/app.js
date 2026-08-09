@@ -12,6 +12,11 @@ const PORT = process.env.PORT || 3000;
 
 console.log('[啟動] Express 應用程式建立完成，PORT:', PORT);
 
+// 正式環境一律透過 Nginx 反向代理（見 Nginx上傳大小限制修復說明.md），
+// 只信任最近這一層代理傳來的 X-Forwarded-For，req.ip 才會是真實使用者
+// IP，而不是 Nginx 自己的位址。若部署拓樸改成有多層代理，這裡要跟著調整。
+app.set('trust proxy', 1);
+
 // 設定檔案上傳
 const upload = multer({
   dest: path.join(__dirname, '..', 'uploads'),
@@ -36,7 +41,8 @@ app.use(session({
 console.log('[啟動] Session 配置完成');
 
 // 中間件
-app.use(express.json());
+// verify callback 保留原始 body（Buffer），LINE Webhook 簽章驗證需要用到
+app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -149,6 +155,8 @@ try {
   console.log('[啟動] ✓ importExport 路由載入完成');
   const auditLogRoutes = require('./routes/auditLogs');
   console.log('[啟動] ✓ auditLogs 路由載入完成');
+  const loginHistoryRoutes = require('./routes/loginHistory');
+  console.log('[啟動] ✓ loginHistory 路由載入完成');
   const apiRoutes = require('./routes/api');
   console.log('[啟動] ✓ api 路由載入完成');
   const userRoutes = require('./routes/users');
@@ -177,10 +185,19 @@ try {
   console.log('[啟動] ✓ pipelines 路由載入完成');
   const deletionRequestRoutes = require('./routes/deletionRequests');
   console.log('[啟動] ✓ deletionRequests 路由載入完成');
+  const customerApprovalRoutes = require('./routes/customerApprovals');
+  console.log('[啟動] ✓ customerApprovals 路由載入完成');
+  const notificationRoutes = require('./routes/notifications');
+  console.log('[啟動] ✓ notifications 路由載入完成');
+  const lineWebhookRoutes = require('./routes/lineWebhook');
+  console.log('[啟動] ✓ lineWebhook 路由載入完成');
 
   // 認證路由（不需要登入）- 必須在其他路由之前
   // authRoutes 內部已經定義了 /login 和 /logout 路徑
   app.use(authRoutes);
+
+  // LINE Webhook（不需要登入，由 LINE 平台呼叫，改用簽章驗證）
+  app.use('/webhooks/line', lineWebhookRoutes);
 
   // 保護所有其他路由（需要登入）
   app.use('/projects', requireAuth, projectRoutes);
@@ -193,8 +210,11 @@ try {
   app.use('/customers', requireAuth, customerRoutes);
   app.use('/pipelines', requireAuth, pipelineRoutes);
   app.use('/deletion-requests', requireAuth, deletionRequestRoutes);
+  app.use('/customer-approvals', requireAuth, customerApprovalRoutes);
+  app.use('/notifications', requireAuth, notificationRoutes);
   app.use('/import-export', requireAuth, requireImportExport, importExportRoutes(upload));
   app.use('/audit-logs', requireAuth, auditLogRoutes);
+  app.use('/login-history', requireAuth, loginHistoryRoutes);
   app.use('/users', requireAuth, userRoutes);
   app.use('/backup-restore', requireAuth, backupRestoreRoutes);
   app.use('/settings', requireAuth, settingsRoutes);

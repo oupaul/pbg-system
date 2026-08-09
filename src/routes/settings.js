@@ -1,9 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
+const User = require('../models/User');
 const { requireAuth } = require('../middleware/auth');
 const { getUserInfo } = require('../utils/authHelper');
 const AuditLogService = require('../services/AuditLogService');
+const EmailService = require('../services/EmailService');
 
 // 輔助函數：檢查是否為管理員
 function requireAdmin(req, res, next) {
@@ -98,6 +100,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
       title: '系統設定',
       settings: settings,
       settingsObj: settingsObj,
+      allUsers: User.findActive(),
       success: req.query.success || '',
       error: req.query.error || ''
     });
@@ -107,6 +110,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
       title: '系統設定',
       settings: [],
       settingsObj: {},
+      allUsers: [],
       success: '',
       error: '載入系統設定失敗：' + err.message
     });
@@ -151,24 +155,31 @@ router.post('/update', requireAuth, requireAdmin, (req, res) => {
           return res.redirect('/settings?error=' + encodeURIComponent('警告提前時間必須在 1-10 分鐘之間'));
         }
       }
+
+      // 特別驗證客戶追蹤提醒天數：必須在 1-90 天之間
+      if (setting_key === 'activity_reminder_days') {
+        if (num < 1 || num > 90) {
+          return res.redirect('/settings?error=' + encodeURIComponent('客戶追蹤提醒天數必須在 1-90 天之間'));
+        }
+      }
     } else if (setting_type === 'boolean') {
       validatedValue = setting_value === 'true' || setting_value === '1' || setting_value === 'on';
     }
-    
+
     // 獲取舊值用於審計日誌
     const oldSetting = db.prepare('SELECT * FROM system_settings WHERE setting_key = ?').get(setting_key);
     const oldValue = oldSetting ? oldSetting.setting_value : null;
-    
+
     // 更新設定
     const success = updateSystemSetting(setting_key, validatedValue, setting_type);
-    
+
     if (success) {
       // 記錄審計日誌
-      AuditLogService.logUpdate('system_settings', setting_key, 
-        { setting_value: oldValue }, 
-        { setting_value: String(validatedValue) }, 
+      AuditLogService.logUpdate('system_settings', setting_key,
+        { setting_value: oldValue },
+        { setting_value: String(validatedValue) },
         getUserInfo(req));
-      
+
       res.redirect('/settings?success=' + encodeURIComponent('設定已成功更新'));
     } else {
       res.redirect('/settings?error=' + encodeURIComponent('更新設定失敗'));
@@ -179,17 +190,23 @@ router.post('/update', requireAuth, requireAdmin, (req, res) => {
   }
 });
 
+// 這些設定為密碼／存取權杖類機敏資料，表單為避免外洩不會回填實際值，
+// 因此留空必須視為「不變更」，絕不能覆蓋成空字串（否則每次儲存其他欄位都會把已設定的密碼洗掉）
+const PRESERVE_IF_EMPTY_KEYS = new Set(['smtp_password', 'line_channel_access_token', 'line_channel_secret']);
+
 // 批量更新設定（僅管理員）
 router.post('/bulk-update', requireAuth, requireAdmin, (req, res) => {
   try {
     const updates = req.body;
     let updateCount = 0;
     const errors = [];
-    
+
     for (const [key, value] of Object.entries(updates)) {
       // 跳過非設定欄位
       if (key === '_method' || key === 'submit') continue;
-      
+      // 機敏欄位留空表示不變更，略過（保留資料庫既有值）
+      if (PRESERVE_IF_EMPTY_KEYS.has(key) && (!value || String(value).trim() === '')) continue;
+
       try {
         // 獲取設定的類型
         const setting = db.prepare('SELECT setting_type FROM system_settings WHERE setting_key = ?').get(key);
@@ -231,6 +248,14 @@ router.post('/bulk-update', requireAuth, requireAdmin, (req, res) => {
               continue;
             }
           }
+
+          // 特別驗證客戶追蹤提醒天數
+          if (key === 'activity_reminder_days') {
+            if (num < 1 || num > 90) {
+              errors.push('客戶追蹤提醒天數必須在 1-90 天之間');
+              continue;
+            }
+          }
         } else if (setting.setting_type === 'boolean') {
           validatedValue = value === 'true' || value === '1' || value === 'on';
         }
@@ -251,6 +276,20 @@ router.post('/bulk-update', requireAuth, requireAdmin, (req, res) => {
     console.error('批量更新設定失敗:', err);
     res.redirect('/settings?error=' + encodeURIComponent('批量更新失敗：' + err.message));
   }
+});
+
+// 測試發送 Email（僅管理員）：用表單目前的值（不一定已存檔）實際寄一封測試信，回傳結果供畫面顯示
+router.post('/test-email', requireAuth, requireAdmin, async (req, res) => {
+  const result = await EmailService.sendTestMail(req.body.to, {
+    host: req.body.smtp_host,
+    port: req.body.smtp_port,
+    secure: req.body.smtp_secure,
+    user: req.body.smtp_user,
+    password: req.body.smtp_password,
+    from: req.body.smtp_from,
+    rejectUnauthorized: req.body.smtp_reject_unauthorized
+  });
+  res.json(result);
 });
 
 // 匯出輔助函數供其他模組使用
