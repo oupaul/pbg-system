@@ -238,12 +238,17 @@ if [ "$IS_FIRST_INSTALL" = false ]; then
         # 等待服務完全停止
         sleep 2
         
-        # 檢查是否還有進程佔用端口 3000
-        PORT_PID=$(sudo lsof -ti:3000 2>/dev/null || echo "")
+        # 檢查是否還有進程佔用服務的端口
+        PORT_PID=$(sudo lsof -ti:${PORT} 2>/dev/null || echo "")
         if [ -n "$PORT_PID" ]; then
-            warning "檢測到端口 3000 仍被佔用 (PID: $PORT_PID)，正在終止..."
-            sudo kill -9 "$PORT_PID" 2>/dev/null || warning "無法終止進程，可能需要手動處理"
-            sleep 1
+            PORT_PROC_CMD=$(ps -p "$PORT_PID" -o args= 2>/dev/null || echo "")
+            if echo "$PORT_PROC_CMD" | grep -q "app\.js"; then
+                warning "檢測到端口 ${PORT} 仍被本專案的程序佔用 (PID: $PORT_PID)，正在終止..."
+                sudo kill -9 "$PORT_PID" 2>/dev/null || warning "無法終止進程，可能需要手動處理"
+                sleep 1
+            else
+                error "端口 ${PORT} 被非本專案的程序佔用 (PID: $PORT_PID，指令: ${PORT_PROC_CMD:-未知})。為避免誤殺無關程序，部署已停止，請手動確認並釋放該端口後重新執行。"
+            fi
         fi
         
         # 再次確認服務狀態
@@ -260,9 +265,14 @@ else
     # 即使是首次安裝，也檢查端口
     PORT_PID=$(sudo lsof -ti:${PORT} 2>/dev/null || echo "")
     if [ -n "$PORT_PID" ]; then
-        warning "檢測到端口 ${PORT} 被佔用 (PID: $PORT_PID)，正在清理..."
-        sudo kill -9 "$PORT_PID" 2>/dev/null || true
-        sleep 1
+        PORT_PROC_CMD=$(ps -p "$PORT_PID" -o args= 2>/dev/null || echo "")
+        if echo "$PORT_PROC_CMD" | grep -q "app\.js"; then
+            warning "檢測到端口 ${PORT} 被本專案的舊程序佔用 (PID: $PORT_PID)，正在清理..."
+            sudo kill -9 "$PORT_PID" 2>/dev/null || true
+            sleep 1
+        else
+            error "端口 ${PORT} 被非本專案的程序佔用 (PID: $PORT_PID，指令: ${PORT_PROC_CMD:-未知})。為避免誤殺無關程序，部署已停止，請手動確認並釋放該端口後重新執行。"
+        fi
     fi
 fi
 
@@ -320,8 +330,13 @@ if [ -f "${PROJECT_DIR}/package.json" ]; then
         log "檢測到 package.json 更新，重新安裝依賴..."
         cd "${PROJECT_DIR}"
         npm install || error "依賴套件安裝失敗"
-        log "修復已知安全性漏洞（非破壞性）..."
-        npm audit fix --audit-level=high 2>&1 | tail -5 || true
+        if [ -z "${SKIP_AUDIT_FIX:-}" ]; then
+            log "修復已知安全性漏洞（僅套用不需要 --force 的修復，不含破壞性變更）..."
+            npm audit fix 2>&1 | tail -10 || true
+            info "若上方仍列出需要 --force 才能修的項目，代表該修復含破壞性變更（例如降版某個依賴），不會自動套用，需手動評估後執行 npm audit fix --force"
+        else
+            info "SKIP_AUDIT_FIX=1，略過自動修復已知安全性漏洞"
+        fi
         log "✓ 依賴套件更新完成"
     else
         log "✓ 依賴套件無需更新"
@@ -359,7 +374,12 @@ if [ -d "${PROJECT_DIR}/migrations" ]; then
         log "資料庫不存在，建立初始結構..."
         npm run migrate || error "基礎資料庫遷移失敗"
     fi
-    node migrations/runner.js || warning "部分 migration 執行失敗，請檢查上方輸出"
+    if ! node migrations/runner.js; then
+        error "Migration 執行失敗，部署已停止（不會啟動服務，避免帶著不完整的 schema 上線）。
+  請檢查上方 migration 錯誤輸出並修正；已成功的 migration 已被記錄，
+  修正後重新執行本腳本時只會重跑尚未成功的項目。
+  資料庫備份（若步驟 2 有建立）：${PROJECT_DIR}/data/invoice_bonus.db.backup-*"
+    fi
     if [ "$IS_FIRST_INSTALL" = true ] && [ ! -f "${PROJECT_DIR}/data/.seeded" ]; then
         log "插入種子資料..."
         npm run seed && touch "${PROJECT_DIR}/data/.seeded" || warning "種子資料插入失敗（可能已存在）"

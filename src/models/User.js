@@ -33,17 +33,6 @@ const User = {
       return hash === passwordHash;
     }
     
-    // 如果是 bcrypt 格式（以 $2a$, $2b$, $2y$ 開頭）
-    if (passwordHash && (passwordHash.startsWith('$2a$') || passwordHash.startsWith('$2b$') || passwordHash.startsWith('$2y$'))) {
-      try {
-        const bcrypt = require('bcrypt');
-        return bcrypt.compareSync(password, passwordHash);
-      } catch (err) {
-        console.error('[User.verifyPassword] bcrypt 驗證錯誤:', err);
-        return false;
-      }
-    }
-    
     // 使用 argon2id 驗證
     try {
       return await argon2.verify(passwordHash, password);

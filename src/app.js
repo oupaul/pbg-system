@@ -150,6 +150,8 @@ try {
   console.log('[啟動] ✓ importExport 路由載入完成');
   const auditLogRoutes = require('./routes/auditLogs');
   console.log('[啟動] ✓ auditLogs 路由載入完成');
+  const loginHistoryRoutes = require('./routes/loginHistory');
+  console.log('[啟動] ✓ loginHistory 路由載入完成');
   const apiRoutes = require('./routes/api');
   console.log('[啟動] ✓ api 路由載入完成');
   const userRoutes = require('./routes/users');
@@ -207,6 +209,7 @@ try {
   app.use('/notifications', requireAuth, notificationRoutes);
   app.use('/import-export', requireAuth, requireImportExport, importExportRoutes(upload));
   app.use('/audit-logs', requireAuth, auditLogRoutes);
+  app.use('/login-history', requireAuth, loginHistoryRoutes);
   app.use('/users', requireAuth, userRoutes);
   app.use('/backup-restore', requireAuth, backupRestoreRoutes);
   app.use('/settings', requireAuth, settingsRoutes);
