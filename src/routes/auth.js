@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
+const LoginHistory = require('../models/LoginHistory');
 const AuditLogService = require('../services/AuditLogService');
 const { getUserInfo } = require('../utils/authHelper');
 const { loginRateLimiter, resetOnSuccess } = require('../middleware/rateLimiter');
@@ -91,6 +92,13 @@ router.post('/login', loginRateLimiter, async (req, res) => {
 
   // 登入成功 — 清除速率限制計數
   resetOnSuccess(req.ip || req.connection.remoteAddress || 'unknown');
+
+  // 記錄登入紀錄（失敗不影響登入流程本身）
+  try {
+    LoginHistory.record(user.id, req.ip || req.connection.remoteAddress || 'unknown', req.get('User-Agent'));
+  } catch (err) {
+    console.error('[登入] 記錄登入紀錄失敗:', err);
+  }
 
   // 登入成功，設置 session
   console.log('[登入] 登入成功，設置 session');

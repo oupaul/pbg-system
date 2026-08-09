@@ -38,6 +38,7 @@
     "migrate:permission-scope": "node migrations/migrate_permission_scope.js",
     "migrate:invoice-summary": "node migrations/migrate_v_invoice_summary.js",
     "migrate:rename-user-role": "node migrations/migrate_rename_user_role.js",
+    "migrate:login-history": "node migrations/migrate_login_history.js",
     "cleanup:attachments": "node scripts/cleanup-deleted-attachments.js",
     "seed": "node migrations/seed.js",
     "test:expected-invoice": "node test_expected_invoice_update.js",
