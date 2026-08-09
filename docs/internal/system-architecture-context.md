@@ -164,6 +164,15 @@ uninstall.sh          # 自動備份後移除
 - 執行環境：Ubuntu 24.04 LTS（推薦）、Node.js 20.x、512MB 記憶體/1GB 硬碟以上
 - 服務以 systemd 管理；`deploy.config.json`（gitignored）存放每個部署環境客製化的站名/port 等，由 `src/config/deploy.js` 讀取
 
+### 7.1 環境變數與密鑰管理
+
+- 實際會讀取的 `process.env.*` 只有四個：`PORT`、`NODE_ENV`、`SESSION_SECRET`、`DB_PATH`（其餘如 `PAGE_TITLE_SUFFIX` 等只在 `deploy.sh` 安裝流程內部使用，用來產生 `deploy.config.json`，執行中的 app 不會讀取）
+- `SESSION_SECRET`：`deploy.sh` 首次部署時以 `openssl rand -hex 32` 產生，直接寫入 systemd unit 的 `Environment=`，不落地在任何 repo 內檔案；`src/app.js` 在未設定時會每次啟動自動產生新的亂數金鑰，代表每次重啟都會讓所有登入 session 失效（有對應的啟動警告訊息）
+- `DB_PATH`：只影響 `migrations/`、`scripts/` 底下的獨立腳本，主程式 `src/models/db.js` 目前寫死使用 `data/invoice_bonus.db`，不會讀取這個變數——這是一個現存的不一致，非本次文件更新處理範圍
+- SMTP／LINE 憑證**不是環境變數**：存在 SQLite 的 `system_settings` 資料表，透過「系統設定」頁面（`routes/settings.js`）維護、`EmailService`/`LineService` 讀取，目前為明文儲存
+- `nas_config.json` 明確不儲存密碼（程式內有註解說明），NAS 備份的認證方式實際只有 SSH key（`ssh -o BatchMode=yes`），沒有實作額外的密碼類環境變數
+- 專案未安裝 `dotenv`，`.env`（若存在）不會被自動載入；新增的 `.env.example` 僅作文件用途
+
 ## 8. 目前開發狀態（撰寫文件時的時間點資訊）
 
 - **分支**：`main`（正式）、`develop`（開發整合，目前與 main 內容一致）、`fix/crm-xss-escaping`（本次 session 建立，領先 develop 2 個 commit，**尚未合併**）

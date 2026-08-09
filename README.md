@@ -36,6 +36,10 @@ sudo ./deploy.sh
 
 **首次登入後請立即變更密碼。**
 
+### 環境變數（進階，選填）
+
+透過 `setup.sh`／`deploy.sh` 部署不需要處理這一步（`SESSION_SECRET` 等會自動產生）。若要用 `npm run dev` 或手動啟動，可參考 [`.env.example`](.env.example) 設定 `PORT`、`NODE_ENV`、`SESSION_SECRET` 等變數（本專案未使用 dotenv，需自行 `export`）。
+
 ---
 
 ## 更新
