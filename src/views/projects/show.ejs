@@ -79,7 +79,7 @@ ${typeof error !== 'undefined' && error ? '<div class="alert alert-danger alert-
           </div>
           <div class="col-12">
             <label class="text-muted small">客戶</label>
-            <div class="fw-bold">${h(project.company_name || '-')} <small class="text-muted">(${h(project.customer_code || '-')} / ${h(project.tax_id || '-')})</small></div>
+            <div class="fw-bold">${project.customer_id ? `<a href="/customers/${project.customer_id}">${h(project.company_name || '-')}</a>` : h(project.company_name || '-')} <small class="text-muted">(${h(project.customer_code || '-')} / ${h(project.tax_id || '-')})</small></div>
           </div>
           <div class="col-12">
             <label class="text-muted small"><i class="bi bi-sticky"></i> 備註</label>
