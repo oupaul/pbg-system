@@ -40,6 +40,10 @@ sudo ./deploy.sh
 
 透過 `setup.sh`／`deploy.sh` 部署不需要處理這一步（`SESSION_SECRET` 等會自動產生）。若要用 `npm run dev` 或手動啟動，可參考 [`.env.example`](.env.example) 設定 `PORT`、`NODE_ENV`、`SESSION_SECRET` 等變數（本專案未使用 dotenv，需自行 `export`）。
 
+### 登入紀錄地區判斷（進階，選填）
+
+「登入紀錄」頁面可顯示登入來源的地區，需自行下載 [MaxMind GeoLite2](https://www.maxmind.com/en/geolite2/signup)（免費，需註冊）的 `GeoLite2-Country.mmdb`，放到 `data/GeoLite2-Country.mmdb`。不放這個檔案不影響任何功能，地區欄位只會顯示「-」。這個資料庫沒有自動更新機制，需要自行定期重新下載。
+
 ---
 
 ## 更新

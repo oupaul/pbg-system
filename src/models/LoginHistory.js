@@ -2,11 +2,11 @@ const db = require('./db');
 
 const LoginHistory = {
   // 記錄一次成功登入
-  record(userId, ipAddress, userAgent) {
+  record(userId, ipAddress, userAgent, countryCode) {
     db.prepare(`
-      INSERT INTO login_history (user_id, ip_address, user_agent)
-      VALUES (?, ?, ?)
-    `).run(userId, ipAddress || null, userAgent || null);
+      INSERT INTO login_history (user_id, ip_address, user_agent, country_code)
+      VALUES (?, ?, ?, ?)
+    `).run(userId, ipAddress || null, userAgent || null, countryCode || null);
   },
 
   // 查詢登入紀錄（可依使用者/日期篩選，分頁）
@@ -31,7 +31,7 @@ const LoginHistory = {
     const offset = (page - 1) * pageSize;
 
     return db.prepare(`
-      SELECT lh.id, lh.user_id, lh.ip_address, lh.user_agent, lh.logged_in_at,
+      SELECT lh.id, lh.user_id, lh.ip_address, lh.user_agent, lh.logged_in_at, lh.country_code,
              u.username, u.name
       FROM login_history lh
       LEFT JOIN users u ON lh.user_id = u.id

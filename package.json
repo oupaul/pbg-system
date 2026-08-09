@@ -39,6 +39,7 @@
     "migrate:invoice-summary": "node migrations/migrate_v_invoice_summary.js",
     "migrate:rename-user-role": "node migrations/migrate_rename_user_role.js",
     "migrate:login-history": "node migrations/migrate_login_history.js",
+    "migrate:login-history-geoip": "node migrations/migrate_login_history_geoip.js",
     "cleanup:attachments": "node scripts/cleanup-deleted-attachments.js",
     "seed": "node migrations/seed.js",
     "test:expected-invoice": "node test_expected_invoice_update.js",
@@ -63,6 +64,7 @@
     "exceljs": "^4.4.0",
     "express": "^4.21.0",
     "express-session": "^1.18.2",
+    "maxmind": "^5.0.7",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^9.0.3",
     "pdfkit": "^0.15.0"

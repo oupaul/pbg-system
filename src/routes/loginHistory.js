@@ -18,6 +18,13 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+// ISO 3166-1 alpha-2 國碼轉國旗 emoji（純用代碼機械轉換，不涉及地名字串，
+// 避免地緣政治相關的命名爭議）
+function countryCodeToFlag(code) {
+  if (!/^[A-Z]{2}$/.test(code || '')) return null;
+  return String.fromCodePoint(...code.split('').map(c => 0x1f1e6 + c.charCodeAt(0) - 65));
+}
+
 const PAGE_SIZE = 50;
 
 router.get('/', (req, res) => {
@@ -33,7 +40,10 @@ router.get('/', (req, res) => {
     username_html: escapeHtml(r.username),
     name_html: escapeHtml(r.name),
     ip_address_html: escapeHtml(r.ip_address || '-'),
-    user_agent_html: escapeHtml(r.user_agent || '-')
+    user_agent_html: escapeHtml(r.user_agent || '-'),
+    country_display: countryCodeToFlag(r.country_code)
+      ? `${countryCodeToFlag(r.country_code)} ${r.country_code}`
+      : '-'
   }));
   const total = LoginHistory.count(filters);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));

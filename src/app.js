@@ -12,6 +12,11 @@ const PORT = process.env.PORT || 3000;
 
 console.log('[啟動] Express 應用程式建立完成，PORT:', PORT);
 
+// 正式環境一律透過 Nginx 反向代理（見 Nginx上傳大小限制修復說明.md），
+// 只信任最近這一層代理傳來的 X-Forwarded-For，req.ip 才會是真實使用者
+// IP，而不是 Nginx 自己的位址。若部署拓樸改成有多層代理，這裡要跟著調整。
+app.set('trust proxy', 1);
+
 // 設定檔案上傳
 const upload = multer({
   dest: path.join(__dirname, '..', 'uploads'),

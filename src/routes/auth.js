@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const LoginHistory = require('../models/LoginHistory');
+const GeoIpService = require('../services/GeoIpService');
 const AuditLogService = require('../services/AuditLogService');
 const { getUserInfo } = require('../utils/authHelper');
 const { loginRateLimiter, resetOnSuccess } = require('../middleware/rateLimiter');
@@ -95,7 +96,9 @@ router.post('/login', loginRateLimiter, async (req, res) => {
 
   // 記錄登入紀錄（失敗不影響登入流程本身）
   try {
-    LoginHistory.record(user.id, req.ip || req.connection.remoteAddress || 'unknown', req.get('User-Agent'));
+    const loginIp = req.ip || req.connection.remoteAddress || 'unknown';
+    const countryCode = await GeoIpService.lookupCountryCode(loginIp);
+    LoginHistory.record(user.id, loginIp, req.get('User-Agent'), countryCode);
   } catch (err) {
     console.error('[登入] 記錄登入紀錄失敗:', err);
   }
