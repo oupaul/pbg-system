@@ -10,7 +10,7 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-function migrate() {
+async function migrate() {
   let db;
   try {
     // 使用 better-sqlite3
@@ -60,10 +60,15 @@ function migrate() {
 
   if (userCount === 0) {
     // 創建預設管理員帳號：admin / admin123
-    const bcrypt = require('bcrypt');
+    const argon2 = require('argon2');
     const defaultPassword = 'admin123';
-    const passwordHash = bcrypt.hashSync(defaultPassword, 10);
-    
+    const passwordHash = await argon2.hash(defaultPassword, {
+      type: argon2.argon2id,
+      memoryCost: 65536, // 64 MB
+      timeCost: 3,
+      parallelism: 4
+    });
+
     db.prepare(`
       INSERT INTO users (username, password_hash, name, role, is_active)
       VALUES (?, ?, ?, ?, ?)
@@ -325,4 +330,7 @@ function migrate() {
   console.log('\n✅ 資料庫遷移完成！');
 }
 
-migrate();
+migrate().catch(err => {
+  console.error('資料庫遷移失敗:', err);
+  process.exit(1);
+});

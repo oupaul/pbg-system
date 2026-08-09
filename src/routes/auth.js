@@ -109,13 +109,11 @@ router.post('/login', loginRateLimiter, async (req, res) => {
   
   console.log('[登入] Session 設置完成，用戶:', req.session.user);
 
-  // 如果密碼是舊的 SHA256 或 bcrypt 格式，自動升級為 argon2id
+  // 如果密碼是舊的 SHA256 格式，自動升級為 argon2id
   const isOldSHA256 = user.password_hash && user.password_hash.length === 64 && /^[a-f0-9]{64}$/i.test(user.password_hash);
-  const isOldBcrypt = user.password_hash && (user.password_hash.startsWith('$2a$') || user.password_hash.startsWith('$2b$') || user.password_hash.startsWith('$2y$'));
-  
-  if (isOldSHA256 || isOldBcrypt) {
-    const formatName = isOldSHA256 ? 'SHA256' : 'bcrypt';
-    console.log(`[登入] 檢測到舊的 ${formatName} 密碼格式，正在升級為 argon2id...`);
+
+  if (isOldSHA256) {
+    console.log('[登入] 檢測到舊的 SHA256 密碼格式，正在升級為 argon2id...');
     try {
       await User.updatePassword(user.id, password);
       console.log(`[登入] 密碼已成功升級為 argon2id`);

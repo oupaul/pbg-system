@@ -59,6 +59,12 @@ coverage/
 dist/
 build/
 
+# Cache
+.cache/
+*.cache
+.eslintcache
+.parcel-cache/
+
 # Claude Code local runtime artifacts (machine-specific, not shared config)
 .claude/settings.local.json
 CLAUDE.local.md
