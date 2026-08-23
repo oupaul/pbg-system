@@ -64,6 +64,7 @@ const MIGRATIONS = [
   'migrate_users_last_active',
   'migrate_login_history',
   'migrate_login_history_geoip',
+  'migrate_pipeline_amount_options',
 ];
 
 function run() {
