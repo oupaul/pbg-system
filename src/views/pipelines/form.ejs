@@ -74,20 +74,19 @@ ${error ? `
         <div class="col-md-3">
           <label class="form-label">預估金額</label>
           ${(() => {
-            const FIXED_AMOUNTS = [100000, 300000, 500000];
+            const options = Array.isArray(amountOptions) ? amountOptions : [];
             const existingAmount = pipeline && pipeline.estimated_amount !== null && pipeline.estimated_amount !== undefined ? Number(pipeline.estimated_amount) : null;
-            const isFixed = existingAmount !== null && FIXED_AMOUNTS.includes(existingAmount);
+            const isFixed = existingAmount !== null && options.some(o => Number(o.amount) === existingAmount);
             const isOther = existingAmount !== null && !isFixed;
             return `
               <select class="form-select mb-2" id="estimatedAmountSelect">
                 <option value="">-- 請選擇 --</option>
-                <option value="100000" ${existingAmount === 100000 ? 'selected' : ''}>10萬</option>
-                <option value="300000" ${existingAmount === 300000 ? 'selected' : ''}>30萬</option>
-                <option value="500000" ${existingAmount === 500000 ? 'selected' : ''}>50萬</option>
+                ${options.map(o => `<option value="${o.amount}" ${existingAmount === Number(o.amount) ? 'selected' : ''}>${Number(o.amount).toLocaleString()}</option>`).join('')}
                 <option value="other" ${isOther ? 'selected' : ''}>其他金額（自行輸入）</option>
               </select>
               <input type="number" id="estimatedAmountOther" class="form-control ${isOther ? '' : 'd-none'}" placeholder="請輸入金額" step="1" min="0" value="${isOther ? existingAmount : ''}">
               <input type="hidden" name="estimated_amount" id="estimatedAmountHidden" value="${existingAmount !== null ? existingAmount : ''}">
+              ${!options.length ? '<small class="form-text text-muted">尚無快選金額，管理員可於「系統設定 → 金額選項管理」新增</small>' : ''}
             `;
           })()}
         </div>

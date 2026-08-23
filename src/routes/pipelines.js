@@ -7,6 +7,7 @@ const Project = require('../models/Project');
 const Salesperson = require('../models/Salesperson');
 const Customer = require('../models/Customer');
 const Activity = require('../models/Activity');
+const PipelineAmountOptions = require('./pipelineAmountOptions');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireEditPermission, requireCrmEditPermission } = require('../middleware/auth');
 const cache = require('../services/CacheService');
@@ -205,6 +206,7 @@ router.get('/new', requireCrmEditPermission, (req, res) => {
     salespeople: Salesperson.findAll(),
     customers: Customer.findAll(),
     projectTypes: getActiveProjectTypes(),
+    amountOptions: PipelineAmountOptions.findActive(),
     action: '/pipelines',
     presetCustomerId: req.query.customer_id || '',
     // 決定快速新增客戶時，是否直接建立（admin/user）或先暫存於頁面、待銷售機會一併送出時才送審（其餘角色）
@@ -374,6 +376,7 @@ router.get('/:id/edit', requireCrmEditPermission, (req, res) => {
     salespeople: Salesperson.findAll(),
     customers: Customer.findAll(),
     projectTypes: getActiveProjectTypes(),
+    amountOptions: PipelineAmountOptions.findActive(),
     action: `/pipelines/${pipeline.id}`,
     presetCustomerId: '',
     error: req.query.error || ''

@@ -1,0 +1,142 @@
+<%
+  function escapeHtml(str) {
+    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+%>
+<%- include('../layout', { body: `
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2><i class="bi bi-cash-stack"></i> 銷售機會金額選項管理</h2>
+  <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addOptionModal">
+    <i class="bi bi-plus-circle"></i> 新增選項
+  </button>
+</div>
+
+${error ? `
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-circle"></i> ${escapeHtml(error)}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+${success ? `
+  <div class="alert alert-success alert-dismissible fade show" role="alert">
+    <i class="bi bi-check-circle"></i> ${escapeHtml(success)}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+<div class="alert alert-info">
+  <i class="bi bi-info-circle"></i> 這裡設定的是「新增銷售機會」表單中預估金額的快選按鈕。停用或刪除選項不會影響既有銷售機會已記錄的金額。
+</div>
+
+<div class="card">
+  <div class="card-header bg-primary text-white">
+    <h5 class="mb-0"><i class="bi bi-list-ul"></i> 金額選項列表</h5>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 80px;">排序</th>
+            <th>金額</th>
+            <th>狀態</th>
+            <th style="width: 200px;">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${options.map(o => `
+            <tr>
+              <td>${o.display_order}</td>
+              <td>$${Number(o.amount).toLocaleString()}</td>
+              <td>${o.is_active === 1 ? '<span class="badge bg-success">啟用</span>' : '<span class="badge bg-secondary">停用</span>'}</td>
+              <td>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="editOption(${o.id}, ${o.amount}, ${o.display_order}, ${o.is_active})">
+                  <i class="bi bi-pencil"></i> 編輯
+                </button>
+                <form action="/pipeline-amount-options/delete/${o.id}" method="POST" style="display:inline" onsubmit="return confirm('確定要刪除此金額選項？')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-trash"></i> 刪除
+                  </button>
+                </form>
+              </td>
+            </tr>
+          `).join('') || '<tr><td colspan="4" class="text-center text-muted py-3">尚無金額選項，請點擊「新增選項」新增</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="addOptionModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="/pipeline-amount-options/create">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-plus-circle"></i> 新增金額選項</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">金額 <span class="text-danger">*</span></label>
+            <input type="number" name="amount" class="form-control" min="1" step="1" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">顯示順序</label>
+            <input type="number" name="display_order" class="form-control" min="0">
+            <small class="form-text text-muted">數字越小越靠前，留空則排在最後</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editOptionModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="/pipeline-amount-options/update/" id="editOptionForm">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-pencil"></i> 編輯金額選項</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">金額 <span class="text-danger">*</span></label>
+            <input type="number" name="amount" id="editOptionAmount" class="form-control" min="1" step="1" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">顯示順序</label>
+            <input type="number" name="display_order" id="editOptionOrder" class="form-control" min="0">
+          </div>
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="is_active" id="editOptionActive" value="1">
+              <label class="form-check-label" for="editOptionActive">啟用</label>
+            </div>
+            <small class="form-text text-muted">停用的選項將不會出現在新增銷售機會的下拉選單中</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">儲存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function editOption(id, amount, order, isActive) {
+  document.getElementById('editOptionForm').action = '/pipeline-amount-options/update/' + id;
+  document.getElementById('editOptionAmount').value = amount;
+  document.getElementById('editOptionOrder').value = order;
+  document.getElementById('editOptionActive').checked = isActive === 1;
+  new bootstrap.Modal(document.getElementById('editOptionModal')).show();
+}
+</script>
+` }) %>
