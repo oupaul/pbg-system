@@ -664,6 +664,7 @@ router.get('/:id', (req, res) => {
   const totalReceived = paymentsForStatus.reduce((sum, p) => sum + Payment.calculateActualReceived(p), 0);
   const totalBonus = bonuses.reduce((sum, b) => sum + (b.bonus_amount || 0), 0);
   const totalCost = Cost.getTotalByProject(project.id);
+  const estimatedCost = Cost.getEstimatedTotalByProject(project.id);
   const grossProfit = (project.price_without_tax || 0) - totalCost;
   
   // 建立類型顏色映射
@@ -701,6 +702,7 @@ router.get('/:id', (req, res) => {
       outstanding: totalInvoiced - totalReceived - (project.sales_discount || 0),
       totalBonus,
       totalCost,
+      estimatedCost,
       grossProfit
     }
   });

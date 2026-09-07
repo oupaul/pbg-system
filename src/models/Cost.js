@@ -16,12 +16,22 @@ const Cost = {
     return db.prepare(`SELECT * FROM costs WHERE id = ?`).get(id);
   },
 
-  // 計算專案的總成本
+  // 計算專案的總成本（僅計實際發生的成本，不含預估）
   getTotalByProject(projectId) {
     const result = db.prepare(`
       SELECT COALESCE(SUM(amount), 0) as total
       FROM costs
-      WHERE project_id = ?
+      WHERE project_id = ? AND is_estimate = 0
+    `).get(projectId);
+    return result ? result.total : 0;
+  },
+
+  // 計算專案的預估成本總額
+  getEstimatedTotalByProject(projectId) {
+    const result = db.prepare(`
+      SELECT COALESCE(SUM(amount), 0) as total
+      FROM costs
+      WHERE project_id = ? AND is_estimate = 1
     `).get(projectId);
     return result ? result.total : 0;
   },
@@ -33,19 +43,21 @@ const Cost = {
     const costType = data.cost_type || null;
     const amount = data.amount !== undefined && data.amount !== null ? parseFloat(data.amount) : 0;
     const notes = data.notes || null;
-    
+    const isEstimate = data.is_estimate ? 1 : 0;
+
     const stmt = db.prepare(`
       INSERT INTO costs (
-        project_id, cost_date, cost_type, amount, notes
-      ) VALUES (?, ?, ?, ?, ?)
+        project_id, cost_date, cost_type, amount, notes, is_estimate
+      ) VALUES (?, ?, ?, ?, ?, ?)
     `);
-    
+
     const result = stmt.run(
       projectId,
       costDate,
       costType,
       amount,
-      notes
+      notes,
+      isEstimate
     );
     
     const costId = result.lastInsertRowid;
@@ -67,14 +79,18 @@ const Cost = {
     const values = [];
     const newData = {};
     
-    const allowedFields = ['cost_date', 'cost_type', 'amount', 'notes'];
-    
+    const allowedFields = ['cost_date', 'cost_type', 'amount', 'notes', 'is_estimate'];
+
     allowedFields.forEach(field => {
       if (data[field] !== undefined) {
         fields.push(`${field} = ?`);
         if (field === 'amount') {
           values.push(parseFloat(data[field]) || 0);
           newData[field] = parseFloat(data[field]) || 0;
+        } else if (field === 'is_estimate') {
+          const v = data[field] ? 1 : 0;
+          values.push(v);
+          newData[field] = v;
         } else {
           values.push(data[field]);
           newData[field] = data[field];

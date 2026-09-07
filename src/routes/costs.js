@@ -12,6 +12,7 @@ router.post('/', (req, res) => {
       cost_type: req.body.cost_type || null,
       amount: parseFloat(req.body.amount) || 0,
       notes: req.body.notes || null,
+      is_estimate: req.body.is_estimate === '1' ? 1 : 0,
       userInfo: getUserInfo(req)
     });
 
@@ -39,6 +40,7 @@ router.post('/:id', (req, res) => {
       cost_type: req.body.cost_type || null,
       amount: parseFloat(req.body.amount) || 0,
       notes: req.body.notes || null,
+      is_estimate: req.body.is_estimate === '1' ? 1 : 0,
       userInfo: getUserInfo(req)
     });
 
