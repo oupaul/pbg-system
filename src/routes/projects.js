@@ -11,6 +11,7 @@ const Payment = require('../models/Payment');
 const Bonus = require('../models/Bonus');
 const Salesperson = require('../models/Salesperson');
 const Customer = require('../models/Customer');
+const SettingsRoutes = require('./settings');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireEditPermission } = require('../middleware/auth');
 const AuditLogService = require('../services/AuditLogService');
@@ -83,6 +84,25 @@ function getActiveBonusTypes() {
     `).all();
   } catch (err) {
     console.error('獲取獎金類型失敗:', err);
+    return [];
+  }
+}
+
+// 輔助函數：獲取營業稅率設定（供新增/編輯專案表單的未稅金額試算使用，預設沿用台灣5%）
+function getTaxRate() {
+  return SettingsRoutes.getSystemSetting('tax_rate', 5);
+}
+
+// 輔助函數：獲取指定專案類型目前啟用中的獎金級距（供「新增獎金」表單套用比例使用）
+function getActiveBonusTiers(projectType) {
+  try {
+    return db.prepare(`
+      SELECT * FROM bonus_tiers
+      WHERE is_active = 1 AND project_type = ?
+      ORDER BY tier_name ASC
+    `).all(projectType);
+  } catch (err) {
+    console.error('獲取獎金級距失敗:', err);
     return [];
   }
 }
@@ -381,6 +401,7 @@ router.get('/new', requireEditPermission, (req, res) => {
     customers,
     projectTypes,
     reportGroups,
+    taxRate: getTaxRate(),
     action: '/projects',
     method: 'POST'
   });
@@ -710,6 +731,7 @@ router.get('/:id', (req, res) => {
     attachments,
     bonuses,
     bonusTypes: getActiveBonusTypes(),
+    bonusTiers: getActiveBonusTiers(project.project_type),
     typeColorMap,
     showDeleted, // 是否顯示已刪除的發票/收款
     success: req.query.success ? decodeURIComponent(req.query.success) : null,
@@ -746,6 +768,7 @@ router.get('/:id/edit', requireEditPermission, (req, res) => {
     customers,
     projectTypes,
     reportGroups,
+    taxRate: getTaxRate(),
     action: `/projects/${project.id}`,
     method: 'POST'
   });

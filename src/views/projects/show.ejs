@@ -224,6 +224,24 @@ ${locals.canEdit ? `
 </div>
 
 <script>
+// 套用獎金級距：依選擇的級距比例/成本扣除率重新算出計算基礎與獎金金額
+function applyBonusTier(select) {
+  const priceWithoutTax = ${JSON.stringify(project.price_without_tax || 0)};
+  const option = select.options[select.selectedIndex];
+  const baseInput = document.getElementById('bonusBaseAmount');
+  const percentageInput = document.getElementById('bonusPercentage');
+  const amountInput = document.getElementById('bonusAmount');
+  if (!option || !option.dataset.percentage) {
+    return;
+  }
+  const percentage = parseFloat(option.dataset.percentage) || 0;
+  const costDeductionRate = parseFloat(option.dataset.costDeductionRate) || 0;
+  const baseAmount = priceWithoutTax * (1 - costDeductionRate / 100);
+  baseInput.value = Math.round(baseAmount);
+  percentageInput.value = percentage;
+  amountInput.value = Math.round(baseAmount * percentage / 100);
+}
+
 // 更新隱藏欄位的值
 function updateExpectedInvoiceField() {
   const yearSelect = document.getElementById('expectedYear');
@@ -879,17 +897,27 @@ ${locals.canEdit ? `
               }).join('') : ''}
             </select>
           </div>
+          ${typeof bonusTiers !== 'undefined' && bonusTiers && bonusTiers.length > 0 ? `
+          <div class="mb-3">
+            <label class="form-label">套用獎金級距(選填)</label>
+            <select id="bonusTierSelect" class="form-select" onchange="applyBonusTier(this)">
+              <option value="">-- 手動輸入 --</option>
+              ${bonusTiers.map(t => `<option value="" data-percentage="${t.percentage}" data-cost-deduction-rate="${t.cost_deduction_rate}">${h(t.tier_name)}（${t.percentage}%，扣成本${t.cost_deduction_rate}%）</option>`).join('')}
+            </select>
+            <small class="form-text text-muted">依「獎金級距設定」帶入計算基礎與比例，仍可手動修改後再送出</small>
+          </div>
+          ` : ''}
           <div class="mb-3">
             <label class="form-label">計算基礎(未稅)</label>
-            <input type="number" name="base_amount" class="form-control" value="${project.price_without_tax || 0}">
+            <input type="number" name="base_amount" id="bonusBaseAmount" class="form-control" value="${project.price_without_tax || 0}">
           </div>
           <div class="mb-3">
             <label class="form-label">獎金比例(%)</label>
-            <input type="number" name="bonus_percentage" class="form-control" step="0.1">
+            <input type="number" name="bonus_percentage" id="bonusPercentage" class="form-control" step="0.1">
           </div>
           <div class="mb-3">
             <label class="form-label">獎金金額</label>
-            <input type="number" name="bonus_amount" class="form-control" required>
+            <input type="number" name="bonus_amount" id="bonusAmount" class="form-control" required>
           </div>
           <div class="mb-3">
             <label class="form-label">發放日期</label>

@@ -222,10 +222,11 @@ ${locals.isAdmin ? `
 ` : ''}
 
 <script>
-// 自動計算未稅金額
+// 自動計算未稅金額（稅率取自「系統設定 → 公司基本資料」，未設定時預設5%）
+const TAX_RATE = ${JSON.stringify(typeof taxRate !== 'undefined' && taxRate != null ? taxRate : 5)};
 function calculateWithoutTax() {
   const withTax = document.querySelector('input[name="price_with_tax"]').value;
-  const withoutTax = Math.round(withTax / 1.05);
+  const withoutTax = Math.round(withTax / (1 + TAX_RATE / 100));
   document.querySelector('input[name="price_without_tax"]').value = withoutTax;
 }
 

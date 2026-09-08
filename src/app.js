@@ -175,6 +175,8 @@ try {
   console.log('[啟動] ✓ bonusTypes 路由載入完成');
   const customerLevelsRoutes = require('./routes/customerLevels');
   console.log('[啟動] ✓ customerLevels 路由載入完成');
+  const bonusTiersRoutes = require('./routes/bonusTiers');
+  console.log('[啟動] ✓ bonusTiers 路由載入完成');
   const reportGroupsRoutes = require('./routes/reportGroups');
   console.log('[啟動] ✓ reportGroups 路由載入完成');
   const recentPaymentsRoutes = require('./routes/recentPayments');
@@ -231,6 +233,7 @@ try {
   app.use('/pipeline-amount-options', requireAuth, pipelineAmountOptionsRoutes);
   app.use('/bonus-types', requireAuth, bonusTypesRoutes);
   app.use('/customer-levels', requireAuth, customerLevelsRoutes);
+  app.use('/bonus-tiers', requireAuth, bonusTiersRoutes);
   app.use('/report-groups', requireAuth, reportGroupsRoutes);
   app.use('/recent-payments', requireAuth, recentPaymentsRoutes);
   app.use('/sales-performance', requireAuth, salesPerformanceRoutes);

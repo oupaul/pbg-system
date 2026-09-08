@@ -162,6 +162,13 @@ router.post('/update', requireAuth, requireAdmin, (req, res) => {
           return res.redirect('/settings?error=' + encodeURIComponent('客戶追蹤提醒天數必須在 1-90 天之間'));
         }
       }
+
+      // 特別驗證稅率：必須在 0-100 之間
+      if (setting_key === 'tax_rate') {
+        if (num < 0 || num > 100) {
+          return res.redirect('/settings?error=' + encodeURIComponent('稅率必須在 0-100 之間'));
+        }
+      }
     } else if (setting_type === 'boolean') {
       validatedValue = setting_value === 'true' || setting_value === '1' || setting_value === 'on';
     }
@@ -253,6 +260,14 @@ router.post('/bulk-update', requireAuth, requireAdmin, (req, res) => {
           if (key === 'activity_reminder_days') {
             if (num < 1 || num > 90) {
               errors.push('客戶追蹤提醒天數必須在 1-90 天之間');
+              continue;
+            }
+          }
+
+          // 特別驗證稅率
+          if (key === 'tax_rate') {
+            if (num < 0 || num > 100) {
+              errors.push('稅率必須在 0-100 之間');
               continue;
             }
           }

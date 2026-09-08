@@ -1,0 +1,186 @@
+<%
+  function escapeHtml(str) {
+    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+%>
+<%- include('../layout', { body: `
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2><i class="bi bi-percent"></i> 獎金級距設定</h2>
+  <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTierModal" ${projectTypes.length === 0 ? 'disabled' : ''}>
+    <i class="bi bi-plus-circle"></i> 新增級距
+  </button>
+</div>
+
+${error ? `
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-circle"></i> ${escapeHtml(error)}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+${success ? `
+  <div class="alert alert-success alert-dismissible fade show" role="alert">
+    <i class="bi bi-check-circle"></i> ${escapeHtml(success)}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+<div class="alert alert-info">
+  <i class="bi bi-info-circle"></i> 這裡設定的級距比例，會在專案詳情頁「新增獎金」表單提供「套用比例」選項，選擇後自動帶入計算基礎與獎金比例（仍可手動修改）。每個專案類型可以設定多筆不同名稱的級距。
+</div>
+
+${projectTypes.length === 0 ? `
+<div class="alert alert-warning">
+  <i class="bi bi-exclamation-triangle"></i> 目前沒有啟用中的專案類型，請先到「類型管理」新增專案類型，才能設定對應的獎金級距。
+</div>
+` : ''}
+
+<div class="card">
+  <div class="card-header bg-primary text-white">
+    <h5 class="mb-0"><i class="bi bi-list-ul"></i> 獎金級距列表</h5>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>專案類型</th>
+            <th>級距名稱</th>
+            <th>獎金比例</th>
+            <th>成本扣除率</th>
+            <th>說明</th>
+            <th>狀態</th>
+            <th style="width: 200px;">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tiers.map(t => `
+            <tr>
+              <td>${escapeHtml(t.project_type)}</td>
+              <td>${escapeHtml(t.tier_name)}</td>
+              <td>${t.percentage}%</td>
+              <td>${t.cost_deduction_rate}%</td>
+              <td class="text-muted small">${escapeHtml(t.description || '')}</td>
+              <td>${t.is_active === 1 ? '<span class="badge bg-success">啟用</span>' : '<span class="badge bg-secondary">停用</span>'}</td>
+              <td>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick='editTier(${t.id}, ${JSON.stringify(t.project_type)}, ${JSON.stringify(t.tier_name)}, ${t.percentage}, ${t.cost_deduction_rate}, ${JSON.stringify(t.description || '')}, ${t.is_active})'>
+                  <i class="bi bi-pencil"></i> 編輯
+                </button>
+                <form action="/bonus-tiers/delete/${t.id}" method="POST" style="display:inline" onsubmit="return confirm('確定要刪除此獎金級距？')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-trash"></i> 刪除
+                  </button>
+                </form>
+              </td>
+            </tr>
+          `).join('') || '<tr><td colspan="7" class="text-center text-muted py-3">尚無獎金級距設定，請點擊「新增級距」新增</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="addTierModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="/bonus-tiers/create">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-plus-circle"></i> 新增獎金級距</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">專案類型 <span class="text-danger">*</span></label>
+            <select name="project_type" class="form-select" required>
+              ${projectTypes.map(pt => `<option value="${escapeHtml(pt)}">${escapeHtml(pt)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">級距名稱 <span class="text-danger">*</span></label>
+            <input type="text" name="tier_name" class="form-control" required maxlength="30" placeholder="例如：簽約獎金">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">獎金比例 (%)</label>
+            <input type="number" name="percentage" class="form-control" step="0.1" min="0" max="100" value="0">
+            <small class="form-text text-muted">套用時會用「計算基礎 × 此比例」算出建議獎金金額</small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">成本扣除率 (%)</label>
+            <input type="number" name="cost_deduction_rate" class="form-control" step="0.1" min="0" max="100" value="0">
+            <small class="form-text text-muted">套用時計算基礎 = 專案未稅金額 × (1 - 此扣除率)</small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">說明</label>
+            <textarea name="description" class="form-control" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editTierModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="/bonus-tiers/update/" id="editTierForm">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-pencil"></i> 編輯獎金級距</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">專案類型 <span class="text-danger">*</span></label>
+            <select name="project_type" id="editTierType" class="form-select" required>
+              ${projectTypes.map(pt => `<option value="${escapeHtml(pt)}">${escapeHtml(pt)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">級距名稱 <span class="text-danger">*</span></label>
+            <input type="text" name="tier_name" id="editTierName" class="form-control" required maxlength="30">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">獎金比例 (%)</label>
+            <input type="number" name="percentage" id="editTierPercentage" class="form-control" step="0.1" min="0" max="100">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">成本扣除率 (%)</label>
+            <input type="number" name="cost_deduction_rate" id="editTierCostRate" class="form-control" step="0.1" min="0" max="100">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">說明</label>
+            <textarea name="description" id="editTierDescription" class="form-control" rows="2"></textarea>
+          </div>
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="is_active" id="editTierActive" value="1">
+              <label class="form-check-label" for="editTierActive">啟用</label>
+            </div>
+            <small class="form-text text-muted">停用的級距將不會出現在「新增獎金」表單的套用選單中</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">儲存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function editTier(id, projectType, tierName, percentage, costRate, description, isActive) {
+  document.getElementById('editTierForm').action = '/bonus-tiers/update/' + id;
+  document.getElementById('editTierType').value = projectType;
+  document.getElementById('editTierName').value = tierName;
+  document.getElementById('editTierPercentage').value = percentage;
+  document.getElementById('editTierCostRate').value = costRate;
+  document.getElementById('editTierDescription').value = description;
+  document.getElementById('editTierActive').checked = isActive === 1;
+  new bootstrap.Modal(document.getElementById('editTierModal')).show();
+}
+</script>
+` }) %>

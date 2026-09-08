@@ -6,6 +6,14 @@
   const localError = escapeHtml(typeof error !== 'undefined' ? error : '');
   const localSuccess = escapeHtml(typeof success !== 'undefined' ? success : '');
   
+  // 公司基本資料設定
+  const companyNameSetting = localSettings.find(s => s.setting_key === 'company_name');
+  const companyTaxIdSetting = localSettings.find(s => s.setting_key === 'company_tax_id');
+  const taxRateSetting = localSettings.find(s => s.setting_key === 'tax_rate');
+  const companyNameValue = companyNameSetting ? companyNameSetting.setting_value : '';
+  const companyTaxIdValue = companyTaxIdSetting ? companyTaxIdSetting.setting_value : '';
+  const taxRateValue = taxRateSetting ? taxRateSetting.setting_value : '5';
+
   const notificationDaysSetting = localSettings.find(s => s.setting_key === 'invoice_notification_days_before_month_end');
   const notificationEnabledSetting = localSettings.find(s => s.setting_key === 'invoice_notification_enabled');
   const idleTimeoutSetting = localSettings.find(s => s.setting_key === 'idle_timeout_minutes');
@@ -85,6 +93,34 @@
   }
 
   bodyHtml += '<div class="card">';
+  bodyHtml += '  <div class="card-header bg-dark text-white">';
+  bodyHtml += '    <h5 class="mb-0"><i class="bi bi-building"></i> 公司基本資料</h5>';
+  bodyHtml += '  </div>';
+  bodyHtml += '  <div class="card-body">';
+  bodyHtml += '    <form method="POST" action="/settings/bulk-update">';
+  bodyHtml += '      <div class="row g-3">';
+  bodyHtml += '        <div class="col-md-6">';
+  bodyHtml += '          <label for="company_name" class="form-label"><strong>公司名稱</strong></label>';
+  bodyHtml += '          <input type="text" class="form-control" id="company_name" name="company_name" value="' + escapeHtml(companyNameValue) + '" placeholder="例如：範例股份有限公司">';
+  bodyHtml += '          <div class="form-text">顯示於報表與通知信件標題，留空則沿用系統預設名稱</div>';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="col-md-6">';
+  bodyHtml += '          <label for="company_tax_id" class="form-label"><strong>統一編號</strong></label>';
+  bodyHtml += '          <input type="text" class="form-control" id="company_tax_id" name="company_tax_id" value="' + escapeHtml(companyTaxIdValue) + '" maxlength="20">';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="col-md-6">';
+  bodyHtml += '          <label for="tax_rate" class="form-label"><strong>營業稅率 (%)</strong></label>';
+  bodyHtml += '          <input type="number" class="form-control" id="tax_rate" name="tax_rate" value="' + escapeHtml(String(taxRateValue)) + '" step="0.1" min="0" max="100" required>';
+  bodyHtml += '          <div class="form-text">用於未稅/含稅金額換算（例如新增專案試算），預設 5% 為台灣營業稅率，其他地區請依實際稅制調整</div>';
+  bodyHtml += '        </div>';
+  bodyHtml += '      </div>';
+  bodyHtml += '      <hr class="my-4">';
+  bodyHtml += '      <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> 儲存設定</button>';
+  bodyHtml += '    </form>';
+  bodyHtml += '  </div>';
+  bodyHtml += '</div>';
+
+  bodyHtml += '<div class="card mt-4">';
   bodyHtml += '  <div class="card-header bg-dark text-white">';
   bodyHtml += '    <h5 class="mb-0"><i class="bi bi-globe"></i> 系統網址設定</h5>';
   bodyHtml += '  </div>';

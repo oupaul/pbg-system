@@ -73,6 +73,8 @@ const MIGRATIONS = [
   'migrate_customer_levels',
   'migrate_remove_customer_level_check',
   'migrate_remove_customer_creation_request_level_check',
+  'migrate_remove_bonus_tier_type_check',
+  'migrate_company_settings',
 ];
 
 function run() {
