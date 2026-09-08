@@ -83,7 +83,7 @@ const GrossProfitAnalysisService = {
       LEFT JOIN salespeople s ON p.salesperson_id = s.id
       LEFT JOIN report_groups rg ON p.report_group_id = rg.id
       LEFT JOIN (
-        SELECT project_id, SUM(amount) as total_cost FROM costs WHERE is_estimate = 0 GROUP BY project_id
+        SELECT project_id, SUM(actual_amount) as total_cost FROM costs GROUP BY project_id
       ) c ON p.id = c.project_id
       ${whereClause}
       ORDER BY gross_profit DESC, p.contract_year DESC, p.project_code
@@ -116,7 +116,7 @@ const GrossProfitAnalysisService = {
           FROM projects p
           LEFT JOIN customers cust ON p.customer_id = cust.id
           LEFT JOIN salespeople s ON p.salesperson_id = s.id
-          LEFT JOIN (SELECT project_id, SUM(amount) as total_cost FROM costs WHERE is_estimate = 0 GROUP BY project_id) c ON p.id = c.project_id
+          LEFT JOIN (SELECT project_id, SUM(actual_amount) as total_cost FROM costs GROUP BY project_id) c ON p.id = c.project_id
           ${fallbackWhereClause}
           ORDER BY gross_profit DESC, p.contract_year DESC, p.project_code
         `).all(...fallbackParams);
@@ -181,7 +181,7 @@ const GrossProfitAnalysisService = {
       FROM salespeople s
       LEFT JOIN projects p ON s.id = p.salesperson_id
       LEFT JOIN (
-        SELECT project_id, SUM(amount) as total_cost FROM costs WHERE is_estimate = 0 GROUP BY project_id
+        SELECT project_id, SUM(actual_amount) as total_cost FROM costs GROUP BY project_id
       ) c ON p.id = c.project_id
       ${whereClause}
       GROUP BY s.id
@@ -246,7 +246,7 @@ const GrossProfitAnalysisService = {
           ELSE 0 END as gross_margin_pct
       FROM projects p
       LEFT JOIN (
-        SELECT project_id, SUM(amount) as total_cost FROM costs WHERE is_estimate = 0 GROUP BY project_id
+        SELECT project_id, SUM(actual_amount) as total_cost FROM costs GROUP BY project_id
       ) c ON p.id = c.project_id
       ${whereClause}
       GROUP BY p.project_type
@@ -314,7 +314,7 @@ const GrossProfitAnalysisService = {
       FROM projects p
       LEFT JOIN report_groups rg ON p.report_group_id = rg.id
       LEFT JOIN (
-        SELECT project_id, SUM(amount) as total_cost FROM costs WHERE is_estimate = 0 GROUP BY project_id
+        SELECT project_id, SUM(actual_amount) as total_cost FROM costs GROUP BY project_id
       ) c ON p.id = c.project_id
       ${whereClause}
       GROUP BY p.report_group_id
