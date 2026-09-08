@@ -261,8 +261,11 @@ router.post('/bulk-update', requireAuth, requireAdmin, (req, res) => {
           }
         } else if (setting.setting_type === 'boolean') {
           validatedValue = value === 'true' || value === '1' || value === 'on';
+        } else if (key === 'date_calendar_system' && !['roc', 'gregorian'].includes(value)) {
+          errors.push('報表日期曆法必須是民國曆或西元曆');
+          continue;
         }
-        
+
         updateSystemSetting(key, validatedValue, setting.setting_type);
         updateCount++;
       } catch (err) {

@@ -83,6 +83,7 @@ const MIGRATIONS = [
   'migrate_remove_customer_creation_request_status_check',
   'migrate_pipeline_statuses',
   'migrate_remove_pipeline_status_check',
+  'migrate_date_calendar_setting',
 ];
 
 function run() {

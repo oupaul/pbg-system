@@ -26,10 +26,24 @@ function applyFont(doc) {
   if (fontPath) doc.font(fontPath);
 }
 
+// 報表日期曆法：讀取「系統設定 → 公司基本資料」的 date_calendar_system，
+// 預設 'roc'（民國曆，維持既有安裝行為不變），可設定為 'gregorian'（西元曆）
+function getDateCalendarSystem() {
+  try {
+    const row = db.prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'date_calendar_system'").get();
+    return row ? row.setting_value : 'roc';
+  } catch (err) {
+    return 'roc';
+  }
+}
+
 function formatROCDate(dateStr) {
   if (!dateStr) return '';
   const d = dayjs(dateStr);
   if (!d.isValid()) return '';
+  if (getDateCalendarSystem() === 'gregorian') {
+    return d.format('YYYY/MM/DD');
+  }
   const rocYear = d.year() - 1911;
   return `${rocYear}/${d.format('MM/DD')}`;
 }

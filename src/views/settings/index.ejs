@@ -10,9 +10,11 @@
   const companyNameSetting = localSettings.find(s => s.setting_key === 'company_name');
   const companyTaxIdSetting = localSettings.find(s => s.setting_key === 'company_tax_id');
   const taxRateSetting = localSettings.find(s => s.setting_key === 'tax_rate');
+  const dateCalendarSetting = localSettings.find(s => s.setting_key === 'date_calendar_system');
   const companyNameValue = companyNameSetting ? companyNameSetting.setting_value : '';
   const companyTaxIdValue = companyTaxIdSetting ? companyTaxIdSetting.setting_value : '';
   const taxRateValue = taxRateSetting ? taxRateSetting.setting_value : '5';
+  const dateCalendarValue = dateCalendarSetting ? dateCalendarSetting.setting_value : 'roc';
 
   const notificationDaysSetting = localSettings.find(s => s.setting_key === 'invoice_notification_days_before_month_end');
   const notificationEnabledSetting = localSettings.find(s => s.setting_key === 'invoice_notification_enabled');
@@ -112,6 +114,14 @@
   bodyHtml += '          <label for="tax_rate" class="form-label"><strong>營業稅率 (%)</strong></label>';
   bodyHtml += '          <input type="number" class="form-control" id="tax_rate" name="tax_rate" value="' + escapeHtml(String(taxRateValue)) + '" step="0.1" min="0" max="100" required>';
   bodyHtml += '          <div class="form-text">用於未稅/含稅金額換算（例如新增專案試算），預設 5% 為台灣營業稅率，其他地區請依實際稅制調整</div>';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="col-md-6">';
+  bodyHtml += '          <label for="date_calendar_system" class="form-label"><strong>報表日期曆法</strong></label>';
+  bodyHtml += '          <select class="form-select" id="date_calendar_system" name="date_calendar_system">';
+  bodyHtml += '            <option value="roc" ' + (dateCalendarValue === 'roc' ? 'selected' : '') + '>民國曆（例如 115/09/09）</option>';
+  bodyHtml += '            <option value="gregorian" ' + (dateCalendarValue === 'gregorian' ? 'selected' : '') + '>西元曆（例如 2026/09/09）</option>';
+  bodyHtml += '          </select>';
+  bodyHtml += '          <div class="form-text">影響 PDF 報表（如獎金報表）裡的日期顯示格式</div>';
   bodyHtml += '        </div>';
   bodyHtml += '      </div>';
   bodyHtml += '      <hr class="my-4">';
