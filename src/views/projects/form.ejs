@@ -36,13 +36,14 @@
         </div>
         <div class="col-md-2">
           <label class="form-label">專案類型 <span class="text-danger">*</span></label>
-          <select name="project_type" class="form-select" required>
+          <select name="project_type" id="project_type" class="form-select" required>
             <option value="">-- 選擇類型 --</option>
             ${typeof projectTypes !== 'undefined' && projectTypes ? projectTypes.map(type => {
               const selected = project && project.project_type === type.type_name ? 'selected' : '';
               return '<option value="' + type.type_name + '" ' + selected + '>' + type.type_name + '</option>';
             }).join('') : '<option value="食驗室">食驗室</option><option value="純廣">純廣</option><option value="專案">專案</option>'}
           </select>
+          ${locals.isAdmin ? '<small class="form-text text-muted">找不到類型？<a href="#" id="quickAddTypeLink" class="text-primary">快速新增</a></small>' : ''}
         </div>
         <div class="col-md-2">
           <label class="form-label">報表群組</label>
@@ -182,6 +183,40 @@
   </div>
 </div>
 
+${locals.isAdmin ? `
+<!-- 快速新增專案類型 Modal -->
+<div class="modal fade" id="quickAddTypeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title">
+          <i class="bi bi-tags"></i> 快速新增專案類型
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="quickAddTypeForm">
+          <div class="mb-3">
+            <label class="form-label">類型名稱 <span class="text-danger">*</span></label>
+            <input type="text" name="type_name" class="form-control" required>
+          </div>
+          <small class="form-text text-muted">顏色標籤、顯示順序等細節可之後到「系統設定 → 類型管理」調整</small>
+        </form>
+        <div id="quickAddTypeError" class="alert alert-danger d-none mt-3"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-lg"></i> 取消
+        </button>
+        <button type="button" class="btn btn-primary" id="quickAddTypeSubmit">
+          <i class="bi bi-check-lg"></i> 新增並選擇
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+` : ''}
+
 <script>
 // 自動計算未稅金額
 function calculateWithoutTax() {
@@ -272,6 +307,68 @@ document.addEventListener('DOMContentLoaded', function() {
         // 恢復按鈕狀態
         quickAddSubmit.disabled = false;
         quickAddSubmit.innerHTML = '<i class="bi bi-check-lg"></i> 新增並選擇';
+      }
+    });
+  }
+
+  // 快速新增專案類型功能（僅管理員看得到連結，見上方 locals.isAdmin 判斷）
+  const quickAddTypeLink = document.getElementById('quickAddTypeLink');
+  if (quickAddTypeLink) {
+    const quickAddTypeModal = new bootstrap.Modal(document.getElementById('quickAddTypeModal'));
+    const quickAddTypeForm = document.getElementById('quickAddTypeForm');
+    const quickAddTypeSubmit = document.getElementById('quickAddTypeSubmit');
+    const quickAddTypeError = document.getElementById('quickAddTypeError');
+
+    quickAddTypeLink.addEventListener('click', function(e) {
+      e.preventDefault();
+      quickAddTypeForm.reset();
+      quickAddTypeError.classList.add('d-none');
+      quickAddTypeModal.show();
+    });
+
+    quickAddTypeSubmit.addEventListener('click', async function() {
+      const formData = new FormData(quickAddTypeForm);
+      const typeName = (formData.get('type_name') || '').trim();
+
+      if (!typeName) {
+        quickAddTypeError.textContent = '請填寫類型名稱';
+        quickAddTypeError.classList.remove('d-none');
+        return;
+      }
+
+      quickAddTypeSubmit.disabled = true;
+      quickAddTypeSubmit.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 新增中...';
+      quickAddTypeError.classList.add('d-none');
+
+      try {
+        const response = await fetch('/project-types/quick-add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type_name: typeName })
+        });
+        const result = await response.json();
+
+        if (result.success) {
+          const typeSelect = document.getElementById('project_type');
+          const newOption = new Option(result.type.type_name, result.type.type_name, true, true);
+          typeSelect.appendChild(newOption);
+          typeSelect.value = result.type.type_name;
+
+          quickAddTypeModal.hide();
+          if (typeof showToast === 'function') {
+            showToast('類型新增成功：' + result.type.type_name, 'success');
+          }
+        } else {
+          quickAddTypeError.textContent = result.error || '新增類型失敗';
+          quickAddTypeError.classList.remove('d-none');
+        }
+      } catch (error) {
+        console.error('快速新增專案類型錯誤:', error);
+        quickAddTypeError.textContent = '新增時發生錯誤：' + error.message;
+        quickAddTypeError.classList.remove('d-none');
+      } finally {
+        quickAddTypeSubmit.disabled = false;
+        quickAddTypeSubmit.innerHTML = '<i class="bi bi-check-lg"></i> 新增並選擇';
       }
     });
   }

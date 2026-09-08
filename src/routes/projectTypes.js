@@ -79,6 +79,35 @@ router.post('/create', requireAuth, requireAdmin, (req, res) => {
   }
 });
 
+// 快速新增專案類型（僅管理員；供新增專案表單「快速新增」使用，只取類型名稱，
+// 其餘顏色/排序/毛利警示等細節維持預設值，之後可到「類型管理」頁面補齊）
+router.post('/quick-add', requireAuth, requireAdmin, (req, res) => {
+  try {
+    const typeName = (req.body.type_name || '').trim();
+    if (!typeName) {
+      return res.status(400).json({ success: false, error: '類型名稱不能為空' });
+    }
+
+    const existing = db.prepare('SELECT id FROM project_types WHERE type_name = ?').get(typeName);
+    if (existing) {
+      return res.status(400).json({ success: false, error: '類型名稱已存在' });
+    }
+
+    const maxOrder = db.prepare('SELECT MAX(display_order) as max_order FROM project_types').get();
+    const order = (maxOrder?.max_order || 0) + 1;
+
+    const result = db.prepare(`
+      INSERT INTO project_types (type_name, badge_color, display_order, is_active, updated_at)
+      VALUES (?, 'info', ?, 1, datetime('now', 'localtime'))
+    `).run(typeName, order);
+
+    res.json({ success: true, type: { id: result.lastInsertRowid, type_name: typeName } });
+  } catch (err) {
+    console.error('快速新增專案類型失敗:', err);
+    res.status(500).json({ success: false, error: '新增失敗：' + err.message });
+  }
+});
+
 // 更新專案類型（僅管理員）
 router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
   const { id } = req.params;
