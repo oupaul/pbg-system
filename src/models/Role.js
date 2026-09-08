@@ -54,10 +54,11 @@ const Role = {
           can_manage_settings, can_backup_restore,
           can_view_all_projects, can_view_own_projects,
           can_edit_crm,
+          can_approve_customer,
           project_view_scope,
           dashboard_view_mode,
           is_system_role, is_active, display_order
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         data.role_key,
         data.role_name,
@@ -71,6 +72,7 @@ const Role = {
         data.can_view_all_projects !== undefined ? data.can_view_all_projects : 1,
         data.can_view_own_projects !== undefined ? data.can_view_own_projects : 1,
         data.can_edit_crm !== undefined ? data.can_edit_crm : 1,
+        data.can_approve_customer || 0,
         scopeValue,
         dashboardMode,
         data.is_system_role || 0,
@@ -83,7 +85,7 @@ const Role = {
       // 記錄審計日誌
       if (userId) {
         const newRole = this.findById(roleId);
-        AuditLogService.log('roles', roleId, 'create', userId, null, newRole);
+        AuditLogService.log('create', 'roles', roleId, null, newRole, userId);
       }
 
       return roleId;
@@ -160,6 +162,10 @@ const Role = {
         fields.push('can_edit_crm = ?');
         values.push(data.can_edit_crm);
       }
+      if (data.can_approve_customer !== undefined) {
+        fields.push('can_approve_customer = ?');
+        values.push(data.can_approve_customer);
+      }
       if (data.is_active !== undefined) {
         fields.push('is_active = ?');
         values.push(data.is_active);
@@ -195,7 +201,7 @@ const Role = {
       // 記錄審計日誌
       if (userId && result.changes > 0) {
         const newData = this.findById(id);
-        AuditLogService.log('roles', id, 'update', userId, oldData, newData);
+        AuditLogService.log('update', 'roles', id, oldData, newData, userId);
       }
 
       return result.changes > 0;
@@ -235,7 +241,7 @@ const Role = {
 
       // 記錄審計日誌
       if (userId && result.changes > 0) {
-        AuditLogService.log('roles', id, 'delete', userId, oldData, null);
+        AuditLogService.log('delete', 'roles', id, oldData, null, userId);
       }
 
       return result.changes > 0;
@@ -271,7 +277,7 @@ const Role = {
 
       // 記錄審計日誌
       if (userId && result.changes > 0) {
-        AuditLogService.log('roles', id, 'hard_delete', userId, oldData, null);
+        AuditLogService.log('hard_delete', 'roles', id, oldData, null, userId);
       }
 
       return result.changes > 0;
@@ -297,7 +303,8 @@ const Role = {
       can_backup_restore: role.can_backup_restore === 1,
       can_view_all_projects: role.can_view_all_projects === 1,
       can_view_own_projects: role.can_view_own_projects === 1,
-      can_edit_crm: role.can_edit_crm === 1
+      can_edit_crm: role.can_edit_crm === 1,
+      can_approve_customer: role.can_approve_customer === 1
     };
   },
 

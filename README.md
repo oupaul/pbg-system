@@ -36,6 +36,8 @@ sudo ./deploy.sh
 
 **首次登入後請立即變更密碼。**
 
+若是為新客戶公司導入這套系統，請依照 [新公司導入檢查清單](docs/新公司導入檢查清單.md) 確認所有業務規則清單（專案類型、獎金類型、客戶等級等）都已設定成符合該公司的實際情況，避免沿用了不屬於自己公司的預設假設值。
+
 ### 環境變數（進階，選填）
 
 透過 `setup.sh`／`deploy.sh` 部署不需要處理這一步（`SESSION_SECRET` 等會自動產生）。若要用 `npm run dev` 或手動啟動，可參考 [`.env.example`](.env.example) 設定 `PORT`、`NODE_ENV`、`SESSION_SECRET` 等變數（本專案未使用 dotenv，需自行 `export`）。

@@ -77,6 +77,24 @@ const requireDeletePermission = (req, res, next) => {
   return res.status(403).json({ error: '權限不足', message: '此功能僅限具備刪除權限的角色使用' });
 };
 
+// 新客戶/廠商審核：僅限具備 can_approve_customer 權限的角色
+const requireCustomerApprovalPermission = (req, res, next) => {
+  if (!req.user) {
+    if (req.accepts('html')) {
+      return res.status(403).render('error', { title: '權限不足', message: '此功能僅限具備審核權限的角色使用', error: {} });
+    }
+    return res.status(401).json({ error: '未登入' });
+  }
+
+  const role = getRolePermissions(req.user.role);
+  if (role && role.can_approve_customer) return next();
+
+  if (req.accepts('html')) {
+    return res.status(403).render('error', { title: '權限不足', message: '此功能僅限具備審核權限的角色使用', error: {} });
+  }
+  return res.status(403).json({ error: '權限不足', message: '此功能僅限具備審核權限的角色使用' });
+};
+
 // 匯入/匯出功能：僅限系統管理員（admin）與專案管理員（user）
 const requireImportExport = (req, res, next) => {
   if (!req.user) {
@@ -144,6 +162,7 @@ const setUserPermissions = (req, res, next) => {
     req.user.canEdit = role ? !!role.can_edit : req.user.role === ROLES.ADMIN || req.user.role === ROLES.USER;
     req.user.canDelete = role ? !!role.can_delete : req.user.canEdit;
     req.user.canEditCrm = role ? !!role.can_edit_crm : req.user.canEdit || req.user.role === ROLES.SALESPERSON;
+    req.user.canApproveCustomer = role ? !!role.can_approve_customer : (req.user.role === ROLES.ADMIN || req.user.role === ROLES.USER);
     req.user.isAdmin = role ? !!role.can_manage_users : req.user.role === ROLES.ADMIN;
     req.user.isReadOnly = !req.user.canEdit;
     req.user.isSalesperson = req.user.role === ROLES.SALESPERSON;
@@ -163,6 +182,7 @@ const setUserPermissions = (req, res, next) => {
     res.locals.canEdit = req.user.canEdit;
     res.locals.canEditCrm = req.user.canEditCrm;
     res.locals.canDelete = req.user.canDelete;
+    res.locals.canApproveCustomer = req.user.canApproveCustomer;
     res.locals.isAdmin = req.user.isAdmin;
     res.locals.isReadOnly = req.user.isReadOnly;
 
@@ -176,8 +196,8 @@ const setUserPermissions = (req, res, next) => {
       }
     }
 
-    // 新客戶/廠商審核：僅系統管理員（admin）與專案管理員（user）能核准，才需要看到待審核數量
-    if (req.user.role === ROLES.ADMIN || req.user.role === ROLES.USER) {
+    // 新客戶/廠商審核：僅具備 can_approve_customer 權限的角色能核准，才需要看到待審核數量
+    if (req.user.canApproveCustomer) {
       try {
         const db = require('../models/db');
         const row = db.prepare(`SELECT COUNT(*) as count FROM customer_creation_requests WHERE request_status = 'pending'`).get();
@@ -212,6 +232,7 @@ module.exports = {
   requireEditPermission,
   requireCrmEditPermission,
   requireDeletePermission,
+  requireCustomerApprovalPermission,
   requireImportExport,
   requireAdmin,
   setUserPermissions

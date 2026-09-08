@@ -161,6 +161,21 @@
                   </label>
                 </div>
               </div>
+              <div class="col-md-6">
+                <div class="form-check form-switch mb-3">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="can_approve_customer"
+                    name="can_approve_customer"
+                    ${role && role.can_approve_customer ? 'checked' : ''}
+                  >
+                  <label class="form-check-label" for="can_approve_customer">
+                    <strong>新客戶/廠商審核</strong>
+                    <div class="text-muted small">可以核准或駁回新客戶/廠商建立申請（獨立於上方「客戶/銷售機會編輯」）</div>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
         </div>

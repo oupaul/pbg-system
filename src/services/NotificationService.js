@@ -121,8 +121,13 @@ const NotificationService = {
   },
 
   // 通知具備客戶/廠商審核權限者（admin/user，對應 customerApprovals.js 的權限檢查）
+  // 通知具備新客戶/廠商審核權限者（roles.can_approve_customer = 1）
   notifyCustomerApprovers(payload, excludeUserId = null) {
-    const rows = db.prepare(`SELECT id FROM users WHERE role IN ('admin', 'user') AND is_active = 1`).all();
+    const rows = db.prepare(`
+      SELECT u.id FROM users u
+      JOIN roles r ON r.role_key = u.role
+      WHERE r.can_approve_customer = 1 AND u.is_active = 1
+    `).all();
     this.notifyUsers(rows.map(r => r.id), payload, excludeUserId);
   },
 

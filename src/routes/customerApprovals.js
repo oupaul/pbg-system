@@ -7,22 +7,7 @@ const Pipeline = require('../models/Pipeline');
 const db = require('../models/db');
 const CustomerLevels = require('./customerLevels');
 const NotificationService = require('../services/NotificationService');
-
-// 新客戶/廠商審核：僅系統管理員（admin）與專案管理員（user）可使用
-const requireCustomerApprovalPermission = (req, res, next) => {
-  if (!req.user) {
-    if (req.accepts('html')) {
-      return res.status(403).render('error', { title: '權限不足', message: '此功能僅限系統管理員與專案管理員使用', error: {} });
-    }
-    return res.status(401).json({ error: '未登入' });
-  }
-  if (req.user.role === 'admin' || req.user.role === 'user') return next();
-
-  if (req.accepts('html')) {
-    return res.status(403).render('error', { title: '權限不足', message: '此功能僅限系統管理員與專案管理員使用', error: {} });
-  }
-  return res.status(403).json({ error: '權限不足', message: '此功能僅限系統管理員與專案管理員使用' });
-};
+const { requireCustomerApprovalPermission } = require('../middleware/auth');
 
 function getActiveProjectTypes() {
   try {
