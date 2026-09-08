@@ -39,7 +39,7 @@ router.get('/', (req, res) => {
     let currentYearMonth = '';
     let typeColorMap = {};
 
-    if (req.user && req.user.role === 'salesperson' && req.user.salesperson_id) {
+    if (req.user && req.user.project_view_scope === 'own' && req.user.salesperson_id) {
       // 收款提醒
       let paymentReminderDays = 7;
       try {
@@ -122,7 +122,7 @@ router.get('/', (req, res) => {
   const selectedYear = req.query.year && req.query.year !== 'all' ? parseInt(req.query.year) : null;
 
   // 業務員儀表板僅顯示自己負責的專案（admin/user/boss 仍看得到全公司資料）
-  const salespersonId = (req.user && req.user.role === 'salesperson' && req.user.salesperson_id)
+  const salespersonId = (req.user && req.user.project_view_scope === 'own' && req.user.salesperson_id)
     ? req.user.salesperson_id : null;
   const spCondP = salespersonId ? ' AND p.salesperson_id = ?' : '';
   const spCondPlain = salespersonId ? ' AND salesperson_id = ?' : '';
@@ -382,9 +382,9 @@ router.get('/', (req, res) => {
   let overdueInvoiceProjects = []; // 已超過設定月份的專案
   
   // 開票提醒：包含所有專案（含獨立加總業務）；業務員僅見自己負責專案
-  const notifSalespersonCond = (req.user && req.user.role === 'salesperson' && req.user.salesperson_id)
+  const notifSalespersonCond = (req.user && req.user.project_view_scope === 'own' && req.user.salesperson_id)
     ? ' AND v.salesperson_id = ?' : '';
-  const notifSalespersonParam = (req.user && req.user.role === 'salesperson' && req.user.salesperson_id)
+  const notifSalespersonParam = (req.user && req.user.project_view_scope === 'own' && req.user.salesperson_id)
     ? req.user.salesperson_id : null;
   if (notificationEnabled) {
     const overdueParams = notifSalespersonParam != null ? [currentYearMonth, notifSalespersonParam] : [currentYearMonth];
@@ -426,33 +426,33 @@ router.get('/', (req, res) => {
 
   // 應收帳款帳齡分析（admin/user 可見），始終包含全部發票（含獨立加總業務），以掌握完整應收狀況
   let receivablesAging = null;
-  if (req.user && (req.user.role === 'admin' || req.user.role === 'user')) {
+  if (req.user && req.user.canEdit) {
     receivablesAging = ReceivablesAgingService.getAgingReport(selectedYear, null);
   }
 
   // 收款提醒：預計收款日即將到期或已逾期
-  // admin/user 可見全部；salesperson 僅見自己負責專案
+  // 具編輯權限者可見全部；scope 為 own 者（如業務員）僅見自己負責專案
   let paymentReminder = { upcoming: [], overdue: [] };
-  if (req.user && (req.user.role === 'admin' || req.user.role === 'user' || req.user.role === 'salesperson')) {
+  if (req.user && (req.user.canEdit || req.user.project_view_scope === 'own')) {
     let paymentReminderDays = 7;
     try {
       const reminderSetting = db.prepare('SELECT setting_value FROM system_settings WHERE setting_key = ?').get('payment_reminder_days');
       if (reminderSetting) paymentReminderDays = parseInt(reminderSetting.setting_value, 10) || 7;
     } catch (e) { /* use default */ }
-    const salespersonFilter = (req.user.role === 'salesperson' && req.user.salesperson_id) ? req.user.salesperson_id : null;
+    const salespersonFilter = (req.user.project_view_scope === 'own' && req.user.salesperson_id) ? req.user.salesperson_id : null;
     paymentReminder = ReceivablesAgingService.getPaymentReminder(paymentReminderDays, null, salespersonFilter);
   }
 
   // 客戶追蹤提醒：有客戶關係負責人但超過設定天數沒有活動紀錄的客戶
-  // admin/user 可見全部；salesperson 僅見自己負責的客戶
+  // 具編輯權限者可見全部；scope 為 own 者（如業務員）僅見自己負責的客戶
   let activityReminders = [];
-  if (req.user && (req.user.role === 'admin' || req.user.role === 'user' || req.user.role === 'salesperson')) {
+  if (req.user && (req.user.canEdit || req.user.project_view_scope === 'own')) {
     let activityReminderDays = 14;
     try {
       const arSetting = db.prepare('SELECT setting_value FROM system_settings WHERE setting_key = ?').get('activity_reminder_days');
       if (arSetting) activityReminderDays = parseInt(arSetting.setting_value, 10) || 14;
     } catch (e) { /* use default */ }
-    const activityOwnerFilter = (req.user.role === 'salesperson') ? req.user.id : null;
+    const activityOwnerFilter = (req.user.project_view_scope === 'own') ? req.user.id : null;
     activityReminders = ActivityReminderService.getOverdueCustomers(activityReminderDays, activityOwnerFilter);
   }
 

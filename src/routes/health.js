@@ -4,22 +4,10 @@ const db = require('../models/db');
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 const BackupRestoreService = require('../services/BackupRestoreService');
 const AuditLogService = require('../services/AuditLogService');
 const loadDeployConfig = require('../config/deploy');
-
-// 輔助函數：檢查是否為管理員
-function requireAdmin(req, res, next) {
-  if (!req.user || req.user.role !== 'admin') {
-    return res.status(403).render('error', {
-      title: '權限不足',
-      message: '只有管理員可以訪問此頁面',
-      error: {}
-    });
-  }
-  next();
-}
 
 // 格式化檔案大小
 function formatFileSize(bytes) {

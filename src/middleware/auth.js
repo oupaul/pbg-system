@@ -95,7 +95,7 @@ const requireCustomerApprovalPermission = (req, res, next) => {
   return res.status(403).json({ error: '權限不足', message: '此功能僅限具備審核權限的角色使用' });
 };
 
-// 匯入/匯出功能：僅限系統管理員（admin）與專案管理員（user）
+// 匯入/匯出功能：僅限具備 can_edit 權限的角色（Uses roles table so custom roles work correctly）
 const requireImportExport = (req, res, next) => {
   if (!req.user) {
     if (req.accepts('html')) {
@@ -108,7 +108,8 @@ const requireImportExport = (req, res, next) => {
     return res.status(401).json({ error: '未登入' });
   }
 
-  if (req.user.role === ROLES.ADMIN || req.user.role === ROLES.USER) return next();
+  const role = getRolePermissions(req.user.role);
+  if (role && role.can_edit) return next();
 
   if (req.accepts('html')) {
     return res.status(403).render('error', {

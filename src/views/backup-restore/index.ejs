@@ -40,7 +40,7 @@
           <li class="nav-item">
             <a class="nav-link" href="/audit-logs"><i class="bi bi-clock-history"></i> 修改記錄</a>
           </li>
-          <% if (typeof user !== 'undefined' && user && user.role === 'admin') { %>
+          <% if (typeof user !== 'undefined' && user && isAdmin) { %>
           <li class="nav-item">
             <a class="nav-link" href="/backup-restore"><i class="bi bi-archive"></i> 備份還原</a>
           </li>
@@ -60,7 +60,7 @@
                     <i class="bi bi-key"></i> 修改密碼
                   </a>
                 </li>
-                <% if (user.role === 'admin') { %>
+                <% if (isAdmin) { %>
                 <li>
                   <a class="dropdown-item" href="/users">
                     <i class="bi bi-people"></i> 使用者管理

@@ -179,7 +179,7 @@ ${typeof showNotification !== 'undefined' && showNotification && (typeof upcomin
 </div>
 
 <!-- 調試資訊區塊（僅管理員可見） -->
-${typeof showNotification !== 'undefined' && locals.user && locals.user.role === 'admin' ? `
+${typeof showNotification !== 'undefined' && locals.user && locals.isAdmin ? `
 <div class="alert alert-info alert-dismissible fade show mb-3" role="alert">
   <h6 class="alert-heading"><i class="bi bi-info-circle"></i> 通知系統狀態（調試資訊）</h6>
   <ul class="mb-0 small">
@@ -384,7 +384,7 @@ ${typeof activityReminders !== 'undefined' && activityReminders && activityRemin
     </div>
   </div>
   
-  ${locals.user && locals.user.role === 'admin' ? `
+  ${locals.user && locals.isAdmin ? `
   <div class="col-md-3">
     <div class="card bg-info text-white h-100">
       <div class="card-body">
@@ -700,7 +700,7 @@ ${typeof receivablesAging !== 'undefined' && receivablesAging && receivablesAgin
   </div>
 </div>
 
-${locals.user && locals.user.role === 'boss' ? '' : `
+${locals.canEdit ? `
 <div class="row g-4">
   <div class="col-md-12">
     <div class="card">
@@ -718,6 +718,6 @@ ${locals.user && locals.user.role === 'boss' ? '' : `
     </div>
   </div>
 </div>
-`}
+` : ''}
 `}
 `}) %>

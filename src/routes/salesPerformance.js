@@ -1,5 +1,5 @@
 /**
- * 業務績效儀表板（僅 admin、user、boss 可存取）
+ * 業務績效儀表板（僅 project_view_scope 為 'all' 的角色可存取，內建的 admin/user/boss 皆屬此類）
  */
 const express = require('express');
 const router = express.Router();
@@ -17,9 +17,11 @@ function getStatusLinkNames() {
   };
 }
 
-const allowedRoles = ['admin', 'user', 'boss'];
 router.get('/', (req, res) => {
-  if (!req.user || !allowedRoles.includes(req.user.role)) {
+  // 比照原本 admin/user/boss 可存取、salesperson 不可存取的語意，改用角色的
+  // project_view_scope 判斷（這三個內建角色皆為 'all'，salesperson 為 'own'），
+  // 自訂角色也能透過設定 project_view_scope 取得對應存取權
+  if (!req.user || req.user.project_view_scope !== 'all') {
     return res.status(403).render('error', { message: '無權限存取業務績效頁面', error: {} });
   }
   const years = Project.getYears();

@@ -155,7 +155,7 @@ ${typeof error !== 'undefined' && error ? '<div class="alert alert-danger alert-
           <span>應收帳款</span>
           <span class="text-danger">$${(summary.outstanding || 0).toLocaleString()}</span>
         </div>
-        ${locals.user && (locals.user.role === 'admin' || locals.user.role === 'user') ? `
+        ${locals.canEdit ? `
         <hr>
         <div class="d-flex justify-content-between">
           <span>獎金合計</span>
@@ -628,7 +628,7 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
   </div>
 </div>
 
-${locals.user && (locals.user.role === 'admin' || locals.user.role === 'user') ? `
+${locals.canEdit ? `
 <!-- 獎金明細 -->
 <div class="card">
   <div class="card-header d-flex justify-content-between align-items-center">

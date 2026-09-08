@@ -89,7 +89,7 @@
               <li><a class="dropdown-item <%= navActive('/bonuses') %>" href="/bonuses"><i class="bi bi-currency-dollar"></i> 獎金管理</a></li>
               <li><a class="dropdown-item <%= navActive('/referral-rewards') %>" href="/referral-rewards"><i class="bi bi-gift"></i> 轉介紹獎勵</a></li>
               <li><a class="dropdown-item <%= navActive('/sales-performance') %>" href="/sales-performance"><i class="bi bi-graph-up"></i> 業務績效</a></li>
-              <% if (user.role === 'admin' || user.role === 'user') { %>
+              <% if (typeof canEdit !== 'undefined' && canEdit) { %>
               <li><a class="dropdown-item <%= navActive('/salespeople') %>" href="/salespeople"><i class="bi bi-people"></i> 業務管理</a></li>
               <li><a class="dropdown-item <%= navActive('/recent-payments') %>" href="/recent-payments"><i class="bi bi-cash-coin"></i> 近期收款</a></li>
               <% } %>
@@ -97,7 +97,7 @@
           </li>
           <% } %>
 
-          <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user')) { %>
+          <% if (typeof canEdit !== 'undefined' && canEdit) { %>
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle <%= navGroupActive(['/project-templates', '/import-export', '/audit-logs', '/project-types', '/pipeline-amount-options', '/bonus-types', '/bonus-tiers', '/customer-levels', '/customer-statuses', '/activity-types', '/pipeline-statuses', '/report-groups', '/roles', '/settings', '/backup-restore', '/health', '/login-history', '/notifications/broadcast']) %>" href="#" id="systemGroupDropdown" role="button" data-bs-toggle="dropdown">
               <i class="bi bi-gear-wide-connected"></i> 系統設定
@@ -106,7 +106,7 @@
               <li><a class="dropdown-item <%= navActive('/project-templates') %>" href="/project-templates"><i class="bi bi-file-earmark-text"></i> 專案範本</a></li>
               <li><a class="dropdown-item <%= navActive('/import-export') %>" href="/import-export"><i class="bi bi-arrow-left-right"></i> 匯入/匯出</a></li>
               <li><a class="dropdown-item <%= navActive('/audit-logs') %>" href="/audit-logs"><i class="bi bi-clock-history"></i> 修改記錄</a></li>
-              <% if (user.role === 'admin') { %>
+              <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
               <li><hr class="dropdown-divider"></li>
               <li><a class="dropdown-item <%= navActive('/project-types') %>" href="/project-types"><i class="bi bi-tags"></i> 類型管理</a></li>
               <li><a class="dropdown-item <%= navActive('/pipeline-amount-options') %>" href="/pipeline-amount-options"><i class="bi bi-cash-stack"></i> 金額選項管理</a></li>
@@ -179,7 +179,7 @@
                     <i class="bi bi-key"></i> 修改密碼
                   </a>
                 </li>
-                <% if (user.role === 'admin') { %>
+                <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
                 <li>
                   <a class="dropdown-item" href="/users">
                     <i class="bi bi-people"></i> 使用者管理

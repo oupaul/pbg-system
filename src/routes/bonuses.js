@@ -19,19 +19,19 @@ router.get('/', (req, res) => {
   let salespersonFilter = '';
   let filterParams = [selectedYear];
   
-  if (req.user && req.user.role === 'salesperson' && req.user.salesperson_id) {
+  if (req.user && req.user.project_view_scope === 'own' && req.user.salesperson_id) {
     // 業務員只能看到自己的獎金
     salespersonFilter = ' AND b.salesperson_id = ?';
     filterParams.push(req.user.salesperson_id);
   }
 
   // 獎金統計
-  const stats = req.user && req.user.role === 'salesperson' && req.user.salesperson_id
+  const stats = req.user && req.user.project_view_scope === 'own' && req.user.salesperson_id
     ? Bonus.getStatisticsBySalesperson(selectedYear, req.user.salesperson_id)
     : Bonus.getStatistics(selectedYear);
   
   // 業務獎金彙總
-  const salespersonSummary = req.user && req.user.role === 'salesperson' && req.user.salesperson_id
+  const salespersonSummary = req.user && req.user.project_view_scope === 'own' && req.user.salesperson_id
     ? Bonus.getSalespersonSummary(selectedYear).filter(s => s.salesperson_id === req.user.salesperson_id)
     : Bonus.getSalespersonSummary(selectedYear);
 
@@ -211,10 +211,9 @@ router.post('/batch-update', (req, res) => {
   }
 });
 
-// 批次刪除獎金（需要編輯權限）
+// 批次刪除獎金（需要刪除權限）
 router.post('/batch-delete', (req, res) => {
-  // 檢查編輯權限
-  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'user')) {
+  if (!req.user || !req.user.canDelete) {
     return res.redirect('/bonuses?error=' + encodeURIComponent('權限不足'));
   }
 

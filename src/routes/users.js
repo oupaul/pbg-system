@@ -2,24 +2,13 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const Salesperson = require('../models/Salesperson');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { getUserInfo } = require('../utils/authHelper');
 const AuditLogService = require('../services/AuditLogService');
 const db = require('../models/db');
 const { PROJECT_VIEW_SCOPE } = require('../constants');
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function requireAdmin(req, res, next) {
-  if (!req.user || req.user.role !== 'admin') {
-    return res.status(403).render('error', {
-      title: '權限不足',
-      message: '只有管理員可以訪問此頁面',
-      error: {}
-    });
-  }
-  next();
-}
 
 function getRoles() {
   try {

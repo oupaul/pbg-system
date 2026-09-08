@@ -159,7 +159,7 @@ router.get('/', (req, res) => {
   
   // 業務下拉清單：業務員只顯示自己；非 admin/user/boss 排除獨立計算業務；含離職人員
   let salespeople;
-  if (req.user && req.user.role === 'salesperson' && req.user.salesperson_id) {
+  if (req.user && req.user.project_view_scope === 'own' && req.user.salesperson_id) {
     const sp = Salesperson.findById(req.user.salesperson_id);
     salespeople = sp ? [sp] : [];
   } else {

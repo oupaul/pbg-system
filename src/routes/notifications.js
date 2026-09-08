@@ -5,18 +5,7 @@ const NotificationService = require('../services/NotificationService');
 const User = require('../models/User');
 const { getNotificationIcon } = NotificationService;
 const { ONLINE_THRESHOLD_MINUTES } = require('../constants');
-
-// 廣播訊息：僅系統管理員可使用
-function requireAdmin(req, res, next) {
-  if (!req.user || req.user.role !== 'admin') {
-    return res.status(403).render('error', {
-      title: '權限不足',
-      message: '只有管理員可以使用廣播通知功能',
-      error: {}
-    });
-  }
-  next();
-}
+const { requireAdmin } = require('../middleware/auth');
 
 // 通知中心：僅顯示、操作自己的通知
 router.get('/', (req, res) => {

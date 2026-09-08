@@ -17,10 +17,12 @@ const { getUserInfo } = require('../utils/authHelper');
 const { requireCrmEditPermission } = require('../middleware/auth');
 const NotificationService = require('../services/NotificationService');
 
-// 新增客戶/廠商是否需要送審：僅系統管理員（admin）與專案管理員（user）可直接建立，
-// 其餘角色（業務員、自訂角色等）一律先送審，核准後才會真正進入系統
+// 新增客戶/廠商是否需要送審：能核准他人申請的角色（roles.can_approve_customer）
+// 直接建立即可，不需要自己送審給自己審；其餘角色（業務員、自訂角色等）
+// 一律先送審，核准後才會真正進入系統。req.user.canApproveCustomer 由
+// middleware/auth.js 的 setUserPermissions 依角色旗標計算，自訂角色也適用
 function canCreateCustomerDirectly(user) {
-  return !!(user && (user.role === 'admin' || user.role === 'user'));
+  return !!(user && user.canApproveCustomer);
 }
 
 // 客戶列表

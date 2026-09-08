@@ -2,22 +2,10 @@ const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
 const User = require('../models/User');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { getUserInfo } = require('../utils/authHelper');
 const AuditLogService = require('../services/AuditLogService');
 const EmailService = require('../services/EmailService');
-
-// 輔助函數：檢查是否為管理員
-function requireAdmin(req, res, next) {
-  if (!req.user || req.user.role !== 'admin') {
-    return res.status(403).render('error', {
-      title: '權限不足',
-      message: '只有管理員可以訪問此頁面',
-      error: {}
-    });
-  }
-  next();
-}
 
 // 輔助函數：獲取系統設定
 function getSystemSetting(key, defaultValue = null) {
