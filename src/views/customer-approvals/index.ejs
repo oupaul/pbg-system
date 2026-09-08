@@ -160,9 +160,11 @@ ${(requests || []).map(r => {
                 <label class="form-label">客戶等級</label>
                 <select name="customer_level" class="form-select">
                   <option value="" ${!r.customer_level ? 'selected' : ''}>-- 未分級 --</option>
-                  <option value="A" ${r.customer_level === 'A' ? 'selected' : ''}>A</option>
-                  <option value="B" ${r.customer_level === 'B' ? 'selected' : ''}>B</option>
-                  <option value="C" ${r.customer_level === 'C' ? 'selected' : ''}>C</option>
+                  ${(typeof customerLevels !== 'undefined' && customerLevels ? customerLevels : []).map(l => {
+                    const safeName = escapeHtml(l.level_name).replace(/"/g, '&quot;');
+                    const selected = r.customer_level === l.level_name ? 'selected' : '';
+                    return '<option value="' + safeName + '" ' + selected + '>' + escapeHtml(l.level_name) + '</option>';
+                  }).join('')}
                 </select>
               </div>
               <div class="col-md-4">

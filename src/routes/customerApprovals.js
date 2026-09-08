@@ -5,6 +5,7 @@ const Salesperson = require('../models/Salesperson');
 const User = require('../models/User');
 const Pipeline = require('../models/Pipeline');
 const db = require('../models/db');
+const CustomerLevels = require('./customerLevels');
 const NotificationService = require('../services/NotificationService');
 
 // 新客戶/廠商審核：僅系統管理員（admin）與專案管理員（user）可使用
@@ -62,6 +63,7 @@ router.get('/', requireCustomerApprovalPermission, (req, res) => {
     salespeople: Salesperson.findAll(),
     staffUsers: User.findActiveNonAdmin(),
     projectTypes: getActiveProjectTypes(),
+    customerLevels: CustomerLevels.findActive(),
     error: req.query.error || '',
     success: req.query.success || ''
   });

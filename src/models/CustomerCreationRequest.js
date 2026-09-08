@@ -15,6 +15,10 @@ const CustomerCreationRequest = {
   create(data) {
     if (!data.customer_code) throw new Error('客戶編號不能為空');
     if (!data.company_name) throw new Error('公司名稱不能為空');
+    if (data.customer_level) {
+      const validLevel = db.prepare('SELECT id FROM customer_levels WHERE level_name = ? AND is_active = 1').get(data.customer_level);
+      if (!validLevel) throw new Error(`客戶等級「${data.customer_level}」不存在或已停用`);
+    }
 
     const result = db.prepare(`
       INSERT INTO customer_creation_requests (
@@ -86,6 +90,10 @@ const CustomerCreationRequest = {
     const request = this.findById(id);
     if (!request) throw new Error('找不到此申請');
     if (request.request_status !== 'pending') throw new Error('此申請已被處理過，無法編輯');
+    if (data.customer_level) {
+      const validLevel = db.prepare('SELECT id FROM customer_levels WHERE level_name = ? AND is_active = 1').get(data.customer_level);
+      if (!validLevel) throw new Error(`客戶等級「${data.customer_level}」不存在或已停用`);
+    }
 
     const fields = [];
     const values = [];

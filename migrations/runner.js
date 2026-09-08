@@ -70,6 +70,9 @@ const MIGRATIONS = [
   'migrate_referral_rewards',
   'migrate_bonus_types',
   'migrate_remove_bonus_type_check',
+  'migrate_customer_levels',
+  'migrate_remove_customer_level_check',
+  'migrate_remove_customer_creation_request_level_check',
 ];
 
 function run() {

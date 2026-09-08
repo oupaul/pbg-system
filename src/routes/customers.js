@@ -5,6 +5,7 @@ const Project = require('../models/Project');
 const Pipeline = require('../models/Pipeline');
 const Activity = require('../models/Activity');
 const ReferralReward = require('../models/ReferralReward');
+const CustomerLevels = require('./customerLevels');
 const DeletionRequest = require('../models/DeletionRequest');
 const CustomerCreationRequest = require('../models/CustomerCreationRequest');
 const User = require('../models/User');
@@ -150,6 +151,8 @@ router.get('/', (req, res) => {
       partyTypeFilter,
       vendorTypeFilter,
       staffUsers: User.findActiveNonAdmin(),
+      customerLevels: CustomerLevels.findActive(),
+      customerLevelColorMap: CustomerLevels.findColorMap(),
       req: req,
       error: req.query.error || '',
       success: req.query.success || ''
@@ -341,7 +344,12 @@ router.get('/:id', (req, res) => {
     pendingActivityDeletionIds,
     referralRewards,
     allCustomers: Customer.findAll(),
+    // 轉介紹「被介紹客戶」欄位的快速新增：跟 /customers/quick-add 的直接建立權限一致，
+    // 非管理員/專案管理員一律要送審，這裡不做那整套審核綁定，先不顯示快速新增連結
+    canCreateCustomerDirectly: canCreateCustomerDirectly(req.user),
     staffUsers: User.findActiveNonAdmin(),
+    customerLevels: CustomerLevels.findActive(),
+    customerLevelColorMap: CustomerLevels.findColorMap(),
     error: req.query.error || '',
     success: req.query.success || ''
   });

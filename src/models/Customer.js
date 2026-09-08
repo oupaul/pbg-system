@@ -123,7 +123,16 @@ const Customer = {
     if (!data.company_name) {
       throw new Error('公司名稱不能為空');
     }
-    
+
+    // customer_level 不再由資料庫 CHECK 約束限制（改為可自訂的 customer_levels 表），
+    // 有值才驗證，空值/未分級維持允許
+    if (data.customer_level) {
+      const validLevel = db.prepare('SELECT id FROM customer_levels WHERE level_name = ? AND is_active = 1').get(data.customer_level);
+      if (!validLevel) {
+        throw new Error(`客戶等級「${data.customer_level}」不存在或已停用，請至「客戶等級管理」確認`);
+      }
+    }
+
     const { partyType, vendorType } = normalizePartyFields(data);
 
     const stmt = db.prepare(`
@@ -218,7 +227,15 @@ const Customer = {
     // 取得舊值
     const oldRecord = this.findById(id);
     if (!oldRecord) return false;
-    
+
+    // customer_level 不再由資料庫 CHECK 約束限制，有值才驗證
+    if (data.customer_level) {
+      const validLevel = db.prepare('SELECT id FROM customer_levels WHERE level_name = ? AND is_active = 1').get(data.customer_level);
+      if (!validLevel) {
+        throw new Error(`客戶等級「${data.customer_level}」不存在或已停用，請至「客戶等級管理」確認`);
+      }
+    }
+
     // 構建更新欄位和值
     const fields = [];
     const values = [];

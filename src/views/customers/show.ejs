@@ -17,7 +17,7 @@
       ${escapeHtml(customer.company_name)}
       <span class="badge bg-${customer.party_type === '廠商' ? 'dark' : customer.party_type === '兩者皆是' ? 'primary' : 'info'} align-middle">${customer.party_type || '客戶'}</span>
       ${customer.vendor_type ? '<span class="badge bg-secondary align-middle">' + escapeHtml(customer.vendor_type) + '</span>' : ''}
-      ${customer.customer_level ? '<span class="badge bg-' + (customer.customer_level === 'A' ? 'success' : customer.customer_level === 'B' ? 'warning' : 'secondary') + ' align-middle">' + customer.customer_level + '級</span>' : ''}
+      ${customer.customer_level ? '<span class="badge bg-' + ((typeof customerLevelColorMap !== 'undefined' && customerLevelColorMap[customer.customer_level]) || 'secondary') + ' align-middle">' + escapeHtml(customer.customer_level) + '級</span>' : ''}
       <span class="badge bg-${customer.status === '往來中' ? 'success' : customer.status === '暫停往來' ? 'warning' : 'secondary'} align-middle">${customer.status || '往來中'}</span>
     </h1>
     ${customer.industry ? '<p class="text-muted mb-0"><i class="bi bi-building"></i> ' + customer.industry.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>' : ''}
@@ -323,9 +323,11 @@ ${locals.canEditCrm ? `
           <label class="form-label">客戶等級</label>
           <select name="customer_level" class="form-select">
             <option value="" ${!customer.customer_level ? 'selected' : ''}>-- 未分級 --</option>
-            <option value="A" ${customer.customer_level === 'A' ? 'selected' : ''}>A</option>
-            <option value="B" ${customer.customer_level === 'B' ? 'selected' : ''}>B</option>
-            <option value="C" ${customer.customer_level === 'C' ? 'selected' : ''}>C</option>
+            ${(typeof customerLevels !== 'undefined' && customerLevels ? customerLevels : []).map(l => {
+              const safeName = escapeHtml(l.level_name).replace(/"/g, '&quot;');
+              const selected = customer.customer_level === l.level_name ? 'selected' : '';
+              return '<option value="' + safeName + '" ' + selected + '>' + escapeHtml(l.level_name) + '</option>';
+            }).join('')}
           </select>
         </div>
         <div class="col-md-4">
@@ -369,7 +371,7 @@ ${locals.canEditCrm ? `
         <div class="modal-body">
           <div class="mb-3">
             <label class="form-label">被介紹客戶</label>
-            <select name="referred_customer_id" class="form-select select2-dropdown">
+            <select name="referred_customer_id" id="referredCustomerSelect" class="form-select select2-dropdown">
               <option value="">-- 尚未成立/不指定 --</option>
               ${(allCustomers || []).filter(c => c.id !== customer.id).map(c => {
                 const companyName = (c.company_name || '').replace(/"/g, '&quot;');
@@ -377,6 +379,7 @@ ${locals.canEditCrm ? `
                 return '<option value="' + c.id + '">' + companyName + ' (' + customerCode + ')</option>';
               }).join('')}
             </select>
+            ${canCreateCustomerDirectly ? '<small class="form-text text-muted">找不到客戶？<a href="#" id="quickAddReferredCustomerLink" class="text-primary">快速新增</a></small>' : ''}
           </div>
           <div class="mb-3">
             <label class="form-label">受益對象</label>
@@ -409,6 +412,116 @@ ${locals.canEditCrm ? `
     </div>
   </div>
 </div>
+
+${canCreateCustomerDirectly ? `
+<!-- 快速新增客戶 Modal（供「新增轉介紹紀錄」的被介紹客戶欄位使用） -->
+<div class="modal fade" id="quickAddReferredCustomerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title">
+          <i class="bi bi-building-add"></i> 快速新增客戶
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="quickAddReferredCustomerForm">
+          <div class="mb-3">
+            <label class="form-label">客戶編號 <span class="text-danger">*</span></label>
+            <input type="text" name="customer_code" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">公司名稱 <span class="text-danger">*</span></label>
+            <input type="text" name="company_name" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">統一編號</label>
+            <input type="text" name="tax_id" class="form-control" maxlength="8" pattern="[0-9]{8}">
+            <small class="form-text text-muted">8 位數字</small>
+          </div>
+        </form>
+        <div id="quickAddReferredCustomerError" class="alert alert-danger d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-lg"></i> 取消
+        </button>
+        <button type="button" class="btn btn-primary" id="quickAddReferredCustomerSubmit">
+          <i class="bi bi-check-lg"></i> 新增並選擇
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const quickAddLink = document.getElementById('quickAddReferredCustomerLink');
+  if (!quickAddLink) return;
+
+  const quickAddModal = new bootstrap.Modal(document.getElementById('quickAddReferredCustomerModal'));
+  const quickAddForm = document.getElementById('quickAddReferredCustomerForm');
+  const quickAddSubmit = document.getElementById('quickAddReferredCustomerSubmit');
+  const quickAddError = document.getElementById('quickAddReferredCustomerError');
+
+  quickAddLink.addEventListener('click', function(e) {
+    e.preventDefault();
+    quickAddForm.reset();
+    quickAddError.classList.add('d-none');
+    quickAddModal.show();
+  });
+
+  quickAddSubmit.addEventListener('click', async function() {
+    const formData = new FormData(quickAddForm);
+
+    if (!formData.get('customer_code') || !formData.get('company_name')) {
+      quickAddError.textContent = '請填寫客戶編號和公司名稱';
+      quickAddError.classList.remove('d-none');
+      return;
+    }
+
+    quickAddSubmit.disabled = true;
+    quickAddSubmit.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 新增中...';
+    quickAddError.classList.add('d-none');
+
+    try {
+      const response = await fetch('/customers/quick-add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_code: formData.get('customer_code'),
+          company_name: formData.get('company_name'),
+          tax_id: formData.get('tax_id') || ''
+        })
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        const c = result.customer;
+        const displayText = c.company_name + ' (' + c.customer_code + ')';
+        const newOption = new Option(displayText, c.id, true, true);
+        $('#referredCustomerSelect').append(newOption).trigger('change');
+
+        quickAddModal.hide();
+        if (typeof showToast === 'function') {
+          showToast('客戶新增成功：' + c.company_name, 'success');
+        }
+      } else {
+        quickAddError.textContent = result.error || '新增客戶失敗';
+        quickAddError.classList.remove('d-none');
+      }
+    } catch (error) {
+      console.error('快速新增客戶錯誤:', error);
+      quickAddError.textContent = '新增客戶時發生錯誤：' + error.message;
+      quickAddError.classList.remove('d-none');
+    } finally {
+      quickAddSubmit.disabled = false;
+      quickAddSubmit.innerHTML = '<i class="bi bi-check-lg"></i> 新增並選擇';
+    }
+  });
+});
+</script>
+` : ''}
 
 <!-- 編輯轉介紹 Modals -->
 ${(referralRewards || []).map(r => `

@@ -181,7 +181,7 @@ ${typeof success !== 'undefined' && success ? `
               </td>
               <td>${escapeHtml(c.owner_salesperson_name) || '-'}</td>
               <td>${escapeHtml(c.salesperson_names) || '-'}</td>
-              <td class="text-center">${c.customer_level ? '<span class="badge bg-' + (c.customer_level === 'A' ? 'success' : c.customer_level === 'B' ? 'warning' : 'secondary') + '">' + c.customer_level + '</span>' : '-'}</td>
+              <td class="text-center">${c.customer_level ? '<span class="badge bg-' + ((typeof customerLevelColorMap !== 'undefined' && customerLevelColorMap[c.customer_level]) || 'secondary') + '">' + escapeHtml(c.customer_level) + '</span>' : '-'}</td>
               <td><span class="badge bg-${c.status === '往來中' ? 'success' : c.status === '暫停往來' ? 'warning' : 'secondary'}">${c.status || '往來中'}</span></td>
             </tr>
           `).join('')}
@@ -274,9 +274,10 @@ ${typeof success !== 'undefined' && success ? `
               <label class="form-label">客戶等級</label>
               <select name="customer_level" class="form-select">
                 <option value="">-- 未分級 --</option>
-                <option value="A">A</option>
-                <option value="B">B</option>
-                <option value="C">C</option>
+                ${(typeof customerLevels !== 'undefined' && customerLevels ? customerLevels : []).map(l => {
+                  const safeName = escapeHtml(l.level_name).replace(/"/g, '&quot;');
+                  return '<option value="' + safeName + '">' + escapeHtml(l.level_name) + '</option>';
+                }).join('')}
               </select>
             </div>
             <div class="col-md-4 mb-3">
