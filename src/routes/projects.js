@@ -73,6 +73,20 @@ function getActiveProjectTypes() {
   }
 }
 
+// 輔助函數：獲取所有啟用的獎金類型
+function getActiveBonusTypes() {
+  try {
+    return db.prepare(`
+      SELECT * FROM bonus_types
+      WHERE is_active = 1
+      ORDER BY display_order ASC, type_name ASC
+    `).all();
+  } catch (err) {
+    console.error('獲取獎金類型失敗:', err);
+    return [];
+  }
+}
+
 // 輔助函數：獲取類型顏色（包括停用的類型）
 function getProjectTypeColor(typeName) {
   try {
@@ -695,6 +709,7 @@ router.get('/:id', (req, res) => {
     vendors,
     attachments,
     bonuses,
+    bonusTypes: getActiveBonusTypes(),
     typeColorMap,
     showDeleted, // 是否顯示已刪除的發票/收款
     success: req.query.success ? decodeURIComponent(req.query.success) : null,

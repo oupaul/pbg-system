@@ -99,7 +99,7 @@
 
           <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user')) { %>
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle <%= navGroupActive(['/project-templates', '/import-export', '/audit-logs', '/project-types', '/pipeline-amount-options', '/report-groups', '/roles', '/settings', '/backup-restore', '/health', '/login-history', '/notifications/broadcast']) %>" href="#" id="systemGroupDropdown" role="button" data-bs-toggle="dropdown">
+            <a class="nav-link dropdown-toggle <%= navGroupActive(['/project-templates', '/import-export', '/audit-logs', '/project-types', '/pipeline-amount-options', '/bonus-types', '/report-groups', '/roles', '/settings', '/backup-restore', '/health', '/login-history', '/notifications/broadcast']) %>" href="#" id="systemGroupDropdown" role="button" data-bs-toggle="dropdown">
               <i class="bi bi-gear-wide-connected"></i> 系統設定
             </a>
             <ul class="dropdown-menu">
@@ -110,6 +110,7 @@
               <li><hr class="dropdown-divider"></li>
               <li><a class="dropdown-item <%= navActive('/project-types') %>" href="/project-types"><i class="bi bi-tags"></i> 類型管理</a></li>
               <li><a class="dropdown-item <%= navActive('/pipeline-amount-options') %>" href="/pipeline-amount-options"><i class="bi bi-cash-stack"></i> 金額選項管理</a></li>
+              <li><a class="dropdown-item <%= navActive('/bonus-types') %>" href="/bonus-types"><i class="bi bi-award"></i> 獎金類型管理</a></li>
               <li><a class="dropdown-item <%= navActive('/report-groups') %>" href="/report-groups"><i class="bi bi-collection"></i> 報表群組</a></li>
               <li><a class="dropdown-item <%= navActive('/roles') %>" href="/roles"><i class="bi bi-shield-check"></i> 角色管理</a></li>
               <li><a class="dropdown-item <%= navActive('/settings') %>" href="/settings"><i class="bi bi-gear"></i> 系統設定</a></li>

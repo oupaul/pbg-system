@@ -68,6 +68,8 @@ const MIGRATIONS = [
   'migrate_cost_vendor_budget',
   'migrate_contract_term',
   'migrate_referral_rewards',
+  'migrate_bonus_types',
+  'migrate_remove_bonus_type_check',
 ];
 
 function run() {

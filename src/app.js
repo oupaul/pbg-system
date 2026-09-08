@@ -171,6 +171,8 @@ try {
   console.log('[啟動] ✓ projectTypes 路由載入完成');
   const pipelineAmountOptionsRoutes = require('./routes/pipelineAmountOptions');
   console.log('[啟動] ✓ pipelineAmountOptions 路由載入完成');
+  const bonusTypesRoutes = require('./routes/bonusTypes');
+  console.log('[啟動] ✓ bonusTypes 路由載入完成');
   const reportGroupsRoutes = require('./routes/reportGroups');
   console.log('[啟動] ✓ reportGroups 路由載入完成');
   const recentPaymentsRoutes = require('./routes/recentPayments');
@@ -225,6 +227,7 @@ try {
   app.use('/settings', requireAuth, settingsRoutes);
   app.use('/project-types', requireAuth, projectTypesRoutes);
   app.use('/pipeline-amount-options', requireAuth, pipelineAmountOptionsRoutes);
+  app.use('/bonus-types', requireAuth, bonusTypesRoutes);
   app.use('/report-groups', requireAuth, reportGroupsRoutes);
   app.use('/recent-payments', requireAuth, recentPaymentsRoutes);
   app.use('/sales-performance', requireAuth, salesPerformanceRoutes);

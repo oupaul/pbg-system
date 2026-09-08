@@ -31,6 +31,13 @@ const Bonus = {
 
   // 新增獎金記錄
   create(data) {
+    // bonus_type 不再由資料庫 CHECK 約束限制（改為可自訂的 bonus_types 表），
+    // 這裡是唯一的新增入口（POST /bonuses 與 Excel 匯入都會經過這裡），改在應用層驗證
+    const validType = db.prepare('SELECT id FROM bonus_types WHERE type_name = ? AND is_active = 1').get(data.bonus_type);
+    if (!validType) {
+      throw new Error(`獎金類型「${data.bonus_type}」不存在或已停用，請至「獎金類型管理」確認`);
+    }
+
     const stmt = db.prepare(`
       INSERT INTO bonus_calculations (
         project_id, salesperson_id, bonus_type, base_amount,

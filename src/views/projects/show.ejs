@@ -872,11 +872,11 @@ ${locals.canEdit ? `
           <div class="mb-3">
             <label class="form-label">獎金類型</label>
             <select name="bonus_type" class="form-select" required>
-              <option value="食驗室獎金">食驗室獎金</option>
-              <option value="純廣獎金">純廣獎金</option>
-              <option value="專案簽約獎金">專案簽約獎金</option>
-              <option value="專案結案獎金">專案結案獎金</option>
-              <option value="開發獎金">開發獎金</option>
+              <option value="">-- 選擇類型 --</option>
+              ${typeof bonusTypes !== 'undefined' && bonusTypes ? bonusTypes.map(t => {
+                const safeName = (t.type_name || '').replace(/"/g, '&quot;');
+                return '<option value="' + safeName + '">' + h(t.type_name) + '</option>';
+              }).join('') : ''}
             </select>
           </div>
           <div class="mb-3">
