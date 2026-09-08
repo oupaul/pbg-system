@@ -443,6 +443,7 @@ router.post('/', requireEditPermission, (req, res) => {
       is_new_customer: req.body.is_new_customer === '1',
       notes: req.body.notes ? req.body.notes.trim() : null,
       report_group_id: req.body.report_group_id || null,
+      contract_term: req.body.contract_term ? req.body.contract_term.trim() : null,
       userInfo: getUserInfo(req)
     });
 
@@ -792,6 +793,7 @@ router.post('/:id', requireEditPermission, (req, res) => {
       is_new_customer: req.body.is_new_customer === '1' ? 1 : 0,
       notes: req.body.notes || null,
       report_group_id: req.body.report_group_id && req.body.report_group_id !== '' ? parseInt(req.body.report_group_id) : null,
+      contract_term: req.body.contract_term ? req.body.contract_term.trim() : null,
       userInfo: getUserInfo(req) // 添加用戶資訊用於審計日誌
     });
 

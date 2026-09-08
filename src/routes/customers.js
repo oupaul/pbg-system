@@ -4,6 +4,7 @@ const Customer = require('../models/Customer');
 const Project = require('../models/Project');
 const Pipeline = require('../models/Pipeline');
 const Activity = require('../models/Activity');
+const ReferralReward = require('../models/ReferralReward');
 const DeletionRequest = require('../models/DeletionRequest');
 const CustomerCreationRequest = require('../models/CustomerCreationRequest');
 const User = require('../models/User');
@@ -327,6 +328,9 @@ router.get('/:id', (req, res) => {
       `).all(...activities.map(a => a.id)).map(r => r.target_id)
     : [];
 
+  // 轉介紹紀錄（此客戶身為介紹人的紀錄）
+  const referralRewards = ReferralReward.findByCustomer(customer.id);
+
   res.render('customers/show', {
     title: customer.company_name,
     customer,
@@ -335,6 +339,8 @@ router.get('/:id', (req, res) => {
     pipelines,
     activities,
     pendingActivityDeletionIds,
+    referralRewards,
+    allCustomers: Customer.findAll(),
     staffUsers: User.findActiveNonAdmin(),
     error: req.query.error || '',
     success: req.query.success || ''

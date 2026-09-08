@@ -1,0 +1,66 @@
+<%
+  function escapeHtml(str) {
+    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+%>
+<%- include('../layout', { body: `
+<div class="row mb-4">
+  <div class="col">
+    <h1 class="h3"><i class="bi bi-gift"></i> 轉介紹獎勵</h1>
+  </div>
+  <div class="col-auto">
+    <form class="d-flex" method="get">
+      <select name="status" class="form-select" onchange="this.form.submit()">
+        <option value="">全部狀態</option>
+        <option value="待發放" ${statusFilter === '待發放' ? 'selected' : ''}>待發放</option>
+        <option value="已發放" ${statusFilter === '已發放' ? 'selected' : ''}>已發放</option>
+        <option value="充公" ${statusFilter === '充公' ? 'selected' : ''}>充公</option>
+      </select>
+    </form>
+  </div>
+</div>
+
+${error ? '<div class="alert alert-danger alert-dismissible fade show" role="alert"><i class="bi bi-exclamation-triangle"></i> ' + escapeHtml(error) + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>' : ''}
+${success ? '<div class="alert alert-success alert-dismissible fade show" role="alert"><i class="bi bi-check-circle"></i> ' + escapeHtml(success) + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>' : ''}
+
+<div class="card">
+  <div class="card-header"><i class="bi bi-list-ul"></i> 轉介紹獎勵明細</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>介紹人客戶</th>
+            <th>被介紹客戶</th>
+            <th>對應專案</th>
+            <th>受益對象</th>
+            <th class="text-end">獎勵金額</th>
+            <th>狀態</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${(rewards || []).map(r => {
+            const recipientLabel = r.recipient_type === 'staff'
+              ? escapeHtml(r.recipient_user_name || '-') + ' <span class="badge bg-info">員工</span>'
+              : escapeHtml(r.referring_customer_name) + ' <span class="badge bg-secondary">客戶本人</span>';
+            const statusBadge = r.status === '已發放' ? 'success' : r.status === '充公' ? 'danger' : 'warning';
+            return `
+            <tr onclick="location.href='/customers/${r.referring_customer_id}'" style="cursor:pointer">
+              <td><a href="/customers/${r.referring_customer_id}">${escapeHtml(r.referring_customer_name)}</a></td>
+              <td>${r.referred_customer_name ? escapeHtml(r.referred_customer_name) : '<span class="text-muted">-</span>'}</td>
+              <td>${r.project_code ? escapeHtml(r.project_code) : '<span class="text-muted">-</span>'}</td>
+              <td>${recipientLabel}</td>
+              <td class="text-end">$${(r.reward_amount || 0).toLocaleString()}</td>
+              <td><span class="badge bg-${statusBadge}">${r.status}</span></td>
+            </tr>
+          `;
+          }).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">尚無轉介紹獎勵記錄</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer text-muted">
+    共 ${(rewards || []).length} 筆記錄 · 要新增或編輯狀態，請至對應客戶的詳情頁「轉介紹紀錄」區塊操作
+  </div>
+</div>
+` }) %>

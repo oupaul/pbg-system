@@ -175,11 +175,14 @@ const Project = {
       }
     }
     
-    // 視圖 v_project_summary 可能未含 report_group_id，從 projects 表補上（供編輯表單報表群組選單）
+    // 視圖 v_project_summary 可能未含 report_group_id/contract_term，從 projects 表補上
     try {
-      const base = db.prepare(`SELECT report_group_id FROM projects WHERE id = ?`).get(id);
-      if (base !== undefined) project.report_group_id = base.report_group_id;
-    } catch (_) { /* 若 projects 尚無 report_group_id 欄位則略過 */ }
+      const base = db.prepare(`SELECT report_group_id, contract_term FROM projects WHERE id = ?`).get(id);
+      if (base !== undefined) {
+        project.report_group_id = base.report_group_id;
+        project.contract_term = base.contract_term;
+      }
+    } catch (_) { /* 若 projects 尚無這些欄位則略過 */ }
     
     return project;
   },
@@ -279,15 +282,16 @@ const Project = {
     const notes = data.notes || null;
     const reportGroupId = data.report_group_id !== undefined && data.report_group_id !== null && data.report_group_id !== ''
       ? parseInt(data.report_group_id) : null;
-    
+    const contractTerm = data.contract_term || null;
+
     const stmt = db.prepare(`
       INSERT INTO projects (
         project_code, contract_year, contract_month, status, project_type,
         salesperson_id, customer_id, project_name, price_with_tax, price_without_tax,
-        sales_discount, is_new_customer, expected_invoice_year_month, notes, report_group_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        sales_discount, is_new_customer, expected_invoice_year_month, notes, report_group_id, contract_term
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    
+
     try {
       const result = stmt.run(
         projectCode,
@@ -304,7 +308,8 @@ const Project = {
         isNewCustomer,
         expectedInvoiceYearMonth,
         notes,
-        reportGroupId
+        reportGroupId,
+        contractTerm
       );
       
       const projectId = result.lastInsertRowid;
@@ -372,8 +377,9 @@ const Project = {
 
     const allowedFields = [
       'project_code', 'contract_year', 'contract_month', 'status', 'project_type',
-      'salesperson_id', 'customer_id', 'project_name', 'price_with_tax', 
-      'price_without_tax', 'sales_discount', 'is_new_customer', 'expected_invoice_year_month', 'notes', 'report_group_id'
+      'salesperson_id', 'customer_id', 'project_name', 'price_with_tax',
+      'price_without_tax', 'sales_discount', 'is_new_customer', 'expected_invoice_year_month', 'notes', 'report_group_id',
+      'contract_term'
     ];
 
     const newData = {};

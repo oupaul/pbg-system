@@ -147,6 +147,8 @@ try {
   console.log('[啟動] ✓ payments 路由載入完成');
   const bonusRoutes = require('./routes/bonuses');
   console.log('[啟動] ✓ bonuses 路由載入完成');
+  const referralRewardRoutes = require('./routes/referralRewards');
+  console.log('[啟動] ✓ referralRewards 路由載入完成');
   const salespersonRoutes = require('./routes/salespeople');
   console.log('[啟動] ✓ salespeople 路由載入完成');
   const customerRoutes = require('./routes/customers');
@@ -208,6 +210,7 @@ try {
   app.use('/payments', requireAuth, paymentRoutes);
   app.use('/costs', requireAuth, costRoutes);
   app.use('/bonuses', requireAuth, bonusRoutes);
+  app.use('/referral-rewards', requireAuth, referralRewardRoutes);
   app.use('/salespeople', requireAuth, salespersonRoutes);
   app.use('/customers', requireAuth, customerRoutes);
   app.use('/pipelines', requireAuth, pipelineRoutes);

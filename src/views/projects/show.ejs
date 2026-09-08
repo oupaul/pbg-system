@@ -77,6 +77,10 @@ ${typeof error !== 'undefined' && error ? '<div class="alert alert-danger alert-
             <label class="text-muted small">新/舊客戶</label>
             <div>${project.is_new_customer ? '<span class="badge bg-success">新客戶</span>' : '<span class="badge bg-secondary">舊客戶</span>'}</div>
           </div>
+          <div class="col-md-4">
+            <label class="text-muted small">合約年限</label>
+            <div class="fw-bold">${h(project.contract_term || '-')}</div>
+          </div>
           <div class="col-12">
             <label class="text-muted small">客戶</label>
             <div class="fw-bold">${project.customer_id ? `<a href="/customers/${project.customer_id}">${h(project.company_name || '-')}</a>` : h(project.company_name || '-')} <small class="text-muted">(${h(project.customer_code || '-')} / ${h(project.tax_id || '-')})</small></div>

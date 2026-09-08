@@ -66,6 +66,8 @@ const MIGRATIONS = [
   'migrate_login_history_geoip',
   'migrate_pipeline_amount_options',
   'migrate_cost_vendor_budget',
+  'migrate_contract_term',
+  'migrate_referral_rewards',
 ];
 
 function run() {

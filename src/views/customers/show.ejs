@@ -156,6 +156,54 @@ ${success ? `
 </div>
 
 <div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-gift"></i> 轉介紹紀錄</span>
+    ${locals.canEditCrm ? '<button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addReferralModal"><i class="bi bi-plus-lg"></i> 新增轉介紹</button>' : ''}
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>被介紹客戶</th>
+            <th>對應專案</th>
+            <th>受益對象</th>
+            <th class="text-end">獎勵金額</th>
+            <th>狀態</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${(referralRewards || []).map(r => {
+            const recipientLabel = r.recipient_type === 'staff'
+              ? escapeHtml(r.recipient_user_name || '-') + ' <span class="badge bg-info">員工</span>'
+              : escapeHtml(customer.company_name) + ' <span class="badge bg-secondary">客戶本人</span>';
+            const statusBadge = r.status === '已發放' ? 'success' : r.status === '充公' ? 'danger' : 'warning';
+            const deleteControl = !locals.canEditCrm ? '' : `<form action="/referral-rewards/${r.id}/delete" method="POST" style="display:inline" onsubmit="return confirm('確定要刪除此轉介紹紀錄？')">
+              <input type="hidden" name="redirect" value="/customers/${customer.id}">
+              <button type="submit" class="btn btn-sm btn-link text-danger p-0" title="刪除"><i class="bi bi-trash"></i></button>
+            </form>`;
+            return `
+            <tr>
+              <td>${r.referred_customer_name ? escapeHtml(r.referred_customer_name) : '<span class="text-muted">-</span>'}</td>
+              <td>${r.project_code ? escapeHtml(r.project_code) : '<span class="text-muted">-</span>'}</td>
+              <td>${recipientLabel}</td>
+              <td class="text-end">$${(r.reward_amount || 0).toLocaleString()}</td>
+              <td><span class="badge bg-${statusBadge}">${r.status}</span></td>
+              <td class="text-end">
+                ${locals.canEditCrm ? '<button type="button" class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editReferralModal' + r.id + '"><i class="bi bi-pencil"></i></button>' : ''}
+                ${deleteControl}
+              </td>
+            </tr>
+          `;
+          }).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">尚無轉介紹紀錄</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
   <div class="card-header"><i class="bi bi-clock-history"></i> 活動紀錄</div>
   <div class="card-body">
     ${locals.canEditCrm ? `
@@ -305,5 +353,145 @@ ${locals.canEditCrm ? `
     </form>
   </div>
 </div>
+` : ''}
+
+${locals.canEditCrm ? `
+<!-- 新增轉介紹 Modal -->
+<div class="modal fade" id="addReferralModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="/referral-rewards" method="POST">
+        <input type="hidden" name="referring_customer_id" value="${customer.id}">
+        <div class="modal-header">
+          <h5 class="modal-title">新增轉介紹紀錄</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">被介紹客戶</label>
+            <select name="referred_customer_id" class="form-select select2-dropdown">
+              <option value="">-- 尚未成立/不指定 --</option>
+              ${(allCustomers || []).filter(c => c.id !== customer.id).map(c => {
+                const companyName = (c.company_name || '').replace(/"/g, '&quot;');
+                const customerCode = (c.customer_code || '').replace(/"/g, '&quot;');
+                return '<option value="' + c.id + '">' + companyName + ' (' + customerCode + ')</option>';
+              }).join('')}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">受益對象</label>
+            <select name="recipient_type" class="form-select referral-recipient-type">
+              <option value="customer" selected>客戶本人（${escapeHtml(customer.company_name)}）</option>
+              <option value="staff">指定員工</option>
+            </select>
+          </div>
+          <div class="mb-3 referral-recipient-user d-none">
+            <label class="form-label">員工</label>
+            <select name="recipient_user_id" class="form-select select2-dropdown">
+              <option value="">-- 選擇員工 --</option>
+              ${(staffUsers || []).map(u => '<option value="' + u.id + '">' + (u.name || '').replace(/"/g, '&quot;') + '</option>').join('')}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">獎勵金額</label>
+            <input type="number" name="reward_amount" class="form-control" step="1" min="0" value="0">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">備註</label>
+            <textarea name="notes" class="form-control" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 編輯轉介紹 Modals -->
+${(referralRewards || []).map(r => `
+<div class="modal fade" id="editReferralModal${r.id}" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="/referral-rewards/${r.id}" method="POST">
+        <input type="hidden" name="redirect" value="/customers/${customer.id}">
+        <div class="modal-header">
+          <h5 class="modal-title">編輯轉介紹紀錄</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">被介紹客戶</label>
+            <select name="referred_customer_id" class="form-select select2-dropdown">
+              <option value="">-- 尚未成立/不指定 --</option>
+              ${(allCustomers || []).filter(c => c.id !== customer.id).map(c => {
+                const companyName = (c.company_name || '').replace(/"/g, '&quot;');
+                const customerCode = (c.customer_code || '').replace(/"/g, '&quot;');
+                const selected = r.referred_customer_id === c.id ? 'selected' : '';
+                return '<option value="' + c.id + '" ' + selected + '>' + companyName + ' (' + customerCode + ')</option>';
+              }).join('')}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">受益對象</label>
+            <select name="recipient_type" class="form-select referral-recipient-type">
+              <option value="customer" ${r.recipient_type !== 'staff' ? 'selected' : ''}>客戶本人（${escapeHtml(customer.company_name)}）</option>
+              <option value="staff" ${r.recipient_type === 'staff' ? 'selected' : ''}>指定員工</option>
+            </select>
+          </div>
+          <div class="mb-3 referral-recipient-user ${r.recipient_type === 'staff' ? '' : 'd-none'}">
+            <label class="form-label">員工</label>
+            <select name="recipient_user_id" class="form-select select2-dropdown">
+              <option value="">-- 選擇員工 --</option>
+              ${(staffUsers || []).map(u => {
+                const selected = r.recipient_user_id === u.id ? 'selected' : '';
+                return '<option value="' + u.id + '" ' + selected + '>' + (u.name || '').replace(/"/g, '&quot;') + '</option>';
+              }).join('')}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">獎勵金額</label>
+            <input type="number" name="reward_amount" class="form-control" step="1" min="0" value="${r.reward_amount || 0}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">狀態</label>
+            <select name="status" class="form-select">
+              <option value="待發放" ${r.status === '待發放' ? 'selected' : ''}>待發放</option>
+              <option value="已發放" ${r.status === '已發放' ? 'selected' : ''}>已發放</option>
+              <option value="充公" ${r.status === '充公' ? 'selected' : ''}>充公</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">充公原因</label>
+            <textarea name="forfeiture_reason" class="form-control" rows="2">${r.forfeiture_reason || ''}</textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">備註</label>
+            <textarea name="notes" class="form-control" rows="2">${r.notes || ''}</textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">更新</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+`).join('')}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.referral-recipient-type').forEach(function(select) {
+    const userField = select.closest('.modal-body').querySelector('.referral-recipient-user');
+    select.addEventListener('change', function() {
+      if (!userField) return;
+      userField.classList.toggle('d-none', select.value !== 'staff');
+    });
+  });
+});
+</script>
 ` : ''}
 `}) %>

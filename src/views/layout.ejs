@@ -82,11 +82,12 @@
 
           <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user' || user.role === 'boss')) { %>
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle <%= navGroupActive(['/bonuses', '/sales-performance', '/salespeople', '/recent-payments']) %>" href="#" id="salesGroupDropdown" role="button" data-bs-toggle="dropdown">
+            <a class="nav-link dropdown-toggle <%= navGroupActive(['/bonuses', '/referral-rewards', '/sales-performance', '/salespeople', '/recent-payments']) %>" href="#" id="salesGroupDropdown" role="button" data-bs-toggle="dropdown">
               <i class="bi bi-graph-up-arrow"></i> 業務數據
             </a>
             <ul class="dropdown-menu">
               <li><a class="dropdown-item <%= navActive('/bonuses') %>" href="/bonuses"><i class="bi bi-currency-dollar"></i> 獎金管理</a></li>
+              <li><a class="dropdown-item <%= navActive('/referral-rewards') %>" href="/referral-rewards"><i class="bi bi-gift"></i> 轉介紹獎勵</a></li>
               <li><a class="dropdown-item <%= navActive('/sales-performance') %>" href="/sales-performance"><i class="bi bi-graph-up"></i> 業務績效</a></li>
               <% if (user.role === 'admin' || user.role === 'user') { %>
               <li><a class="dropdown-item <%= navActive('/salespeople') %>" href="/salespeople"><i class="bi bi-people"></i> 業務管理</a></li>

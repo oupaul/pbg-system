@@ -57,7 +57,11 @@
           </select>
           <small class="form-text text-muted">用於毛利分析「依群組彙總」合併計算</small>
         </div>
-        
+        <div class="col-md-2">
+          <label class="form-label">合約年限</label>
+          <input type="text" name="contract_term" class="form-control" value="${project ? (project.contract_term || '').replace(/"/g, '&quot;') : ''}" placeholder="例如：1年、3年">
+        </div>
+
         <div class="col-12">
           <label class="form-label">專案名稱 <span class="text-danger">*</span></label>
           <input type="text" name="project_name" class="form-control" value="${project ? (project.project_name || '').replace(/"/g, '&quot;') : ''}" required>
