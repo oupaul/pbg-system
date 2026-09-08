@@ -1,0 +1,188 @@
+<%
+  function escapeHtml(str) {
+    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  const badgeColors = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark'];
+  const colorNames = {
+    primary: '主要色（藍）', secondary: '次要色（灰）', success: '成功色（綠）',
+    danger: '危險色（紅）', warning: '警告色（黃）', info: '資訊色（淺藍）',
+    light: '淺色（淺灰）', dark: '深色（黑）'
+  };
+%>
+<%- include('../layout', { body: `
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2><i class="bi bi-signpost-split"></i> 客戶狀態管理</h2>
+  <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addStatusModal">
+    <i class="bi bi-plus-circle"></i> 新增狀態
+  </button>
+</div>
+
+${error ? `
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-circle"></i> ${escapeHtml(error)}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+${success ? `
+  <div class="alert alert-success alert-dismissible fade show" role="alert">
+    <i class="bi bi-check-circle"></i> ${escapeHtml(success)}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+<div class="alert alert-info">
+  <i class="bi bi-info-circle"></i> 這裡設定的是客戶/廠商新增與編輯表單裡的往來狀態選項。停用或刪除狀態前，系統會先檢查是否有客戶資料或送審中的申請仍在使用該狀態。
+</div>
+
+<div class="card">
+  <div class="card-header bg-primary text-white">
+    <h5 class="mb-0"><i class="bi bi-list-ul"></i> 客戶狀態列表</h5>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 80px;">排序</th>
+            <th>狀態名稱</th>
+            <th>顏色標籤</th>
+            <th>狀態</th>
+            <th style="width: 200px;">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${statuses.map(s => {
+            const badgePreview = '<span class="badge bg-' + s.badge_color + '">' + escapeHtml(s.status_name) + '</span>';
+            const colorDescription = colorNames[s.badge_color] || s.badge_color;
+            return `
+            <tr>
+              <td>${s.display_order}</td>
+              <td>${escapeHtml(s.status_name)}</td>
+              <td>${badgePreview} <small class="text-muted">(${colorDescription})</small></td>
+              <td>${s.is_active === 1 ? '<span class="badge bg-success">啟用</span>' : '<span class="badge bg-secondary">停用</span>'}</td>
+              <td>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="editStatus(${s.id}, '${escapeHtml(s.status_name).replace(/'/g, "\\'")}', '${s.badge_color}', ${s.display_order}, ${s.is_active})">
+                  <i class="bi bi-pencil"></i> 編輯
+                </button>
+                <form action="/customer-statuses/delete/${s.id}" method="POST" style="display:inline" onsubmit="return confirm('確定要刪除此客戶狀態？\\n\\n注意：如果有客戶資料使用此狀態，將無法刪除。')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-trash"></i> 刪除
+                  </button>
+                </form>
+              </td>
+            </tr>
+          `;
+          }).join('') || '<tr><td colspan="5" class="text-center text-muted py-3">尚無客戶狀態，請點擊「新增狀態」新增</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="addStatusModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="/customer-statuses/create">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-plus-circle"></i> 新增客戶狀態</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">狀態名稱 <span class="text-danger">*</span></label>
+            <input type="text" name="status_name" class="form-control" required maxlength="20">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">標籤顏色</label>
+            <select name="badge_color" id="addBadgeColor" class="form-select" onchange="updateColorPreview('add')">
+              ${badgeColors.map(color => `<option value="${color}" ${color === 'secondary' ? 'selected' : ''}>${color} - ${colorNames[color]}</option>`).join('')}
+            </select>
+            <div class="mt-2">
+              <small class="text-muted">預覽：</small>
+              <span class="badge bg-secondary ms-2" id="addColorPreview">範例</span>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">顯示順序</label>
+            <input type="number" name="display_order" class="form-control" min="0">
+            <small class="form-text text-muted">數字越小越靠前，留空則排在最後</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editStatusModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="/customer-statuses/update/" id="editStatusForm">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-pencil"></i> 編輯客戶狀態</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">狀態名稱 <span class="text-danger">*</span></label>
+            <input type="text" name="status_name" id="editStatusName" class="form-control" required maxlength="20">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">標籤顏色</label>
+            <select name="badge_color" id="editBadgeColor" class="form-select" onchange="updateColorPreview('edit')">
+              ${badgeColors.map(color => `<option value="${color}">${color} - ${colorNames[color]}</option>`).join('')}
+            </select>
+            <div class="mt-2">
+              <small class="text-muted">預覽：</small>
+              <span class="badge bg-secondary ms-2" id="editColorPreview">範例</span>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">顯示順序</label>
+            <input type="number" name="display_order" id="editStatusOrder" class="form-control" min="0">
+          </div>
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="is_active" id="editStatusActive" value="1">
+              <label class="form-check-label" for="editStatusActive">啟用</label>
+            </div>
+            <small class="form-text text-muted">停用的狀態將不會出現在新增/編輯客戶的下拉選單中，但已存在的客戶資料不受影響</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">儲存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function editStatus(id, name, color, order, isActive) {
+  document.getElementById('editStatusForm').action = '/customer-statuses/update/' + id;
+  document.getElementById('editStatusName').value = name;
+  document.getElementById('editBadgeColor').value = color;
+  document.getElementById('editStatusOrder').value = order;
+  document.getElementById('editStatusActive').checked = isActive === 1;
+  updateColorPreview('edit');
+  new bootstrap.Modal(document.getElementById('editStatusModal')).show();
+}
+function updateColorPreview(mode) {
+  const selectId = mode === 'edit' ? 'editBadgeColor' : 'addBadgeColor';
+  const previewId = mode === 'edit' ? 'editColorPreview' : 'addColorPreview';
+  const select = document.getElementById(selectId);
+  const preview = document.getElementById(previewId);
+  if (select && preview) {
+    preview.className = 'badge bg-' + select.value + ' ms-2';
+  }
+}
+document.addEventListener('DOMContentLoaded', function() {
+  updateColorPreview('add');
+});
+</script>
+` }) %>

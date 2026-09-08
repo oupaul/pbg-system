@@ -6,6 +6,9 @@ const Pipeline = require('../models/Pipeline');
 const Activity = require('../models/Activity');
 const ReferralReward = require('../models/ReferralReward');
 const CustomerLevels = require('./customerLevels');
+const CustomerStatuses = require('./customerStatuses');
+const ActivityTypes = require('./activityTypes');
+const PipelineStatuses = require('./pipelineStatuses');
 const DeletionRequest = require('../models/DeletionRequest');
 const CustomerCreationRequest = require('../models/CustomerCreationRequest');
 const User = require('../models/User');
@@ -153,6 +156,8 @@ router.get('/', (req, res) => {
       staffUsers: User.findActiveNonAdmin(),
       customerLevels: CustomerLevels.findActive(),
       customerLevelColorMap: CustomerLevels.findColorMap(),
+      customerStatuses: CustomerStatuses.findActive(),
+      customerStatusColorMap: CustomerStatuses.findColorMap(),
       req: req,
       error: req.query.error || '',
       success: req.query.success || ''
@@ -350,6 +355,11 @@ router.get('/:id', (req, res) => {
     staffUsers: User.findActiveNonAdmin(),
     customerLevels: CustomerLevels.findActive(),
     customerLevelColorMap: CustomerLevels.findColorMap(),
+    customerStatuses: CustomerStatuses.findActive(),
+    customerStatusColorMap: CustomerStatuses.findColorMap(),
+    activityTypes: ActivityTypes.findActive(),
+    activityTypeColorMap: ActivityTypes.findColorMap(),
+    pipelineStatusColorMap: PipelineStatuses.findColorMap(),
     error: req.query.error || '',
     success: req.query.success || ''
   });

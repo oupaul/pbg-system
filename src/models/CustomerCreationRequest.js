@@ -8,6 +8,17 @@ function hasBundledPipeline(request) {
   return !!(request && request.pipeline_opportunity_name);
 }
 
+// 驗證客戶往來狀態：customer_statuses 尚未設定任何啟用中的狀態時（全新安裝）視為
+// 尚未啟用驗證，放行任何值，避免全新安裝連送出第一筆申請都會失敗
+function validateCustomerStatus(statusValue) {
+  const activeCount = db.prepare('SELECT COUNT(*) as c FROM customer_statuses WHERE is_active = 1').get().c;
+  if (activeCount === 0) return;
+  const validStatus = db.prepare('SELECT id FROM customer_statuses WHERE status_name = ? AND is_active = 1').get(statusValue);
+  if (!validStatus) {
+    throw new Error(`客戶往來狀態「${statusValue}」不存在或已停用`);
+  }
+}
+
 const CustomerCreationRequest = {
   // 建立新客戶/廠商送審申請（非管理員/專案管理員新增時呼叫）。
   // 若同時帶有 pipeline_opportunity_name 等欄位，代表這筆申請也綁定了一筆待建立的銷售機會，
@@ -19,6 +30,7 @@ const CustomerCreationRequest = {
       const validLevel = db.prepare('SELECT id FROM customer_levels WHERE level_name = ? AND is_active = 1').get(data.customer_level);
       if (!validLevel) throw new Error(`客戶等級「${data.customer_level}」不存在或已停用`);
     }
+    validateCustomerStatus(data.status || '往來中');
 
     const result = db.prepare(`
       INSERT INTO customer_creation_requests (
@@ -93,6 +105,9 @@ const CustomerCreationRequest = {
     if (data.customer_level) {
       const validLevel = db.prepare('SELECT id FROM customer_levels WHERE level_name = ? AND is_active = 1').get(data.customer_level);
       if (!validLevel) throw new Error(`客戶等級「${data.customer_level}」不存在或已停用`);
+    }
+    if (data.status) {
+      validateCustomerStatus(data.status);
     }
 
     const fields = [];

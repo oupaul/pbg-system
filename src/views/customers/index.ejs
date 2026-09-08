@@ -182,7 +182,7 @@ ${typeof success !== 'undefined' && success ? `
               <td>${escapeHtml(c.owner_salesperson_name) || '-'}</td>
               <td>${escapeHtml(c.salesperson_names) || '-'}</td>
               <td class="text-center">${c.customer_level ? '<span class="badge bg-' + ((typeof customerLevelColorMap !== 'undefined' && customerLevelColorMap[c.customer_level]) || 'secondary') + '">' + escapeHtml(c.customer_level) + '</span>' : '-'}</td>
-              <td><span class="badge bg-${c.status === '往來中' ? 'success' : c.status === '暫停往來' ? 'warning' : 'secondary'}">${c.status || '往來中'}</span></td>
+              <td><span class="badge bg-${(typeof customerStatusColorMap !== 'undefined' && customerStatusColorMap[c.status]) || 'secondary'}">${escapeHtml(c.status || '往來中')}</span></td>
             </tr>
           `).join('')}
         </tbody>
@@ -287,9 +287,10 @@ ${typeof success !== 'undefined' && success ? `
             <div class="col-md-4 mb-3">
               <label class="form-label">往來狀態</label>
               <select name="status" class="form-select">
-                <option value="往來中" selected>往來中</option>
-                <option value="暫停往來">暫停往來</option>
-                <option value="已流失">已流失</option>
+                ${(typeof customerStatuses !== 'undefined' && customerStatuses ? customerStatuses : []).map(s => {
+                  const safeName = escapeHtml(s.status_name).replace(/"/g, '&quot;');
+                  return '<option value="' + safeName + '">' + escapeHtml(s.status_name) + '</option>';
+                }).join('')}
               </select>
             </div>
           </div>

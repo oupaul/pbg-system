@@ -2,6 +2,18 @@ const db = require('./db');
 const AuditLogService = require('../services/AuditLogService');
 const { PROJECT_VIEW_SCOPE, ROLES } = require('../constants');
 
+// 驗證客戶往來狀態：customer_statuses 尚未設定任何啟用中的狀態時（全新安裝、
+// 管理員還沒去「客戶狀態管理」新增任何值），視為尚未啟用驗證，放行任何值，
+// 避免全新安裝連建立第一筆客戶都會因為找不到預設狀態而失敗
+function validateCustomerStatus(statusValue) {
+  const activeCount = db.prepare('SELECT COUNT(*) as c FROM customer_statuses WHERE is_active = 1').get().c;
+  if (activeCount === 0) return;
+  const validStatus = db.prepare('SELECT id FROM customer_statuses WHERE status_name = ? AND is_active = 1').get(statusValue);
+  if (!validStatus) {
+    throw new Error(`客戶往來狀態「${statusValue}」不存在或已停用，請至「客戶狀態管理」確認`);
+  }
+}
+
 // 正規化客戶/廠商身份欄位：vendor_type 僅在具備廠商身份（廠商/兩者皆是）時才有意義
 function normalizePartyFields(data) {
   const partyType = ['客戶', '廠商', '兩者皆是'].includes(data.party_type) ? data.party_type : '客戶';
@@ -133,6 +145,8 @@ const Customer = {
       }
     }
 
+    validateCustomerStatus(data.status || '往來中');
+
     const { partyType, vendorType } = normalizePartyFields(data);
 
     const stmt = db.prepare(`
@@ -234,6 +248,10 @@ const Customer = {
       if (!validLevel) {
         throw new Error(`客戶等級「${data.customer_level}」不存在或已停用，請至「客戶等級管理」確認`);
       }
+    }
+
+    if (data.status) {
+      validateCustomerStatus(data.status);
     }
 
     // 構建更新欄位和值

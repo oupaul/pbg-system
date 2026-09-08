@@ -13,6 +13,29 @@ function normalizeProjectTypes(value) {
   return null;
 }
 
+// 銷售機會狀態是否存在且啟用中：pipeline_statuses 尚未設定任何啟用中的狀態時
+// （理論上不會發生，migration 一律會種入預設三種狀態，但保留退回舊版寫死清單
+// 的防呆，避免資料表被清空導致完全無法變更狀態）
+function isValidPipelineStatus(status) {
+  const activeCount = db.prepare('SELECT COUNT(*) as c FROM pipeline_statuses WHERE is_active = 1').get().c;
+  if (activeCount === 0) return ['洽談中', '已成交', '已流失'].includes(status);
+  return !!db.prepare('SELECT id FROM pipeline_statuses WHERE status_name = ? AND is_active = 1').get(status);
+}
+
+// 取得狀態對應的贏單/輸單旗標：找不到對應設定時（同上，理論上不會發生）
+// 退回舊版寫死判斷字串是否等於「已成交」/「已流失」
+function getStatusFlags(status) {
+  const row = db.prepare('SELECT is_won, is_lost FROM pipeline_statuses WHERE status_name = ?').get(status);
+  if (row) return { isWon: !!row.is_won, isLost: !!row.is_lost };
+  return { isWon: status === '已成交', isLost: status === '已流失' };
+}
+
+// 取得目前設定為「贏單」的狀態名稱，供錯誤訊息顯示用
+function getWonStatusName() {
+  const row = db.prepare('SELECT status_name FROM pipeline_statuses WHERE is_won = 1 AND is_active = 1 LIMIT 1').get();
+  return row ? row.status_name : '已成交';
+}
+
 const Pipeline = {
   // 取得銷售機會列表：對所有登入者開放（比照客戶/廠商列表的做法），業務開發資訊由團隊互相可見，
   // 不像正式專案的財務金額需要依角色權限範圍過濾；可依狀態/客戶篩選
@@ -37,9 +60,10 @@ const Pipeline = {
       LEFT JOIN customers c ON p.customer_id = c.id
       LEFT JOIN salespeople s ON p.salesperson_id = s.id
       LEFT JOIN users ou ON p.owner_user_id = ou.id
+      LEFT JOIN pipeline_statuses ps ON ps.status_name = p.status
       ${conditions}
       ORDER BY
-        CASE p.status WHEN '洽談中' THEN 0 WHEN '已成交' THEN 1 ELSE 2 END,
+        COALESCE(ps.display_order, 999),
         p.expected_close_year_month ASC,
         p.created_at DESC
     `).all(...params);
@@ -136,14 +160,15 @@ const Pipeline = {
   setStatus(id, status, extra = {}) {
     const oldRecord = this.findById(id);
     if (!oldRecord) return false;
-    if (!['洽談中', '已成交', '已流失'].includes(status)) throw new Error('無效的狀態');
+    if (!isValidPipelineStatus(status)) throw new Error('無效的狀態');
     if (oldRecord.converted_project_id) throw new Error('此商機已轉入專案，無法變更狀態');
 
+    const { isLost } = getStatusFlags(status);
     db.prepare(`
       UPDATE pipelines
       SET status = ?, lost_reason = ?, updated_at = datetime('now', 'localtime')
       WHERE id = ?
-    `).run(status, status === '已流失' ? (extra.lost_reason || null) : null, id);
+    `).run(status, isLost ? (extra.lost_reason || null) : null, id);
 
     AuditLogService.logUpdate('pipelines', id, oldRecord, { status }, extra.userInfo);
     return true;
@@ -153,7 +178,7 @@ const Pipeline = {
   convertToProject(id, projectData) {
     const pipeline = this.findById(id);
     if (!pipeline) throw new Error('找不到此商機');
-    if (pipeline.status !== '已成交') throw new Error('僅「已成交」的商機可以轉入專案');
+    if (!getStatusFlags(pipeline.status).isWon) throw new Error(`僅「${getWonStatusName()}」的商機可以轉入專案`);
     if (pipeline.converted_project_id) throw new Error('此商機已轉入專案');
 
     const projectId = Project.create({

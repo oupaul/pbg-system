@@ -8,6 +8,8 @@ const Salesperson = require('../models/Salesperson');
 const Customer = require('../models/Customer');
 const Activity = require('../models/Activity');
 const PipelineAmountOptions = require('./pipelineAmountOptions');
+const ActivityTypes = require('./activityTypes');
+const PipelineStatuses = require('./pipelineStatuses');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireEditPermission, requireCrmEditPermission } = require('../middleware/auth');
 const cache = require('../services/CacheService');
@@ -37,12 +39,18 @@ function getTypeColorMap() {
 
 const WIN_PROBABILITY_STAGES = { 10: '初步接洽', 30: '需求分析', 50: '提案報價', 100: '商務談判' };
 
-const PIPELINE_STATUSES = ['洽談中', '已成交', '已流失'];
+function getActivePipelineStatusNames() {
+  try {
+    return db.prepare(`SELECT status_name FROM pipeline_statuses WHERE is_active = 1 ORDER BY display_order ASC`).all().map(s => s.status_name);
+  } catch (err) {
+    return ['洽談中', '已成交', '已流失'];
+  }
+}
 
-// 銷售機會列表統計：依狀態分別加總（洽談中/已成交/已流失）、依成交機率分類加總、依預計成交月份加總
+// 銷售機會列表統計：依狀態分別加總、依成交機率分類加總、依預計成交月份加總
 // 統計範圍與目前列表一致（套用同一組狀態篩選後的結果）
 function buildPipelineSummary(pipelines) {
-  const statusGroups = new Map(PIPELINE_STATUSES.map(s => [s, { amount: 0, count: 0 }]));
+  const statusGroups = new Map(getActivePipelineStatusNames().map(s => [s, { amount: 0, count: 0 }]));
   pipelines.forEach(p => {
     if (!statusGroups.has(p.status)) statusGroups.set(p.status, { amount: 0, count: 0 });
     const g = statusGroups.get(p.status);
@@ -186,6 +194,8 @@ router.get('/', (req, res) => {
       sortIcons,
       typeColorMap: getTypeColorMap(),
       summary: buildPipelineSummary(pipelines),
+      pipelineStatuses: PipelineStatuses.findActive(),
+      pipelineStatusColorMap: PipelineStatuses.findColorMap(),
       error: req.query.error || ''
     });
   } catch (err) {
@@ -277,6 +287,10 @@ router.get('/:id', (req, res) => {
     activities,
     pendingActivityDeletionIds,
     typeColorMap: getTypeColorMap(),
+    activityTypes: ActivityTypes.findActive(),
+    activityTypeColorMap: ActivityTypes.findColorMap(),
+    pipelineStatuses: PipelineStatuses.findActive(),
+    pipelineStatusColorMap: PipelineStatuses.findColorMap(),
     error: req.query.error || '',
     success: req.query.success || ''
   });
@@ -443,7 +457,9 @@ router.get('/:id/convert', requireEditPermission, (req, res) => {
   if (!pipeline) {
     return res.status(404).render('error', { title: '找不到銷售機會', message: '找不到此銷售機會', error: {} });
   }
-  if (pipeline.status !== '已成交') {
+  const wonStatus = db.prepare('SELECT is_won FROM pipeline_statuses WHERE status_name = ?').get(pipeline.status);
+  const isWon = wonStatus ? !!wonStatus.is_won : pipeline.status === '已成交';
+  if (!isWon) {
     return res.redirect(`/pipelines/${pipeline.id}?error=` + encodeURIComponent('僅「已成交」的銷售機會可以轉入專案'));
   }
   if (pipeline.converted_project_id) {

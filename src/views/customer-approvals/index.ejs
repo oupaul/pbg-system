@@ -174,9 +174,11 @@ ${(requests || []).map(r => {
               <div class="col-md-4">
                 <label class="form-label">往來狀態</label>
                 <select name="status" class="form-select">
-                  <option value="往來中" ${r.status === '往來中' ? 'selected' : ''}>往來中</option>
-                  <option value="暫停往來" ${r.status === '暫停往來' ? 'selected' : ''}>暫停往來</option>
-                  <option value="已流失" ${r.status === '已流失' ? 'selected' : ''}>已流失</option>
+                  ${(typeof customerStatuses !== 'undefined' && customerStatuses ? customerStatuses : []).map(s => {
+                    const safeName = escapeHtml(s.status_name).replace(/"/g, '&quot;');
+                    const selected = r.status === s.status_name ? 'selected' : '';
+                    return '<option value="' + safeName + '" ' + selected + '>' + escapeHtml(s.status_name) + '</option>';
+                  }).join('')}
                 </select>
               </div>
             </div>

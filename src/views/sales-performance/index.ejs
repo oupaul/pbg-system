@@ -19,7 +19,7 @@
       <div class="card-body">
         <h6 class="text-muted"><i class="bi bi-bullseye"></i> 洽談中銷售機會</h6>
         <h4 class="mb-0">${(pipelineSummary?.open_count || 0)} 筆 / $${(pipelineSummary?.open_amount || 0).toLocaleString()}</h4>
-        <a href="/pipelines?status=${encodeURIComponent('洽談中')}" class="small">查看銷售機會列表</a>
+        <a href="/pipelines?status=${encodeURIComponent(typeof openStatusName !== 'undefined' ? openStatusName : '洽談中')}" class="small">查看銷售機會列表</a>
       </div>
     </div>
   </div>
@@ -28,7 +28,7 @@
       <div class="card-body">
         <h6 class="text-muted"><i class="bi bi-exclamation-triangle"></i> 已成交待轉入專案</h6>
         <h4 class="mb-0 ${(pipelineSummary?.won_pending_count || 0) > 0 ? 'text-warning' : ''}">${(pipelineSummary?.won_pending_count || 0)} 筆 / $${(pipelineSummary?.won_pending_amount || 0).toLocaleString()}</h4>
-        ${(pipelineSummary?.won_pending_count || 0) > 0 ? '<a href="/pipelines?status=' + encodeURIComponent('已成交') + '" class="small">提醒財務盡快建立專案</a>' : '<span class="small text-muted">目前無待處理項目</span>'}
+        ${(pipelineSummary?.won_pending_count || 0) > 0 ? '<a href="/pipelines?status=' + encodeURIComponent(typeof wonStatusName !== 'undefined' ? wonStatusName : '已成交') + '" class="small">提醒財務盡快建立專案</a>' : '<span class="small text-muted">目前無待處理項目</span>'}
       </div>
     </div>
   </div>

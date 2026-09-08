@@ -6,6 +6,7 @@ const User = require('../models/User');
 const Pipeline = require('../models/Pipeline');
 const db = require('../models/db');
 const CustomerLevels = require('./customerLevels');
+const CustomerStatuses = require('./customerStatuses');
 const NotificationService = require('../services/NotificationService');
 const { requireCustomerApprovalPermission } = require('../middleware/auth');
 
@@ -49,6 +50,7 @@ router.get('/', requireCustomerApprovalPermission, (req, res) => {
     staffUsers: User.findActiveNonAdmin(),
     projectTypes: getActiveProjectTypes(),
     customerLevels: CustomerLevels.findActive(),
+    customerStatuses: CustomerStatuses.findActive(),
     error: req.query.error || '',
     success: req.query.success || ''
   });

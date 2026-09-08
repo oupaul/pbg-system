@@ -32,6 +32,12 @@ const Activity = {
     if (!data.customer_id) throw new Error('客戶為必填欄位');
     if (!data.content || !data.content.trim()) throw new Error('活動內容為必填欄位');
 
+    const activityType = data.activity_type || '其他';
+    const validType = db.prepare('SELECT id FROM activity_types WHERE type_name = ? AND is_active = 1').get(activityType);
+    if (!validType) {
+      throw new Error(`活動類型「${activityType}」不存在或已停用，請至「活動類型管理」確認`);
+    }
+
     const stmt = db.prepare(`
       INSERT INTO activities (customer_id, pipeline_id, activity_type, content, activity_date, created_by)
       VALUES (?, ?, ?, ?, ?, ?)
@@ -40,7 +46,7 @@ const Activity = {
     const result = stmt.run(
       parseInt(data.customer_id),
       data.pipeline_id ? parseInt(data.pipeline_id) : null,
-      data.activity_type || '其他',
+      activityType,
       data.content.trim(),
       data.activity_date || new Date().toISOString().slice(0, 19).replace('T', ' '),
       data.userInfo || 'system'

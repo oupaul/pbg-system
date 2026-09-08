@@ -1,10 +1,14 @@
 <%
   const WIN_PROBABILITY_STAGES = { 10: '初步接洽', 30: '需求分析', 50: '提案報價', 100: '商務談判' };
-  const STATUS_CARD_STYLE = {
-    '洽談中': { bg: 'bg-warning', icon: 'bi-hourglass-split' },
-    '已成交': { bg: 'bg-success', icon: 'bi-check-circle' },
-    '已流失': { bg: 'bg-secondary', icon: 'bi-x-circle' }
-  };
+  const localPipelineStatuses = typeof pipelineStatuses !== 'undefined' && pipelineStatuses ? pipelineStatuses : [];
+  const localStatusColorMap = typeof pipelineStatusColorMap !== 'undefined' && pipelineStatusColorMap ? pipelineStatusColorMap : {};
+  // 卡片圖示依贏單/輸單旗標決定，沒有對應設定的狀態（含尚未設定 pipeline_statuses 時）一律用預設現金圖示
+  function statusIcon(statusName) {
+    const s = localPipelineStatuses.find(x => x.status_name === statusName);
+    if (s && s.is_won) return 'bi-check-circle';
+    if (s && s.is_lost) return 'bi-x-circle';
+    return 'bi-hourglass-split';
+  }
   // 商機名稱、客戶/業務姓名皆為自由文字欄位，輸出前需跳脫，避免儲存型 XSS
   function escapeHtml(str) {
     return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -30,9 +34,11 @@ ${error ? `
 <div class="mb-3">
   <div class="btn-group" role="group">
     <a href="/pipelines" class="btn btn-sm ${!statusFilter ? 'btn-primary' : 'btn-outline-primary'}">全部</a>
-    <a href="/pipelines?status=${encodeURIComponent('洽談中')}" class="btn btn-sm ${statusFilter === '洽談中' ? 'btn-warning' : 'btn-outline-warning'}">洽談中</a>
-    <a href="/pipelines?status=${encodeURIComponent('已成交')}" class="btn btn-sm ${statusFilter === '已成交' ? 'btn-success' : 'btn-outline-success'}">已成交</a>
-    <a href="/pipelines?status=${encodeURIComponent('已流失')}" class="btn btn-sm ${statusFilter === '已流失' ? 'btn-secondary' : 'btn-outline-secondary'}">已流失</a>
+    ${localPipelineStatuses.map(s => {
+      const color = localStatusColorMap[s.status_name] || 'secondary';
+      const active = statusFilter === s.status_name;
+      return '<a href="/pipelines?status=' + encodeURIComponent(s.status_name) + '" class="btn btn-sm ' + (active ? 'btn-' + color : 'btn-outline-' + color) + '">' + escapeHtml(s.status_name) + '</a>';
+    }).join('')}
   </div>
   <small class="text-muted ms-2">以下統計數字皆依目前篩選條件計算</small>
 </div>
@@ -40,9 +46,9 @@ ${error ? `
 <div class="row g-3 mb-3">
   ${(summary.byStatus || []).map(g => `
     <div class="col-md-4">
-      <div class="card h-100 ${(STATUS_CARD_STYLE[g.status] || {}).bg || 'bg-primary'} text-white">
+      <div class="card h-100 bg-${localStatusColorMap[g.status] || 'primary'} text-white">
         <div class="card-body text-center">
-          <h6 class="mb-1"><i class="bi ${(STATUS_CARD_STYLE[g.status] || {}).icon || 'bi-cash-stack'}"></i> ${escapeHtml(g.status)}預估金額</h6>
+          <h6 class="mb-1"><i class="bi ${statusIcon(g.status)}"></i> ${escapeHtml(g.status)}預估金額</h6>
           <h3 class="mb-0">$${(g.amount || 0).toLocaleString()}</h3>
           <small>共 ${g.count || 0} 筆</small>
         </div>
@@ -194,7 +200,7 @@ ${error ? `
               <td>${p.win_probability !== null && p.win_probability !== undefined ? (WIN_PROBABILITY_STAGES[p.win_probability] ? WIN_PROBABILITY_STAGES[p.win_probability] + ' ' : '') + p.win_probability + '%' : '-'}</td>
               <td>${p.expected_close_year_month || '-'}</td>
               <td>
-                <span class="badge bg-${p.status === '已成交' ? 'success' : p.status === '已流失' ? 'secondary' : 'warning'}">${p.status}</span>
+                <span class="badge bg-${localStatusColorMap[p.status] || 'warning'}">${escapeHtml(p.status)}</span>
                 ${p.converted_project_id ? '<span class="badge bg-info ms-1">已轉入專案</span>' : ''}
               </td>
             </tr>

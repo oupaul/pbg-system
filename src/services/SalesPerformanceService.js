@@ -37,7 +37,8 @@ const SalesPerformanceService = {
           COUNT(*) as pipeline_count,
           COALESCE(SUM(pl.estimated_amount), 0) as pipeline_amount
         FROM pipelines pl
-        WHERE pl.status = '洽談中' AND pl.deleted_at IS NULL ${pipelineYearCondition}
+        WHERE pl.status IN (SELECT status_name FROM pipeline_statuses WHERE is_won = 0 AND is_lost = 0)
+          AND pl.deleted_at IS NULL ${pipelineYearCondition}
         GROUP BY pl.salesperson_id
       ) pf ON pf.salesperson_id = s.id
       WHERE s.status = 'active' OR p.id IS NOT NULL OR pf.salesperson_id IS NOT NULL
@@ -101,12 +102,16 @@ const SalesPerformanceService = {
   getPipelineSummary() {
     const open = db.prepare(`
       SELECT COUNT(*) as count, COALESCE(SUM(estimated_amount), 0) as amount
-      FROM pipelines WHERE status = '洽談中' AND deleted_at IS NULL
+      FROM pipelines
+      WHERE status IN (SELECT status_name FROM pipeline_statuses WHERE is_won = 0 AND is_lost = 0)
+        AND deleted_at IS NULL
     `).get();
 
     const wonPending = db.prepare(`
       SELECT COUNT(*) as count, COALESCE(SUM(estimated_amount), 0) as amount
-      FROM pipelines WHERE status = '已成交' AND converted_project_id IS NULL AND deleted_at IS NULL
+      FROM pipelines
+      WHERE status IN (SELECT status_name FROM pipeline_statuses WHERE is_won = 1)
+        AND converted_project_id IS NULL AND deleted_at IS NULL
     `).get();
 
     return {

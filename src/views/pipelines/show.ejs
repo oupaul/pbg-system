@@ -5,6 +5,13 @@
   function escapeHtml(str) {
     return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
+  // 狀態操作按鈕要送出「贏單」「輸單」「其餘（洽談中）」狀態各自實際的名稱，
+  // 而不是寫死「已成交」/「已流失」/「洽談中」字串，改名後按鈕才會繼續正確運作
+  const localPipelineStatuses = typeof pipelineStatuses !== 'undefined' && pipelineStatuses ? pipelineStatuses : [];
+  const localPipelineStatusColorMap = typeof pipelineStatusColorMap !== 'undefined' && pipelineStatusColorMap ? pipelineStatusColorMap : {};
+  const wonStatusName = (localPipelineStatuses.find(s => s.is_won) || {}).status_name || '已成交';
+  const lostStatusName = (localPipelineStatuses.find(s => s.is_lost) || {}).status_name || '已流失';
+  const openStatusName = (localPipelineStatuses.find(s => !s.is_won && !s.is_lost) || {}).status_name || '洽談中';
 %>
 <%- include('../layout', { body: `
 <div class="row mb-4">
@@ -17,7 +24,7 @@
     </nav>
     <h1 class="h3 mt-2">
       ${escapeHtml(pipeline.opportunity_name)}
-      <span class="badge bg-${pipeline.status === '已成交' ? 'success' : pipeline.status === '已流失' ? 'secondary' : 'warning'} align-middle">${pipeline.status}</span>
+      <span class="badge bg-${localPipelineStatusColorMap[pipeline.status] || 'warning'} align-middle">${escapeHtml(pipeline.status)}</span>
       ${pipeline.converted_project_id ? '<span class="badge bg-info align-middle">已轉入專案</span>' : ''}
     </h1>
   </div>
@@ -106,10 +113,10 @@ ${pipeline.notes ? `
       <form action="/pipelines/${pipeline.id}/activities" method="POST" class="row g-2 mb-4">
         <div class="col-md-2">
           <select name="activity_type" class="form-select">
-            <option value="拜訪">拜訪</option>
-            <option value="電話">電話</option>
-            <option value="客訴">客訴</option>
-            <option value="其他">其他</option>
+            ${(typeof activityTypes !== 'undefined' && activityTypes ? activityTypes : []).map(t => {
+              const safeName = escapeHtml(t.type_name).replace(/"/g, '&quot;');
+              return '<option value="' + safeName + '">' + escapeHtml(t.type_name) + '</option>';
+            }).join('')}
           </select>
         </div>
         <div class="col-md-7">
@@ -135,7 +142,7 @@ ${pipeline.notes ? `
         return `
         <li class="list-group-item d-flex justify-content-between align-items-start">
           <div>
-            <span class="badge bg-${a.activity_type === '客訴' ? 'danger' : a.activity_type === '拜訪' ? 'primary' : a.activity_type === '電話' ? 'info' : 'secondary'} me-2">${a.activity_type}</span>
+            <span class="badge bg-${(typeof activityTypeColorMap !== 'undefined' && activityTypeColorMap[a.activity_type]) || 'secondary'} me-2">${escapeHtml(a.activity_type)}</span>
             <span>${a.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
             <div class="text-muted small mt-1">${a.activity_date} · ${escapeHtml(a.created_by) || 'system'}</div>
           </div>
@@ -163,25 +170,25 @@ ${locals.canEditCrm && !pipeline.converted_project_id ? `
 <div class="card mb-4">
   <div class="card-header"><i class="bi bi-arrow-repeat"></i> 狀態操作</div>
   <div class="card-body d-flex gap-2 flex-wrap">
-    ${pipeline.status !== '已成交' ? `
+    ${pipeline.status !== wonStatusName ? `
       <form action="/pipelines/${pipeline.id}/status" method="POST">
-        <input type="hidden" name="status" value="已成交">
-        <button type="submit" class="btn btn-success"><i class="bi bi-check-circle"></i> 標記成交</button>
+        <input type="hidden" name="status" value="${escapeHtml(wonStatusName)}">
+        <button type="submit" class="btn btn-success"><i class="bi bi-check-circle"></i> 標記${escapeHtml(wonStatusName)}</button>
       </form>
     ` : `
-      ${locals.canEdit ? '<a href="/pipelines/' + pipeline.id + '/convert" class="btn btn-success"><i class="bi bi-box-arrow-in-right"></i> 轉入專案（由財務提供專案編號）</a>' : '<span class="btn btn-success disabled">已成交，待財務轉入專案</span>'}
+      ${locals.canEdit ? '<a href="/pipelines/' + pipeline.id + '/convert" class="btn btn-success"><i class="bi bi-box-arrow-in-right"></i> 轉入專案（由財務提供專案編號）</a>' : '<span class="btn btn-success disabled">' + escapeHtml(wonStatusName) + '，待財務轉入專案</span>'}
       <form action="/pipelines/${pipeline.id}/status" method="POST">
-        <input type="hidden" name="status" value="洽談中">
-        <button type="submit" class="btn btn-outline-warning"><i class="bi bi-arrow-counterclockwise"></i> 改回洽談中</button>
+        <input type="hidden" name="status" value="${escapeHtml(openStatusName)}">
+        <button type="submit" class="btn btn-outline-warning"><i class="bi bi-arrow-counterclockwise"></i> 改回${escapeHtml(openStatusName)}</button>
       </form>
     `}
-    ${pipeline.status !== '已流失' ? `
+    ${pipeline.status !== lostStatusName ? `
       <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#lostReasonModal">
-        <i class="bi bi-x-circle"></i> 標記流失
+        <i class="bi bi-x-circle"></i> 標記${escapeHtml(lostStatusName)}
       </button>
     ` : `
       <form action="/pipelines/${pipeline.id}/status" method="POST">
-        <input type="hidden" name="status" value="洽談中">
+        <input type="hidden" name="status" value="${escapeHtml(openStatusName)}">
         <button type="submit" class="btn btn-outline-warning"><i class="bi bi-arrow-counterclockwise"></i> 重新開啟</button>
       </form>
     `}
@@ -199,7 +206,7 @@ ${locals.canEditCrm && !pipeline.converted_project_id ? `
   <div class="modal-dialog">
     <div class="modal-content">
       <form action="/pipelines/${pipeline.id}/status" method="POST" id="lostReasonForm">
-        <input type="hidden" name="status" value="已流失">
+        <input type="hidden" name="status" value="${escapeHtml(lostStatusName)}">
         <div class="modal-header">
           <h5 class="modal-title">標記流失</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -265,7 +272,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 ` : ''}
 
-${pipeline.status === '已流失' && pipeline.lost_reason ? `
+${pipeline.status === lostStatusName && pipeline.lost_reason ? `
 <div class="alert alert-secondary"><strong>流失原因：</strong>${pipeline.lost_reason.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
 ` : ''}
 ` }) %>

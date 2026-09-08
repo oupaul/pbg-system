@@ -76,6 +76,13 @@ const MIGRATIONS = [
   'migrate_remove_bonus_tier_type_check',
   'migrate_company_settings',
   'migrate_customer_approval_permission',
+  'migrate_activity_types',
+  'migrate_remove_activity_type_check',
+  'migrate_customer_statuses',
+  'migrate_remove_customer_status_check',
+  'migrate_remove_customer_creation_request_status_check',
+  'migrate_pipeline_statuses',
+  'migrate_remove_pipeline_status_check',
 ];
 
 function run() {
