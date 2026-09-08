@@ -2,12 +2,14 @@ const db = require('./db');
 const AuditLogService = require('../services/AuditLogService');
 
 const Cost = {
-  // 取得專案的所有成本
+  // 取得專案的所有成本（含廠商名稱，供畫面顯示用）
   findByProject(projectId) {
     return db.prepare(`
-      SELECT * FROM costs
-      WHERE project_id = ?
-      ORDER BY cost_date DESC, created_at DESC
+      SELECT costs.*, customers.company_name AS vendor_name
+      FROM costs
+      LEFT JOIN customers ON customers.id = costs.vendor_id
+      WHERE costs.project_id = ?
+      ORDER BY costs.cost_date DESC, costs.created_at DESC
     `).all(projectId);
   },
 
@@ -16,10 +18,20 @@ const Cost = {
     return db.prepare(`SELECT * FROM costs WHERE id = ?`).get(id);
   },
 
-  // 計算專案的總成本
+  // 計算專案的實際成本總額
   getTotalByProject(projectId) {
     const result = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total
+      SELECT COALESCE(SUM(actual_amount), 0) as total
+      FROM costs
+      WHERE project_id = ?
+    `).get(projectId);
+    return result ? result.total : 0;
+  },
+
+  // 計算專案的預估成本總額
+  getEstimatedTotalByProject(projectId) {
+    const result = db.prepare(`
+      SELECT COALESCE(SUM(estimated_amount), 0) as total
       FROM costs
       WHERE project_id = ?
     `).get(projectId);
@@ -31,28 +43,32 @@ const Cost = {
     const projectId = data.project_id !== undefined && data.project_id !== null ? parseInt(data.project_id) : null;
     const costDate = data.cost_date || null;
     const costType = data.cost_type || null;
-    const amount = data.amount !== undefined && data.amount !== null ? parseFloat(data.amount) : 0;
+    const vendorId = data.vendor_id ? parseInt(data.vendor_id) : null;
+    const estimatedAmount = data.estimated_amount !== undefined && data.estimated_amount !== null ? parseFloat(data.estimated_amount) || 0 : 0;
+    const actualAmount = data.actual_amount !== undefined && data.actual_amount !== null ? parseFloat(data.actual_amount) || 0 : 0;
     const notes = data.notes || null;
-    
+
     const stmt = db.prepare(`
       INSERT INTO costs (
-        project_id, cost_date, cost_type, amount, notes
-      ) VALUES (?, ?, ?, ?, ?)
+        project_id, cost_date, cost_type, vendor_id, estimated_amount, actual_amount, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
-    
+
     const result = stmt.run(
       projectId,
       costDate,
       costType,
-      amount,
+      vendorId,
+      estimatedAmount,
+      actualAmount,
       notes
     );
-    
+
     const costId = result.lastInsertRowid;
-    
+
     // 記錄修改
     AuditLogService.logCreate('costs', costId, data, data.userInfo);
-    
+
     return costId;
   },
 
@@ -61,20 +77,25 @@ const Cost = {
     // 取得舊值
     const oldRecord = this.findById(id);
     if (!oldRecord) return false;
-    
+
     // 構建更新欄位和值
     const fields = [];
     const values = [];
     const newData = {};
-    
-    const allowedFields = ['cost_date', 'cost_type', 'amount', 'notes'];
-    
+
+    const allowedFields = ['cost_date', 'cost_type', 'vendor_id', 'estimated_amount', 'actual_amount', 'notes'];
+
     allowedFields.forEach(field => {
       if (data[field] !== undefined) {
         fields.push(`${field} = ?`);
-        if (field === 'amount') {
-          values.push(parseFloat(data[field]) || 0);
-          newData[field] = parseFloat(data[field]) || 0;
+        if (field === 'estimated_amount' || field === 'actual_amount') {
+          const v = parseFloat(data[field]) || 0;
+          values.push(v);
+          newData[field] = v;
+        } else if (field === 'vendor_id') {
+          const v = data[field] ? parseInt(data[field]) : null;
+          values.push(v);
+          newData[field] = v;
         } else {
           values.push(data[field]);
           newData[field] = data[field];

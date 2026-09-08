@@ -563,6 +563,8 @@ router.get('/:id', (req, res) => {
   const bonuses = Bonus.findByProject(project.id);
   const Cost = require('../models/Cost');
   const costs = Cost.findByProject(project.id);
+  // 成本明細「廠商」下拉選單：客戶/廠商表裡 party_type 含「廠商」的資料
+  const vendors = Customer.findAll({ party_type: '廠商' }, req.user);
 
   // 計算每筆發票的收款狀態（與收款明細比對，僅用未刪除的收款）
   // 支援分次收款：僅在「已收齊」時顯示提前/準時/逾期到款；部分收款時依預計收款日顯示待收狀態
@@ -664,6 +666,7 @@ router.get('/:id', (req, res) => {
   const totalReceived = paymentsForStatus.reduce((sum, p) => sum + Payment.calculateActualReceived(p), 0);
   const totalBonus = bonuses.reduce((sum, b) => sum + (b.bonus_amount || 0), 0);
   const totalCost = Cost.getTotalByProject(project.id);
+  const estimatedCost = Cost.getEstimatedTotalByProject(project.id);
   const grossProfit = (project.price_without_tax || 0) - totalCost;
   
   // 建立類型顏色映射
@@ -688,6 +691,7 @@ router.get('/:id', (req, res) => {
     invoiceUnpaidSummary, // 每筆發票已收/未收摘要（支援分次收款）
     payments,
     costs,
+    vendors,
     attachments,
     bonuses,
     typeColorMap,
@@ -701,6 +705,7 @@ router.get('/:id', (req, res) => {
       outstanding: totalInvoiced - totalReceived - (project.sales_discount || 0),
       totalBonus,
       totalCost,
+      estimatedCost,
       grossProfit
     }
   });

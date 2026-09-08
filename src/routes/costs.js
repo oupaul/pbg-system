@@ -10,7 +10,9 @@ router.post('/', (req, res) => {
       project_id: req.body.project_id,
       cost_date: req.body.cost_date,
       cost_type: req.body.cost_type || null,
-      amount: parseFloat(req.body.amount) || 0,
+      vendor_id: req.body.vendor_id || null,
+      estimated_amount: parseFloat(req.body.estimated_amount) || 0,
+      actual_amount: parseFloat(req.body.actual_amount) || 0,
       notes: req.body.notes || null,
       userInfo: getUserInfo(req)
     });
@@ -37,7 +39,9 @@ router.post('/:id', (req, res) => {
     Cost.update(req.params.id, {
       cost_date: req.body.cost_date,
       cost_type: req.body.cost_type || null,
-      amount: parseFloat(req.body.amount) || 0,
+      vendor_id: req.body.vendor_id || null,
+      estimated_amount: parseFloat(req.body.estimated_amount) || 0,
+      actual_amount: parseFloat(req.body.actual_amount) || 0,
       notes: req.body.notes || null,
       userInfo: getUserInfo(req)
     });
