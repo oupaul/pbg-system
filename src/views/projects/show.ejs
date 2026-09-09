@@ -344,6 +344,25 @@ function resetExpectedInvoice() {
 </div>
 ` : '')}
 
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pane-invoices" type="button" role="tab"><i class="bi bi-receipt"></i> 發票明細</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-payments" type="button" role="tab"><i class="bi bi-cash"></i> 收款明細</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-costs" type="button" role="tab"><i class="bi bi-cash-stack"></i> 成本明細</button>
+  </li>
+  ${locals.canEdit ? `
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-bonuses" type="button" role="tab"><i class="bi bi-award"></i> 獎金明細</button>
+  </li>
+  ` : ''}
+</ul>
+
+<div class="tab-content">
+<div class="tab-pane fade show active overflow-visible" id="pane-invoices" role="tabpanel">
 <!-- 發票明細（overflow-visible 讓「更多」下拉選單顯示在最上層） -->
 <div class="card mb-4 overflow-visible">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -406,6 +425,8 @@ function resetExpectedInvoice() {
       </table>
     </div>
   </div>
+</div>
+</div>
 </div>
 
 ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
@@ -544,6 +565,8 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
 </div>
 `).join('')}
 
+<div class="tab-content">
+<div class="tab-pane fade" id="pane-payments" role="tabpanel">
 <!-- 收款明細 -->
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -586,7 +609,11 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
     </div>
   </div>
 </div>
+</div>
+</div>
 
+<div class="tab-content">
+<div class="tab-pane fade" id="pane-costs" role="tabpanel">
 <!-- 成本明細 -->
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center">
@@ -639,8 +666,12 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
     </div>
   </div>
 </div>
+</div>
+</div>
 
 ${locals.canEdit ? `
+<div class="tab-content">
+<div class="tab-pane fade" id="pane-bonuses" role="tabpanel">
 <!-- 獎金明細 -->
 <div class="card">
   <div class="card-header d-flex justify-content-between align-items-center">
@@ -683,6 +714,8 @@ ${locals.canEdit ? `
       </table>
     </div>
   </div>
+</div>
+</div>
 </div>
 ` : ''}
 
