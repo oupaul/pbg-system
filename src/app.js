@@ -121,6 +121,9 @@ app.use((req, res, next) => {
   res.locals.idleTimeoutMinutes = getSystemSetting('idle_timeout_minutes', 30);
   res.locals.idleWarningMinutes = getSystemSetting('idle_warning_minutes', 2);
 
+  // 金額顯示的幣別符號前綴，供所有視圖使用（取代原本寫死的 '$'）
+  res.locals.currencySymbol = getSystemSetting('currency_symbol', '$');
+
   // 目前路徑，供導覽列標示當前所在頁面使用
   res.locals.currentPath = req.path;
 

@@ -48,7 +48,7 @@ ${success ? `
           ${options.map(o => `
             <tr>
               <td>${o.display_order}</td>
-              <td>$${Number(o.amount).toLocaleString()}</td>
+              <td>${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${Number(o.amount).toLocaleString()}</td>
               <td>${o.is_active === 1 ? '<span class="badge bg-success">啟用</span>' : '<span class="badge bg-secondary">停用</span>'}</td>
               <td>
                 <button type="button" class="btn btn-sm btn-outline-primary" onclick="editOption(${o.id}, ${o.amount}, ${o.display_order}, ${o.is_active})">

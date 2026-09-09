@@ -264,6 +264,9 @@ router.post('/bulk-update', requireAuth, requireAdmin, (req, res) => {
         } else if (key === 'date_calendar_system' && !['roc', 'gregorian'].includes(value)) {
           errors.push('報表日期曆法必須是民國曆或西元曆');
           continue;
+        } else if (key === 'currency_symbol' && (!value || !String(value).trim())) {
+          errors.push('幣別符號不能為空');
+          continue;
         }
 
         updateSystemSetting(key, validatedValue, setting.setting_type);

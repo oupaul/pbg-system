@@ -107,59 +107,59 @@ ${typeof error !== 'undefined' && error ? '<div class="alert alert-danger alert-
       <div class="card-body">
         <div class="d-flex justify-content-between mb-2">
           <span>價格(含稅)</span>
-          <strong>$${(project.price_with_tax || 0).toLocaleString()}</strong>
+          <strong>${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(project.price_with_tax || 0).toLocaleString()}</strong>
         </div>
         <div class="d-flex justify-content-between mb-2">
           <span>價格(未稅)</span>
-          <span>$${(project.price_without_tax || 0).toLocaleString()}</span>
+          <span>${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(project.price_without_tax || 0).toLocaleString()}</span>
         </div>
         ${typeof project.sales_discount !== 'undefined' && project.sales_discount ? `
         <div class="d-flex justify-content-between mb-2">
           <span>銷貨折讓</span>
-          <span class="text-warning">-$${(project.sales_discount || 0).toLocaleString()}</span>
+          <span class="text-warning">-${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(project.sales_discount || 0).toLocaleString()}</span>
         </div>
         ` : ''}
         ${typeof summary.totalCost !== 'undefined' ? `
         <div class="d-flex justify-content-between mb-2">
           <span>總成本</span>
-          <span class="text-danger">$${(summary.totalCost || 0).toLocaleString()}</span>
+          <span class="text-danger">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(summary.totalCost || 0).toLocaleString()}</span>
         </div>
         ` : ''}
         ${typeof summary.estimatedCost !== 'undefined' && summary.estimatedCost ? `
         <div class="d-flex justify-content-between mb-2">
           <span>預估成本</span>
-          <span class="text-secondary">$${(summary.estimatedCost || 0).toLocaleString()}</span>
+          <span class="text-secondary">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(summary.estimatedCost || 0).toLocaleString()}</span>
         </div>
         ` : ''}
         ${typeof summary.grossProfit !== 'undefined' ? `
         <div class="d-flex justify-content-between mb-2">
           <span>未稅毛利</span>
-          <strong class="${summary.grossProfit >= 0 ? 'text-success' : 'text-danger'}">$${(summary.grossProfit || 0).toLocaleString()}</strong>
+          <strong class="${summary.grossProfit >= 0 ? 'text-success' : 'text-danger'}">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(summary.grossProfit || 0).toLocaleString()}</strong>
         </div>
         ` : ''}
         <hr>
         <div class="d-flex justify-content-between mb-2">
           <span>已開發票</span>
-          <span class="text-success">$${(summary.totalInvoiced || 0).toLocaleString()}</span>
+          <span class="text-success">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(summary.totalInvoiced || 0).toLocaleString()}</span>
         </div>
         <div class="d-flex justify-content-between mb-2">
           <span>未開發票</span>
-          <span class="text-warning">$${(summary.uninvoiced || 0).toLocaleString()}</span>
+          <span class="text-warning">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(summary.uninvoiced || 0).toLocaleString()}</span>
         </div>
         <hr>
         <div class="d-flex justify-content-between mb-2">
           <span>已收款</span>
-          <span class="text-success">$${(summary.totalReceived || 0).toLocaleString()}</span>
+          <span class="text-success">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(summary.totalReceived || 0).toLocaleString()}</span>
         </div>
         <div class="d-flex justify-content-between mb-2">
           <span>應收帳款</span>
-          <span class="text-danger">$${(summary.outstanding || 0).toLocaleString()}</span>
+          <span class="text-danger">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(summary.outstanding || 0).toLocaleString()}</span>
         </div>
         ${locals.canEdit ? `
         <hr>
         <div class="d-flex justify-content-between">
           <span>獎金合計</span>
-          <strong class="text-primary">$${(summary.totalBonus || 0).toLocaleString()}</strong>
+          <strong class="text-primary">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(summary.totalBonus || 0).toLocaleString()}</strong>
         </div>
         ` : ''}
       </div>
@@ -385,14 +385,14 @@ function resetExpectedInvoice() {
               <td>${inv.invoice_date || '-'}</td>
               <td><code>${h(inv.invoice_number || '-')}</code></td>
               <td>${inv.expected_payment_date || '-'}</td>
-              <td class="text-end">$${(inv.amount_with_tax || 0).toLocaleString()}${(inv.allowance_amount || 0) > 0 ? ' <span class="text-muted small">折讓 $' + (inv.allowance_amount || 0).toLocaleString() + '，認列 $' + Math.max(0, (inv.amount_with_tax || 0) - (inv.allowance_amount || 0)).toLocaleString() + '</span>' : ''}</td>
+              <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(inv.amount_with_tax || 0).toLocaleString()}${(inv.allowance_amount || 0) > 0 ? ' <span class="text-muted small">折讓 ' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + (inv.allowance_amount || 0).toLocaleString() + '，認列 ' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + Math.max(0, (inv.amount_with_tax || 0) - (inv.allowance_amount || 0)).toLocaleString() + '</span>' : ''}</td>
               <td>${(() => {
                 const isValid = !inv.status || inv.status === '有效';
                 const received = inv.total_received != null ? inv.total_received : null;
                 const unpaid   = inv.unpaid_amount  != null ? inv.unpaid_amount  : null;
                 const amountHtml = (isValid && received != null)
-                  ? '<div class="small text-muted lh-1 mb-1">已收 <strong class="text-success">$' + Math.round(received).toLocaleString() + '</strong>' +
-                    (unpaid > 0 ? ' / 未收 <strong class="text-danger">$' + Math.round(unpaid).toLocaleString() + '</strong>' : ' <span class="badge bg-success-subtle text-success border border-success-subtle">✓ 收齊</span>') +
+                  ? '<div class="small text-muted lh-1 mb-1">已收 <strong class="text-success">' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + Math.round(received).toLocaleString() + '</strong>' +
+                    (unpaid > 0 ? ' / 未收 <strong class="text-danger">' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + Math.round(unpaid).toLocaleString() + '</strong>' : ' <span class="badge bg-success-subtle text-success border border-success-subtle">✓ 收齊</span>') +
                     '</div>'
                   : '';
                 const statusHtml = '<span class="' + (typeof inv.paymentStatus !== 'undefined' ? inv.paymentStatus.class : 'text-muted') + '">' +
@@ -419,7 +419,7 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <p class="text-muted">發票號碼：<code>${h(inv.invoice_number || '-')}</code>，金額：$${(inv.amount_with_tax || 0).toLocaleString()}</p>
+          <p class="text-muted">發票號碼：<code>${h(inv.invoice_number || '-')}</code>，金額：${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(inv.amount_with_tax || 0).toLocaleString()}</p>
           <div class="mb-3">
             <label class="form-label">作廢日期</label>
             <input type="date" name="voided_at" class="form-control" value="${new Date().toISOString().slice(0, 10)}">
@@ -448,7 +448,7 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <p class="text-muted">原發票：<code>${h(inv.invoice_number || '-')}</code>，金額：$${(inv.amount_with_tax || 0).toLocaleString()}</p>
+          <p class="text-muted">原發票：<code>${h(inv.invoice_number || '-')}</code>，金額：${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(inv.amount_with_tax || 0).toLocaleString()}</p>
           <div class="mb-3">
             <label class="form-label">作廢原因（選填）</label>
             <input type="text" name="void_reason" class="form-control" placeholder="例如：開立錯誤需重開">
@@ -491,7 +491,7 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <p class="text-muted">發票號碼：<code>${h(inv.invoice_number || '-')}</code>，原金額：$${(inv.amount_with_tax || 0).toLocaleString()}。設定折讓金額後，認列金額 = 原金額 − 折讓金額，發票仍為有效。</p>
+          <p class="text-muted">發票號碼：<code>${h(inv.invoice_number || '-')}</code>，原金額：${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(inv.amount_with_tax || 0).toLocaleString()}。設定折讓金額後，認列金額 = 原金額 − 折讓金額，發票仍為有效。</p>
           <div class="mb-3">
             <label class="form-label">折讓金額 <span class="text-danger">*</span></label>
             <input type="number" name="allowance_amount" class="form-control" min="0" max="${inv.amount_with_tax || 0}" step="0.01" value="${inv.allowance_amount || 0}" required>
@@ -524,7 +524,7 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <p class="text-muted">發票號碼：<code>${h(inv.invoice_number || '-')}</code>，金額：$${(inv.amount_with_tax || 0).toLocaleString()} 將設為整筆折讓，不計入已開立總額。</p>
+          <p class="text-muted">發票號碼：<code>${h(inv.invoice_number || '-')}</code>，金額：${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(inv.amount_with_tax || 0).toLocaleString()} 將設為整筆折讓，不計入已開立總額。</p>
           <div class="mb-3">
             <label class="form-label">折讓日期</label>
             <input type="date" name="voided_at" class="form-control" value="${new Date().toISOString().slice(0, 10)}">
@@ -575,8 +575,8 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
               <td>${isDeleted ? '<span class="badge bg-secondary">已刪除</span>' : '-'}</td>
               <td>${pay.payment_date || '-'}</td>
               <td><code>${h(pay.invoice_number || '-')}</code></td>
-              <td class="text-end">$${(pay.bank_deposit_amount || 0).toLocaleString()}</td>
-              <td class="text-end text-danger">$${(pay.payment_difference || 0).toLocaleString()}</td>
+              <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(pay.bank_deposit_amount || 0).toLocaleString()}</td>
+              <td class="text-end text-danger">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(pay.payment_difference || 0).toLocaleString()}</td>
               <td><small>${h(pay.notes || '')}</small></td>
               <td class="text-end">${actionCell}</td>
             </tr>
@@ -613,8 +613,8 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
               <td>${cost.cost_date || '-'}</td>
               <td>${h(cost.cost_type || '-')}</td>
               <td>${cost.vendor_name ? h(cost.vendor_name) : '<span class="text-muted">-</span>'}</td>
-              <td class="text-end text-secondary">$${(cost.estimated_amount || 0).toLocaleString()}</td>
-              <td class="text-end text-danger">$${(cost.actual_amount || 0).toLocaleString()}</td>
+              <td class="text-end text-secondary">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(cost.estimated_amount || 0).toLocaleString()}</td>
+              <td class="text-end text-danger">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(cost.actual_amount || 0).toLocaleString()}</td>
               <td><small>${h(cost.notes || '')}</small></td>
               <td class="text-end">
                 ${locals.canEdit ? '<button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editCostModal' + cost.id + '"><i class="bi bi-pencil"></i></button>' : ''}
@@ -653,9 +653,9 @@ ${locals.canEdit ? `
           ${bonuses.length ? bonuses.map(b => `
             <tr>
               <td>${b.bonus_type}</td>
-              <td class="text-end">$${(b.base_amount || 0).toLocaleString()}</td>
+              <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(b.base_amount || 0).toLocaleString()}</td>
               <td class="text-end">${b.bonus_percentage ? b.bonus_percentage + '%' : '-'}</td>
-              <td class="text-end fw-bold">$${(b.bonus_amount || 0).toLocaleString()}</td>
+              <td class="text-end fw-bold">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(b.bonus_amount || 0).toLocaleString()}</td>
               <td>${b.payment_date || '-'}</td>
               <td>
                 <span class="badge bg-${b.status === '已發放' ? 'success' : b.status === '充公' ? 'danger' : 'warning'}">${b.status}</span>
@@ -731,8 +731,8 @@ ${locals.canEdit ? `
             <select name="invoice_id" class="form-select">
               <option value="">-- 選擇發票 --</option>
               ${(typeof invoiceUnpaidSummary !== 'undefined' ? invoiceUnpaidSummary : []).filter(s => s.isValid !== false).map(s => {
-                const unpaidLabel = s.unpaid > 0 ? `，未收 $${s.unpaid.toLocaleString()}` : '，已收齊';
-                return `<option value="${s.invoice_id}">${s.invoice_number} (總額 $${s.amount.toLocaleString()}${unpaidLabel})</option>`;
+                const unpaidLabel = s.unpaid > 0 ? `，未收 ${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${s.unpaid.toLocaleString()}` : '，已收齊';
+                return `<option value="${s.invoice_id}">${s.invoice_number} (總額 ${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${s.amount.toLocaleString()}${unpaidLabel})</option>`;
               }).join('')}
             </select>
             <small class="text-muted d-block mt-1">支援一筆發票分多次收款，可重複選擇同一發票</small>
@@ -1001,9 +1001,9 @@ ${payments.map(pay => `
               <option value="">-- 選擇發票 --</option>
               ${(typeof invoiceUnpaidSummary !== 'undefined' ? invoiceUnpaidSummary : []).map(s => {
                 const isCurrent = s.invoice_id == pay.invoice_id;
-                const unpaidLabel = s.unpaid > 0 ? `，未收 $${s.unpaid.toLocaleString()}` : '，已收齊';
+                const unpaidLabel = s.unpaid > 0 ? `，未收 ${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${s.unpaid.toLocaleString()}` : '，已收齊';
                 const suffix = !s.isValid ? ' (已作廢/折讓)' : '';
-                return `<option value="${s.invoice_id}" ${isCurrent ? 'selected' : ''}>${s.invoice_number} (總額 $${s.amount.toLocaleString()}${unpaidLabel})${suffix}</option>`;
+                return `<option value="${s.invoice_id}" ${isCurrent ? 'selected' : ''}>${s.invoice_number} (總額 ${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${s.amount.toLocaleString()}${unpaidLabel})${suffix}</option>`;
               }).join('')}
             </select>
           </div>

@@ -33,7 +33,7 @@
     <div class="card">
       <div class="card-body">
         <h6 class="text-muted">總收入（未稅）</h6>
-        <h4 class="mb-0">$${(totals.revenue || 0).toLocaleString()}</h4>
+        <h4 class="mb-0">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(totals.revenue || 0).toLocaleString()}</h4>
       </div>
     </div>
   </div>
@@ -41,7 +41,7 @@
     <div class="card">
       <div class="card-body">
         <h6 class="text-muted">總成本</h6>
-        <h4 class="mb-0 text-danger">$${(totals.cost || 0).toLocaleString()}</h4>
+        <h4 class="mb-0 text-danger">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(totals.cost || 0).toLocaleString()}</h4>
       </div>
     </div>
   </div>
@@ -49,7 +49,7 @@
     <div class="card">
       <div class="card-body">
         <h6 class="text-muted">總毛利</h6>
-        <h4 class="mb-0 ${(totals.grossProfit || 0) >= 0 ? 'text-success' : 'text-danger'}">$${(totals.grossProfit || 0).toLocaleString()}</h4>
+        <h4 class="mb-0 ${(totals.grossProfit || 0) >= 0 ? 'text-success' : 'text-danger'}">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(totals.grossProfit || 0).toLocaleString()}</h4>
       </div>
     </div>
   </div>
@@ -116,7 +116,7 @@
                 const typeColor = (typeof typeColorMap !== 'undefined' && r.project_type && typeColorMap[r.project_type]) ? typeColorMap[r.project_type] : 'info';
                 const typeBadge = '<span class="badge bg-' + typeColor + '">' + (r.project_type || '').replace(/</g, '&lt;') + '</span>';
                 const dataAttrs = ' data-project_code="' + (r.project_code || '').replace(/"/g, '&quot;') + '" data-customer_name="' + (r.customer_name || '').replace(/"/g, '&quot;') + '" data-project_name="' + (r.project_name || '').replace(/"/g, '&quot;') + '" data-contract_year="' + (r.contract_year || '') + '" data-project_type="' + (r.project_type || '').replace(/"/g, '&quot;') + '" data-status="' + (r.status || '').replace(/"/g, '&quot;') + '" data-revenue="' + (parseFloat(r.revenue) || 0) + '" data-total_cost="' + (parseFloat(r.total_cost) || 0) + '" data-gross_profit="' + (parseFloat(r.gross_profit) || 0) + '" data-gross_margin_pct="' + (parseFloat(r.gross_margin_pct) || 0) + '"';
-                return '<tr class="' + rowClass + '"' + dataAttrs + '><td><a href="/projects/' + r.id + '"><code>' + (r.project_code || '') + '</code></a></td><td>' + (r.customer_name || '').replace(/</g, '&lt;').substring(0, 18) + '</td><td>' + (r.project_name || '').replace(/</g, '&lt;').substring(0, 25) + '</td><td>' + typeBadge + '</td><td class="text-end">' + marginCell + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger fw-bold') + '">$' + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">$' + (r.revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">$' + (r.total_cost || 0).toLocaleString() + '</td><td>' + (r.contract_year || '') + '</td><td>' + statusBadge + '</td><td><a href="/projects/' + r.id + '" class="btn btn-sm btn-outline-primary">詳情</a></td></tr>';
+                return '<tr class="' + rowClass + '"' + dataAttrs + '><td><a href="/projects/' + r.id + '"><code>' + (r.project_code || '') + '</code></a></td><td>' + (r.customer_name || '').replace(/</g, '&lt;').substring(0, 18) + '</td><td>' + (r.project_name || '').replace(/</g, '&lt;').substring(0, 25) + '</td><td>' + typeBadge + '</td><td class="text-end">' + marginCell + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger fw-bold') + '">' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + (r.revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + (r.total_cost || 0).toLocaleString() + '</td><td>' + (r.contract_year || '') + '</td><td>' + statusBadge + '</td><td><a href="/projects/' + r.id + '" class="btn btn-sm btn-outline-primary">詳情</a></td></tr>';
               }).join('') : '<tr><td colspan="11" class="text-center text-muted py-4">尚無資料</td></tr>'}
             </tbody>
           </table>
@@ -195,7 +195,7 @@
               </tr>
             </thead>
             <tbody>
-              ${(bySalesperson || []).length ? (bySalesperson || []).map(r => '<tr><td><strong>' + (r.name || '') + '</strong></td><td class="text-center">' + (r.project_count || 0) + '</td><td class="text-end">$' + (r.total_revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">$' + (r.total_cost || 0).toLocaleString() + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger') + '">$' + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">' + (r.gross_margin_pct || 0) + '%</td><td><a href="/projects?salesperson=' + encodeURIComponent(r.name) + (selectedYear !== 'all' ? '&year=' + selectedYear : '') + '" class="btn btn-sm btn-outline-primary">專案</a></td></tr>').join('') : '<tr><td colspan="7" class="text-center text-muted py-4">尚無資料</td></tr>'}
+              ${(bySalesperson || []).length ? (bySalesperson || []).map(r => '<tr><td><strong>' + (r.name || '') + '</strong></td><td class="text-center">' + (r.project_count || 0) + '</td><td class="text-end">' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + (r.total_revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + (r.total_cost || 0).toLocaleString() + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger') + '">' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">' + (r.gross_margin_pct || 0) + '%</td><td><a href="/projects?salesperson=' + encodeURIComponent(r.name) + (selectedYear !== 'all' ? '&year=' + selectedYear : '') + '" class="btn btn-sm btn-outline-primary">專案</a></td></tr>').join('') : '<tr><td colspan="7" class="text-center text-muted py-4">尚無資料</td></tr>'}
             </tbody>
           </table>
         </div>
@@ -221,7 +221,7 @@
             <tbody>
               ${(byType || []).length ? (byType || []).map(r => {
                 const typeColor = (typeof typeColorMap !== 'undefined' && r.project_type && typeColorMap[r.project_type]) ? typeColorMap[r.project_type] : 'info';
-                return '<tr><td><span class="badge bg-' + typeColor + '">' + (r.project_type || '') + '</span></td><td class="text-center">' + (r.project_count || 0) + '</td><td class="text-end">$' + (r.total_revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">$' + (r.total_cost || 0).toLocaleString() + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger') + '">$' + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">' + (r.gross_margin_pct || 0) + '%</td></tr>';
+                return '<tr><td><span class="badge bg-' + typeColor + '">' + (r.project_type || '') + '</span></td><td class="text-center">' + (r.project_count || 0) + '</td><td class="text-end">' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + (r.total_revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + (r.total_cost || 0).toLocaleString() + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger') + '">' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">' + (r.gross_margin_pct || 0) + '%</td></tr>';
               }).join('') : '<tr><td colspan="6" class="text-center text-muted py-4">尚無資料</td></tr>'}
             </tbody>
           </table>
@@ -249,7 +249,7 @@
               </tr>
             </thead>
             <tbody>
-              ${(byGroup || []).length ? (byGroup || []).map(r => '<tr><td><strong>' + (r.report_group_name || '未分群').replace(/</g, '&lt;') + '</strong></td><td class="text-center">' + (r.project_count || 0) + '</td><td class="text-end">$' + (r.total_revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">$' + (r.total_cost || 0).toLocaleString() + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger') + '">$' + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">' + (r.gross_margin_pct || 0) + '%</td></tr>').join('') : '<tr><td colspan="6" class="text-center text-muted py-4">尚無資料</td></tr>'}
+              ${(byGroup || []).length ? (byGroup || []).map(r => '<tr><td><strong>' + (r.report_group_name || '未分群').replace(/</g, '&lt;') + '</strong></td><td class="text-center">' + (r.project_count || 0) + '</td><td class="text-end">' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + (r.total_revenue || 0).toLocaleString() + '</td><td class="text-end text-danger">' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + (r.total_cost || 0).toLocaleString() + '</td><td class="text-end ' + ((r.gross_profit || 0) >= 0 ? 'text-success' : 'text-danger') + '">' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + (r.gross_profit || 0).toLocaleString() + '</td><td class="text-end">' + (r.gross_margin_pct || 0) + '%</td></tr>').join('') : '<tr><td colspan="6" class="text-center text-muted py-4">尚無資料</td></tr>'}
             </tbody>
           </table>
         </div>

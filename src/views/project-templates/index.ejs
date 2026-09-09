@@ -35,7 +35,7 @@ ${typeof error !== 'undefined' && error ? '<div class="alert alert-danger alert-
               <td>${t.project_type || '-'}</td>
               <td>${t.salesperson_name || '-'}</td>
               <td>${t.customer_name || '-'}</td>
-              <td class="text-end">$${(t.price_with_tax || 0).toLocaleString()}</td>
+              <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(t.price_with_tax || 0).toLocaleString()}</td>
               <td class="text-end">
                 <a href="/projects/new?from_template=${t.id}" class="btn btn-sm btn-success"><i class="bi bi-plus-circle"></i> 從此建立專案</a>
                 <a href="/project-templates/${t.id}/edit" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>

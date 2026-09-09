@@ -132,9 +132,9 @@ ${typeof showNotification !== 'undefined' && showNotification && (typeof upcomin
                   ${isOverdue ? '<span class="badge bg-danger ms-1">已過期</span>' : ''}
                 </td>
                 <td>${p.salesperson_name || '-'}</td>
-                <td class="text-end">$${(p.price_with_tax || 0).toLocaleString()}</td>
-                <td class="text-end ${p.total_invoiced > 0 ? 'text-success' : 'text-muted'}">$${(p.total_invoiced || 0).toLocaleString()}</td>
-                <td class="text-end ${p.uninvoiced_amount > 0 ? 'text-danger fw-bold' : ''}">$${(p.uninvoiced_amount || 0).toLocaleString()}</td>
+                <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(p.price_with_tax || 0).toLocaleString()}</td>
+                <td class="text-end ${p.total_invoiced > 0 ? 'text-success' : 'text-muted'}">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(p.total_invoiced || 0).toLocaleString()}</td>
+                <td class="text-end ${p.uninvoiced_amount > 0 ? 'text-danger fw-bold' : ''}">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(p.uninvoiced_amount || 0).toLocaleString()}</td>
                 <td><a href="/projects/${p.id}" class="btn btn-sm btn-outline-primary"><i class="bi bi-arrow-right"></i> 查看</a></td>
               </tr>
             `;
@@ -245,12 +245,12 @@ ${showNotification && (typeof upcomingInvoiceProjects !== 'undefined' && upcomin
                   ${isOverdue ? '<span class="badge bg-danger ms-1">已過期</span>' : ''}
                 </td>
                 <td>${p.salesperson_name || '-'}</td>
-                <td class="text-end">$${(p.price_with_tax || 0).toLocaleString()}</td>
+                <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(p.price_with_tax || 0).toLocaleString()}</td>
                 <td class="text-end ${p.total_invoiced > 0 ? 'text-success' : 'text-muted'}">
-                  $${(p.total_invoiced || 0).toLocaleString()}
+                  ${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(p.total_invoiced || 0).toLocaleString()}
                 </td>
                 <td class="text-end ${p.uninvoiced_amount > 0 ? 'text-danger fw-bold' : ''}">
-                  $${(p.uninvoiced_amount || 0).toLocaleString()}
+                  ${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(p.uninvoiced_amount || 0).toLocaleString()}
                 </td>
                 <td>
                   <a href="/projects/${p.id}" class="btn btn-sm btn-outline-primary">
@@ -376,7 +376,7 @@ ${typeof activityReminders !== 'undefined' && activityReminders && activityRemin
         <div class="d-flex justify-content-between align-items-center">
           <div>
             <h6 class="card-subtitle mb-2">總金額(含稅)</h6>
-            <h2 class="card-title mb-0">$${(stats.total_amount || 0).toLocaleString()}</h2>
+            <h2 class="card-title mb-0">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(stats.total_amount || 0).toLocaleString()}</h2>
           </div>
           <i class="bi bi-cash-stack fs-1 opacity-50"></i>
         </div>
@@ -391,11 +391,11 @@ ${typeof activityReminders !== 'undefined' && activityReminders && activityRemin
         <div class="d-flex justify-content-between align-items-center">
           <div>
             <h6 class="card-subtitle mb-2">總獎金</h6>
-            <h2 class="card-title mb-0">$${(bonusStats.total_bonus || 0).toLocaleString()}</h2>
+            <h2 class="card-title mb-0">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(bonusStats.total_bonus || 0).toLocaleString()}</h2>
           </div>
           <i class="bi bi-award fs-1 opacity-50"></i>
         </div>
-        <small>已發放: $${(bonusStats.paid_bonus || 0).toLocaleString()}</small>
+        <small>已發放: ${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(bonusStats.paid_bonus || 0).toLocaleString()}</small>
       </div>
     </div>
   </div>
@@ -406,7 +406,7 @@ ${typeof activityReminders !== 'undefined' && activityReminders && activityRemin
         <div class="d-flex justify-content-between align-items-center">
           <div>
             <h6 class="card-subtitle mb-2">待發放獎金</h6>
-            <h2 class="card-title mb-0">$${(bonusStats.pending_bonus || 0).toLocaleString()}</h2>
+            <h2 class="card-title mb-0">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(bonusStats.pending_bonus || 0).toLocaleString()}</h2>
           </div>
           <i class="bi bi-hourglass-split fs-1 opacity-50"></i>
         </div>
@@ -423,7 +423,7 @@ ${typeof activityReminders !== 'undefined' && activityReminders && activityRemin
         <div class="d-flex justify-content-between align-items-center">
           <div>
             <h6 class="card-subtitle mb-2">已開立發票總額</h6>
-            <h2 class="card-title mb-0">$${(invoiceStats.total_invoiced || 0).toLocaleString()}</h2>
+            <h2 class="card-title mb-0">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(invoiceStats.total_invoiced || 0).toLocaleString()}</h2>
           </div>
           <i class="bi bi-receipt fs-1 opacity-50"></i>
         </div>
@@ -438,7 +438,7 @@ ${typeof activityReminders !== 'undefined' && activityReminders && activityRemin
         <div class="d-flex justify-content-between align-items-center">
           <div>
             <h6 class="card-subtitle mb-2">未開立發票金額</h6>
-            <h2 class="card-title mb-0">$${((stats.total_amount || 0) - (invoiceStats.total_invoiced || 0)).toLocaleString()}</h2>
+            <h2 class="card-title mb-0">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${((stats.total_amount || 0) - (invoiceStats.total_invoiced || 0)).toLocaleString()}</h2>
           </div>
           <i class="bi bi-file-earmark-x fs-1 opacity-50"></i>
         </div>
@@ -453,11 +453,11 @@ ${typeof activityReminders !== 'undefined' && activityReminders && activityRemin
         <div class="d-flex justify-content-between align-items-center">
           <div>
             <h6 class="card-subtitle mb-2">已開立發票未收款總額</h6>
-            <h2 class="card-title mb-0">$${(typeof totalUnpaidInvoiced !== 'undefined' ? totalUnpaidInvoiced : 0).toLocaleString()}</h2>
+            <h2 class="card-title mb-0">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(typeof totalUnpaidInvoiced !== 'undefined' ? totalUnpaidInvoiced : 0).toLocaleString()}</h2>
           </div>
           <i class="bi bi-cash-coin fs-1 opacity-50"></i>
         </div>
-        <small>已開票: $${(invoiceStats.total_invoiced || 0).toLocaleString()} | 已收款: $${(typeof paymentStats !== 'undefined' && paymentStats.total_received ? paymentStats.total_received : 0).toLocaleString()}</small>
+        <small>已開票: ${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(invoiceStats.total_invoiced || 0).toLocaleString()} | 已收款: ${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(typeof paymentStats !== 'undefined' && paymentStats.total_received ? paymentStats.total_received : 0).toLocaleString()}</small>
       </div>
     </div>
   </div>
@@ -483,31 +483,31 @@ ${typeof separateBlocks !== 'undefined' && separateBlocks && separateBlocks.leng
           <div class="col-md-2">
             <div class="border rounded p-2 text-center">
               <div class="small text-muted">總金額</div>
-              <div class="fw-bold">$${(block.stats.total_amount || 0).toLocaleString()}</div>
+              <div class="fw-bold">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(block.stats.total_amount || 0).toLocaleString()}</div>
             </div>
           </div>
           <div class="col-md-2">
             <div class="border rounded p-2 text-center">
               <div class="small text-muted">已開立發票</div>
-              <div class="fw-bold">$${(block.invoiceStats.total_invoiced || 0).toLocaleString()}</div>
+              <div class="fw-bold">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(block.invoiceStats.total_invoiced || 0).toLocaleString()}</div>
             </div>
           </div>
           <div class="col-md-2">
             <div class="border rounded p-2 text-center">
               <div class="small text-muted">未開立發票</div>
-              <div class="fw-bold">$${((block.stats.total_amount || 0) - (block.invoiceStats.total_invoiced || 0)).toLocaleString()}</div>
+              <div class="fw-bold">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${((block.stats.total_amount || 0) - (block.invoiceStats.total_invoiced || 0)).toLocaleString()}</div>
             </div>
           </div>
           <div class="col-md-2">
             <div class="border rounded p-2 text-center">
               <div class="small text-muted">已收款</div>
-              <div class="fw-bold">$${(block.paymentStats.total_received || 0).toLocaleString()}</div>
+              <div class="fw-bold">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(block.paymentStats.total_received || 0).toLocaleString()}</div>
             </div>
           </div>
           <div class="col-md-2">
             <div class="border rounded p-2 text-center">
               <div class="small text-muted">未收款</div>
-              <div class="fw-bold">$${(block.totalUnpaidInvoiced || 0).toLocaleString()}</div>
+              <div class="fw-bold">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(block.totalUnpaidInvoiced || 0).toLocaleString()}</div>
             </div>
           </div>
         </div>
@@ -530,42 +530,42 @@ ${typeof receivablesAging !== 'undefined' && receivablesAging && receivablesAgin
           <div class="col-md-2">
             <div class="border rounded p-2 text-center ${receivablesAging.buckets.notYetDue.amount > 0 ? 'bg-success bg-opacity-10' : ''}">
               <div class="small text-muted">未到期</div>
-              <div class="fw-bold">$${(receivablesAging.buckets.notYetDue.amount || 0).toLocaleString()}</div>
+              <div class="fw-bold">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(receivablesAging.buckets.notYetDue.amount || 0).toLocaleString()}</div>
               <div class="small">${receivablesAging.buckets.notYetDue.count || 0} 筆</div>
             </div>
           </div>
           <div class="col-md-2">
             <div class="border rounded p-2 text-center ${receivablesAging.buckets.days1_30.amount > 0 ? 'bg-warning bg-opacity-25' : ''}">
               <div class="small text-muted">1-30 天</div>
-              <div class="fw-bold">$${(receivablesAging.buckets.days1_30.amount || 0).toLocaleString()}</div>
+              <div class="fw-bold">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(receivablesAging.buckets.days1_30.amount || 0).toLocaleString()}</div>
               <div class="small">${receivablesAging.buckets.days1_30.count || 0} 筆</div>
             </div>
           </div>
           <div class="col-md-2">
             <div class="border rounded p-2 text-center ${receivablesAging.buckets.days31_60.amount > 0 ? 'bg-warning bg-opacity-25' : ''}">
               <div class="small text-muted">31-60 天</div>
-              <div class="fw-bold">$${(receivablesAging.buckets.days31_60.amount || 0).toLocaleString()}</div>
+              <div class="fw-bold">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(receivablesAging.buckets.days31_60.amount || 0).toLocaleString()}</div>
               <div class="small">${receivablesAging.buckets.days31_60.count || 0} 筆</div>
             </div>
           </div>
           <div class="col-md-2">
             <div class="border rounded p-2 text-center ${receivablesAging.buckets.days61_90.amount > 0 ? 'bg-danger bg-opacity-25' : ''}">
               <div class="small text-muted">61-90 天</div>
-              <div class="fw-bold">$${(receivablesAging.buckets.days61_90.amount || 0).toLocaleString()}</div>
+              <div class="fw-bold">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(receivablesAging.buckets.days61_90.amount || 0).toLocaleString()}</div>
               <div class="small">${receivablesAging.buckets.days61_90.count || 0} 筆</div>
             </div>
           </div>
           <div class="col-md-2">
             <div class="border rounded p-2 text-center ${receivablesAging.buckets.over90.amount > 0 ? 'bg-danger bg-opacity-25' : ''}">
               <div class="small text-muted">90 天以上</div>
-              <div class="fw-bold">$${(receivablesAging.buckets.over90.amount || 0).toLocaleString()}</div>
+              <div class="fw-bold">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(receivablesAging.buckets.over90.amount || 0).toLocaleString()}</div>
               <div class="small">${receivablesAging.buckets.over90.count || 0} 筆</div>
             </div>
           </div>
           <div class="col-md-2">
             <div class="border rounded p-2 text-center ${receivablesAging.buckets.noDate.amount > 0 ? 'bg-secondary bg-opacity-25' : ''}">
               <div class="small text-muted">未設預計日</div>
-              <div class="fw-bold">$${(receivablesAging.buckets.noDate.amount || 0).toLocaleString()}</div>
+              <div class="fw-bold">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(receivablesAging.buckets.noDate.amount || 0).toLocaleString()}</div>
               <div class="small">${receivablesAging.buckets.noDate.count || 0} 筆</div>
             </div>
           </div>
@@ -619,7 +619,7 @@ ${typeof receivablesAging !== 'undefined' && receivablesAging && receivablesAgin
         <div class="mb-3 project-type-item" style="cursor: pointer;" onclick="window.location.href='${typeUrl}'" title="點擊查看 ${typeStat.type_name} 類型的專案">
           <div class="d-flex justify-content-between mb-1">
             <span><i class="bi bi-circle-fill text-${typeStat.badge_color || 'info'}"></i> <span class="text-decoration-underline">${typeStat.type_name}</span></span>
-            <span>$${(typeStat.amount || 0).toLocaleString()}</span>
+            <span>${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(typeStat.amount || 0).toLocaleString()}</span>
           </div>
           <div class="progress" style="height: 10px;">
             <div class="progress-bar bg-${typeStat.badge_color || 'info'}" style="width: ${percentage}%"></div>
@@ -687,7 +687,7 @@ ${typeof receivablesAging !== 'undefined' && receivablesAging && receivablesAgin
                   <td>${p.project_name}</td>
                   <td><span class="badge bg-${typeColor}">${p.project_type}</span></td>
                   <td>${p.salesperson_name || '-'}</td>
-                  <td>$${(p.price_with_tax || 0).toLocaleString()}</td>
+                  <td>${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(p.price_with_tax || 0).toLocaleString()}</td>
                   <td><span class="badge bg-${p.status === '已結案' ? 'secondary' : 'warning'}">${p.status}</span></td>
                 </tr>
               `;

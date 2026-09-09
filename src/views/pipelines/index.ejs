@@ -49,7 +49,7 @@ ${error ? `
       <div class="card h-100 bg-${localStatusColorMap[g.status] || 'primary'} text-white">
         <div class="card-body text-center">
           <h6 class="mb-1"><i class="bi ${statusIcon(g.status)}"></i> ${escapeHtml(g.status)}預估金額</h6>
-          <h3 class="mb-0">$${(g.amount || 0).toLocaleString()}</h3>
+          <h3 class="mb-0">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(g.amount || 0).toLocaleString()}</h3>
           <small>共 ${g.count || 0} 筆</small>
         </div>
       </div>
@@ -67,7 +67,7 @@ ${error ? `
             <div class="col">
               <div class="border rounded p-2 h-100">
                 <div class="small text-muted">${g.label ? g.label + ' ' : ''}${g.pct !== null ? g.pct + '%' : ''}</div>
-                <div class="fw-bold">$${(g.amount || 0).toLocaleString()}</div>
+                <div class="fw-bold">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(g.amount || 0).toLocaleString()}</div>
                 <div class="small text-muted">${g.count || 0} 筆</div>
               </div>
             </div>
@@ -97,7 +97,7 @@ ${error ? `
                 <tr>
                   <td>${escapeHtml(g.month)}</td>
                   <td class="text-center">${g.count || 0}</td>
-                  <td class="text-end">$${(g.amount || 0).toLocaleString()}</td>
+                  <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(g.amount || 0).toLocaleString()}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -124,7 +124,7 @@ ${error ? `
                 <tr>
                   <td>${escapeHtml(g.salesperson)}</td>
                   <td class="text-center">${g.count || 0}</td>
-                  <td class="text-end">$${(g.amount || 0).toLocaleString()}</td>
+                  <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(g.amount || 0).toLocaleString()}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -196,7 +196,7 @@ ${error ? `
               <td>${escapeHtml(p.opportunity_name)}</td>
               <td>${escapeHtml(p.customer_name) || '-'}</td>
               <td>${escapeHtml(p.salesperson_name) || '-'}</td>
-              <td class="text-end">$${(p.estimated_amount || 0).toLocaleString()}</td>
+              <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(p.estimated_amount || 0).toLocaleString()}</td>
               <td>${p.win_probability !== null && p.win_probability !== undefined ? (WIN_PROBABILITY_STAGES[p.win_probability] ? WIN_PROBABILITY_STAGES[p.win_probability] + ' ' : '') + p.win_probability + '%' : '-'}</td>
               <td>${p.expected_close_year_month || '-'}</td>
               <td>

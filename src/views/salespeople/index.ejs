@@ -70,10 +70,10 @@
                 ${s.resigned_date ? '<small class="text-muted ms-1">' + s.resigned_date + '</small>' : ''}
               </td>
               <td class="text-center">${s.project_count || 0}</td>
-              <td class="text-end">$${(s.total_amount || 0).toLocaleString()}</td>
-              <td class="text-end">$${(s.lab_amount || 0).toLocaleString()}</td>
-              <td class="text-end">$${(s.ad_amount || 0).toLocaleString()}</td>
-              <td class="text-end">$${(s.project_amount || 0).toLocaleString()}</td>
+              <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(s.total_amount || 0).toLocaleString()}</td>
+              <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(s.lab_amount || 0).toLocaleString()}</td>
+              <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(s.ad_amount || 0).toLocaleString()}</td>
+              <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(s.project_amount || 0).toLocaleString()}</td>
             </tr>
           `).join('') || '<tr><td colspan="7" class="text-center text-muted py-3">尚無業務人員</td></tr>'}
         </tbody>

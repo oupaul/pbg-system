@@ -21,7 +21,7 @@
       <div class="col-md-9">
         <div class="alert alert-info mb-0">
           <i class="bi bi-info-circle"></i> 
-          顯示最近 <strong>${days}</strong> 天的收款記錄，共 <strong>${totalCount}</strong> 筆，總金額 <strong>$${totalAmount.toLocaleString()}</strong>
+          顯示最近 <strong>${days}</strong> 天的收款記錄，共 <strong>${totalCount}</strong> 筆，總金額 <strong>${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${totalAmount.toLocaleString()}</strong>
         </div>
       </div>
     </form>
@@ -65,11 +65,11 @@ ${payments.length === 0 ? `
               <td>${p.salesperson_name || '-'}</td>
               <td><code>${p.invoice_number || '-'}</code></td>
               <td class="text-end fw-bold text-success">
-                $${(p.bank_deposit_amount || 0).toLocaleString()}
+                ${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(p.bank_deposit_amount || 0).toLocaleString()}
               </td>
               <td class="text-end ${p.payment_difference && p.payment_difference !== 0 ? 'text-warning' : ''}">
                 ${p.payment_difference && p.payment_difference !== 0 ? `
-                  <span class="badge bg-warning">${p.payment_difference > 0 ? '+' : ''}$${p.payment_difference.toLocaleString()}</span>
+                  <span class="badge bg-warning">${p.payment_difference > 0 ? '+' : ''}${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${p.payment_difference.toLocaleString()}</span>
                   ${p.difference_type ? '<br><small class="text-muted">' + p.difference_type + '</small>' : ''}
                 ` : '-'}
               </td>
@@ -85,7 +85,7 @@ ${payments.length === 0 ? `
         <tfoot class="table-light">
           <tr>
             <th colspan="7" class="text-end">總計：</th>
-            <th class="text-end text-success">$${totalAmount.toLocaleString()}</th>
+            <th class="text-end text-success">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${totalAmount.toLocaleString()}</th>
             <th colspan="3"></th>
           </tr>
         </tfoot>

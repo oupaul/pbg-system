@@ -27,8 +27,8 @@ ${success ? '<div class="alert alert-success alert-dismissible fade show" role="
       <div class="card h-100">
         <div class="card-body text-center">
           <h6 class="text-muted">${s.bonus_type}</h6>
-          <h4 class="mb-0">$${(s.total_amount || 0).toLocaleString()}</h4>
-          <small class="text-success">已發放: $${(s.paid_amount || 0).toLocaleString()}</small>
+          <h4 class="mb-0">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(s.total_amount || 0).toLocaleString()}</h4>
+          <small class="text-success">已發放: ${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(s.paid_amount || 0).toLocaleString()}</small>
         </div>
       </div>
     </div>
@@ -57,9 +57,9 @@ ${success ? '<div class="alert alert-success alert-dismissible fade show" role="
             <tr onclick="location.href='/salespeople/${s.id}?year=${selectedYear}'" style="cursor:pointer">
               <td><strong>${s.name}</strong></td>
               <td class="text-center">${s.project_count || 0}</td>
-              <td class="text-end">$${(s.total_bonus || 0).toLocaleString()}</td>
-              <td class="text-end text-success">$${(s.paid_bonus || 0).toLocaleString()}</td>
-              <td class="text-end text-warning">$${(s.pending_bonus || 0).toLocaleString()}</td>
+              <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(s.total_bonus || 0).toLocaleString()}</td>
+              <td class="text-end text-success">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(s.paid_bonus || 0).toLocaleString()}</td>
+              <td class="text-end text-warning">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(s.pending_bonus || 0).toLocaleString()}</td>
             </tr>
           `).join('') || '<tr><td colspan="5" class="text-center text-muted py-3">尚無資料</td></tr>'}
         </tbody>
@@ -137,7 +137,7 @@ ${success ? '<div class="alert alert-success alert-dismissible fade show" role="
                 <td>${b.project_name}</td>
                 <td><span class="badge bg-${typeof typeColorMap !== 'undefined' && typeColorMap[b.project_type] ? typeColorMap[b.project_type] : (b.project_type === '食驗室' ? 'primary' : b.project_type === '純廣' ? 'success' : 'info')}">${b.project_type}</span></td>
                 <td>${b.bonus_type}</td>
-                <td class="text-end fw-bold">$${(b.bonus_amount || 0).toLocaleString()}</td>
+                <td class="text-end fw-bold">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(b.bonus_amount || 0).toLocaleString()}</td>
                 <td>${b.payment_date || '-'}</td>
                 <td>
                   <span class="badge bg-${b.status === '已發放' ? 'success' : b.status === '充公' ? 'danger' : 'warning'}">${b.status}</span>

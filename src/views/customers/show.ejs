@@ -84,7 +84,7 @@ ${success ? `
     <div class="card bg-primary text-white">
       <div class="card-body text-center">
         <h6>專案數 / 總金額</h6>
-        <h4>${stats?.project_count || 0} 件 / $${(stats?.total_amount || 0).toLocaleString()}</h4>
+        <h4>${stats?.project_count || 0} 件 / ${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(stats?.total_amount || 0).toLocaleString()}</h4>
       </div>
     </div>
   </div>
@@ -112,7 +112,7 @@ ${success ? `
               <td>${p.project_name}</td>
               <td><span class="badge bg-${p.project_type === '食驗室' ? 'primary' : p.project_type === '純廣' ? 'success' : 'info'}">${p.project_type}</span></td>
               <td>${p.salesperson_name || '-'}</td>
-              <td class="text-end">${p._locked ? '<span class="text-muted">-</span>' : '$' + (p.price_with_tax || 0).toLocaleString()}</td>
+              <td class="text-end">${p._locked ? '<span class="text-muted">-</span>' : '' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + (p.price_with_tax || 0).toLocaleString()}</td>
               <td><span class="badge bg-${p.status === '已結案' ? 'secondary' : 'warning'}">${p.status}</span></td>
             </tr>
           `).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">尚無專案</td></tr>'}
@@ -144,7 +144,7 @@ ${success ? `
             <tr onclick="location.href='/pipelines/${p.id}'" style="cursor:pointer">
               <td>${escapeHtml(p.opportunity_name)}</td>
               <td>${escapeHtml(p.salesperson_name) || '-'}</td>
-              <td class="text-end">$${(p.estimated_amount || 0).toLocaleString()}</td>
+              <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(p.estimated_amount || 0).toLocaleString()}</td>
               <td>${p.expected_close_year_month || '-'}</td>
               <td><span class="badge bg-${(typeof pipelineStatusColorMap !== 'undefined' && pipelineStatusColorMap[p.status]) || 'warning'}">${escapeHtml(p.status)}</span></td>
             </tr>
@@ -188,7 +188,7 @@ ${success ? `
               <td>${r.referred_customer_name ? escapeHtml(r.referred_customer_name) : '<span class="text-muted">-</span>'}</td>
               <td>${r.project_code ? escapeHtml(r.project_code) : '<span class="text-muted">-</span>'}</td>
               <td>${recipientLabel}</td>
-              <td class="text-end">$${(r.reward_amount || 0).toLocaleString()}</td>
+              <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(r.reward_amount || 0).toLocaleString()}</td>
               <td><span class="badge bg-${statusBadge}">${r.status}</span></td>
               <td class="text-end">
                 ${locals.canEditCrm ? '<button type="button" class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editReferralModal' + r.id + '"><i class="bi bi-pencil"></i></button>' : ''}

@@ -84,6 +84,7 @@ const MIGRATIONS = [
   'migrate_pipeline_statuses',
   'migrate_remove_pipeline_status_check',
   'migrate_date_calendar_setting',
+  'migrate_currency_symbol_setting',
 ];
 
 function run() {

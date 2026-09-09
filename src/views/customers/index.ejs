@@ -174,7 +174,7 @@ ${typeof success !== 'undefined' && success ? `
               <td>${escapeHtml(c.tax_id) || '-'}</td>
               <td style="white-space: nowrap;"><strong>${escapeHtml(c.company_name) || ''}</strong></td>
               <td class="text-center">${c.project_count || 0}</td>
-              <td class="text-end">$${(c.total_project_amount || 0).toLocaleString()}</td>
+              <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(c.total_project_amount || 0).toLocaleString()}</td>
               <td>
                 <span class="badge bg-${c.party_type === '廠商' ? 'dark' : c.party_type === '兩者皆是' ? 'primary' : 'info'}">${c.party_type || '客戶'}</span>
                 ${c.vendor_type ? '<span class="badge bg-secondary">' + escapeHtml(c.vendor_type) + '</span>' : ''}

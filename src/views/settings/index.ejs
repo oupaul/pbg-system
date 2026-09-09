@@ -11,10 +11,12 @@
   const companyTaxIdSetting = localSettings.find(s => s.setting_key === 'company_tax_id');
   const taxRateSetting = localSettings.find(s => s.setting_key === 'tax_rate');
   const dateCalendarSetting = localSettings.find(s => s.setting_key === 'date_calendar_system');
+  const currencySymbolSetting = localSettings.find(s => s.setting_key === 'currency_symbol');
   const companyNameValue = companyNameSetting ? companyNameSetting.setting_value : '';
   const companyTaxIdValue = companyTaxIdSetting ? companyTaxIdSetting.setting_value : '';
   const taxRateValue = taxRateSetting ? taxRateSetting.setting_value : '5';
   const dateCalendarValue = dateCalendarSetting ? dateCalendarSetting.setting_value : 'roc';
+  const currencySymbolValue = currencySymbolSetting ? currencySymbolSetting.setting_value : '$';
 
   const notificationDaysSetting = localSettings.find(s => s.setting_key === 'invoice_notification_days_before_month_end');
   const notificationEnabledSetting = localSettings.find(s => s.setting_key === 'invoice_notification_enabled');
@@ -122,6 +124,11 @@
   bodyHtml += '            <option value="gregorian" ' + (dateCalendarValue === 'gregorian' ? 'selected' : '') + '>西元曆（例如 2026/09/09）</option>';
   bodyHtml += '          </select>';
   bodyHtml += '          <div class="form-text">影響 PDF 報表（如獎金報表）裡的日期顯示格式</div>';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="col-md-6">';
+  bodyHtml += '          <label for="currency_symbol" class="form-label"><strong>幣別符號</strong></label>';
+  bodyHtml += '          <input type="text" class="form-control" id="currency_symbol" name="currency_symbol" value="' + escapeHtml(currencySymbolValue) + '" maxlength="10" required>';
+  bodyHtml += '          <div class="form-text">畫面上金額顯示的前綴符號，例如 $、NT$、¥、€；不影響數字千分位格式</div>';
   bodyHtml += '        </div>';
   bodyHtml += '      </div>';
   bodyHtml += '      <hr class="my-4">';

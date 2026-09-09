@@ -174,15 +174,15 @@
     bodyHtml += '        <hr>';
     bodyHtml += '        <div class="mb-2">';
     bodyHtml += '          <strong>專案總金額：</strong>';
-    bodyHtml += '          <div class="text-end">$' + ((healthInfo.statistics.totalProjectAmount || 0).toLocaleString()) + '</div>';
+    bodyHtml += '          <div class="text-end">' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + ((healthInfo.statistics.totalProjectAmount || 0).toLocaleString()) + '</div>';
     bodyHtml += '        </div>';
     bodyHtml += '        <div class="mb-2">';
     bodyHtml += '          <strong>已開立發票總額：</strong>';
-    bodyHtml += '          <div class="text-end text-success">$' + ((healthInfo.statistics.totalInvoiced || 0).toLocaleString()) + '</div>';
+    bodyHtml += '          <div class="text-end text-success">' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + ((healthInfo.statistics.totalInvoiced || 0).toLocaleString()) + '</div>';
     bodyHtml += '        </div>';
     bodyHtml += '        <div class="mb-2">';
     bodyHtml += '          <strong>已收款總額：</strong>';
-    bodyHtml += '          <div class="text-end text-success">$' + ((healthInfo.statistics.totalReceived || 0).toLocaleString()) + '</div>';
+    bodyHtml += '          <div class="text-end text-success">' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + ((healthInfo.statistics.totalReceived || 0).toLocaleString()) + '</div>';
     bodyHtml += '        </div>';
   } else {
     bodyHtml += '        <div class="alert alert-warning">';

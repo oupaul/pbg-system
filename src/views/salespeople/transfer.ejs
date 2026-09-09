@@ -160,6 +160,7 @@ const ALL_PROJECTS = ${JSON.stringify(allProjects.map(p => ({
   uninvoiced_amount: p.uninvoiced_amount || 0
 }))
 )};
+const CURRENCY_SYMBOL = ${JSON.stringify(typeof currencySymbol !== 'undefined' ? currencySymbol : '$')};
 
 // 初始化計數
 (function initCounts() {
@@ -217,8 +218,8 @@ function renderTable(projects) {
   const totalUninvoiced = projects.reduce((s, p) => s + p.uninvoiced_amount, 0);
   summary.innerHTML =
     '<strong class="text-dark">' + projects.length + ' 筆</strong>，' +
-    '合計 <strong class="text-primary">$' + Math.round(totalAmount).toLocaleString() + '</strong>，' +
-    '未開票 <strong class="text-warning">$' + Math.round(totalUninvoiced).toLocaleString() + '</strong>';
+    '合計 <strong class="text-primary">' + CURRENCY_SYMBOL + Math.round(totalAmount).toLocaleString() + '</strong>，' +
+    '未開票 <strong class="text-warning">' + CURRENCY_SYMBOL + Math.round(totalUninvoiced).toLocaleString() + '</strong>';
 
   const typeColorMap = { '食驗室': 'primary', '純廣': 'success' };
   const statusColorMap = { '已結案': 'secondary', '取消': 'danger', '未結案': 'warning' };
@@ -234,9 +235,9 @@ function renderTable(projects) {
       '<td><span class="badge bg-' + typeColor + '">' + p.project_type + '</span></td>' +
       '<td><span class="badge bg-' + statusColor + '">' + p.status + '</span></td>' +
       '<td class="text-center">' + p.contract_year + '</td>' +
-      '<td class="text-end">$' + Math.round(p.price_with_tax).toLocaleString() + '</td>' +
+      '<td class="text-end">' + CURRENCY_SYMBOL + Math.round(p.price_with_tax).toLocaleString() + '</td>' +
       '<td class="text-end ' + uninvClass + '">' +
-        (p.uninvoiced_amount > 0 ? '$' + Math.round(p.uninvoiced_amount).toLocaleString() : '-') +
+        (p.uninvoiced_amount > 0 ? CURRENCY_SYMBOL + Math.round(p.uninvoiced_amount).toLocaleString() : '-') +
       '</td>' +
     '</tr>';
   }).join('');
