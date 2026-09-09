@@ -193,6 +193,16 @@ try {
   console.log('[啟動] ✓ bonusTiers 路由載入完成');
   const activityTypesRoutes = require('./routes/activityTypes');
   console.log('[啟動] ✓ activityTypes 路由載入完成');
+  const costTypesRoutes = require('./routes/costTypes');
+  console.log('[啟動] ✓ costTypes 路由載入完成');
+  const costCategoriesRoutes = require('./routes/costCategories');
+  console.log('[啟動] ✓ costCategories 路由載入完成');
+  const paymentMethodsRoutes = require('./routes/paymentMethods');
+  console.log('[啟動] ✓ paymentMethods 路由載入完成');
+  const paymentTermsRoutes = require('./routes/paymentTerms');
+  console.log('[啟動] ✓ paymentTerms 路由載入完成');
+  const orderStatusesRoutes = require('./routes/orderStatuses');
+  console.log('[啟動] ✓ orderStatuses 路由載入完成');
   const reportGroupsRoutes = require('./routes/reportGroups');
   console.log('[啟動] ✓ reportGroups 路由載入完成');
   const recentPaymentsRoutes = require('./routes/recentPayments');
@@ -254,6 +264,11 @@ try {
   app.use('/approval-chains', requireAuth, approvalChainsRoutes);
   app.use('/bonus-tiers', requireAuth, bonusTiersRoutes);
   app.use('/activity-types', requireAuth, activityTypesRoutes);
+  app.use('/cost-types', requireAuth, costTypesRoutes);
+  app.use('/cost-categories', requireAuth, costCategoriesRoutes);
+  app.use('/payment-methods', requireAuth, paymentMethodsRoutes);
+  app.use('/payment-terms', requireAuth, paymentTermsRoutes);
+  app.use('/order-statuses', requireAuth, orderStatusesRoutes);
   app.use('/report-groups', requireAuth, reportGroupsRoutes);
   app.use('/recent-payments', requireAuth, recentPaymentsRoutes);
   app.use('/sales-performance', requireAuth, salesPerformanceRoutes);

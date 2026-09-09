@@ -99,7 +99,7 @@
 
           <% if (typeof canEdit !== 'undefined' && canEdit) { %>
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle <%= navGroupActive(['/project-templates', '/import-export', '/audit-logs', '/project-types', '/pipeline-amount-options', '/bonus-types', '/bonus-tiers', '/customer-levels', '/customer-statuses', '/activity-types', '/pipeline-statuses', '/approval-chains', '/report-groups', '/roles', '/settings', '/backup-restore', '/health', '/login-history', '/notifications/broadcast']) %>" href="#" id="systemGroupDropdown" role="button" data-bs-toggle="dropdown">
+            <a class="nav-link dropdown-toggle <%= navGroupActive(['/project-templates', '/import-export', '/audit-logs', '/project-types', '/pipeline-amount-options', '/bonus-types', '/bonus-tiers', '/customer-levels', '/customer-statuses', '/activity-types', '/pipeline-statuses', '/approval-chains', '/cost-types', '/cost-categories', '/payment-methods', '/payment-terms', '/order-statuses', '/report-groups', '/roles', '/settings', '/backup-restore', '/health', '/login-history', '/notifications/broadcast']) %>" href="#" id="systemGroupDropdown" role="button" data-bs-toggle="dropdown">
               <i class="bi bi-gear-wide-connected"></i> 系統設定
             </a>
             <ul class="dropdown-menu">
@@ -117,6 +117,11 @@
               <li><a class="dropdown-item <%= navActive('/customer-statuses') %>" href="/customer-statuses"><i class="bi bi-signpost-split"></i> 客戶狀態管理</a></li>
               <li><a class="dropdown-item <%= navActive('/pipeline-statuses') %>" href="/pipeline-statuses"><i class="bi bi-bullseye"></i> 銷售機會狀態管理</a></li>
               <li><a class="dropdown-item <%= navActive('/approval-chains') %>" href="/approval-chains"><i class="bi bi-diagram-3"></i> 簽核關卡設定</a></li>
+              <li><a class="dropdown-item <%= navActive('/cost-types') %>" href="/cost-types"><i class="bi bi-tags"></i> 成本類型管理</a></li>
+              <li><a class="dropdown-item <%= navActive('/cost-categories') %>" href="/cost-categories"><i class="bi bi-tags"></i> 費用類別管理</a></li>
+              <li><a class="dropdown-item <%= navActive('/payment-methods') %>" href="/payment-methods"><i class="bi bi-credit-card"></i> 付款辦法管理</a></li>
+              <li><a class="dropdown-item <%= navActive('/payment-terms') %>" href="/payment-terms"><i class="bi bi-calendar-check"></i> 付款條件管理</a></li>
+              <li><a class="dropdown-item <%= navActive('/order-statuses') %>" href="/order-statuses"><i class="bi bi-clipboard-check"></i> 下單狀態管理</a></li>
               <li><a class="dropdown-item <%= navActive('/report-groups') %>" href="/report-groups"><i class="bi bi-collection"></i> 報表群組</a></li>
               <li><a class="dropdown-item <%= navActive('/roles') %>" href="/roles"><i class="bi bi-shield-check"></i> 角色管理</a></li>
               <li><a class="dropdown-item <%= navActive('/settings') %>" href="/settings"><i class="bi bi-gear"></i> 系統設定</a></li>

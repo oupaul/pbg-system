@@ -88,6 +88,12 @@ const MIGRATIONS = [
   'migrate_approval_chains',
   'migrate_customer_creation_request_current_step',
   'migrate_deletion_request_current_step',
+  'migrate_cost_types',
+  'migrate_cost_categories',
+  'migrate_payment_methods',
+  'migrate_payment_terms',
+  'migrate_order_statuses',
+  'migrate_cost_item_fields',
 ];
 
 function run() {

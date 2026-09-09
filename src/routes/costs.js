@@ -14,6 +14,12 @@ router.post('/', (req, res) => {
       estimated_amount: parseFloat(req.body.estimated_amount) || 0,
       actual_amount: parseFloat(req.body.actual_amount) || 0,
       notes: req.body.notes || null,
+      item_code: req.body.item_code || null,
+      item_name: req.body.item_name || '',
+      cost_category: req.body.cost_category || null,
+      payment_method: req.body.payment_method || null,
+      payment_term: req.body.payment_term || null,
+      order_status: req.body.order_status || null,
       userInfo: getUserInfo(req)
     });
 
@@ -43,6 +49,12 @@ router.post('/:id', (req, res) => {
       estimated_amount: parseFloat(req.body.estimated_amount) || 0,
       actual_amount: parseFloat(req.body.actual_amount) || 0,
       notes: req.body.notes || null,
+      item_code: req.body.item_code || null,
+      item_name: req.body.item_name || '',
+      cost_category: req.body.cost_category || null,
+      payment_method: req.body.payment_method || null,
+      payment_term: req.body.payment_term || null,
+      order_status: req.body.order_status || null,
       userInfo: getUserInfo(req)
     });
 
