@@ -182,6 +182,8 @@ try {
   console.log('[啟動] ✓ customerStatuses 路由載入完成');
   const pipelineStatusesRoutes = require('./routes/pipelineStatuses');
   console.log('[啟動] ✓ pipelineStatuses 路由載入完成');
+  const approvalChainsRoutes = require('./routes/approvalChains');
+  console.log('[啟動] ✓ approvalChains 路由載入完成');
   const bonusTiersRoutes = require('./routes/bonusTiers');
   console.log('[啟動] ✓ bonusTiers 路由載入完成');
   const activityTypesRoutes = require('./routes/activityTypes');
@@ -244,6 +246,7 @@ try {
   app.use('/customer-levels', requireAuth, customerLevelsRoutes);
   app.use('/customer-statuses', requireAuth, customerStatusesRoutes);
   app.use('/pipeline-statuses', requireAuth, pipelineStatusesRoutes);
+  app.use('/approval-chains', requireAuth, approvalChainsRoutes);
   app.use('/bonus-tiers', requireAuth, bonusTiersRoutes);
   app.use('/activity-types', requireAuth, activityTypesRoutes);
   app.use('/report-groups', requireAuth, reportGroupsRoutes);

@@ -85,6 +85,9 @@ const MIGRATIONS = [
   'migrate_remove_pipeline_status_check',
   'migrate_date_calendar_setting',
   'migrate_currency_symbol_setting',
+  'migrate_approval_chains',
+  'migrate_customer_creation_request_current_step',
+  'migrate_deletion_request_current_step',
 ];
 
 function run() {

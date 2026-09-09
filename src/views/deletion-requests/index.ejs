@@ -35,18 +35,28 @@ ${success ? `
             <th>內容摘要</th>
             <th>申請人</th>
             <th>申請時間</th>
+            ${(typeof chainSteps !== 'undefined' && chainSteps && chainSteps.length > 0) ? '<th>目前關卡</th>' : ''}
             <th></th>
           </tr>
         </thead>
         <tbody>
           ${(requests || []).length === 0 ? `
-            <tr><td colspan="5" class="text-center text-muted py-4">目前沒有待審核的刪除申請</td></tr>
-          ` : requests.map(r => `
+            <tr><td colspan="6" class="text-center text-muted py-4">目前沒有待審核的刪除申請</td></tr>
+          ` : requests.map(r => {
+            const steps = (typeof chainSteps !== 'undefined' && chainSteps) ? chainSteps : [];
+            const currentStepOrder = r.current_step || 1;
+            const stepConfig = steps.find(s => s.step_order === currentStepOrder);
+            const isMyTurn = steps.length === 0 || (stepConfig && typeof currentUserRole !== 'undefined' && stepConfig.role_key === currentUserRole);
+            const stepCell = steps.length > 0
+              ? `<td><span class="badge bg-info text-dark">第 ${currentStepOrder}/${steps.length} 關：${(stepConfig ? (stepConfig.step_name || (typeof roleNameMap !== 'undefined' && roleNameMap[stepConfig.role_key]) || stepConfig.role_key) : '設定異常')}</span>${!isMyTurn ? '<div class="text-muted small mt-1">尚未輪到您審核</div>' : ''}</td>`
+              : '';
+            return `
             <tr>
               <td><span class="badge bg-secondary">${targetLabels[r.target_type] || r.target_type}</span></td>
               <td>${r.target_link ? '<a href="' + r.target_link + '" target="_blank">' + (r.target_summary || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + ' <i class="bi bi-box-arrow-up-right small"></i></a>' : (r.target_summary || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
               <td>${r.requested_by_name || '-'}</td>
               <td>${r.requested_at}</td>
+              ${stepCell}
               <td class="text-end">
                 <div class="d-flex gap-2 justify-content-end">
                   <form action="/deletion-requests/${r.id}/approve" method="POST" onsubmit="return confirm('確定要核准並刪除這筆資料嗎？')">
@@ -58,7 +68,8 @@ ${success ? `
                 </div>
               </td>
             </tr>
-          `).join('')}
+          `;
+          }).join('')}
         </tbody>
       </table>
     </div>

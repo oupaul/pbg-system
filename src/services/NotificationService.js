@@ -120,24 +120,47 @@ const NotificationService = {
     targets.forEach(id => this.notify(id, payload));
   },
 
-  // 通知具備客戶/廠商審核權限者（admin/user，對應 customerApprovals.js 的權限檢查）
-  // 通知具備新客戶/廠商審核權限者（roles.can_approve_customer = 1）
+  // 通知具備新客戶/廠商審核權限者：有設定多層簽核時通知第一關角色，
+  // 沒有設定時維持原本走 roles.can_approve_customer = 1 的單層審核通知對象
   notifyCustomerApprovers(payload, excludeUserId = null) {
-    const rows = db.prepare(`
-      SELECT u.id FROM users u
-      JOIN roles r ON r.role_key = u.role
-      WHERE r.can_approve_customer = 1 AND u.is_active = 1
-    `).all();
+    const firstStep = db.prepare(`
+      SELECT role_key FROM approval_chain_steps
+      WHERE approval_type = 'customer_creation' AND is_active = 1
+      ORDER BY step_order ASC LIMIT 1
+    `).get();
+
+    const rows = firstStep
+      ? db.prepare(`SELECT id FROM users WHERE role = ? AND is_active = 1`).all(firstStep.role_key)
+      : db.prepare(`
+          SELECT u.id FROM users u
+          JOIN roles r ON r.role_key = u.role
+          WHERE r.can_approve_customer = 1 AND u.is_active = 1
+        `).all();
     this.notifyUsers(rows.map(r => r.id), payload, excludeUserId);
   },
 
-  // 通知具備刪除審核權限者（roles.can_delete = 1）
+  // 多層簽核推進到下一關時，通知該關卡指定角色的所有使用者
+  notifyApprovalStepApprovers(roleKey, payload, excludeUserId = null) {
+    const rows = db.prepare(`SELECT id FROM users WHERE role = ? AND is_active = 1`).all(roleKey);
+    this.notifyUsers(rows.map(r => r.id), payload, excludeUserId);
+  },
+
+  // 通知具備刪除審核權限者：有設定多層簽核時通知第一關角色，
+  // 沒有設定時維持原本走 roles.can_delete = 1 的單層審核通知對象
   notifyDeletionApprovers(payload, excludeUserId = null) {
-    const rows = db.prepare(`
-      SELECT u.id FROM users u
-      JOIN roles r ON r.role_key = u.role
-      WHERE r.can_delete = 1 AND u.is_active = 1
-    `).all();
+    const firstStep = db.prepare(`
+      SELECT role_key FROM approval_chain_steps
+      WHERE approval_type = 'deletion' AND is_active = 1
+      ORDER BY step_order ASC LIMIT 1
+    `).get();
+
+    const rows = firstStep
+      ? db.prepare(`SELECT id FROM users WHERE role = ? AND is_active = 1`).all(firstStep.role_key)
+      : db.prepare(`
+          SELECT u.id FROM users u
+          JOIN roles r ON r.role_key = u.role
+          WHERE r.can_delete = 1 AND u.is_active = 1
+        `).all();
     this.notifyUsers(rows.map(r => r.id), payload, excludeUserId);
   },
 

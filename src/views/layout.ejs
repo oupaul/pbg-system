@@ -58,7 +58,7 @@
           <li class="nav-item">
             <a class="nav-link <%= navActive('/search') %>" href="/search"><i class="bi bi-search"></i> 搜尋</a>
           </li>
-          <% if (typeof canDelete !== 'undefined' && canDelete) { %>
+          <% if (typeof canAccessDeletionApprovals !== 'undefined' && canAccessDeletionApprovals) { %>
           <li class="nav-item">
             <a class="nav-link <%= navActive('/deletion-requests') %>" href="/deletion-requests">
               <i class="bi bi-shield-check"></i> 刪除審核
@@ -69,7 +69,7 @@
           </li>
           <% } %>
 
-          <% if (typeof canApproveCustomer !== 'undefined' && canApproveCustomer) { %>
+          <% if (typeof canAccessCustomerApprovals !== 'undefined' && canAccessCustomerApprovals) { %>
           <li class="nav-item">
             <a class="nav-link <%= navActive('/customer-approvals') %>" href="/customer-approvals">
               <i class="bi bi-person-check"></i> 客戶審核
@@ -99,7 +99,7 @@
 
           <% if (typeof canEdit !== 'undefined' && canEdit) { %>
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle <%= navGroupActive(['/project-templates', '/import-export', '/audit-logs', '/project-types', '/pipeline-amount-options', '/bonus-types', '/bonus-tiers', '/customer-levels', '/customer-statuses', '/activity-types', '/pipeline-statuses', '/report-groups', '/roles', '/settings', '/backup-restore', '/health', '/login-history', '/notifications/broadcast']) %>" href="#" id="systemGroupDropdown" role="button" data-bs-toggle="dropdown">
+            <a class="nav-link dropdown-toggle <%= navGroupActive(['/project-templates', '/import-export', '/audit-logs', '/project-types', '/pipeline-amount-options', '/bonus-types', '/bonus-tiers', '/customer-levels', '/customer-statuses', '/activity-types', '/pipeline-statuses', '/approval-chains', '/report-groups', '/roles', '/settings', '/backup-restore', '/health', '/login-history', '/notifications/broadcast']) %>" href="#" id="systemGroupDropdown" role="button" data-bs-toggle="dropdown">
               <i class="bi bi-gear-wide-connected"></i> 系統設定
             </a>
             <ul class="dropdown-menu">
@@ -116,6 +116,7 @@
               <li><a class="dropdown-item <%= navActive('/customer-levels') %>" href="/customer-levels"><i class="bi bi-star"></i> 客戶等級管理</a></li>
               <li><a class="dropdown-item <%= navActive('/customer-statuses') %>" href="/customer-statuses"><i class="bi bi-signpost-split"></i> 客戶狀態管理</a></li>
               <li><a class="dropdown-item <%= navActive('/pipeline-statuses') %>" href="/pipeline-statuses"><i class="bi bi-bullseye"></i> 銷售機會狀態管理</a></li>
+              <li><a class="dropdown-item <%= navActive('/approval-chains') %>" href="/approval-chains"><i class="bi bi-diagram-3"></i> 簽核關卡設定</a></li>
               <li><a class="dropdown-item <%= navActive('/report-groups') %>" href="/report-groups"><i class="bi bi-collection"></i> 報表群組</a></li>
               <li><a class="dropdown-item <%= navActive('/roles') %>" href="/roles"><i class="bi bi-shield-check"></i> 角色管理</a></li>
               <li><a class="dropdown-item <%= navActive('/settings') %>" href="/settings"><i class="bi bi-gear"></i> 系統設定</a></li>

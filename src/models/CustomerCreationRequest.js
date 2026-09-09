@@ -1,7 +1,32 @@
 const db = require('./db');
 const Customer = require('./Customer');
 const Pipeline = require('./Pipeline');
+const ApprovalChain = require('./ApprovalChain');
 const AuditLogService = require('../services/AuditLogService');
+
+// 多層簽核：驗證審核者是否為目前關卡指定的角色，並回傳關卡資訊。
+// steps 為空陣列時代表沒有設定多層簽核（回傳 null），呼叫端應退回原本的單層審核判斷。
+function checkApprovalStep(request, reviewer) {
+  const steps = ApprovalChain.getSteps('customer_creation');
+  if (steps.length === 0) return null;
+
+  const currentStep = request.current_step || 1;
+  const stepConfig = steps.find(s => s.step_order === currentStep);
+  if (!stepConfig) {
+    throw new Error('簽核關卡設定異常，請聯絡系統管理員確認「簽核關卡設定」');
+  }
+  if (reviewer.role !== stepConfig.role_key) {
+    throw new Error(`此關卡（${stepConfig.step_name || stepConfig.role_key}）僅限對應角色審核`);
+  }
+
+  const maxOrder = Math.max(...steps.map(s => s.step_order));
+  const nextStepConfig = steps.find(s => s.step_order > currentStep);
+  return {
+    isLastStep: currentStep >= maxOrder || !nextStepConfig,
+    nextStep: nextStepConfig ? nextStepConfig.step_order : null,
+    nextStepConfig
+  };
+}
 
 // 是否綁定了銷售機會（新增銷售機會時使用「快速新增客戶/廠商」且非管理員/專案管理員送審）
 function hasBundledPipeline(request) {
@@ -142,11 +167,23 @@ const CustomerCreationRequest = {
     return true;
   },
 
-  // 核准：真正建立 customers 資料列；若申請有綁定銷售機會，一併建立該銷售機會
+  // 核准：若有設定多層簽核且尚未到最後一關，只推進到下一關（維持 pending，不建立客戶）；
+  // 沒有設定多層簽核，或已經是最後一關，才真正建立 customers 資料列
+  // （若申請有綁定銷售機會，一併建立該銷售機會）
   approve(id, reviewer) {
     const request = this.findById(id);
     if (!request) throw new Error('找不到此申請');
     if (request.request_status !== 'pending') throw new Error('此申請已被處理過');
+
+    const stepResult = checkApprovalStep(request, reviewer);
+    if (stepResult && !stepResult.isLastStep) {
+      db.prepare(`UPDATE customer_creation_requests SET current_step = ? WHERE id = ?`).run(stepResult.nextStep, id);
+      AuditLogService.logUpdate('customer_creation_requests', id,
+        { current_step: request.current_step || 1 },
+        { current_step: stepResult.nextStep },
+        reviewer.name || reviewer.username);
+      return { advanced: true, nextStep: stepResult.nextStep, nextStepConfig: stepResult.nextStepConfig };
+    }
 
     const customerId = Customer.create({
       customer_code: request.customer_code,
@@ -195,11 +232,14 @@ const CustomerCreationRequest = {
     return { customerId, pipelineId };
   },
 
-  // 駁回：不會建立客戶資料，綁定的銷售機會也一併作廢
+  // 駁回：不會建立客戶資料，綁定的銷售機會也一併作廢。多層簽核時，任一關卡的
+  // 審核者都可以直接駁回整份申請（不需要等其他關卡）
   reject(id, reviewer, reviewNote) {
     const request = this.findById(id);
     if (!request) throw new Error('找不到此申請');
     if (request.request_status !== 'pending') throw new Error('此申請已被處理過');
+
+    checkApprovalStep(request, reviewer);
 
     db.prepare(`
       UPDATE customer_creation_requests

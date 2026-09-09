@@ -44,13 +44,22 @@ ${success ? `
             <th>聯絡人</th>
             <th>申請人</th>
             <th>申請時間</th>
+            ${(typeof chainSteps !== 'undefined' && chainSteps && chainSteps.length > 0) ? '<th>目前關卡</th>' : ''}
             <th></th>
           </tr>
         </thead>
         <tbody>
           ${(requests || []).length === 0 ? `
-            <tr><td colspan="8" class="text-center text-muted py-4">目前沒有待審核的新客戶/廠商申請</td></tr>
-          ` : requests.map(r => `
+            <tr><td colspan="9" class="text-center text-muted py-4">目前沒有待審核的新客戶/廠商申請</td></tr>
+          ` : requests.map(r => {
+            const steps = (typeof chainSteps !== 'undefined' && chainSteps) ? chainSteps : [];
+            const currentStepOrder = r.current_step || 1;
+            const stepConfig = steps.find(s => s.step_order === currentStepOrder);
+            const isMyTurn = steps.length === 0 || (stepConfig && typeof currentUserRole !== 'undefined' && stepConfig.role_key === currentUserRole);
+            const stepCell = steps.length > 0
+              ? `<td><span class="badge bg-info text-dark">第 ${currentStepOrder}/${steps.length} 關：${(stepConfig ? (stepConfig.step_name || (typeof roleNameMap !== 'undefined' && roleNameMap[stepConfig.role_key]) || stepConfig.role_key) : '設定異常')}</span>${!isMyTurn ? '<div class="text-muted small mt-1">尚未輪到您審核</div>' : ''}</td>`
+              : '';
+            return `
             <tr>
               <td>
                 <span class="badge bg-${r.party_type === '廠商' ? 'dark' : r.party_type === '兩者皆是' ? 'primary' : 'info'}">${r.party_type}</span>
@@ -63,6 +72,7 @@ ${success ? `
               <td>${r.contact_name || '-'}</td>
               <td>${r.requested_by_name || '-'}</td>
               <td>${r.requested_at}</td>
+              ${stepCell}
               <td class="text-end">
                 <div class="d-flex gap-2 justify-content-end">
                   <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#editModal${r.id}">
@@ -74,7 +84,8 @@ ${success ? `
                 </div>
               </td>
             </tr>
-          `).join('')}
+          `;
+          }).join('')}
         </tbody>
       </table>
     </div>

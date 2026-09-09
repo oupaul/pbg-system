@@ -7,6 +7,8 @@ const Pipeline = require('../models/Pipeline');
 const db = require('../models/db');
 const CustomerLevels = require('./customerLevels');
 const CustomerStatuses = require('./customerStatuses');
+const ApprovalChain = require('../models/ApprovalChain');
+const Role = require('../models/Role');
 const NotificationService = require('../services/NotificationService');
 const { requireCustomerApprovalPermission } = require('../middleware/auth');
 
@@ -42,6 +44,9 @@ function extractEditableFields(body) {
 // 待審核新客戶/廠商列表
 router.get('/', requireCustomerApprovalPermission, (req, res) => {
   const requests = CustomerCreationRequest.findPending();
+  const chainSteps = ApprovalChain.getSteps('customer_creation');
+  const roleNameMap = {};
+  Role.findAll(true).forEach(r => { roleNameMap[r.role_key] = r.role_name; });
 
   res.render('customer-approvals/index', {
     title: '客戶/廠商審核',
@@ -51,6 +56,9 @@ router.get('/', requireCustomerApprovalPermission, (req, res) => {
     projectTypes: getActiveProjectTypes(),
     customerLevels: CustomerLevels.findActive(),
     customerStatuses: CustomerStatuses.findActive(),
+    chainSteps,
+    roleNameMap,
+    currentUserRole: req.user.role,
     error: req.query.error || '',
     success: req.query.success || ''
   });
@@ -65,7 +73,24 @@ router.post('/:id/approve', requireCustomerApprovalPermission, (req, res) => {
     }
 
     const request = CustomerCreationRequest.findById(req.params.id);
-    const { customerId, pipelineId } = CustomerCreationRequest.approve(req.params.id, req.user);
+    const result = CustomerCreationRequest.approve(req.params.id, req.user);
+
+    if (result.advanced) {
+      // 多層簽核：這一關通過了，但還沒到最後一關，通知下一關的角色，不通知申請人
+      if (request && result.nextStepConfig) {
+        NotificationService.notifyApprovalStepApprovers(result.nextStepConfig.role_key, {
+          type: 'customer_approval_pending',
+          title: `待審核（${result.nextStepConfig.step_name || result.nextStepConfig.role_key}）：${request.company_name}`,
+          message: `上一關已核准，審核人：${req.user.name || req.user.username}`,
+          link: '/customer-approvals',
+          related_type: 'customer_creation_request',
+          related_id: request.id
+        }, req.user.id);
+      }
+      return res.redirect('/customer-approvals?success=' + encodeURIComponent('此關卡已核准，已轉交下一關審核'));
+    }
+
+    const { customerId, pipelineId } = result;
     if (request) {
       const approvedPipeline = pipelineId ? Pipeline.findById(pipelineId) : null;
       NotificationService.notify(request.requested_by, {

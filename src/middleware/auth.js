@@ -10,6 +10,20 @@ function getRolePermissions(roleKey) {
   }
 }
 
+// 多層簽核：即使角色沒有對應的單層審核旗標，只要被設定為某一關的審核角色也算有權限，
+// 這樣才能存取審核列表頁面去處理輪到自己的那一關（實際能不能核准/駁回由 model 層再驗證一次）
+function isApprovalChainRole(approvalType, roleKey) {
+  try {
+    const db = require('../models/db');
+    const row = db.prepare(`
+      SELECT 1 FROM approval_chain_steps WHERE approval_type = ? AND role_key = ? AND is_active = 1 LIMIT 1
+    `).get(approvalType, roleKey);
+    return !!row;
+  } catch {
+    return false;
+  }
+}
+
 const requireAuth = (req, res, next) => {
   if (req.path === '/login' || req.path === '/logout') return next();
 
@@ -70,6 +84,7 @@ const requireDeletePermission = (req, res, next) => {
 
   const role = getRolePermissions(req.user.role);
   if (role && role.can_delete) return next();
+  if (isApprovalChainRole('deletion', req.user.role)) return next();
 
   if (req.accepts('html')) {
     return res.status(403).render('error', { title: '權限不足', message: '此功能僅限具備刪除權限的角色使用', error: {} });
@@ -88,6 +103,7 @@ const requireCustomerApprovalPermission = (req, res, next) => {
 
   const role = getRolePermissions(req.user.role);
   if (role && role.can_approve_customer) return next();
+  if (isApprovalChainRole('customer_creation', req.user.role)) return next();
 
   if (req.accepts('html')) {
     return res.status(403).render('error', { title: '權限不足', message: '此功能僅限具備審核權限的角色使用', error: {} });
@@ -164,6 +180,10 @@ const setUserPermissions = (req, res, next) => {
     req.user.canDelete = role ? !!role.can_delete : req.user.canEdit;
     req.user.canEditCrm = role ? !!role.can_edit_crm : req.user.canEdit || req.user.role === ROLES.SALESPERSON;
     req.user.canApproveCustomer = role ? !!role.can_approve_customer : (req.user.role === ROLES.ADMIN || req.user.role === ROLES.USER);
+    // 多層簽核設定的關卡角色也要能看到審核列表頁與待審核數量，即使沒有單層審核旗標
+    // （例如只被設定為「總經理」那一關，本身不需要 can_approve_customer/can_delete）
+    req.user.canAccessCustomerApprovals = req.user.canApproveCustomer || isApprovalChainRole('customer_creation', req.user.role);
+    req.user.canAccessDeletionApprovals = req.user.canDelete || isApprovalChainRole('deletion', req.user.role);
     req.user.isAdmin = role ? !!role.can_manage_users : req.user.role === ROLES.ADMIN;
     req.user.isReadOnly = !req.user.canEdit;
     req.user.isSalesperson = req.user.role === ROLES.SALESPERSON;
@@ -184,10 +204,12 @@ const setUserPermissions = (req, res, next) => {
     res.locals.canEditCrm = req.user.canEditCrm;
     res.locals.canDelete = req.user.canDelete;
     res.locals.canApproveCustomer = req.user.canApproveCustomer;
+    res.locals.canAccessCustomerApprovals = req.user.canAccessCustomerApprovals;
+    res.locals.canAccessDeletionApprovals = req.user.canAccessDeletionApprovals;
     res.locals.isAdmin = req.user.isAdmin;
     res.locals.isReadOnly = req.user.isReadOnly;
 
-    if (req.user.canDelete) {
+    if (req.user.canAccessDeletionApprovals) {
       try {
         const db = require('../models/db');
         const row = db.prepare(`SELECT COUNT(*) as count FROM deletion_requests WHERE status = 'pending'`).get();
@@ -197,8 +219,8 @@ const setUserPermissions = (req, res, next) => {
       }
     }
 
-    // 新客戶/廠商審核：僅具備 can_approve_customer 權限的角色能核准，才需要看到待審核數量
-    if (req.user.canApproveCustomer) {
+    // 新客戶/廠商審核：具備 can_approve_customer 權限或是多層簽核某一關的角色，才需要看到待審核數量
+    if (req.user.canAccessCustomerApprovals) {
       try {
         const db = require('../models/db');
         const row = db.prepare(`SELECT COUNT(*) as count FROM customer_creation_requests WHERE request_status = 'pending'`).get();

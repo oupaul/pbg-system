@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const DeletionRequest = require('../models/DeletionRequest');
 const Activity = require('../models/Activity');
+const ApprovalChain = require('../models/ApprovalChain');
+const Role = require('../models/Role');
 const { requireDeletePermission } = require('../middleware/auth');
 const NotificationService = require('../services/NotificationService');
 
@@ -32,11 +34,17 @@ router.get('/', requireDeletePermission, (req, res) => {
     ...r,
     target_link: buildTargetLink(r)
   }));
+  const chainSteps = ApprovalChain.getSteps('deletion');
+  const roleNameMap = {};
+  Role.findAll(true).forEach(r => { roleNameMap[r.role_key] = r.role_name; });
 
   res.render('deletion-requests/index', {
     title: '刪除審核',
     requests,
     targetLabels: TARGET_LABELS,
+    chainSteps,
+    roleNameMap,
+    currentUserRole: req.user.role,
     error: req.query.error || '',
     success: req.query.success || ''
   });
@@ -46,7 +54,23 @@ router.get('/', requireDeletePermission, (req, res) => {
 router.post('/:id/approve', requireDeletePermission, (req, res) => {
   try {
     const request = DeletionRequest.findById(req.params.id);
-    DeletionRequest.approve(req.params.id, req.user);
+    const result = DeletionRequest.approve(req.params.id, req.user);
+
+    if (result && result.advanced) {
+      // 多層簽核：這一關通過了，但還沒到最後一關，通知下一關的角色，不通知申請人
+      if (request && result.nextStepConfig) {
+        NotificationService.notifyApprovalStepApprovers(result.nextStepConfig.role_key, {
+          type: 'deletion_request_pending',
+          title: `待審核（${result.nextStepConfig.step_name || result.nextStepConfig.role_key}）：${request.target_summary || ''}`,
+          message: `上一關已核准，審核人：${req.user.name || req.user.username}`,
+          link: '/deletion-requests',
+          related_type: 'deletion_request',
+          related_id: request.id
+        }, req.user.id);
+      }
+      return res.redirect('/deletion-requests?success=' + encodeURIComponent('此關卡已核准，已轉交下一關審核'));
+    }
+
     if (request) {
       NotificationService.notify(request.requested_by, {
         type: 'deletion_request_approved',

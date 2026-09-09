@@ -1,0 +1,174 @@
+<%
+  function escapeHtml(str) {
+    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  const localRoles = roles || [];
+%>
+<%- include('../layout', { body: `
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2><i class="bi bi-diagram-3"></i> 簽核關卡設定</h2>
+</div>
+
+${error ? `
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-circle"></i> ${escapeHtml(error)}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+${success ? `
+  <div class="alert alert-success alert-dismissible fade show" role="alert">
+    <i class="bi bi-check-circle"></i> ${escapeHtml(success)}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+<div class="alert alert-info">
+  <i class="bi bi-info-circle"></i> 每種申請類型都可以設定多關依序審核（例如先主管、後總經理），依序由上到下審核，全部通過才會真正執行。<strong>不設定任何關卡時，維持原本的單層審核方式</strong>（走角色管理頁面的「新客戶/廠商審核」「刪除資料」權限旗標）。任一關卡都可以直接駁回整份申請，不需要等其他關卡。
+</div>
+
+${localRoles.length === 0 ? `
+<div class="alert alert-warning">
+  <i class="bi bi-exclamation-triangle"></i> 目前沒有任何角色，請先到「角色管理」確認角色設定。
+</div>
+` : Object.keys(approvalTypes).map(type => {
+  const steps = chains[type] || [];
+  const typeLabel = approvalTypes[type];
+  return `
+<div class="card mb-4">
+  <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+    <h5 class="mb-0"><i class="bi bi-signpost-2"></i> ${escapeHtml(typeLabel)}</h5>
+    <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#addStepModal-${type}">
+      <i class="bi bi-plus-circle"></i> 新增關卡
+    </button>
+  </div>
+  <div class="card-body p-0">
+    ${steps.length === 0 ? `
+      <div class="text-center text-muted py-4">尚未設定關卡，目前為單層審核</div>
+    ` : `
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 60px;">順序</th>
+            <th>關卡名稱</th>
+            <th>審核角色</th>
+            <th>狀態</th>
+            <th style="width: 260px;">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${steps.map((s, idx) => {
+            const roleObj = localRoles.find(r => r.role_key === s.role_key);
+            const roleLabel = roleObj ? roleObj.role_name : s.role_key;
+            return `
+            <tr>
+              <td>${s.step_order}</td>
+              <td>${escapeHtml(s.step_name || '（未命名）')}</td>
+              <td><span class="badge bg-secondary">${escapeHtml(roleLabel)}</span></td>
+              <td>${s.is_active === 1 ? '<span class="badge bg-success">啟用</span>' : '<span class="badge bg-secondary">停用</span>'}</td>
+              <td>
+                <form action="/approval-chains/reorder/${s.id}" method="POST" style="display:inline">
+                  <input type="hidden" name="direction" value="up">
+                  <button type="submit" class="btn btn-sm btn-outline-secondary" ${idx === 0 ? 'disabled' : ''} title="上移"><i class="bi bi-arrow-up"></i></button>
+                </form>
+                <form action="/approval-chains/reorder/${s.id}" method="POST" style="display:inline">
+                  <input type="hidden" name="direction" value="down">
+                  <button type="submit" class="btn btn-sm btn-outline-secondary" ${idx === steps.length - 1 ? 'disabled' : ''} title="下移"><i class="bi bi-arrow-down"></i></button>
+                </form>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="editStep(${s.id}, '${type}', '${s.role_key}', '${escapeHtml(s.step_name || '').replace(/'/g, "\\'")}', ${s.is_active})">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <form action="/approval-chains/delete/${s.id}" method="POST" style="display:inline" onsubmit="return confirm('確定要刪除此關卡？')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+          `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+    `}
+  </div>
+</div>
+
+<div class="modal fade" id="addStepModal-${type}" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="/approval-chains/create">
+        <input type="hidden" name="approval_type" value="${type}">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-plus-circle"></i> 新增關卡：${escapeHtml(typeLabel)}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">關卡名稱</label>
+            <input type="text" name="step_name" class="form-control" maxlength="20" placeholder="例如：主管審核">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">審核角色 <span class="text-danger">*</span></label>
+            <select name="role_key" class="form-select" required>
+              ${localRoles.map(r => `<option value="${r.role_key}">${escapeHtml(r.role_name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-text">新關卡會加在最後一關之後，可以之後用上移/下移調整順序</div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+`;
+}).join('')}
+
+<div class="modal fade" id="editStepModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="/approval-chains/update/" id="editStepForm">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-pencil"></i> 編輯關卡</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">關卡名稱</label>
+            <input type="text" name="step_name" id="editStepName" class="form-control" maxlength="20">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">審核角色 <span class="text-danger">*</span></label>
+            <select name="role_key" id="editStepRole" class="form-select" required>
+              ${localRoles.map(r => `<option value="${r.role_key}">${escapeHtml(r.role_name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="is_active" id="editStepActive" value="1">
+              <label class="form-check-label" for="editStepActive">啟用</label>
+            </div>
+            <small class="form-text text-muted">若有申請正卡在此關卡，會被擋下無法停用，請先處理完畢</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">儲存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function editStep(id, type, roleKey, stepName, isActive) {
+  document.getElementById('editStepForm').action = '/approval-chains/update/' + id;
+  document.getElementById('editStepName').value = stepName;
+  document.getElementById('editStepRole').value = roleKey;
+  document.getElementById('editStepActive').checked = isActive === 1;
+  new bootstrap.Modal(document.getElementById('editStepModal')).show();
+}
+</script>
+` }) %>
