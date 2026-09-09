@@ -1,6 +1,6 @@
 <%
   // 成交機率固定對應銷售階段名稱，供顯示用
-  const WIN_PROBABILITY_STAGES = { 10: '初步接洽', 30: '需求分析', 50: '提案報價', 100: '商務談判' };
+  const WIN_PROBABILITY_STAGE_LABELS = typeof winProbabilityStageLabels !== 'undefined' ? winProbabilityStageLabels : {};
   // 商機名稱、客戶/業務姓名皆為自由文字欄位，輸出前需跳脫，避免儲存型 XSS
   function escapeHtml(str) {
     return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -93,7 +93,7 @@ ${pendingDeletion ? `
     <div class="card">
       <div class="card-body">
         <h6 class="text-muted">預計成交月份 / 機率</h6>
-        <p class="fs-5 mb-0">${pipeline.expected_close_year_month || '-'} ${pipeline.win_probability !== null && pipeline.win_probability !== undefined ? '(' + (WIN_PROBABILITY_STAGES[pipeline.win_probability] ? WIN_PROBABILITY_STAGES[pipeline.win_probability] + ' ' : '') + pipeline.win_probability + '%)' : ''}</p>
+        <p class="fs-5 mb-0">${pipeline.expected_close_year_month || '-'} ${pipeline.win_probability !== null && pipeline.win_probability !== undefined ? '(' + (WIN_PROBABILITY_STAGE_LABELS[pipeline.win_probability] ? WIN_PROBABILITY_STAGE_LABELS[pipeline.win_probability] + ' ' : '') + pipeline.win_probability + '%)' : ''}</p>
       </div>
     </div>
   </div>

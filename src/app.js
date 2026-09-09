@@ -4,6 +4,7 @@ const express = require('express');
 const path = require('path');
 const multer = require('multer');
 const session = require('express-session');
+const { WIN_PROBABILITY_STAGES, WIN_PROBABILITY_STAGE_LABELS } = require('./constants');
 
 console.log('[啟動] Express 模組載入完成');
 
@@ -123,6 +124,10 @@ app.use((req, res, next) => {
 
   // 金額顯示的幣別符號前綴，供所有視圖使用（取代原本寫死的 '$'）
   res.locals.currencySymbol = getSystemSetting('currency_symbol', '$');
+
+  // 銷售機會成交機率階段對照表，供所有視圖使用（EJS 樣板無法直接 require，改由此處統一注入）
+  res.locals.winProbabilityStages = WIN_PROBABILITY_STAGES;
+  res.locals.winProbabilityStageLabels = WIN_PROBABILITY_STAGE_LABELS;
 
   // 目前路徑，供導覽列標示當前所在頁面使用
   res.locals.currentPath = req.path;

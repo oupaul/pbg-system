@@ -13,7 +13,7 @@ const ActivityReminderService = require('./ActivityReminderService');
 const EmailService = require('./EmailService');
 const LineService = require('./LineService');
 const User = require('../models/User');
-const { ONLINE_THRESHOLD_MINUTES } = require('../constants');
+const { ONLINE_THRESHOLD_MINUTES, WIN_PROBABILITY_STAGE_LABELS } = require('../constants');
 
 // 僅這些「重要事件」類型會嘗試透過 Email/LINE 發送，一般系統提醒（客戶追蹤、開票提醒）不發送，避免訊息轟炸
 const EXTERNAL_CHANNEL_TYPES = new Set([
@@ -74,12 +74,10 @@ function getSystemSetting(key, defaultValue) {
   }
 }
 
-const WIN_PROBABILITY_STAGES = { 10: '初步接洽', 30: '需求分析', 50: '提案報價', 100: '商務談判' };
-
 // 通知內文用：把銷售機會的實際內容組成人看得懂的摘要文字（客戶、金額、機率、預計成交月份等）
 function formatPipelineSummary(pipeline) {
   if (!pipeline) return '';
-  const stageLabel = WIN_PROBABILITY_STAGES[pipeline.win_probability];
+  const stageLabel = WIN_PROBABILITY_STAGE_LABELS[pipeline.win_probability];
   const probText = pipeline.win_probability !== null && pipeline.win_probability !== undefined
     ? (stageLabel ? `${stageLabel} ${pipeline.win_probability}%` : `${pipeline.win_probability}%`)
     : '-';

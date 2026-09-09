@@ -1,5 +1,5 @@
 <%
-  const WIN_PROBABILITY_STAGES = { 10: '初步接洽', 30: '需求分析', 50: '提案報價', 100: '商務談判' };
+  const WIN_PROBABILITY_STAGE_LABELS = typeof winProbabilityStageLabels !== 'undefined' ? winProbabilityStageLabels : {};
   const localPipelineStatuses = typeof pipelineStatuses !== 'undefined' && pipelineStatuses ? pipelineStatuses : [];
   const localStatusColorMap = typeof pipelineStatusColorMap !== 'undefined' && pipelineStatusColorMap ? pipelineStatusColorMap : {};
   // 卡片圖示依贏單/輸單旗標決定，沒有對應設定的狀態（含尚未設定 pipeline_statuses 時）一律用預設現金圖示
@@ -197,7 +197,7 @@ ${error ? `
               <td>${escapeHtml(p.customer_name) || '-'}</td>
               <td>${escapeHtml(p.salesperson_name) || '-'}</td>
               <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(p.estimated_amount || 0).toLocaleString()}</td>
-              <td>${p.win_probability !== null && p.win_probability !== undefined ? (WIN_PROBABILITY_STAGES[p.win_probability] ? WIN_PROBABILITY_STAGES[p.win_probability] + ' ' : '') + p.win_probability + '%' : '-'}</td>
+              <td>${p.win_probability !== null && p.win_probability !== undefined ? (WIN_PROBABILITY_STAGE_LABELS[p.win_probability] ? WIN_PROBABILITY_STAGE_LABELS[p.win_probability] + ' ' : '') + p.win_probability + '%' : '-'}</td>
               <td>${p.expected_close_year_month || '-'}</td>
               <td>
                 <span class="badge bg-${localStatusColorMap[p.status] || 'warning'}">${escapeHtml(p.status)}</span>

@@ -13,6 +13,7 @@ const PipelineStatuses = require('./pipelineStatuses');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireEditPermission, requireCrmEditPermission } = require('../middleware/auth');
 const cache = require('../services/CacheService');
+const { WIN_PROBABILITY_STAGE_LABELS } = require('../constants');
 const NotificationService = require('../services/NotificationService');
 
 function getActiveProjectTypes() {
@@ -36,8 +37,6 @@ function getTypeColorMap() {
   } catch (e) { /* ignore */ }
   return typeColorMap;
 }
-
-const WIN_PROBABILITY_STAGES = { 10: '初步接洽', 30: '需求分析', 50: '提案報價', 100: '商務談判' };
 
 function getActivePipelineStatusNames() {
   try {
@@ -72,7 +71,7 @@ function buildPipelineSummary(pipelines) {
   const byProbability = [...probabilityGroups.entries()]
     .map(([pct, v]) => ({
       pct,
-      label: pct !== null ? (WIN_PROBABILITY_STAGES[pct] || '') : '未設定',
+      label: pct !== null ? (WIN_PROBABILITY_STAGE_LABELS[pct] || '') : '未設定',
       amount: v.amount,
       count: v.count
     }))

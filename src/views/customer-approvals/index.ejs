@@ -1,10 +1,5 @@
 <%
-  const WIN_PROBABILITY_STAGES = [
-    { pct: 10, label: '初步接洽' },
-    { pct: 30, label: '需求分析' },
-    { pct: 50, label: '提案報價' },
-    { pct: 100, label: '商務談判' }
-  ];
+  const WIN_PROBABILITY_STAGES = typeof winProbabilityStages !== 'undefined' ? winProbabilityStages : [];
   function escapeHtml(str) {
     return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
