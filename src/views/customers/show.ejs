@@ -90,6 +90,28 @@ ${success ? `
   </div>
 </div>
 
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pane-projects" type="button" role="tab"><i class="bi bi-folder"></i> 專案列表</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-pipelines" type="button" role="tab"><i class="bi bi-bullseye"></i> 銷售機會</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-referrals" type="button" role="tab"><i class="bi bi-gift"></i> 轉介紹紀錄</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-activities" type="button" role="tab"><i class="bi bi-clock-history"></i> 活動紀錄</button>
+  </li>
+  ${locals.canEditCrm ? `
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-edit" type="button" role="tab"><i class="bi bi-gear"></i> 編輯資料</button>
+  </li>
+  ` : ''}
+</ul>
+
+<div class="tab-content">
+<div class="tab-pane fade show active" id="pane-projects" role="tabpanel">
 <div class="card mb-4">
   <div class="card-header"><i class="bi bi-folder"></i> 專案列表</div>
   <div class="card-body p-0">
@@ -121,7 +143,9 @@ ${success ? `
     </div>
   </div>
 </div>
+</div>
 
+<div class="tab-pane fade" id="pane-pipelines" role="tabpanel">
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center">
     <span><i class="bi bi-bullseye"></i> 銷售機會</span>
@@ -154,7 +178,9 @@ ${success ? `
     </div>
   </div>
 </div>
+</div>
 
+<div class="tab-pane fade" id="pane-referrals" role="tabpanel">
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center">
     <span><i class="bi bi-gift"></i> 轉介紹紀錄</span>
@@ -202,7 +228,9 @@ ${success ? `
     </div>
   </div>
 </div>
+</div>
 
+<div class="tab-pane fade" id="pane-activities" role="tabpanel">
 <div class="card mb-4">
   <div class="card-header"><i class="bi bi-clock-history"></i> 活動紀錄</div>
   <div class="card-body">
@@ -250,8 +278,10 @@ ${success ? `
     </ul>
   </div>
 </div>
+</div>
 
 ${locals.canEditCrm ? `
+<div class="tab-pane fade" id="pane-edit" role="tabpanel">
 <div class="card">
   <div class="card-header"><i class="bi bi-gear"></i> 編輯資料</div>
   <div class="card-body">
@@ -357,7 +387,9 @@ ${locals.canEditCrm ? `
     </form>
   </div>
 </div>
+</div>
 ` : ''}
+</div>
 
 ${locals.canEditCrm ? `
 <!-- 新增轉介紹 Modal -->
