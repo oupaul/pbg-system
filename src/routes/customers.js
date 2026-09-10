@@ -1,4 +1,7 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const router = express.Router();
 const Customer = require('../models/Customer');
 const Project = require('../models/Project');
@@ -14,8 +17,16 @@ const CustomerCreationRequest = require('../models/CustomerCreationRequest');
 const User = require('../models/User');
 const db = require('../models/db');
 const { getUserInfo } = require('../utils/authHelper');
-const { requireCrmEditPermission } = require('../middleware/auth');
+const { requireCrmEditPermission, requireAdmin } = require('../middleware/auth');
 const NotificationService = require('../services/NotificationService');
+const ExcelExportService = require('../services/ExcelExportService');
+const ExcelImportService = require('../services/ExcelImportService');
+
+// 客戶/廠商批次匯入專用的上傳中介層（管理者專用，沿用既有的 uploads/ 暫存目錄）
+const customerImportUpload = multer({
+  dest: path.join(__dirname, '..', '..', 'uploads'),
+  limits: { fileSize: 10 * 1024 * 1024 }
+});
 
 // 新增客戶/廠商是否需要送審：能核准他人申請的角色（roles.can_approve_customer）
 // 直接建立即可，不需要自己送審給自己審；其餘角色（業務員、自訂角色等）
@@ -39,6 +50,16 @@ router.get('/', (req, res) => {
     const partyTypeFilter = req.query.party_type || '';
     // 廠商類型篩選（個人/公司，僅在篩選廠商時有意義）
     const vendorTypeFilter = req.query.vendor_type || '';
+
+    // 批次匯入結果（比照 import-export 頁面的做法，塞在 query string 裡導回本頁顯示）
+    let importResult = null;
+    if (req.query.importResult) {
+      try {
+        importResult = JSON.parse(decodeURIComponent(req.query.importResult));
+      } catch (parseErr) {
+        console.error('解析客戶批次匯入結果失敗:', parseErr.message);
+      }
+    }
 
     // 客戶/廠商資料對所有登入者開放（僅專案依權限範圍過濾），根據是否有搜尋關鍵字決定使用哪個方法
     let customers = searchKeyword
@@ -162,7 +183,8 @@ router.get('/', (req, res) => {
       customerStatusColorMap: CustomerStatuses.findColorMap(),
       req: req,
       error: req.query.error || '',
-      success: req.query.success || ''
+      success: req.query.success || '',
+      importResult
     });
   } catch (err) {
     console.error('客戶列表錯誤:', err);
@@ -172,6 +194,66 @@ router.get('/', (req, res) => {
       message: '載入客戶列表時發生錯誤',
       error: process.env.NODE_ENV === 'development' ? err : {}
     });
+  }
+});
+
+// 客戶/廠商批次匯入範本下載（管理者專用）
+router.get('/import/template', requireAdmin, async (req, res) => {
+  try {
+    const workbook = ExcelExportService.generateCustomerTemplate();
+    const buffer = await ExcelExportService.writeToBuffer(workbook);
+
+    const filename = '客戶廠商匯入範本.xlsx';
+    const encodedFilename = encodeURIComponent(filename).replace(/'/g, '%27');
+    const nodeBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFilename}`);
+    res.setHeader('Content-Length', nodeBuffer.length);
+    res.send(nodeBuffer);
+  } catch (err) {
+    console.error('下載客戶批次匯入範本失敗:', err);
+    res.redirect('/customers?error=' + encodeURIComponent(err.message));
+  }
+});
+
+// 客戶/廠商批次匯入（管理者專用）：直接建立，不經過新增客戶的審核流程
+router.post('/import', requireAdmin, customerImportUpload.single('file'), async (req, res) => {
+  let filePath = null;
+  try {
+    if (!req.file) {
+      return res.redirect('/customers?error=' + encodeURIComponent('請選擇檔案'));
+    }
+    filePath = req.file.path;
+
+    const result = await ExcelImportService.importCustomers(filePath);
+
+    if (fs.existsSync(filePath)) {
+      try { fs.unlinkSync(filePath); } catch (unlinkErr) { console.error('刪除暫存檔失敗:', unlinkErr); }
+    }
+
+    const limitedResult = {
+      success: result.success !== false,
+      createdCount: result.createdCount || 0,
+      skippedCount: result.skippedCount || 0,
+      errorCount: result.errorCount || 0,
+      errors: (result.errors || []).slice(0, 50).map(err => {
+        const msg = (typeof err === 'object' && err !== null) ? (err.message || String(err)) : String(err);
+        return msg.length > 200 ? msg.substring(0, 200) + '...' : msg;
+      })
+    };
+
+    let resultStr = encodeURIComponent(JSON.stringify(limitedResult));
+    if (resultStr.length > 2000) {
+      resultStr = encodeURIComponent(JSON.stringify({ ...limitedResult, errors: limitedResult.errors.slice(0, 10) }));
+    }
+    res.redirect('/customers?importResult=' + resultStr);
+  } catch (err) {
+    console.error('客戶批次匯入錯誤:', err);
+    if (filePath && fs.existsSync(filePath)) {
+      try { fs.unlinkSync(filePath); } catch (unlinkErr) { console.error('刪除暫存檔失敗:', unlinkErr); }
+    }
+    res.redirect('/customers?error=' + encodeURIComponent(err.message || '匯入過程中發生未知錯誤'));
   }
 });
 

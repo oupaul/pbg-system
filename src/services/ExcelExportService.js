@@ -575,6 +575,91 @@ class ExcelExportService {
     return workbook;
   }
 
+  // 客戶/廠商批次匯入範本（管理者專用），欄位對應 Customer.create() 支援的欄位
+  generateCustomerTemplate() {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('客戶廠商總表');
+
+    const headers = [
+      '客戶編號', '統一編號', '公司名稱', '客戶/廠商類型', '廠商類型',
+      '客戶等級', '產業別', '往來狀態', '新/舊客戶', '客戶關係負責人',
+      '聯絡人姓名', '聯絡電話', '聯絡Email', '銀行', '銀行帳號', '地址'
+    ];
+
+    const exampleRow1 = [
+      'CU001', '12345678', 'XX股份有限公司', '客戶', '',
+      '', '', '', '新客戶', '王小明',
+      '陳小華', '02-12345678', 'test@example.com', '', '', '台北市信義區'
+    ];
+    const exampleRow2 = [
+      'VD001', '87654321', 'YY企業有限公司', '廠商', '公司',
+      '', '', '', '', '',
+      '林小明', '', '', '玉山銀行', '1234567890123', ''
+    ];
+
+    worksheet.addRow(headers);
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+
+    worksheet.addRow(exampleRow1);
+    worksheet.addRow(exampleRow2);
+
+    const columnWidths = [12, 12, 24, 12, 10, 10, 14, 10, 10, 14, 12, 14, 22, 14, 18, 30];
+    columnWidths.forEach((width, index) => {
+      worksheet.getColumn(index + 1).width = width;
+    });
+
+    worksheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+    // 動態撈目前啟用的客戶等級/往來狀態選項，避免範本寫死其他公司安裝已改掉的選項
+    let activeLevels = [];
+    let activeStatuses = [];
+    try {
+      activeLevels = db.prepare('SELECT level_name FROM customer_levels WHERE is_active = 1 ORDER BY display_order, level_name').all().map(r => r.level_name);
+    } catch { /* customer_levels 表不存在或尚無資料時保持空陣列 */ }
+    try {
+      activeStatuses = db.prepare('SELECT status_name FROM customer_statuses WHERE is_active = 1 ORDER BY display_order, status_name').all().map(r => r.status_name);
+    } catch { /* customer_statuses 表不存在或尚無資料時保持空陣列 */ }
+    const levelListStr = activeLevels.length ? activeLevels.map(l => `「${l}」`).join('、') : '（目前尚未設定任何客戶等級，留空即可，或先至「客戶等級管理」新增）';
+    const statusListStr = activeStatuses.length ? activeStatuses.map(s => `「${s}」`).join('、') : '（目前尚未設定，留空則使用系統預設值）';
+
+    const infoSheet = workbook.addWorksheet('填寫說明');
+    infoSheet.addRow(['欄位說明']);
+    infoSheet.addRow(['']);
+    infoSheet.addRow(['欄位名稱', '說明', '範例', '必填']);
+    infoSheet.addRow(['客戶編號', '客戶/廠商唯一代碼，不可與既有資料重複', 'CU001', '是']);
+    infoSheet.addRow(['統一編號', '8碼統編', '12345678', '否']);
+    infoSheet.addRow(['公司名稱', '客戶/廠商全名', 'XX股份有限公司', '是']);
+    infoSheet.addRow(['客戶/廠商類型', '客戶 或 廠商 或 兩者皆是（留空視為「客戶」）', '客戶', '否']);
+    infoSheet.addRow(['廠商類型', '個人 或 公司（僅類型為「廠商」或「兩者皆是」時有意義）', '公司', '否']);
+    infoSheet.addRow(['客戶等級', levelListStr, '', '否']);
+    infoSheet.addRow(['產業別', '自由文字', '批發零售', '否']);
+    infoSheet.addRow(['往來狀態', statusListStr, '', '否']);
+    infoSheet.addRow(['新/舊客戶', '新客戶 或 舊客戶（留空視為舊客戶）', '新客戶', '否']);
+    infoSheet.addRow(['客戶關係負責人', '負責此客戶的使用者姓名，需與「使用者管理」裡的姓名完全一致，找不到只會警告、不影響這筆資料建立', '王小明', '否']);
+    infoSheet.addRow(['聯絡人姓名／電話／Email', '對方窗口聯絡資訊', '', '否']);
+    infoSheet.addRow(['銀行／銀行帳號', '廠商付款用', '', '否']);
+    infoSheet.addRow(['地址', '自由文字', '', '否']);
+    infoSheet.addRow(['']);
+    infoSheet.addRow(['注意事項：']);
+    infoSheet.addRow(['1. 客戶編號、統一編號重複的資料整列會匯入失敗，其餘列不受影響']);
+    infoSheet.addRow(['2. 客戶等級／往來狀態若填入系統目前沒有設定的值，整列會匯入失敗並提示到「客戶等級管理」/「客戶狀態管理」確認']);
+    infoSheet.addRow(['3. 這份匯入僅供管理者使用，匯入的資料會直接建立，不會進入一般新增客戶的審核流程']);
+
+    const infoHeaderRow = infoSheet.getRow(3);
+    infoHeaderRow.font = { bold: true };
+    infoHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE7E6E6' } };
+
+    infoSheet.getColumn(1).width = 25;
+    infoSheet.getColumn(2).width = 45;
+    infoSheet.getColumn(3).width = 20;
+    infoSheet.getColumn(4).width = 10;
+
+    return workbook;
+  }
+
   // 將workbook寫入buffer
   async writeToBuffer(workbook) {
     const buffer = await workbook.xlsx.writeBuffer();

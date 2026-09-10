@@ -1161,6 +1161,97 @@ class ExcelImportService {
       results.bonuses++;
     }
   }
+
+  // 客戶/廠商批次匯入（管理者專用）：直接呼叫 Customer.create()，不經過新增客戶的審核流程
+  async importCustomers(filePath) {
+    this.importLog = [];
+    this.errors = [];
+    this.log(`開始匯入客戶/廠商: ${filePath}`);
+
+    const COLS = {
+      CUSTOMER_CODE: 0, TAX_ID: 1, COMPANY_NAME: 2, PARTY_TYPE: 3, VENDOR_TYPE: 4,
+      CUSTOMER_LEVEL: 5, INDUSTRY: 6, STATUS: 7, NEW_CUSTOMER: 8, OWNER_NAME: 9,
+      CONTACT_NAME: 10, CONTACT_PHONE: 11, CONTACT_EMAIL: 12, BANK_NAME: 13, BANK_ACCOUNT: 14, ADDRESS: 15
+    };
+
+    let createdCount = 0;
+    let skippedCount = 0;
+
+    try {
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.readFile(filePath);
+      const worksheet = workbook.worksheets[0];
+      if (!worksheet) {
+        this.error('找不到工作表，請確認上傳的是有效的 Excel 檔案');
+        return { success: false, createdCount, skippedCount, errors: this.errors, errorCount: this.errors.length, log: this.importLog };
+      }
+
+      const totalRows = worksheet.rowCount;
+      for (let rowNumber = 2; rowNumber <= totalRows; rowNumber++) {
+        const excelRow = worksheet.getRow(rowNumber);
+        const row = [];
+        for (let c = 0; c < 16; c++) {
+          row[c] = safeExtractText(excelRow.getCell(c + 1).value);
+        }
+
+        const customerCode = row[COLS.CUSTOMER_CODE];
+        const companyName = row[COLS.COMPANY_NAME];
+        if (!customerCode && !companyName) {
+          continue; // 空白列（含範本裡的空白隔行），跳過不記錄
+        }
+
+        try {
+          if (!customerCode) throw new Error('客戶編號為必填欄位');
+          if (!companyName) throw new Error('公司名稱為必填欄位');
+
+          let ownerSalespersonId = null;
+          const ownerName = row[COLS.OWNER_NAME];
+          if (ownerName) {
+            const user = db.prepare('SELECT id FROM users WHERE name = ?').get(ownerName);
+            if (user) {
+              ownerSalespersonId = user.id;
+            } else {
+              this.log(`第 ${rowNumber} 列：找不到姓名為「${ownerName}」的使用者，客戶關係負責人先留空，可日後手動編輯補上`);
+            }
+          }
+
+          Customer.create({
+            customer_code: customerCode,
+            tax_id: row[COLS.TAX_ID],
+            company_name: companyName,
+            is_new_customer: row[COLS.NEW_CUSTOMER] === '新客戶',
+            contact_name: row[COLS.CONTACT_NAME],
+            contact_phone: row[COLS.CONTACT_PHONE],
+            contact_email: row[COLS.CONTACT_EMAIL],
+            owner_salesperson_id: ownerSalespersonId,
+            customer_level: row[COLS.CUSTOMER_LEVEL] || null,
+            industry: row[COLS.INDUSTRY],
+            status: row[COLS.STATUS] || undefined,
+            party_type: row[COLS.PARTY_TYPE],
+            vendor_type: row[COLS.VENDOR_TYPE],
+            bank_name: row[COLS.BANK_NAME],
+            bank_account: row[COLS.BANK_ACCOUNT],
+            address: row[COLS.ADDRESS]
+          });
+          createdCount++;
+        } catch (rowErr) {
+          skippedCount++;
+          this.error(`第 ${rowNumber} 列（客戶編號：${customerCode || '未填'}）：${rowErr.message}`);
+        }
+      }
+
+      this.log(`匯入完成：成功 ${createdCount} 筆，失敗 ${skippedCount} 筆`);
+      return {
+        success: this.errors.length === 0 || createdCount > 0,
+        createdCount, skippedCount,
+        errors: this.errors, errorCount: this.errors.length,
+        log: this.importLog
+      };
+    } catch (err) {
+      this.error(`匯入失敗: ${err.message}`);
+      return { success: false, createdCount, skippedCount, error: err.message, errors: this.errors, errorCount: this.errors.length, log: this.importLog };
+    }
+  }
 }
 
 module.exports = new ExcelImportService();

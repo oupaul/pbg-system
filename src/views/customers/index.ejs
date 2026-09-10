@@ -25,6 +25,11 @@
     <h1 class="h3"><i class="bi bi-building"></i> 客戶與廠商管理</h1>
   </div>
   <div class="col-auto">
+    ${locals.isAdmin ? `
+      <button class="btn btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#customerImportModal">
+        <i class="bi bi-upload"></i> 批次匯入
+      </button>
+    ` : ''}
     ${locals.canEditCrm ? `
       <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newCustomerModal">
         <i class="bi bi-plus-lg"></i> 新增客戶/廠商
@@ -43,6 +48,21 @@ ${error ? `
 ${typeof success !== 'undefined' && success ? `
   <div class="alert alert-success alert-dismissible fade show" role="alert">
     <i class="bi bi-check-circle"></i> ${escapeHtml(success)}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+${typeof importResult !== 'undefined' && importResult ? `
+  <div class="alert alert-${importResult.errorCount > 0 ? 'warning' : 'success'} alert-dismissible fade show" role="alert">
+    <i class="bi bi-upload"></i> 批次匯入完成：成功 ${importResult.createdCount || 0} 筆，失敗 ${importResult.skippedCount || 0} 筆
+    ${(importResult.errors || []).length ? `
+      <details class="mt-2">
+        <summary style="cursor:pointer">查看失敗明細（${importResult.errors.length} 筆）</summary>
+        <ul class="mb-0 mt-2">
+          ${importResult.errors.map(msg => '<li>' + escapeHtml(msg) + '</li>').join('')}
+        </ul>
+      </details>
+    ` : ''}
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
   </div>
 ` : ''}
@@ -193,6 +213,38 @@ ${typeof success !== 'undefined' && success ? `
     ${(typeof searchKeyword !== 'undefined' && searchKeyword) ? `搜尋「<strong>${escapeHtml(searchKeyword)}</strong>」結果：共 ${(customers || []).length} 筆` : `共 ${(customers || []).length} 筆`}
   </div>
 </div>
+
+${locals.isAdmin ? `
+<!-- 客戶/廠商批次匯入 Modal -->
+<div class="modal fade" id="customerImportModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="/customers/import" method="POST" enctype="multipart/form-data">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-upload"></i> 批次匯入客戶/廠商</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small">
+            請先下載範本，依格式填好資料後上傳。匯入的資料會直接建立，不會經過一般新增客戶的審核流程。
+          </p>
+          <a href="/customers/import/template" class="btn btn-outline-secondary btn-sm mb-3">
+            <i class="bi bi-download"></i> 下載範本
+          </a>
+          <div class="mb-3">
+            <label class="form-label">選擇檔案</label>
+            <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">開始匯入</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+` : ''}
 
 <!-- 新增客戶 Modal -->
 <div class="modal fade" id="newCustomerModal" tabindex="-1">
