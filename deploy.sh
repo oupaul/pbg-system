@@ -373,6 +373,60 @@ if [ -d "${PROJECT_DIR}/migrations" ]; then
     if [ ! -f "${PROJECT_DIR}/data/invoice_bonus.db" ]; then
         log "資料庫不存在，建立初始結構..."
         npm run migrate || error "基礎資料庫遷移失敗"
+
+        # 全新安裝：把 migrate.js 建立的預設 admin/admin123 換成一次性亂數密碼，
+        # 只印在這次部署的 terminal 畫面上、不寫進任何檔案。比照 SESSION_SECRET
+        # 只在首次安裝產生的做法（見下方步驟 5/6），既有安裝升級不會執行到這裡，
+        # 不會覆蓋管理者事後已經改過的密碼。
+        log "產生一次性管理員初始密碼..."
+        ADMIN_INITIAL_PASSWORD=$(openssl rand -base64 12 2>/dev/null | tr -dc 'A-Za-z0-9' | head -c 16)
+        if [ -z "$ADMIN_INITIAL_PASSWORD" ]; then
+            ADMIN_INITIAL_PASSWORD=$(head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 16)
+        fi
+
+        RESET_PW_SCRIPT="${PROJECT_DIR}/.deploy-reset-admin-pw.js"
+        cat > "$RESET_PW_SCRIPT" <<'NODE_SCRIPT_END'
+const Database = require('better-sqlite3');
+const argon2 = require('argon2');
+const path = require('path');
+
+(async () => {
+  const dbPath = path.join(__dirname, 'data', 'invoice_bonus.db');
+  const db = new Database(dbPath);
+  const admin = db.prepare("SELECT id FROM users WHERE username = 'admin'").get();
+  if (!admin) {
+    console.error('[警告] 找不到 admin 帳號，略過初始密碼重設');
+    db.close();
+    return;
+  }
+  const hash = await argon2.hash(process.env.ADMIN_INITIAL_PASSWORD, {
+    type: argon2.argon2id,
+    memoryCost: 65536,
+    timeCost: 3,
+    parallelism: 4
+  });
+  db.prepare("UPDATE users SET password_hash = ? WHERE username = 'admin'").run(hash);
+  db.close();
+})().catch(err => {
+  console.error('[警告] 重設 admin 初始密碼失敗:', err.message);
+  process.exit(1);
+});
+NODE_SCRIPT_END
+
+        if ADMIN_INITIAL_PASSWORD="$ADMIN_INITIAL_PASSWORD" node "$RESET_PW_SCRIPT"; then
+            echo ""
+            echo -e "${GREEN}========================================${NC}"
+            echo -e "${GREEN}  初始管理員帳號${NC}"
+            echo -e "${GREEN}========================================${NC}"
+            echo -e "  帳號：${YELLOW}admin${NC}"
+            echo -e "  密碼：${YELLOW}${ADMIN_INITIAL_PASSWORD}${NC}"
+            echo -e "${RED}  此密碼只會顯示這一次，不會寫入任何檔案或日誌，請立即記下並妥善保存${NC}"
+            echo -e "${GREEN}========================================${NC}"
+            echo ""
+        else
+            warning "重設 admin 初始密碼失敗，帳號密碼維持 migrate.js 產生的預設值 admin123，請部署完成後手動更改"
+        fi
+        rm -f "$RESET_PW_SCRIPT"
     fi
     if ! node migrations/runner.js; then
         error "Migration 執行失敗，部署已停止（不會啟動服務，避免帶著不完整的 schema 上線）。
