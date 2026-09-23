@@ -111,6 +111,25 @@ const requireCustomerApprovalPermission = (req, res, next) => {
   return res.status(403).json({ error: '權限不足', message: '此功能僅限具備審核權限的角色使用' });
 };
 
+// 發票開立申請審核：僅限具備 can_approve_invoice_request 權限的角色
+const requireInvoiceRequestApprovalPermission = (req, res, next) => {
+  if (!req.user) {
+    if (req.accepts('html')) {
+      return res.status(403).render('error', { title: '權限不足', message: '此功能僅限具備審核權限的角色使用', error: {} });
+    }
+    return res.status(401).json({ error: '未登入' });
+  }
+
+  const role = getRolePermissions(req.user.role);
+  if (role && role.can_approve_invoice_request) return next();
+  if (isApprovalChainRole('invoice_request', req.user.role)) return next();
+
+  if (req.accepts('html')) {
+    return res.status(403).render('error', { title: '權限不足', message: '此功能僅限具備審核權限的角色使用', error: {} });
+  }
+  return res.status(403).json({ error: '權限不足', message: '此功能僅限具備審核權限的角色使用' });
+};
+
 // 匯入/匯出功能：僅限具備 can_edit 權限的角色（Uses roles table so custom roles work correctly）
 const requireImportExport = (req, res, next) => {
   if (!req.user) {
@@ -184,6 +203,8 @@ const setUserPermissions = (req, res, next) => {
     // （例如只被設定為「總經理」那一關，本身不需要 can_approve_customer/can_delete）
     req.user.canAccessCustomerApprovals = req.user.canApproveCustomer || isApprovalChainRole('customer_creation', req.user.role);
     req.user.canAccessDeletionApprovals = req.user.canDelete || isApprovalChainRole('deletion', req.user.role);
+    req.user.canApproveInvoiceRequest = role ? !!role.can_approve_invoice_request : (req.user.role === ROLES.ADMIN || req.user.role === ROLES.USER);
+    req.user.canAccessInvoiceRequestApprovals = req.user.canApproveInvoiceRequest || isApprovalChainRole('invoice_request', req.user.role);
     req.user.isAdmin = role ? !!role.can_manage_users : req.user.role === ROLES.ADMIN;
     req.user.isReadOnly = !req.user.canEdit;
     req.user.isSalesperson = req.user.role === ROLES.SALESPERSON;
@@ -206,6 +227,7 @@ const setUserPermissions = (req, res, next) => {
     res.locals.canApproveCustomer = req.user.canApproveCustomer;
     res.locals.canAccessCustomerApprovals = req.user.canAccessCustomerApprovals;
     res.locals.canAccessDeletionApprovals = req.user.canAccessDeletionApprovals;
+    res.locals.canAccessInvoiceRequestApprovals = req.user.canAccessInvoiceRequestApprovals;
     res.locals.isAdmin = req.user.isAdmin;
     res.locals.isReadOnly = req.user.isReadOnly;
 
@@ -227,6 +249,17 @@ const setUserPermissions = (req, res, next) => {
         res.locals.pendingCustomerApprovalCount = row ? row.count : 0;
       } catch {
         res.locals.pendingCustomerApprovalCount = 0;
+      }
+    }
+
+    // 發票開立申請審核：具備 can_approve_invoice_request 權限或是多層簽核某一關的角色，才需要看到待審核數量
+    if (req.user.canAccessInvoiceRequestApprovals) {
+      try {
+        const db = require('../models/db');
+        const row = db.prepare(`SELECT COUNT(*) as count FROM invoice_requests WHERE request_status = 'pending'`).get();
+        res.locals.pendingInvoiceRequestCount = row ? row.count : 0;
+      } catch {
+        res.locals.pendingInvoiceRequestCount = 0;
       }
     }
 
@@ -256,6 +289,7 @@ module.exports = {
   requireCrmEditPermission,
   requireDeletePermission,
   requireCustomerApprovalPermission,
+  requireInvoiceRequestApprovalPermission,
   requireImportExport,
   requireAdmin,
   setUserPermissions

@@ -55,10 +55,11 @@ const Role = {
           can_view_all_projects, can_view_own_projects,
           can_edit_crm,
           can_approve_customer,
+          can_approve_invoice_request,
           project_view_scope,
           dashboard_view_mode,
           is_system_role, is_active, display_order
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         data.role_key,
         data.role_name,
@@ -73,6 +74,7 @@ const Role = {
         data.can_view_own_projects !== undefined ? data.can_view_own_projects : 1,
         data.can_edit_crm !== undefined ? data.can_edit_crm : 1,
         data.can_approve_customer || 0,
+        data.can_approve_invoice_request || 0,
         scopeValue,
         dashboardMode,
         data.is_system_role || 0,
@@ -165,6 +167,10 @@ const Role = {
       if (data.can_approve_customer !== undefined) {
         fields.push('can_approve_customer = ?');
         values.push(data.can_approve_customer);
+      }
+      if (data.can_approve_invoice_request !== undefined) {
+        fields.push('can_approve_invoice_request = ?');
+        values.push(data.can_approve_invoice_request);
       }
       if (data.is_active !== undefined) {
         fields.push('is_active = ?');
@@ -304,7 +310,8 @@ const Role = {
       can_view_all_projects: role.can_view_all_projects === 1,
       can_view_own_projects: role.can_view_own_projects === 1,
       can_edit_crm: role.can_edit_crm === 1,
-      can_approve_customer: role.can_approve_customer === 1
+      can_approve_customer: role.can_approve_customer === 1,
+      can_approve_invoice_request: role.can_approve_invoice_request === 1
     };
   },
 

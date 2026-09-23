@@ -176,6 +176,21 @@
                   </label>
                 </div>
               </div>
+              <div class="col-md-6">
+                <div class="form-check form-switch mb-3">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="can_approve_invoice_request"
+                    name="can_approve_invoice_request"
+                    ${role && role.can_approve_invoice_request ? 'checked' : ''}
+                  >
+                  <label class="form-check-label" for="can_approve_invoice_request">
+                    <strong>發票開立申請審核</strong>
+                    <div class="text-muted small">可以核准或駁回發票開立申請（不分部門）</div>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
         </div>

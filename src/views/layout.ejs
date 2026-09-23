@@ -80,6 +80,17 @@
           </li>
           <% } %>
 
+          <% if (typeof canAccessInvoiceRequestApprovals !== 'undefined' && canAccessInvoiceRequestApprovals) { %>
+          <li class="nav-item">
+            <a class="nav-link <%= navActive('/invoice-requests') %>" href="/invoice-requests">
+              <i class="bi bi-receipt-cutoff"></i> 發票審核
+              <% if (typeof pendingInvoiceRequestCount !== 'undefined' && pendingInvoiceRequestCount > 0) { %>
+                <span class="badge bg-danger"><%= pendingInvoiceRequestCount %></span>
+              <% } %>
+            </a>
+          </li>
+          <% } %>
+
           <% if (typeof user !== 'undefined' && user && (user.role === 'admin' || user.role === 'user' || user.role === 'boss')) { %>
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle <%= navGroupActive(['/bonuses', '/referral-rewards', '/sales-performance', '/salespeople', '/recent-payments']) %>" href="#" id="salesGroupDropdown" role="button" data-bs-toggle="dropdown">

@@ -94,6 +94,9 @@ const MIGRATIONS = [
   'migrate_payment_terms',
   'migrate_order_statuses',
   'migrate_cost_item_fields',
+  'migrate_invoice_requests',
+  'migrate_invoice_request_approval_permission',
+  'migrate_remove_approval_type_check',
 ];
 
 function run() {

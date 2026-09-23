@@ -143,6 +143,25 @@ const NotificationService = {
     this.notifyUsers(rows.map(r => r.id), payload, excludeUserId);
   },
 
+  // 通知具備發票開立申請審核權限者：有設定多層簽核時通知第一關角色，
+  // 沒有設定時維持原本走 roles.can_approve_invoice_request = 1 的單層審核通知對象
+  notifyInvoiceRequestApprovers(payload, excludeUserId = null) {
+    const firstStep = db.prepare(`
+      SELECT role_key FROM approval_chain_steps
+      WHERE approval_type = 'invoice_request' AND is_active = 1
+      ORDER BY step_order ASC LIMIT 1
+    `).get();
+
+    const rows = firstStep
+      ? db.prepare(`SELECT id FROM users WHERE role = ? AND is_active = 1`).all(firstStep.role_key)
+      : db.prepare(`
+          SELECT u.id FROM users u
+          JOIN roles r ON r.role_key = u.role
+          WHERE r.can_approve_invoice_request = 1 AND u.is_active = 1
+        `).all();
+    this.notifyUsers(rows.map(r => r.id), payload, excludeUserId);
+  },
+
   // 通知具備刪除審核權限者：有設定多層簽核時通知第一關角色，
   // 沒有設定時維持原本走 roles.can_delete = 1 的單層審核通知對象
   notifyDeletionApprovers(payload, excludeUserId = null) {

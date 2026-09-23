@@ -7,7 +7,15 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 const APPROVAL_TYPES = {
   customer_creation: '新客戶/廠商審核',
-  deletion: '刪除審核'
+  deletion: '刪除審核',
+  invoice_request: '發票開立審核'
+};
+
+// 各申請類型對應的資料表與狀態欄位名稱（欄位命名沒有統一慣例，逐一列出）
+const APPROVAL_TARGET = {
+  customer_creation: { table: 'customer_creation_requests', col: 'request_status' },
+  deletion: { table: 'deletion_requests', col: 'status' },
+  invoice_request: { table: 'invoice_requests', col: 'request_status' }
 };
 
 router.get('/', requireAuth, requireAdmin, (req, res) => {
@@ -56,9 +64,8 @@ router.post('/create', requireAuth, requireAdmin, (req, res) => {
 });
 
 function countStuckAtStep(approvalType, stepOrder) {
-  const targetTable = approvalType === 'deletion' ? 'deletion_requests' : 'customer_creation_requests';
-  const statusCol = approvalType === 'deletion' ? 'status' : 'request_status';
-  const row = db.prepare(`SELECT COUNT(*) as count FROM ${targetTable} WHERE ${statusCol} = 'pending' AND current_step = ?`).get(stepOrder);
+  const target = APPROVAL_TARGET[approvalType] || APPROVAL_TARGET.customer_creation;
+  const row = db.prepare(`SELECT COUNT(*) as count FROM ${target.table} WHERE ${target.col} = 'pending' AND current_step = ?`).get(stepOrder);
   return row?.count || 0;
 }
 

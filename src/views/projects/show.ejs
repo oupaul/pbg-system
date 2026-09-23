@@ -369,6 +369,7 @@ function resetExpectedInvoice() {
     <span><i class="bi bi-receipt"></i> 發票明細</span>
     <div class="d-flex align-items-center gap-2">
       ${typeof showDeleted !== 'undefined' ? (showDeleted ? '<a href="/projects/' + project.id + '" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye-slash"></i> 隱藏已刪除</a>' : '<a href="/projects/' + project.id + '?show_deleted=1" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye"></i> 顯示已刪除</a>') : ''}
+      ${locals.canEdit ? '<button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#invoiceRequestModal"><i class="bi bi-file-earmark-text"></i> 申請開立發票</button>' : ''}
       ${locals.canEdit ? '<button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#invoiceModal"><i class="bi bi-plus-lg"></i> 新增發票</button>' : ''}
     </div>
   </div>
@@ -718,6 +719,99 @@ ${locals.canEdit ? `
 </div>
 </div>
 ` : ''}
+
+<!-- 申請開立發票 Modal -->
+<div class="modal fade" id="invoiceRequestModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form action="/invoice-requests" method="POST">
+        <input type="hidden" name="project_id" value="${project.id}">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-file-earmark-text"></i> 申請開立發票</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">客戶名稱</label>
+              <input type="text" class="form-control" value="${h(project.company_name || '')}" disabled>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">統一編號</label>
+              <input type="text" class="form-control" value="${h(project.tax_id || '')}" disabled>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">客戶代號</label>
+              <input type="text" class="form-control" value="${h(project.customer_code || '')}" disabled>
+            </div>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">申請類型</label>
+              <input type="text" name="request_type" class="form-control" placeholder="例如：勞務收入">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">報價單號</label>
+              <input type="text" name="quote_number" class="form-control">
+            </div>
+          </div>
+
+          <h6 class="text-muted mt-3">明細品項</h6>
+          <div id="invoiceRequestItems"></div>
+          <button type="button" class="btn btn-sm btn-outline-primary mb-3" onclick="addInvoiceRequestItemRow()"><i class="bi bi-plus-lg"></i> 新增品項</button>
+
+          <hr>
+          <h6 class="text-muted">收件人資訊</h6>
+          <div class="row g-2 mb-3">
+            <div class="col-md-4">
+              <label class="form-label">收件人姓名</label>
+              <input type="text" name="recipient_name" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">收件人電話</label>
+              <input type="text" name="recipient_phone" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">收件地址</label>
+              <input type="text" name="recipient_address" class="form-control">
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">備註</label>
+            <textarea name="notes" class="form-control" rows="2"></textarea>
+          </div>
+          <p class="text-muted small mb-0">1.客戶代碼及專案編號請正確填入。2.請務必確認銷售額+營業稅=總計，切勿有尾差。3.若有特殊需求，請於備註上說明。</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">送出申請</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+var invoiceRequestItemCount = 0;
+function addInvoiceRequestItemRow() {
+  var container = document.getElementById('invoiceRequestItems');
+  var idx = invoiceRequestItemCount++;
+  var row = document.createElement('div');
+  row.className = 'row g-2 mb-2 align-items-end';
+  row.innerHTML =
+    '<div class="col-md-4"><label class="form-label small">品名</label><input type="text" name="items[' + idx + '][item_name]" class="form-control form-control-sm" required></div>' +
+    '<div class="col-md-2"><label class="form-label small">數量</label><input type="number" name="items[' + idx + '][quantity]" class="form-control form-control-sm" value="1" step="1" min="0"></div>' +
+    '<div class="col-md-2"><label class="form-label small">單價(未稅)</label><input type="number" name="items[' + idx + '][unit_price]" class="form-control form-control-sm" value="0" step="1" min="0"></div>' +
+    '<div class="col-md-2"><label class="form-label small">單位</label><input type="text" name="items[' + idx + '][unit]" class="form-control form-control-sm"></div>' +
+    '<div class="col-md-1"><label class="form-label small">備註</label><input type="text" name="items[' + idx + '][notes]" class="form-control form-control-sm"></div>' +
+    '<div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger w-100" onclick="this.closest(\\'.row\\').remove()"><i class="bi bi-trash"></i></button></div>';
+  container.appendChild(row);
+}
+document.getElementById('invoiceRequestModal').addEventListener('show.bs.modal', function() {
+  var container = document.getElementById('invoiceRequestItems');
+  if (container.children.length === 0) { addInvoiceRequestItemRow(); }
+});
+</script>
 
 <!-- 新增發票 Modal -->
 <div class="modal fade" id="invoiceModal" tabindex="-1">

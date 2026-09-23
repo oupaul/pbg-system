@@ -223,6 +223,8 @@ try {
   console.log('[啟動] ✓ deletionRequests 路由載入完成');
   const customerApprovalRoutes = require('./routes/customerApprovals');
   console.log('[啟動] ✓ customerApprovals 路由載入完成');
+  const invoiceRequestRoutes = require('./routes/invoiceRequests');
+  console.log('[啟動] ✓ invoiceRequests 路由載入完成');
   const notificationRoutes = require('./routes/notifications');
   console.log('[啟動] ✓ notifications 路由載入完成');
   const lineWebhookRoutes = require('./routes/lineWebhook');
@@ -248,6 +250,7 @@ try {
   app.use('/pipelines', requireAuth, pipelineRoutes);
   app.use('/deletion-requests', requireAuth, deletionRequestRoutes);
   app.use('/customer-approvals', requireAuth, customerApprovalRoutes);
+  app.use('/invoice-requests', requireAuth, invoiceRequestRoutes);
   app.use('/notifications', requireAuth, notificationRoutes);
   app.use('/import-export', requireAuth, requireImportExport, importExportRoutes(upload));
   app.use('/audit-logs', requireAuth, auditLogRoutes);

@@ -1,0 +1,107 @@
+<%
+  function escapeHtml(str) {
+    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+%>
+<%- include('../layout', { body: `
+<div class="row mb-4">
+  <div class="col">
+    <h1 class="h3"><i class="bi bi-receipt-cutoff"></i> 發票開立申請審核</h1>
+    <p class="text-muted mb-0">核准僅代表同意開立，實際發票號碼/日期仍由財務依現有「新增發票」流程手動輸入。</p>
+  </div>
+</div>
+
+${error ? `
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle"></i> ${escapeHtml(error)}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+${success ? `
+  <div class="alert alert-success alert-dismissible fade show" role="alert">
+    <i class="bi bi-check-circle"></i> ${escapeHtml(success)}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+` : ''}
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th>專案</th>
+            <th>客戶名稱</th>
+            <th class="text-end">總計(含稅)</th>
+            <th>申請人</th>
+            <th>申請時間</th>
+            ${(typeof chainSteps !== 'undefined' && chainSteps && chainSteps.length > 0) ? '<th>目前關卡</th>' : ''}
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${(requests || []).length === 0 ? `
+            <tr><td colspan="7" class="text-center text-muted py-4">目前沒有待審核的發票開立申請</td></tr>
+          ` : requests.map(r => {
+            const steps = (typeof chainSteps !== 'undefined' && chainSteps) ? chainSteps : [];
+            const currentStepOrder = r.current_step || 1;
+            const stepConfig = steps.find(s => s.step_order === currentStepOrder);
+            const isMyTurn = steps.length === 0 || (stepConfig && typeof currentUserRole !== 'undefined' && stepConfig.role_key === currentUserRole);
+            const stepCell = steps.length > 0
+              ? `<td><span class="badge bg-info text-dark">第 ${currentStepOrder}/${steps.length} 關：${(stepConfig ? (stepConfig.step_name || (typeof roleNameMap !== 'undefined' && roleNameMap[stepConfig.role_key]) || stepConfig.role_key) : '設定異常')}</span>${!isMyTurn ? '<div class="text-muted small mt-1">尚未輪到您審核</div>' : ''}</td>`
+              : '';
+            return `
+            <tr>
+              <td>${escapeHtml(r.project_code)}<div class="text-muted small">${escapeHtml(r.project_name)}</div></td>
+              <td>${escapeHtml(r.company_name)}</td>
+              <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(r.total_amount || 0).toLocaleString()}</td>
+              <td>${escapeHtml(r.requested_by_name) || '-'}</td>
+              <td>${r.requested_at}</td>
+              ${stepCell}
+              <td class="text-end">
+                <div class="d-flex gap-2 justify-content-end">
+                  <a href="/invoice-requests/${r.id}/pdf" class="btn btn-sm btn-outline-secondary" target="_blank">
+                    <i class="bi bi-file-earmark-pdf"></i> PDF
+                  </a>
+                  <form action="/invoice-requests/${r.id}/approve" method="POST" style="display:inline" onsubmit="return confirm('確定要核准這筆發票開立申請嗎？')">
+                    <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i> 核准</button>
+                  </form>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#rejectModal${r.id}">
+                    <i class="bi bi-x-lg"></i> 駁回
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+${(requests || []).map(r => `
+  <div class="modal fade" id="rejectModal${r.id}" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form action="/invoice-requests/${r.id}/reject" method="POST">
+          <div class="modal-header">
+            <h5 class="modal-title">駁回發票開立申請</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-2">${escapeHtml(r.project_name)}（${escapeHtml(r.company_name)}）</p>
+            <label class="form-label">駁回原因（選填，會留給申請人參考）</label>
+            <textarea name="review_note" class="form-control" rows="3"></textarea>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-danger">確定駁回</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+`).join('')}
+` }) %>

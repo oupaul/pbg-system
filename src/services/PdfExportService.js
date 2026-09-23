@@ -443,6 +443,131 @@ const PdfExportService = {
       doc.text(`共 ${byProject.length} 筆專案`, projectStartX, y + 10);
       doc.end();
     });
+  },
+
+  /**
+   * 發票開立申請單 PDF（供紙本簽核或存證用）
+   * request 需為 InvoiceRequest.findById() 回傳的完整物件（含 items 明細）
+   */
+  async generateInvoiceRequestPdf(request) {
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 40, size: 'A4' });
+      const chunks = [];
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      applyFont(doc);
+
+      let companyName = '';
+      try {
+        companyName = db.prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'company_name'").get()?.setting_value || '';
+      } catch { /* 讀不到設定值時留空，不影響列印 */ }
+
+      if (companyName) {
+        doc.fontSize(12).text(companyName, { align: 'center' });
+        doc.moveDown(0.2);
+      }
+      doc.fontSize(16).text('發票開立申請單', { align: 'center' });
+      doc.moveDown(1);
+
+      doc.fontSize(9);
+      const leftX = 40;
+      const rightX = 320;
+      let infoY = doc.y;
+      const infoLine = (label, value, x) => {
+        doc.text(`${label}：${value || ''}`, x, infoY, { width: x === leftX ? rightX - leftX - 10 : 515 - rightX });
+      };
+      infoLine('申請日期', formatROCDate(request.requested_at), leftX);
+      infoLine('申請類型', request.request_type, rightX);
+      infoY = doc.y + 4;
+      infoLine('客戶名稱', request.company_name, leftX);
+      infoLine('統一編號', request.tax_id, rightX);
+      infoY = doc.y + 4;
+      infoLine('客戶代號', request.customer_code, leftX);
+      infoLine('報價單號', request.quote_number, rightX);
+      infoY = doc.y + 4;
+      infoLine('專案編號', request.project_code, leftX);
+      infoLine('專案名稱', request.project_name, rightX);
+      doc.y = doc.y + 10;
+      doc.moveDown(0.5);
+
+      // 明細表格
+      const headers = ['項次', '品名', '數量', '單價(未稅)', '單位', '金額', '備註'];
+      const colWidths = [35, 150, 45, 70, 45, 70, 100];
+      const cellPadding = 4;
+      const rowHeight = 24;
+      let y = doc.y;
+      let x = leftX;
+      headers.forEach((h, i) => {
+        doc.rect(x, y, colWidths[i], rowHeight).fillAndStroke('#e9ecef', '#333');
+        doc.fillColor('#000').text(h, x + cellPadding, y + 7, { width: colWidths[i] - cellPadding * 2 });
+        x += colWidths[i];
+      });
+      y += rowHeight;
+
+      (request.items || []).forEach(item => {
+        if (y > 700) {
+          doc.addPage({ size: 'A4', margin: 40 });
+          y = 40;
+        }
+        x = leftX;
+        const rowData = [
+          String(item.item_order || ''),
+          (item.item_name || '').substring(0, 30),
+          String(item.quantity ?? ''),
+          formatCurrency(item.unit_price),
+          item.unit || '',
+          formatCurrency(item.amount),
+          (item.notes || '').substring(0, 20)
+        ];
+        rowData.forEach((val, i) => {
+          doc.rect(x, y, colWidths[i], rowHeight).stroke();
+          doc.text(val, x + cellPadding, y + 7, { width: colWidths[i] - cellPadding * 2 });
+          x += colWidths[i];
+        });
+        y += rowHeight;
+      });
+
+      y += 10;
+      doc.fontSize(10);
+      doc.text(`銷售額合計(未稅)：${formatCurrency(request.subtotal_amount)}`, leftX, y, { align: 'right', width: 515 - leftX });
+      y = doc.y + 2;
+      doc.text(`營業稅：${formatCurrency(request.tax_amount)}`, leftX, y, { align: 'right', width: 515 - leftX });
+      y = doc.y + 2;
+      doc.fontSize(11).text(`總計(含稅)：${formatCurrency(request.total_amount)}`, leftX, y, { align: 'right', width: 515 - leftX });
+      y = doc.y + 15;
+
+      doc.fontSize(9);
+      doc.text(`收件人：${request.recipient_name || ''}　電話：${request.recipient_phone || ''}`, leftX, y);
+      y = doc.y + 2;
+      doc.text(`收件地址：${request.recipient_address || ''}`, leftX, y);
+      y = doc.y + 10;
+      if (request.notes) {
+        doc.text(`備註：${request.notes}`, leftX, y, { width: 515 - leftX });
+        y = doc.y + 10;
+      }
+
+      doc.fontSize(8).fillColor('#555');
+      doc.text('注意事項：1.客戶代碼及專案編號請正確填入。2.請務必確認銷售額+營業稅=總計，切勿有尾差。3.若有特殊需求(例如發票日期)，請於備註上說明。', leftX, y, { width: 515 - leftX });
+      y = doc.y + 20;
+      doc.fillColor('#000');
+
+      // 簽名欄
+      if (y > 680) {
+        doc.addPage({ size: 'A4', margin: 40 });
+        y = 40;
+      }
+      const signBoxWidth = (515 - leftX) / 3;
+      const signLabels = ['部級主管', '財務', '申請人'];
+      signLabels.forEach((label, i) => {
+        const sx = leftX + i * signBoxWidth;
+        doc.rect(sx, y, signBoxWidth - 10, 60).stroke();
+        doc.fontSize(9).text(label, sx, y + 65);
+      });
+
+      doc.end();
+    });
   }
 };
 
