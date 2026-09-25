@@ -1,0 +1,46 @@
+<%
+  function escapeHtml(str) {
+    return (str === null || str === undefined ? '' : String(str))
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+%>
+<%- include('../layout', { body: `
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2><i class="bi bi-search"></i> 搜尋範圍設定</h2>
+</div>
+
+${error ? `<div class="alert alert-danger alert-dismissible fade show"><i class="bi bi-exclamation-circle"></i> ${escapeHtml(error)}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>` : ''}
+${success ? `<div class="alert alert-success alert-dismissible fade show"><i class="bi bi-check-circle"></i> ${escapeHtml(success)}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>` : ''}
+
+<div class="alert alert-info">
+  <i class="bi bi-info-circle"></i> 全域搜尋會自動掃描所有資料表的文字欄位，新增的資料表與欄位預設就會被搜尋。這裡可以取消勾選不想被搜尋到的資料（例如銀行帳號）。
+  灰色標示「系統保護」的資料（帳號、密碼、系統設定、稽核與登入紀錄等）一律不會被搜尋，無法在此開放。
+</div>
+
+${newCount > 0 ? `<div class="alert alert-warning"><i class="bi bi-stars"></i> 有 <strong>${newCount}</strong> 個新出現的欄位尚未確認，預設已納入搜尋，請檢視是否需要排除，按下「儲存」即視為已確認。</div>` : ''}
+
+<form method="POST" action="/search-settings">
+  ${tables.map(t => `
+  <div class="card mb-3 ${t.floorExcluded ? 'bg-light' : ''}">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <div>
+        ${t.floorExcluded
+          ? '<span class="badge bg-secondary me-2">系統保護</span>'
+          : '<input type="hidden" name="all" value="' + escapeHtml(t.name) + '|*"><div class="form-check form-switch d-inline-block me-2"><input class="form-check-input" type="checkbox" name="on" value="' + escapeHtml(t.name) + '|*" ' + (t.searchable ? 'checked' : '') + '></div>'}
+        <strong>${escapeHtml(t.label)}</strong> <small class="text-muted">${escapeHtml(t.name)}</small>
+        ${!t.floorExcluded && !t.ownerType ? '<span class="badge bg-warning text-dark ms-2">未歸屬專案/客戶（僅管理者可搜、不顯示內容）</span>' : ''}
+      </div>
+    </div>
+    <div class="card-body py-2">
+      ${t.columns.map(c => c.floorExcluded
+        ? '<span class="badge bg-secondary me-2 mb-1">' + escapeHtml(c.label) + '（系統保護）</span>'
+        : '<input type="hidden" name="all" value="' + escapeHtml(t.name) + '|' + escapeHtml(c.name) + '">'
+          + '<div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="on" id="f_' + escapeHtml(t.name) + '_' + escapeHtml(c.name) + '" value="' + escapeHtml(t.name) + '|' + escapeHtml(c.name) + '" ' + (c.searchable ? 'checked' : '') + '>'
+          + '<label class="form-check-label" for="f_' + escapeHtml(t.name) + '_' + escapeHtml(c.name) + '">' + escapeHtml(c.label) + (c.isNew ? ' <span class="badge bg-warning text-dark">新出現</span>' : '') + '</label></div>'
+      ).join('')}
+    </div>
+  </div>
+  `).join('')}
+  <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> 儲存</button>
+</form>
+` }) %>

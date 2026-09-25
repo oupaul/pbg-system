@@ -95,6 +95,7 @@ const MIGRATIONS = [
   'migrate_order_statuses',
   'migrate_cost_item_fields',
   'migrate_sales_modes',
+  'migrate_search_settings',
 ];
 
 function run() {

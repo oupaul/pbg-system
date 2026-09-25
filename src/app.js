@@ -195,6 +195,8 @@ try {
   console.log('[啟動] ✓ activityTypes 路由載入完成');
   const salesModesRoutes = require('./routes/salesModes');
   console.log('[啟動] ✓ salesModes 路由載入完成');
+  const searchSettingsRoutes = require('./routes/searchSettings');
+  console.log('[啟動] ✓ searchSettings 路由載入完成');
   const costTypesRoutes = require('./routes/costTypes');
   console.log('[啟動] ✓ costTypes 路由載入完成');
   const costCategoriesRoutes = require('./routes/costCategories');
@@ -267,6 +269,7 @@ try {
   app.use('/bonus-tiers', requireAuth, bonusTiersRoutes);
   app.use('/activity-types', requireAuth, activityTypesRoutes);
   app.use('/sales-modes', requireAuth, salesModesRoutes);
+  app.use('/search-settings', requireAuth, searchSettingsRoutes);
   app.use('/cost-types', requireAuth, costTypesRoutes);
   app.use('/cost-categories', requireAuth, costCategoriesRoutes);
   app.use('/payment-methods', requireAuth, paymentMethodsRoutes);

@@ -99,7 +99,7 @@
 
           <% if (typeof canEdit !== 'undefined' && canEdit) { %>
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle <%= navGroupActive(['/project-templates', '/import-export', '/audit-logs', '/project-types', '/pipeline-amount-options', '/bonus-types', '/bonus-tiers', '/customer-levels', '/customer-statuses', '/activity-types', '/sales-modes', '/pipeline-statuses', '/approval-chains', '/cost-types', '/cost-categories', '/payment-methods', '/payment-terms', '/order-statuses', '/report-groups', '/roles', '/settings', '/backup-restore', '/health', '/login-history', '/notifications/broadcast']) %>" href="#" id="systemGroupDropdown" role="button" data-bs-toggle="dropdown">
+            <a class="nav-link dropdown-toggle <%= navGroupActive(['/project-templates', '/import-export', '/audit-logs', '/project-types', '/pipeline-amount-options', '/bonus-types', '/bonus-tiers', '/customer-levels', '/customer-statuses', '/activity-types', '/sales-modes', '/search-settings', '/pipeline-statuses', '/approval-chains', '/cost-types', '/cost-categories', '/payment-methods', '/payment-terms', '/order-statuses', '/report-groups', '/roles', '/settings', '/backup-restore', '/health', '/login-history', '/notifications/broadcast']) %>" href="#" id="systemGroupDropdown" role="button" data-bs-toggle="dropdown">
               <i class="bi bi-gear-wide-connected"></i> 系統設定
             </a>
             <ul class="dropdown-menu">
@@ -114,6 +114,7 @@
               <li><a class="dropdown-item <%= navActive('/bonus-tiers') %>" href="/bonus-tiers"><i class="bi bi-percent"></i> 獎金級距設定</a></li>
               <li><a class="dropdown-item <%= navActive('/activity-types') %>" href="/activity-types"><i class="bi bi-clock-history"></i> 活動類型管理</a></li>
               <li><a class="dropdown-item <%= navActive('/sales-modes') %>" href="/sales-modes"><i class="bi bi-shop"></i> 銷售模式管理</a></li>
+              <li><a class="dropdown-item <%= navActive('/search-settings') %>" href="/search-settings"><i class="bi bi-search"></i> 搜尋範圍設定</a></li>
               <li><a class="dropdown-item <%= navActive('/customer-levels') %>" href="/customer-levels"><i class="bi bi-star"></i> 客戶等級管理</a></li>
               <li><a class="dropdown-item <%= navActive('/customer-statuses') %>" href="/customer-statuses"><i class="bi bi-signpost-split"></i> 客戶狀態管理</a></li>
               <li><a class="dropdown-item <%= navActive('/pipeline-statuses') %>" href="/pipeline-statuses"><i class="bi bi-bullseye"></i> 銷售機會狀態管理</a></li>

@@ -1,6 +1,7 @@
 const db = require('./db');
 const AuditLogService = require('../services/AuditLogService');
 const { PROJECT_VIEW_SCOPE, ROLES } = require('../constants');
+const SearchService = require('../services/SearchService');
 
 // Return salesperson IDs accessible to a user via user_salesperson_access table
 function getAssignedSalespersonIds(userId) {
@@ -73,9 +74,12 @@ const Project = {
       params.push(`%${filters.salesperson}%`);
     }
     if (filters.keyword) {
-      conditions += ` AND (project_code LIKE ? OR project_name LIKE ? OR company_name LIKE ?)`;
+      // 除了編號/名稱/客戶名，也涵蓋專案底下任何資料（備註、發票、收款、成本等）命中的專案
+      const matchedIds = SearchService.findProjectIdsByKeyword(filters.keyword, user);
+      const idCondition = matchedIds.length ? ` OR id IN (${matchedIds.map(() => '?').join(',')})` : '';
+      conditions += ` AND (project_code LIKE ? OR project_name LIKE ? OR company_name LIKE ?${idCondition})`;
       const keywordPattern = `%${filters.keyword}%`;
-      params.push(keywordPattern, keywordPattern, keywordPattern);
+      params.push(keywordPattern, keywordPattern, keywordPattern, ...matchedIds);
     }
 
     // 排序處理
