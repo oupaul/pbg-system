@@ -193,6 +193,8 @@ try {
   console.log('[啟動] ✓ bonusTiers 路由載入完成');
   const activityTypesRoutes = require('./routes/activityTypes');
   console.log('[啟動] ✓ activityTypes 路由載入完成');
+  const salesModesRoutes = require('./routes/salesModes');
+  console.log('[啟動] ✓ salesModes 路由載入完成');
   const costTypesRoutes = require('./routes/costTypes');
   console.log('[啟動] ✓ costTypes 路由載入完成');
   const costCategoriesRoutes = require('./routes/costCategories');
@@ -264,6 +266,7 @@ try {
   app.use('/approval-chains', requireAuth, approvalChainsRoutes);
   app.use('/bonus-tiers', requireAuth, bonusTiersRoutes);
   app.use('/activity-types', requireAuth, activityTypesRoutes);
+  app.use('/sales-modes', requireAuth, salesModesRoutes);
   app.use('/cost-types', requireAuth, costTypesRoutes);
   app.use('/cost-categories', requireAuth, costCategoriesRoutes);
   app.use('/payment-methods', requireAuth, paymentMethodsRoutes);

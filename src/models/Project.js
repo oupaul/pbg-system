@@ -14,6 +14,16 @@ function getAssignedSalespersonIds(userId) {
   }
 }
 
+// 驗證銷售模式：留空一律放行（選填），有值時必須存在於啟用中的 sales_modes，
+// 否則丟出訊息引導去後台管理頁新增/啟用（比照 Activity.js 的既有寫法）
+function validateSalesMode(value) {
+  if (!value) return;
+  const valid = db.prepare('SELECT id FROM sales_modes WHERE mode_name = ? AND is_active = 1').get(value);
+  if (!valid) {
+    throw new Error(`銷售模式「${value}」不存在或已停用，請至「銷售模式管理」確認`);
+  }
+}
+
 const Project = {
   // 取得所有專案（含關聯資料）
   findAll(filters = {}, user = null) {
@@ -53,6 +63,10 @@ const Project = {
     if (filters.type) {
       conditions += ` AND project_type = ?`;
       params.push(filters.type);
+    }
+    if (filters.sales_mode) {
+      conditions += ` AND id IN (SELECT id FROM projects WHERE sales_mode = ?)`;
+      params.push(filters.sales_mode);
     }
     if (filters.salesperson) {
       conditions += ` AND salesperson_name LIKE ?`;
@@ -143,11 +157,21 @@ const Project = {
         ${conditions}
         ${orderBy}
       `;
-      return db.prepare(sql).all(filters.invoice_year, filters.invoice_year, ...params);
+      return this._attachSalesMode(db.prepare(sql).all(filters.invoice_year, filters.invoice_year, ...params));
     }
 
     const sql = `SELECT * FROM v_project_summary ${conditions} ${orderBy}`;
-    return db.prepare(sql).all(...params);
+    return this._attachSalesMode(db.prepare(sql).all(...params));
+  },
+
+  // v_project_summary 視圖不含 sales_mode，列表查完後另行補上
+  _attachSalesMode(rows) {
+    try {
+      const map = {};
+      db.prepare('SELECT id, sales_mode FROM projects').all().forEach(r => { map[r.id] = r.sales_mode; });
+      rows.forEach(r => { r.sales_mode = map[r.id] || null; });
+    } catch (_) { /* projects 尚無 sales_mode 欄位時略過 */ }
+    return rows;
   },
 
   // 依ID取得單一專案
@@ -177,10 +201,11 @@ const Project = {
     
     // 視圖 v_project_summary 可能未含 report_group_id/contract_term，從 projects 表補上
     try {
-      const base = db.prepare(`SELECT report_group_id, contract_term FROM projects WHERE id = ?`).get(id);
+      const base = db.prepare(`SELECT report_group_id, contract_term, sales_mode FROM projects WHERE id = ?`).get(id);
       if (base !== undefined) {
         project.report_group_id = base.report_group_id;
         project.contract_term = base.contract_term;
+        project.sales_mode = base.sales_mode;
       }
     } catch (_) { /* 若 projects 尚無這些欄位則略過 */ }
     
@@ -283,13 +308,15 @@ const Project = {
     const reportGroupId = data.report_group_id !== undefined && data.report_group_id !== null && data.report_group_id !== ''
       ? parseInt(data.report_group_id) : null;
     const contractTerm = data.contract_term || null;
+    const salesMode = data.sales_mode || null;
+    validateSalesMode(salesMode);
 
     const stmt = db.prepare(`
       INSERT INTO projects (
         project_code, contract_year, contract_month, status, project_type,
         salesperson_id, customer_id, project_name, price_with_tax, price_without_tax,
-        sales_discount, is_new_customer, expected_invoice_year_month, notes, report_group_id, contract_term
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        sales_discount, is_new_customer, expected_invoice_year_month, notes, report_group_id, contract_term, sales_mode
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     try {
@@ -309,7 +336,8 @@ const Project = {
         expectedInvoiceYearMonth,
         notes,
         reportGroupId,
-        contractTerm
+        contractTerm,
+        salesMode
       );
       
       const projectId = result.lastInsertRowid;
@@ -379,8 +407,10 @@ const Project = {
       'project_code', 'contract_year', 'contract_month', 'status', 'project_type',
       'salesperson_id', 'customer_id', 'project_name', 'price_with_tax',
       'price_without_tax', 'sales_discount', 'is_new_customer', 'expected_invoice_year_month', 'notes', 'report_group_id',
-      'contract_term'
+      'contract_term', 'sales_mode'
     ];
+
+    if (data.sales_mode !== undefined) validateSalesMode(data.sales_mode);
 
     const newData = {};
     // 先初始化 newData 為 oldRecord 的副本，確保所有欄位都有值

@@ -53,6 +53,16 @@ ${locals.isReadOnly ? '<div class="alert alert-info mb-4"><i class="bi bi-info-c
         </select>
       </div>
       <div class="col-md-2">
+        <label class="form-label">銷售模式</label>
+        <select name="sales_mode" class="form-select">
+          <option value="">全部</option>
+          ${typeof salesModes !== 'undefined' && salesModes ? salesModes.map(m => {
+            const selected = filters.sales_mode === m.mode_name ? 'selected' : '';
+            return '<option value="' + m.mode_name.replace(/"/g, '&quot;') + '" ' + selected + '>' + m.mode_name.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</option>';
+          }).join('') : ''}
+        </select>
+      </div>
+      <div class="col-md-2">
         <label class="form-label">業務</label>
         <select name="salesperson" class="form-select">
           <option value="">全部</option>
@@ -203,6 +213,7 @@ ${salespersonStats ? `
                 類型${sortIcons.project_type}
               </a>
             </th>
+            <th>銷售模式</th>
             <th>
               <a href="?${sortLinks.salesperson_name}" class="text-white text-decoration-none">
                 業務${sortIcons.salesperson_name}
@@ -263,6 +274,7 @@ ${salespersonStats ? `
               <td>${p.contract_month || '-'}月</td>
               <td>${p.expected_invoice_year_month ? '<small class="text-primary">' + p.expected_invoice_year_month + '</small>' : '<span class="text-muted">-</span>'}</td>
               <td><span class="badge bg-${typeof typeColorMap !== 'undefined' && typeColorMap[p.project_type] ? typeColorMap[p.project_type] : (p.project_type === '食驗室' ? 'primary' : p.project_type === '純廣' ? 'success' : 'info')}">${p.project_type}</span></td>
+              <td>${p.sales_mode ? '<span class="badge bg-' + ((typeof salesModeColorMap !== 'undefined' && salesModeColorMap[p.sales_mode]) || 'secondary') + '">' + String(p.sales_mode).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>' : '<span class="text-muted">-</span>'}</td>
               <td>${p.salesperson_name || '-'}</td>
               <td>${p.company_name || '-'}</td>
               <td>${p.project_name}</td>
@@ -277,12 +289,12 @@ ${salespersonStats ? `
               </td>
             </tr>
           `;
-          }).join('') : '<tr><td colspan="13" class="text-center text-muted py-4">無符合條件的專案</td></tr>'}
+          }).join('') : '<tr><td colspan="14" class="text-center text-muted py-4">無符合條件的專案</td></tr>'}
 
           ${salespersonStats && projects.length > 0 ? `
           <!-- 統計總計行 -->
           <tr class="table-info fw-bold">
-            <td colspan="7" class="text-end"><strong>統計總計：</strong></td>
+            <td colspan="8" class="text-end"><strong>統計總計：</strong></td>
             <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${salespersonStats.totalPrice.toLocaleString()}</td>
             <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${salespersonStats.totalInvoiced.toLocaleString()}</td>
             <td class="text-end">${filters.invoice_year ? '-' : '' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + salespersonStats.totalUninvoiced.toLocaleString()}</td>

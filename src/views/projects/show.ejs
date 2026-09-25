@@ -33,6 +33,12 @@ ${typeof error !== 'undefined' && error ? '<div class="alert alert-danger alert-
             <label class="text-muted small">專案類型</label>
             <div><span class="badge bg-${typeof typeColorMap !== 'undefined' && typeColorMap[project.project_type] ? typeColorMap[project.project_type] : (project.project_type === '食驗室' ? 'primary' : project.project_type === '純廣' ? 'success' : 'info')} fs-6">${h(project.project_type)}</span></div>
           </div>
+          ${project.sales_mode ? `
+          <div class="col-md-3">
+            <label class="text-muted small">銷售模式</label>
+            <div><span class="badge bg-${typeof salesModeColorMap !== 'undefined' && salesModeColorMap[project.sales_mode] ? salesModeColorMap[project.sales_mode] : 'secondary'} fs-6">${h(project.sales_mode)}</span></div>
+          </div>
+          ` : ''}
           <div class="col-md-3">
             <label class="text-muted small">狀態</label>
             <div><span class="badge bg-${project.status === '已結案' ? 'secondary' : project.status === '取消' ? 'danger' : 'warning'} fs-6">${h(project.status)}</span></div>

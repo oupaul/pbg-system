@@ -60,6 +60,23 @@ function getAttachmentsByProject(projectId, options = {}) {
 }
 
 // 輔助函數：獲取所有啟用的專案類型
+// 銷售模式選項與顏色映射（純標籤欄位，選項由「銷售模式管理」自行建立）
+function getActiveSalesModes() {
+  try {
+    return db.prepare(`SELECT * FROM sales_modes WHERE is_active = 1 ORDER BY display_order ASC, mode_name ASC`).all();
+  } catch (err) {
+    return [];
+  }
+}
+
+function getSalesModeColorMap() {
+  const map = {};
+  try {
+    db.prepare('SELECT mode_name, badge_color FROM sales_modes').all().forEach(m => { map[m.mode_name] = m.badge_color; });
+  } catch (err) { /* 表不存在時不預載 */ }
+  return map;
+}
+
 function getActiveProjectTypes() {
   try {
     return db.prepare(`
@@ -142,6 +159,7 @@ router.get('/', (req, res) => {
     year: yearFilter && yearFilter !== 'all' ? yearFilter : null,
     status: req.query.status,
     type: req.query.type,
+    sales_mode: req.query.sales_mode || null,
     salesperson: req.query.salesperson,
     keyword: req.query.keyword,
     expected_invoice_year_month: req.query.expected_invoice_year_month,
@@ -185,6 +203,7 @@ router.get('/', (req, res) => {
     if (filters.year) params.append('year', yearFilter);
     if (filters.status) params.append('status', filters.status);
     if (filters.type) params.append('type', filters.type);
+    if (filters.sales_mode) params.append('sales_mode', filters.sales_mode);
     if (filters.salesperson) params.append('salesperson', filters.salesperson);
     if (filters.customer) params.append('customer', filters.customer);
     if (filters.keyword) params.append('keyword', filters.keyword);
@@ -291,7 +310,9 @@ router.get('/', (req, res) => {
     isFilterStatsOnly: showFilterStats && !showStatsForRole,
     userRole: req.user ? req.user.role : null,
     projectTypes: projectTypes,
-    typeColorMap: typeColorMap
+    typeColorMap: typeColorMap,
+    salesModes: getActiveSalesModes(),
+    salesModeColorMap: getSalesModeColorMap()
   });
 });
 
@@ -400,6 +421,7 @@ router.get('/new', requireEditPermission, (req, res) => {
     salespeople,
     customers,
     projectTypes,
+    salesModes: getActiveSalesModes(),
     reportGroups,
     taxRate: getTaxRate(),
     action: '/projects',
@@ -479,6 +501,7 @@ router.post('/', requireEditPermission, (req, res) => {
       notes: req.body.notes ? req.body.notes.trim() : null,
       report_group_id: req.body.report_group_id || null,
       contract_term: req.body.contract_term ? req.body.contract_term.trim() : null,
+      sales_mode: req.body.sales_mode || null,
       userInfo: getUserInfo(req)
     });
 
@@ -744,6 +767,7 @@ router.get('/:id', (req, res) => {
     bonusTypes: getActiveBonusTypes(),
     bonusTiers: getActiveBonusTiers(project.project_type),
     typeColorMap,
+    salesModeColorMap: getSalesModeColorMap(),
     showDeleted, // 是否顯示已刪除的發票/收款
     success: req.query.success ? decodeURIComponent(req.query.success) : null,
     error: req.query.error ? decodeURIComponent(req.query.error) : null,
@@ -778,6 +802,7 @@ router.get('/:id/edit', requireEditPermission, (req, res) => {
     salespeople,
     customers,
     projectTypes,
+    salesModes: getActiveSalesModes(),
     reportGroups,
     taxRate: getTaxRate(),
     action: `/projects/${project.id}`,
@@ -843,6 +868,7 @@ router.post('/:id', requireEditPermission, (req, res) => {
       notes: req.body.notes || null,
       report_group_id: req.body.report_group_id && req.body.report_group_id !== '' ? parseInt(req.body.report_group_id) : null,
       contract_term: req.body.contract_term ? req.body.contract_term.trim() : null,
+      sales_mode: req.body.sales_mode || null,
       userInfo: getUserInfo(req) // 添加用戶資訊用於審計日誌
     });
 

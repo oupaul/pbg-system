@@ -94,6 +94,7 @@ const MIGRATIONS = [
   'migrate_payment_terms',
   'migrate_order_statuses',
   'migrate_cost_item_fields',
+  'migrate_sales_modes',
 ];
 
 function run() {

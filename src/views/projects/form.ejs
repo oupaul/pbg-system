@@ -46,6 +46,17 @@
           ${locals.isAdmin ? '<small class="form-text text-muted">找不到類型？<a href="#" id="quickAddTypeLink" class="text-primary">快速新增</a></small>' : ''}
         </div>
         <div class="col-md-2">
+          <label class="form-label">銷售模式</label>
+          <select name="sales_mode" class="form-select">
+            <option value="">-- 不指定 --</option>
+            ${typeof salesModes !== 'undefined' && salesModes ? salesModes.map(m => {
+              const selected = project && project.sales_mode === m.mode_name ? 'selected' : '';
+              const safe = m.mode_name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+              return '<option value="' + safe + '" ' + selected + '>' + safe + '</option>';
+            }).join('') : ''}
+          </select>
+        </div>
+        <div class="col-md-2">
           <label class="form-label">報表群組</label>
           <select name="report_group_id" class="form-select">
             <option value="">-- 未分群 --</option>
