@@ -380,15 +380,15 @@ function resetExpectedInvoice() {
   </div>
   <div class="card-body p-0 overflow-visible">
     <div class="table-responsive invoice-table-responsive">
-      <table class="table table-hover mb-0">
+      <table class="table table-hover mb-0 js-sortable">
         <thead class="table-light">
           <tr>
-            <th>狀態</th>
-            <th>發票日期</th>
-            <th>發票號碼</th>
-            <th>預計收款日</th>
-            <th class="text-end">金額(含稅)</th>
-            <th>收款狀態</th>
+            <th data-sortkey="text">狀態</th>
+            <th data-sortkey="date">發票日期</th>
+            <th data-sortkey="text">發票號碼</th>
+            <th data-sortkey="date">預計收款日</th>
+            <th class="text-end" data-sortkey="num">金額(含稅)</th>
+            <th data-sortkey="num">收款狀態</th>
             <th></th>
           </tr>
         </thead>
@@ -405,13 +405,13 @@ function resetExpectedInvoice() {
               ? (locals.canEdit ? '<form action="/invoices/' + inv.id + '/restore" method="POST" style="display:inline"><button type="submit" class="btn btn-sm btn-outline-success"><i class="bi bi-arrow-counterclockwise"></i> 還原</button></form>' : '')
               : (locals.canEdit && isValid ? '<button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editInvoiceModal' + inv.id + '"><i class="bi bi-pencil"></i></button>' : '') + (locals.canEdit && isValid ? '<div class="btn-group dropdown" data-bs-boundary="viewport" data-bs-popper-config="{\"strategy\":\"fixed\"}"><button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">更多</button><ul class="dropdown-menu dropdown-menu-invoice dropdown-menu-end"><li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#voidModal' + inv.id + '"><i class="bi bi-x-circle me-1"></i>作廢</a></li><li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#voidReissueModal' + inv.id + '"><i class="bi bi-arrow-repeat me-1"></i>作廢重開</a></li><li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#partialAllowanceModal' + inv.id + '"><i class="bi bi-percent me-1"></i>部分折讓</a></li><li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#allowanceModal' + inv.id + '"><i class="bi bi-dash-circle me-1"></i>整筆折讓</a></li></ul></div>' : '') + (locals.canEdit ? '<form action="/invoices/' + inv.id + '/delete" method="POST" style="display:inline" onsubmit="return confirm(\'確定刪除？\')"><button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>' : '');
             return `
-            <tr class="${rowClass}" id="inv${inv.id}">
+            <tr class="${rowClass}" id="inv${inv.id}"${isDeleted ? ' data-deleted="1"' : ''}>
               <td>${statusBadge}${deletedBadge}${replacementLink}</td>
               <td>${inv.invoice_date || '-'}</td>
               <td><code>${h(inv.invoice_number || '-')}</code></td>
               <td>${inv.expected_payment_date || '-'}</td>
-              <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(inv.amount_with_tax || 0).toLocaleString()}${(inv.allowance_amount || 0) > 0 ? ' <span class="text-muted small">折讓 ' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + (inv.allowance_amount || 0).toLocaleString() + '，認列 ' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + Math.max(0, (inv.amount_with_tax || 0) - (inv.allowance_amount || 0)).toLocaleString() + '</span>' : ''}</td>
-              <td>${(() => {
+              <td class="text-end" data-sortvalue="${inv.amount_with_tax || 0}">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(inv.amount_with_tax || 0).toLocaleString()}${(inv.allowance_amount || 0) > 0 ? ' <span class="text-muted small">折讓 ' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + (inv.allowance_amount || 0).toLocaleString() + '，認列 ' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + Math.max(0, (inv.amount_with_tax || 0) - (inv.allowance_amount || 0)).toLocaleString() + '</span>' : ''}</td>
+              <td data-sortvalue="${inv.unpaid_amount != null ? inv.unpaid_amount : 0}">${(() => {
                 const isValid = !inv.status || inv.status === '有效';
                 const received = inv.total_received != null ? inv.total_received : null;
                 const unpaid   = inv.unpaid_amount  != null ? inv.unpaid_amount  : null;
@@ -581,15 +581,15 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
-      <table class="table table-hover mb-0">
+      <table class="table table-hover mb-0 js-sortable">
         <thead class="table-light">
           <tr>
-            <th>狀態</th>
-            <th>收款日期</th>
-            <th>對應發票</th>
-            <th class="text-end">匯入金額</th>
-            <th class="text-end">差異(匯費等)</th>
-            <th>備註</th>
+            <th data-sortkey="text">狀態</th>
+            <th data-sortkey="date">收款日期</th>
+            <th data-sortkey="text">對應發票</th>
+            <th class="text-end" data-sortkey="num">匯入金額</th>
+            <th class="text-end" data-sortkey="num">差異(匯費等)</th>
+            <th data-sortkey="text">備註</th>
             <th></th>
           </tr>
         </thead>
@@ -600,7 +600,7 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
               ? (locals.canEdit ? '<form action="/payments/' + pay.id + '/restore" method="POST" style="display:inline"><button type="submit" class="btn btn-sm btn-outline-success"><i class="bi bi-arrow-counterclockwise"></i> 還原</button></form>' : '')
               : (locals.canEdit ? '<button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editPaymentModal' + pay.id + '"><i class="bi bi-pencil"></i></button>' : '') + (locals.canEdit ? '<form action="/payments/' + pay.id + '/delete" method="POST" style="display:inline" onsubmit="return confirm(\'確定刪除？\')"><button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>' : '');
             return `
-            <tr class="${isDeleted ? 'table-secondary' : ''}">
+            <tr class="${isDeleted ? 'table-secondary' : ''}"${isDeleted ? ' data-deleted="1"' : ''}>
               <td>${isDeleted ? '<span class="badge bg-secondary">已刪除</span>' : '-'}</td>
               <td>${pay.payment_date || '-'}</td>
               <td><code>${h(pay.invoice_number || '-')}</code></td>
@@ -628,21 +628,21 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
-      <table class="table table-hover mb-0">
+      <table class="table table-hover mb-0 js-sortable">
         <thead class="table-light">
           <tr>
-            <th>進項編號</th>
-            <th>成本名稱</th>
-            <th>成本日期</th>
-            <th>成本類型</th>
-            <th>費用類別</th>
-            <th>廠商</th>
-            <th>付款辦法</th>
-            <th>付款條件</th>
-            <th>下單狀態</th>
-            <th class="text-end">預估金額</th>
-            <th class="text-end">實際金額</th>
-            <th>備註</th>
+            <th data-sortkey="text">進項編號</th>
+            <th data-sortkey="text">成本名稱</th>
+            <th data-sortkey="date">成本日期</th>
+            <th data-sortkey="text">成本類型</th>
+            <th data-sortkey="text">費用類別</th>
+            <th data-sortkey="text">廠商</th>
+            <th data-sortkey="text">付款辦法</th>
+            <th data-sortkey="text">付款條件</th>
+            <th data-sortkey="text">下單狀態</th>
+            <th class="text-end" data-sortkey="num">預估金額</th>
+            <th class="text-end" data-sortkey="num">實際金額</th>
+            <th data-sortkey="text">備註</th>
             <th></th>
           </tr>
         </thead>
@@ -686,15 +686,15 @@ ${locals.canEdit ? `
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
-      <table class="table table-hover mb-0">
+      <table class="table table-hover mb-0 js-sortable">
         <thead class="table-light">
           <tr>
-            <th>獎金類型</th>
-            <th class="text-end">計算基礎</th>
-            <th class="text-end">比例</th>
-            <th class="text-end">獎金金額</th>
-            <th>發放日期</th>
-            <th>狀態</th>
+            <th data-sortkey="text">獎金類型</th>
+            <th class="text-end" data-sortkey="num">計算基礎</th>
+            <th class="text-end" data-sortkey="num">比例</th>
+            <th class="text-end" data-sortkey="num">獎金金額</th>
+            <th data-sortkey="date">發放日期</th>
+            <th data-sortkey="text">狀態</th>
             <th></th>
           </tr>
         </thead>
@@ -724,6 +724,69 @@ ${locals.canEdit ? `
 </div>
 </div>
 ` : ''}
+
+<style>
+  table.js-sortable thead th[data-sortkey] { cursor: pointer; user-select: none; white-space: nowrap; }
+  table.js-sortable thead th[data-sortkey]:hover { background-color: rgba(0,0,0,.04); }
+  table.js-sortable thead th .sort-ind { font-size: .7em; opacity: .55; margin-left: 3px; }
+</style>
+<script>
+(function () {
+  var collator = new Intl.Collator('zh-Hant');
+  function cellValue(td, type) {
+    var raw = td.getAttribute('data-sortvalue');
+    var text = raw !== null ? raw : td.textContent.trim();
+    if (type === 'num') {
+      var n = parseFloat(String(text).replace(/[^0-9.\\-]/g, ''));
+      return isNaN(n) ? null : n;
+    }
+    if (type === 'date') {
+      return /^[0-9]{2,4}[-\\/][0-9]{1,2}[-\\/][0-9]{1,2}/.test(text) ? text : null;
+    }
+    return text === '-' || text === '' ? null : text;
+  }
+  function sortTable(table, colIdx, type, dir) {
+    var tbody = table.tBodies[0];
+    var rows = Array.prototype.slice.call(tbody.rows);
+    var data = rows.filter(function (r) { return !r.querySelector('td[colspan]'); });
+    var normal = data.filter(function (r) { return r.getAttribute('data-deleted') !== '1'; });
+    var deleted = data.filter(function (r) { return r.getAttribute('data-deleted') === '1'; });
+    function cmp(a, b) {
+      var va = cellValue(a.cells[colIdx], type), vb = cellValue(b.cells[colIdx], type);
+      if (va === null && vb === null) return 0;
+      if (va === null) return 1;
+      if (vb === null) return -1;
+      var r = type === 'num' ? va - vb : collator.compare(String(va), String(vb));
+      return dir === 'asc' ? r : -r;
+    }
+    normal.sort(cmp);
+    deleted.sort(cmp);
+    normal.concat(deleted).forEach(function (r) { tbody.appendChild(r); });
+  }
+  document.querySelectorAll('table.js-sortable').forEach(function (table) {
+    var ths = table.tHead.rows[0].cells;
+    Array.prototype.forEach.call(ths, function (th, idx) {
+      var type = th.getAttribute('data-sortkey');
+      if (!type) return;
+      var ind = document.createElement('span');
+      ind.className = 'sort-ind';
+      ind.textContent = '⇅';
+      th.appendChild(ind);
+      th.addEventListener('click', function () {
+        var dir = th.getAttribute('data-dir') === 'asc' ? 'desc' : 'asc';
+        Array.prototype.forEach.call(ths, function (o) {
+          o.removeAttribute('data-dir');
+          var i = o.querySelector('.sort-ind');
+          if (i) i.textContent = '⇅';
+        });
+        th.setAttribute('data-dir', dir);
+        ind.textContent = dir === 'asc' ? '▲' : '▼';
+        sortTable(table, idx, type, dir);
+      });
+    });
+  });
+})();
+</script>
 
 <!-- 新增發票 Modal -->
 <div class="modal fade" id="invoiceModal" tabindex="-1">
