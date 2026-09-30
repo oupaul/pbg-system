@@ -117,6 +117,13 @@ const Project = {
       conditions += ` AND (total_invoiced > 0) AND (total_invoiced - COALESCE(total_received, 0) - COALESCE(sales_discount, 0) > 0) AND project_type NOT IN ('非營利專案', '廣告交換')`;
       conditions += ` AND id IN (SELECT DISTINCT project_id FROM invoices WHERE expected_payment_date IS NOT NULL AND TRIM(expected_payment_date) <> '' AND date(expected_payment_date) < date('now', 'localtime'))`;
     }
+    // 已完成：發票金額涵蓋合約總價（已全部開立），且收款已扣抵折讓後不再有未收餘額（已全數收款）。
+    // price_with_tax > 0 是為了排除本來就沒有計價金額的專案（否則會因為 0 >= 0 誤判為已完成）
+    if (filters.completed === true || filters.completed === 'true') {
+      conditions += ` AND price_with_tax > 0 AND COALESCE(total_invoiced, 0) >= price_with_tax`;
+      conditions += ` AND (COALESCE(total_invoiced, 0) - COALESCE(total_received, 0) - COALESCE(sales_discount, 0)) <= 0`;
+      conditions += ` AND project_type NOT IN ('非營利專案', '廣告交換')`;
+    }
     if (filters.expected_invoice_year_month) {
       conditions += ` AND expected_invoice_year_month = ?`;
       params.push(filters.expected_invoice_year_month);

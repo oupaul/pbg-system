@@ -6,6 +6,7 @@
       ${filters.uninvoiced ? '<span class="badge bg-warning text-dark ms-2">未開立發票</span>' : ''}
       ${filters.unpaid ? '<span class="badge bg-danger ms-2">未收款</span>' : ''}
       ${filters.overdue_unpaid ? '<span class="badge bg-dark ms-2">逾期未收款</span>' : ''}
+      ${filters.completed ? '<span class="badge bg-success ms-2">已完成開票收款</span>' : ''}
     </h1>
   </div>
   <div class="col-auto d-flex gap-2">
@@ -17,6 +18,9 @@
     </a>
     <a href="/projects${filters.overdue_unpaid ? '' : '?overdue_unpaid=true'}" class="btn ${filters.overdue_unpaid ? 'btn-dark' : 'btn-outline-dark'}">
       <i class="bi bi-calendar-x"></i> ${filters.overdue_unpaid ? '顯示全部' : '逾期未收款'}
+    </a>
+    <a href="/projects${filters.completed ? '' : '?completed=true'}" class="btn ${filters.completed ? 'btn-success' : 'btn-outline-success'}">
+      <i class="bi bi-check-circle"></i> ${filters.completed ? '顯示全部' : '已完成開票收款'}
     </a>
     ${locals.canEdit ? '<a href="/projects/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 新增專案</a>' : ''}
   </div>
@@ -91,6 +95,9 @@ ${locals.isReadOnly ? '<div class="alert alert-info mb-4"><i class="bi bi-info-c
       ` : ''}
       ${filters.overdue_unpaid ? `
         <input type="hidden" name="overdue_unpaid" value="true">
+      ` : ''}
+      ${filters.completed ? `
+        <input type="hidden" name="completed" value="true">
       ` : ''}
       ${filters.invoice_year ? `
         <input type="hidden" name="invoice_year" value="${filters.invoice_year}">

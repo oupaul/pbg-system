@@ -166,6 +166,7 @@ router.get('/', (req, res) => {
     uninvoiced: req.query.uninvoiced === 'true' || req.query.uninvoiced === true,
     unpaid: req.query.unpaid === 'true' || req.query.unpaid === true,
     overdue_unpaid: req.query.overdue_unpaid === 'true' || req.query.overdue_unpaid === true,
+    completed: req.query.completed === 'true' || req.query.completed === true,
     invoice_year: req.query.invoice_year || null, // 發票年度篩選
     sortBy: req.query.sortBy || 'contract_year',
     sortOrder: req.query.sortOrder || 'DESC'
@@ -211,6 +212,7 @@ router.get('/', (req, res) => {
     if (filters.uninvoiced) params.append('uninvoiced', 'true');
     if (filters.unpaid) params.append('unpaid', 'true');
     if (filters.overdue_unpaid) params.append('overdue_unpaid', 'true');
+    if (filters.completed) params.append('completed', 'true');
     if (filters.invoice_year) params.append('invoice_year', filters.invoice_year);
     params.append('sortBy', newSortBy);
     params.append('sortOrder', newSortOrder);
@@ -266,7 +268,7 @@ router.get('/', (req, res) => {
   const displayYear = yearFilter && yearFilter !== 'all' ? yearFilter : 'all';
 
   // 計算統計資訊：所有角色皆顯示（依目前篩選結果加總）
-  const showFilterStats = filters.uninvoiced || filters.unpaid || filters.overdue_unpaid;
+  const showFilterStats = filters.uninvoiced || filters.unpaid || filters.overdue_unpaid || filters.completed;
   const showStatsForRole = !!req.user; // 登入者皆顯示
   let salespersonStats = null;
   if (showStatsForRole || showFilterStats) {
@@ -329,6 +331,7 @@ router.get('/invoice-detail', (req, res) => {
     uninvoiced: req.query.uninvoiced === 'true',
     unpaid: req.query.unpaid === 'true',
     overdue_unpaid: req.query.overdue_unpaid === 'true',
+    completed: req.query.completed === 'true',
     invoice_year: req.query.invoice_year || null,
     sortBy: 'contract_year',
     sortOrder: 'DESC'
