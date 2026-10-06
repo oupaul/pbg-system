@@ -575,6 +575,60 @@ class ExcelExportService {
     return workbook;
   }
 
+  // 客戶活動紀錄批次匯入範本（管理者專用）
+  generateActivityTemplate() {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('活動紀錄');
+
+    const headers = ['客戶編號', '公司名稱', '活動日期', '活動類型', '活動內容', '關聯銷售機會', '記錄人'];
+    worksheet.addRow(headers);
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+
+    let activeTypes = [];
+    try {
+      activeTypes = db.prepare('SELECT type_name FROM activity_types WHERE is_active = 1 ORDER BY display_order, type_name').all().map(r => r.type_name);
+    } catch { /* activity_types 表不存在時保持空陣列 */ }
+    const firstType = activeTypes[0] || '拜訪';
+
+    worksheet.addRow(['CU001', 'XX股份有限公司', '2026-03-01', firstType, '拜訪客戶討論明年度合作方案', '', '王小明']);
+    worksheet.addRow(['', 'YY企業有限公司', '115/03/05', firstType, '電話追蹤報價進度', 'YY年度專案', '']);
+
+    [12, 24, 14, 12, 50, 24, 12].forEach((w, i) => { worksheet.getColumn(i + 1).width = w; });
+    worksheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+    const typeListStr = activeTypes.length ? activeTypes.map(t => `「${t}」`).join('、') : '（目前尚未設定任何活動類型，匯入時會依 Excel 內容自動建立）';
+
+    const infoSheet = workbook.addWorksheet('填寫說明');
+    infoSheet.addRow(['欄位說明']);
+    infoSheet.addRow(['']);
+    infoSheet.addRow(['欄位名稱', '說明', '範例', '必填']);
+    infoSheet.addRow(['客戶編號', '優先用客戶編號對應客戶；沒填才用公司名稱', 'CU001', '擇一']);
+    infoSheet.addRow(['公司名稱', '需與系統內客戶名稱完全一致，且只能對應到一位客戶', 'XX股份有限公司', '擇一']);
+    infoSheet.addRow(['活動日期', '可填 Excel 日期、2026-03-01、2026/3/1 或民國年 115/03/01', '2026-03-01', '是']);
+    infoSheet.addRow(['活動類型', `目前可用：${typeListStr}。填入系統沒有的類型會自動新增；留空視為「其他」`, firstType, '否']);
+    infoSheet.addRow(['活動內容', '活動紀錄的文字內容', '拜訪客戶討論明年度合作方案', '是']);
+    infoSheet.addRow(['關聯銷售機會', '填該客戶底下的銷售機會名稱（需完全一致），找不到時仍會匯入但不會關聯', 'YY年度專案', '否']);
+    infoSheet.addRow(['記錄人', '原本記錄這筆活動的人，留空則記為執行匯入的人', '王小明', '否']);
+    infoSheet.addRow(['']);
+    infoSheet.addRow(['注意事項：']);
+    infoSheet.addRow(['1. 同一客戶、同日期、同類型、同內容的紀錄若已存在，會自動略過，可以放心重複匯入']);
+    infoSheet.addRow(['2. 請刪除範本內的兩列範例資料，再填入您的資料']);
+    infoSheet.addRow(['3. 這份匯入僅供管理者使用']);
+
+    const infoHeaderRow = infoSheet.getRow(3);
+    infoHeaderRow.font = { bold: true };
+    infoHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE7E6E6' } };
+    infoSheet.getColumn(1).width = 16;
+    infoSheet.getColumn(2).width = 70;
+    infoSheet.getColumn(3).width = 28;
+    infoSheet.getColumn(4).width = 8;
+
+    return workbook;
+  }
+
   // 客戶/廠商批次匯入範本（管理者專用），欄位對應 Customer.create() 支援的欄位
   generateCustomerTemplate() {
     const workbook = new ExcelJS.Workbook();

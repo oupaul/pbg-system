@@ -29,6 +29,9 @@
       <button class="btn btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#customerImportModal">
         <i class="bi bi-upload"></i> 批次匯入
       </button>
+      <button class="btn btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#activityImportModal">
+        <i class="bi bi-clock-history"></i> 匯入活動紀錄
+      </button>
     ` : ''}
     ${locals.canEditCrm ? `
       <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newCustomerModal">
@@ -54,7 +57,16 @@ ${typeof success !== 'undefined' && success ? `
 
 ${typeof importResult !== 'undefined' && importResult ? `
   <div class="alert alert-${importResult.errorCount > 0 ? 'warning' : 'success'} alert-dismissible fade show" role="alert">
-    <i class="bi bi-upload"></i> 批次匯入完成：成功 ${importResult.createdCount || 0} 筆，失敗 ${importResult.skippedCount || 0} 筆
+    <i class="bi bi-upload"></i> ${importResult.kind === 'activities' ? '活動紀錄' : ''}批次匯入完成：成功 ${importResult.createdCount || 0} 筆${importResult.kind === 'activities' ? '，略過重複 ' + (importResult.duplicateCount || 0) + ' 筆' : ''}，失敗 ${importResult.skippedCount || 0} 筆
+    ${(importResult.createdTypes || []).length ? '<div class="small mt-1"><i class="bi bi-tags"></i> 本次自動新增的活動類型：' + importResult.createdTypes.map(t => escapeHtml(t)).join('、') + '</div>' : ''}
+    ${(importResult.warnings || []).length ? `
+      <details class="mt-2">
+        <summary style="cursor:pointer">查看警告（${importResult.warnings.length} 筆）</summary>
+        <ul class="mb-0 mt-2">
+          ${importResult.warnings.map(msg => '<li>' + escapeHtml(msg) + '</li>').join('')}
+        </ul>
+      </details>
+    ` : ''}
     ${(importResult.errors || []).length ? `
       <details class="mt-2">
         <summary style="cursor:pointer">查看失敗明細（${importResult.errors.length} 筆）</summary>
@@ -229,6 +241,38 @@ ${locals.isAdmin ? `
             請先下載範本，依格式填好資料後上傳。匯入的資料會直接建立，不會經過一般新增客戶的審核流程。
           </p>
           <a href="/customers/import/template" class="btn btn-outline-secondary btn-sm mb-3">
+            <i class="bi bi-download"></i> 下載範本
+          </a>
+          <div class="mb-3">
+            <label class="form-label">選擇檔案</label>
+            <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">開始匯入</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+` : ''}
+
+${locals.isAdmin ? `
+<!-- 活動紀錄批次匯入 Modal -->
+<div class="modal fade" id="activityImportModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="/customers/import-activities" method="POST" enctype="multipart/form-data">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-clock-history"></i> 批次匯入活動紀錄</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small">
+            依客戶編號（或公司名稱）對應客戶。系統沒有的活動類型會自動新增；同一客戶、同日期、同類型、同內容的紀錄已存在時會自動略過，可以放心重複匯入。
+          </p>
+          <a href="/customers/import-activities/template" class="btn btn-outline-secondary btn-sm mb-3">
             <i class="bi bi-download"></i> 下載範本
           </a>
           <div class="mb-3">

@@ -257,6 +257,70 @@ router.post('/import', requireAdmin, customerImportUpload.single('file'), async 
   }
 });
 
+// 活動紀錄批次匯入範本下載（管理者專用）
+router.get('/import-activities/template', requireAdmin, async (req, res) => {
+  try {
+    const workbook = ExcelExportService.generateActivityTemplate();
+    const buffer = await ExcelExportService.writeToBuffer(workbook);
+    const encodedFilename = encodeURIComponent('活動紀錄匯入範本.xlsx').replace(/'/g, '%27');
+    const nodeBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFilename}`);
+    res.setHeader('Content-Length', nodeBuffer.length);
+    res.send(nodeBuffer);
+  } catch (err) {
+    console.error('下載活動紀錄匯入範本失敗:', err);
+    res.redirect('/customers?error=' + encodeURIComponent(err.message));
+  }
+});
+
+// 活動紀錄批次匯入（管理者專用）
+router.post('/import-activities', requireAdmin, customerImportUpload.single('file'), async (req, res) => {
+  let filePath = null;
+  try {
+    if (!req.file) {
+      return res.redirect('/customers?error=' + encodeURIComponent('請選擇檔案'));
+    }
+    filePath = req.file.path;
+
+    const result = await ExcelImportService.importActivities(filePath, getUserInfo(req));
+
+    if (fs.existsSync(filePath)) {
+      try { fs.unlinkSync(filePath); } catch (unlinkErr) { console.error('刪除暫存檔失敗:', unlinkErr); }
+    }
+
+    const clip = (v) => {
+      const msg = (typeof v === 'object' && v !== null) ? (v.message || String(v)) : String(v);
+      return msg.length > 200 ? msg.substring(0, 200) + '...' : msg;
+    };
+    const limitedResult = {
+      kind: 'activities',
+      success: result.success !== false,
+      createdCount: result.createdCount || 0,
+      duplicateCount: result.duplicateCount || 0,
+      skippedCount: result.failedCount || 0,
+      errorCount: result.errorCount || 0,
+      errors: (result.errors || []).slice(0, 50).map(clip),
+      warnings: (result.warnings || []).slice(0, 30).map(clip),
+      createdTypes: (result.createdTypes || []).slice(0, 30)
+    };
+
+    let resultStr = encodeURIComponent(JSON.stringify(limitedResult));
+    if (resultStr.length > 2000) {
+      resultStr = encodeURIComponent(JSON.stringify({
+        ...limitedResult, errors: limitedResult.errors.slice(0, 8), warnings: limitedResult.warnings.slice(0, 5), createdTypes: limitedResult.createdTypes.slice(0, 10)
+      }));
+    }
+    res.redirect('/customers?importResult=' + resultStr);
+  } catch (err) {
+    console.error('活動紀錄批次匯入錯誤:', err);
+    if (filePath && fs.existsSync(filePath)) {
+      try { fs.unlinkSync(filePath); } catch (unlinkErr) { console.error('刪除暫存檔失敗:', unlinkErr); }
+    }
+    res.redirect('/customers?error=' + encodeURIComponent(err.message || '匯入過程中發生未知錯誤'));
+  }
+});
+
 // 快速新增客戶/廠商（API，返回 JSON）
 // 非管理員/專案管理員送出的申請不會直接建立客戶，而是進入審核佇列
 router.post('/quick-add', requireCrmEditPermission, (req, res) => {

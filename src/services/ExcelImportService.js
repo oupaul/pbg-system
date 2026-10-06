@@ -5,6 +5,7 @@ const Invoice = require('../models/Invoice');
 const Payment = require('../models/Payment');
 const Salesperson = require('../models/Salesperson');
 const Customer = require('../models/Customer');
+const Activity = require('../models/Activity');
 const Bonus = require('../models/Bonus');
 const dayjs = require('dayjs');
 
@@ -73,6 +74,41 @@ function safeExtractText(value) {
     return null;
   }
   return String(value).trim() || null;
+}
+
+
+// 活動日期解析：接受 Excel 日期、Excel 序號、YYYY-MM-DD / YYYY/M/D、民國年 113/07/10；回傳 YYYY-MM-DD 或 null
+function parseActivityDate(raw) {
+  if (raw === null || raw === undefined || raw === '') return null;
+  const isRealDate = (y, m, d) => {
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+  };
+  const fmt = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+  if (raw instanceof Date) {
+    return isNaN(raw.getTime()) ? null : raw.toISOString().slice(0, 10);
+  }
+  if (typeof raw === 'object') {
+    const inner = raw.result !== undefined ? raw.result : (raw.text !== undefined ? raw.text : raw.value);
+    return inner === raw ? null : parseActivityDate(inner);
+  }
+  if (typeof raw === 'number') {
+    if (raw < 1 || raw > 80000) return null;
+    return new Date(Date.UTC(1899, 11, 30) + Math.floor(raw) * 86400000).toISOString().slice(0, 10);
+  }
+  const str = String(raw).trim();
+  let m = str.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+  if (m) {
+    const [y, mo, d] = [parseInt(m[1]), parseInt(m[2]), parseInt(m[3])];
+    return isRealDate(y, mo, d) ? fmt(y, mo, d) : null;
+  }
+  m = str.match(/^(\d{2,3})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+  if (m) {
+    const [y, mo, d] = [parseInt(m[1]) + 1911, parseInt(m[2]), parseInt(m[3])];
+    return isRealDate(y, mo, d) ? fmt(y, mo, d) : null;
+  }
+  return null;
 }
 
 class ExcelImportService {
@@ -1250,6 +1286,132 @@ class ExcelImportService {
     } catch (err) {
       this.error(`匯入失敗: ${err.message}`);
       return { success: false, createdCount, skippedCount, error: err.message, errors: this.errors, errorCount: this.errors.length, log: this.importLog };
+    }
+  }
+
+  // 客戶活動紀錄批次匯入（管理者專用）：
+  // 依客戶編號（或公司名稱）對應客戶；缺少的活動類型自動新增；同客戶＋同日期＋同類型＋同內容已存在則略過
+  async importActivities(filePath, userInfo) {
+    this.importLog = [];
+    this.errors = [];
+    this.log(`開始匯入活動紀錄: ${filePath}`);
+
+    const COLS = { CODE: 0, NAME: 1, DATE: 2, TYPE: 3, CONTENT: 4, PIPELINE: 5, RECORDER: 6 };
+    const MAX_TYPE_LENGTH = 20;
+    let createdCount = 0;
+    let duplicateCount = 0;
+    let failedCount = 0;
+    const warnings = [];
+    const createdTypes = [];
+
+    const typeCache = {};
+    db.prepare('SELECT type_name, is_active FROM activity_types').all().forEach(t => { typeCache[t.type_name] = t.is_active; });
+
+    const fail = (rowNumber, label, message) => {
+      failedCount++;
+      this.error(`第 ${rowNumber} 列${label ? `（${label}）` : ''}：${message}`);
+    };
+
+    try {
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.readFile(filePath);
+      const worksheet = workbook.worksheets[0];
+      if (!worksheet) {
+        this.error('找不到工作表，請確認上傳的是有效的 Excel 檔案');
+        return { success: false, createdCount, duplicateCount, failedCount, errors: this.errors, errorCount: this.errors.length, warnings, createdTypes };
+      }
+
+      for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
+        const excelRow = worksheet.getRow(rowNumber);
+        const code = safeExtractText(excelRow.getCell(COLS.CODE + 1).value);
+        const name = safeExtractText(excelRow.getCell(COLS.NAME + 1).value);
+        const rawDate = excelRow.getCell(COLS.DATE + 1).value;
+        const typeText = safeExtractText(excelRow.getCell(COLS.TYPE + 1).value);
+        const content = safeExtractText(excelRow.getCell(COLS.CONTENT + 1).value);
+        const pipelineName = safeExtractText(excelRow.getCell(COLS.PIPELINE + 1).value);
+        const recorder = safeExtractText(excelRow.getCell(COLS.RECORDER + 1).value);
+
+        if (!code && !name && !content && (rawDate === null || rawDate === undefined || rawDate === '')) continue;
+        const label = code || name || '';
+
+        try {
+          // 1. 對應客戶
+          let customer;
+          if (code) {
+            customer = db.prepare('SELECT id, company_name FROM customers WHERE customer_code = ? AND deleted_at IS NULL').get(code);
+            if (!customer) { fail(rowNumber, label, `找不到客戶編號「${code}」`); continue; }
+          } else if (name) {
+            const matches = db.prepare('SELECT id, company_name FROM customers WHERE company_name = ? AND deleted_at IS NULL').all(name);
+            if (matches.length === 0) { fail(rowNumber, label, `找不到公司名稱「${name}」的客戶`); continue; }
+            if (matches.length > 1) { fail(rowNumber, label, `公司名稱「${name}」對應到 ${matches.length} 位客戶，請改填客戶編號`); continue; }
+            customer = matches[0];
+          } else {
+            fail(rowNumber, label, '客戶編號與公司名稱至少要填一項'); continue;
+          }
+
+          // 2. 日期與內容
+          const activityDate = parseActivityDate(rawDate);
+          if (!activityDate) { fail(rowNumber, label, '活動日期為必填，或格式無法辨識'); continue; }
+          if (!content) { fail(rowNumber, label, '活動內容為必填欄位'); continue; }
+
+          // 3. 活動類型（缺少的自動新增）
+          const typeName = typeText || '其他';
+          if (typeName.length > MAX_TYPE_LENGTH) { fail(rowNumber, label, `活動類型「${typeName}」超過 ${MAX_TYPE_LENGTH} 個字`); continue; }
+          if (typeCache[typeName] === 0) {
+            fail(rowNumber, label, `活動類型「${typeName}」已停用，請至「活動類型管理」啟用後再匯入`); continue;
+          }
+          if (typeCache[typeName] === undefined) {
+            const maxOrder = db.prepare('SELECT MAX(display_order) AS m FROM activity_types').get();
+            db.prepare(`INSERT INTO activity_types (type_name, badge_color, display_order, is_active, updated_at)
+              VALUES (?, 'secondary', ?, 1, datetime('now', 'localtime'))`).run(typeName, ((maxOrder && maxOrder.m) || 0) + 1);
+            typeCache[typeName] = 1;
+            createdTypes.push(typeName);
+          }
+
+          // 4. 去重
+          const existing = db.prepare(`
+            SELECT id FROM activities
+            WHERE customer_id = ? AND substr(activity_date, 1, 10) = ? AND activity_type = ? AND TRIM(content) = ? AND deleted_at IS NULL
+          `).get(customer.id, activityDate, typeName, content);
+          if (existing) { duplicateCount++; continue; }
+
+          // 5. 關聯銷售機會（找不到只警告，不擋列）
+          let pipelineId = null;
+          if (pipelineName) {
+            const pipe = db.prepare(`
+              SELECT id FROM pipelines WHERE customer_id = ? AND opportunity_name = ? AND deleted_at IS NULL ORDER BY id LIMIT 1
+            `).get(customer.id, pipelineName);
+            if (pipe) pipelineId = pipe.id;
+            else warnings.push(`第 ${rowNumber} 列（${label}）：找不到銷售機會「${pipelineName}」，已匯入但未關聯`);
+          }
+
+          const activityId = Activity.create({
+            customer_id: customer.id,
+            pipeline_id: pipelineId,
+            activity_type: typeName,
+            content,
+            activity_date: activityDate,
+            userInfo
+          });
+          if (recorder) {
+            db.prepare('UPDATE activities SET created_by = ? WHERE id = ?').run(recorder, activityId);
+          }
+          createdCount++;
+        } catch (rowErr) {
+          fail(rowNumber, label, rowErr.message);
+        }
+      }
+
+      this.log(`活動紀錄匯入完成：成功 ${createdCount}、略過重複 ${duplicateCount}、失敗 ${failedCount}`);
+      return {
+        success: failedCount === 0 || createdCount > 0 || duplicateCount > 0,
+        createdCount, duplicateCount, failedCount,
+        errors: this.errors, errorCount: this.errors.length,
+        warnings, createdTypes
+      };
+    } catch (err) {
+      this.error(`匯入失敗: ${err.message}`);
+      return { success: false, createdCount, duplicateCount, failedCount, error: err.message, errors: this.errors, errorCount: this.errors.length, warnings, createdTypes };
     }
   }
 }
