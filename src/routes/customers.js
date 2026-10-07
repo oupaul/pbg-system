@@ -298,6 +298,7 @@ router.post('/import-activities', requireAdmin, customerImportUpload.single('fil
       success: result.success !== false,
       createdCount: result.createdCount || 0,
       duplicateCount: result.duplicateCount || 0,
+      linkedCount: result.linkedCount || 0,
       skippedCount: result.failedCount || 0,
       errorCount: result.errorCount || 0,
       errors: (result.errors || []).slice(0, 50).map(clip),

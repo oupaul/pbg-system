@@ -57,7 +57,7 @@ ${typeof success !== 'undefined' && success ? `
 
 ${typeof importResult !== 'undefined' && importResult ? `
   <div class="alert alert-${importResult.errorCount > 0 ? 'warning' : 'success'} alert-dismissible fade show" role="alert">
-    <i class="bi bi-upload"></i> ${importResult.kind === 'activities' ? '活動紀錄' : ''}批次匯入完成：成功 ${importResult.createdCount || 0} 筆${importResult.kind === 'activities' ? '，略過重複 ' + (importResult.duplicateCount || 0) + ' 筆' : ''}，失敗 ${importResult.skippedCount || 0} 筆
+    <i class="bi bi-upload"></i> ${importResult.kind === 'activities' ? '活動紀錄' : ''}批次匯入完成：成功 ${importResult.createdCount || 0} 筆${importResult.kind === 'activities' ? '，補上商機關聯 ' + (importResult.linkedCount || 0) + ' 筆，略過重複 ' + (importResult.duplicateCount || 0) + ' 筆' : ''}，失敗 ${importResult.skippedCount || 0} 筆
     ${(importResult.createdTypes || []).length ? '<div class="small mt-1"><i class="bi bi-tags"></i> 本次自動新增的活動類型：' + importResult.createdTypes.map(t => escapeHtml(t)).join('、') + '</div>' : ''}
     ${(importResult.warnings || []).length ? `
       <details class="mt-2">
@@ -270,7 +270,7 @@ ${locals.isAdmin ? `
         </div>
         <div class="modal-body">
           <p class="text-muted small">
-            依客戶編號（或公司名稱）對應客戶。系統沒有的活動類型會自動新增；同一客戶、同日期、同類型、同內容的紀錄已存在時會自動略過，可以放心重複匯入。
+            依客戶編號（或公司名稱）對應客戶。系統沒有的活動類型會自動新增；同一客戶、同日期、同類型、同內容的紀錄已存在時會自動略過，可以放心重複匯入；若原本沒有關聯銷售機會、這次 Excel 有填，會補上關聯。
           </p>
           <a href="/customers/import-activities/template" class="btn btn-outline-secondary btn-sm mb-3">
             <i class="bi bi-download"></i> 下載範本

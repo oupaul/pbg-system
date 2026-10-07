@@ -6,6 +6,7 @@ const Payment = require('../models/Payment');
 const Salesperson = require('../models/Salesperson');
 const Customer = require('../models/Customer');
 const Activity = require('../models/Activity');
+const AuditLogService = require('./AuditLogService');
 const Bonus = require('../models/Bonus');
 const dayjs = require('dayjs');
 
@@ -1300,6 +1301,7 @@ class ExcelImportService {
     const MAX_TYPE_LENGTH = 20;
     let createdCount = 0;
     let duplicateCount = 0;
+    let linkedCount = 0;
     let failedCount = 0;
     const warnings = [];
     const createdTypes = [];
@@ -1368,22 +1370,36 @@ class ExcelImportService {
             createdTypes.push(typeName);
           }
 
-          // 4. 去重
-          const existing = db.prepare(`
-            SELECT id FROM activities
-            WHERE customer_id = ? AND substr(activity_date, 1, 10) = ? AND activity_type = ? AND TRIM(content) = ? AND deleted_at IS NULL
-          `).get(customer.id, activityDate, typeName, content);
-          if (existing) { duplicateCount++; continue; }
-
-          // 5. 關聯銷售機會（找不到只警告，不擋列）
+          // 4. 關聯銷售機會（找不到只警告，不擋列）
           let pipelineId = null;
+          let pipelineMissing = false;
           if (pipelineName) {
             const pipe = db.prepare(`
               SELECT id FROM pipelines WHERE customer_id = ? AND opportunity_name = ? AND deleted_at IS NULL ORDER BY id LIMIT 1
             `).get(customer.id, pipelineName);
             if (pipe) pipelineId = pipe.id;
-            else warnings.push(`第 ${rowNumber} 列（${label}）：找不到銷售機會「${pipelineName}」，已匯入但未關聯`);
+            else pipelineMissing = true;
           }
+
+          // 5. 去重：已存在就略過；但若已存在的紀錄原本沒有關聯商機、這次有對應到商機，只補上關聯
+          //（已經有關聯的紀錄不覆蓋，日期/類型/內容/記錄人都不更新）
+          const existing = db.prepare(`
+            SELECT id, pipeline_id FROM activities
+            WHERE customer_id = ? AND substr(activity_date, 1, 10) = ? AND activity_type = ? AND TRIM(content) = ? AND deleted_at IS NULL
+            ORDER BY (pipeline_id IS NULL) DESC, id LIMIT 1
+          `).get(customer.id, activityDate, typeName, content);
+          if (existing) {
+            if (pipelineId && !existing.pipeline_id) {
+              db.prepare('UPDATE activities SET pipeline_id = ? WHERE id = ?').run(pipelineId, existing.id);
+              AuditLogService.logUpdate('activities', existing.id, { pipeline_id: null }, { pipeline_id: pipelineId }, userInfo);
+              linkedCount++;
+            } else {
+              duplicateCount++;
+              if (pipelineMissing) warnings.push(`第 ${rowNumber} 列（${label}）：紀錄已存在，且找不到銷售機會「${pipelineName}」，未補上關聯`);
+            }
+            continue;
+          }
+          if (pipelineMissing) warnings.push(`第 ${rowNumber} 列（${label}）：找不到銷售機會「${pipelineName}」，已匯入但未關聯`);
 
           const activityId = Activity.create({
             customer_id: customer.id,
@@ -1402,10 +1418,10 @@ class ExcelImportService {
         }
       }
 
-      this.log(`活動紀錄匯入完成：成功 ${createdCount}、略過重複 ${duplicateCount}、失敗 ${failedCount}`);
+      this.log(`活動紀錄匯入完成：成功 ${createdCount}、補上關聯 ${linkedCount}、略過重複 ${duplicateCount}、失敗 ${failedCount}`);
       return {
-        success: failedCount === 0 || createdCount > 0 || duplicateCount > 0,
-        createdCount, duplicateCount, failedCount,
+        success: failedCount === 0 || createdCount > 0 || duplicateCount > 0 || linkedCount > 0,
+        createdCount, linkedCount, duplicateCount, failedCount,
         errors: this.errors, errorCount: this.errors.length,
         warnings, createdTypes
       };

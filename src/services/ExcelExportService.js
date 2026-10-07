@@ -614,7 +614,7 @@ class ExcelExportService {
     infoSheet.addRow(['記錄人', '原本記錄這筆活動的人，留空則記為執行匯入的人', '王小明', '否']);
     infoSheet.addRow(['']);
     infoSheet.addRow(['注意事項：']);
-    infoSheet.addRow(['1. 同一客戶、同日期、同類型、同內容的紀錄若已存在，會自動略過，可以放心重複匯入']);
+    infoSheet.addRow(['1. 同一客戶、同日期、同類型、同內容的紀錄若已存在，會自動略過，可以放心重複匯入；若該紀錄原本沒有關聯銷售機會、這次有填「關聯銷售機會」，會補上關聯（已有關聯的不會被改動）']);
     infoSheet.addRow(['2. 請刪除範本內的兩列範例資料，再填入您的資料']);
     infoSheet.addRow(['3. 這份匯入僅供管理者使用']);
 
