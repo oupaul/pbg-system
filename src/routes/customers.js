@@ -508,6 +508,11 @@ router.get('/:id', (req, res) => {
     customerStatusColorMap: CustomerStatuses.findColorMap(),
     activityTypes: ActivityTypes.findActive(),
     activityTypeColorMap: ActivityTypes.findColorMap(),
+    typeColorMap: (() => {
+      const map = {};
+      try { db.prepare('SELECT type_name, badge_color FROM project_types').all().forEach(t => { map[t.type_name] = t.badge_color; }); } catch (e) { /* 表不存在時不預載 */ }
+      return map;
+    })(),
     pipelineStatusColorMap: PipelineStatuses.findColorMap(),
     error: req.query.error || '',
     success: req.query.success || ''

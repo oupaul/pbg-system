@@ -42,21 +42,12 @@
                 總金額${sortIcons.total_amount}
               </a>
             </th>
+            ${(typeColumns || []).map(col => `
             <th class="text-end">
-              <a href="?${sortLinks.lab_amount}" class="text-white text-decoration-none">
-                食驗室${sortIcons.lab_amount}
+              <a href="?${sortLinks[col.key]}" class="text-white text-decoration-none">
+                ${col.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}${sortIcons[col.key]}
               </a>
-            </th>
-            <th class="text-end">
-              <a href="?${sortLinks.ad_amount}" class="text-white text-decoration-none">
-                純廣${sortIcons.ad_amount}
-              </a>
-            </th>
-            <th class="text-end">
-              <a href="?${sortLinks.project_amount}" class="text-white text-decoration-none">
-                專案${sortIcons.project_amount}
-              </a>
-            </th>
+            </th>`).join('')}
           </tr>
         </thead>
         <tbody>
@@ -71,11 +62,9 @@
               </td>
               <td class="text-center">${s.project_count || 0}</td>
               <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(s.total_amount || 0).toLocaleString()}</td>
-              <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(s.lab_amount || 0).toLocaleString()}</td>
-              <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(s.ad_amount || 0).toLocaleString()}</td>
-              <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(s.project_amount || 0).toLocaleString()}</td>
+              ${(typeColumns || []).map(col => '<td class="text-end">' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + (s[col.key] || 0).toLocaleString() + '</td>').join('')}
             </tr>
-          `).join('') || '<tr><td colspan="7" class="text-center text-muted py-3">尚無業務人員</td></tr>'}
+          `).join('') || '<tr><td colspan="${4 + (typeColumns || []).length}" class="text-center text-muted py-3">尚無業務人員</td></tr>'}
         </tbody>
       </table>
     </div>

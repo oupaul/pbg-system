@@ -6,6 +6,23 @@ const Bonus = require('../models/Bonus');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireEditPermission } = require('../middleware/auth');
 const cache = require('../services/CacheService');
+const db = require('../models/db');
+
+// 專案類型（含顏色），供類型金額欄位與徽章顏色使用
+function getProjectTypeRows() {
+  try {
+    return db.prepare(`SELECT type_name, badge_color, display_order FROM project_types WHERE is_active = 1 ORDER BY display_order ASC, type_name ASC`).all();
+  } catch (err) {
+    return [];
+  }
+}
+function getTypeColorMap() {
+  const map = {};
+  try {
+    db.prepare('SELECT type_name, badge_color FROM project_types').all().forEach(t => { map[t.type_name] = t.badge_color; });
+  } catch (err) { /* 表不存在時不預載 */ }
+  return map;
+}
 
 // 業務列表
 router.get('/', (req, res) => {
@@ -20,9 +37,34 @@ router.get('/', (req, res) => {
   const sortOrder = req.query.sortOrder || 'ASC';
 
   // 計算每位業務的業績
+  const typeAmountsBySp = Salesperson.getTypeAmounts(selectedYear);
   let salespeopleWithStats = salespeople.map(sp => {
     const perf = Salesperson.getPerformance(sp.id, selectedYear);
     return { ...sp, ...perf };
+  });
+
+  // 專案類型金額欄位：依「專案類型管理」目前啟用的類型自動產生（不寫死類型名稱），
+  // 依全體業務該類型的總金額由大到小排序；超過上限的類型、已停用或沒有對應的類型合併為「其他類型」
+  const MAX_TYPE_COLUMNS = 5;
+  const typeRows = getProjectTypeRows();
+  const activeNames = new Set(typeRows.map(t => t.type_name));
+  const typeTotals = {};
+  Object.values(typeAmountsBySp).forEach(m => Object.entries(m).forEach(([name, amt]) => { typeTotals[name] = (typeTotals[name] || 0) + amt; }));
+  const rankedTypes = typeRows
+    .filter(t => (typeTotals[t.type_name] || 0) > 0 || typeRows.length <= MAX_TYPE_COLUMNS)
+    .sort((a, b) => (typeTotals[b.type_name] || 0) - (typeTotals[a.type_name] || 0) || a.display_order - b.display_order)
+    .slice(0, MAX_TYPE_COLUMNS);
+  const typeColumns = rankedTypes.map((t, i) => ({ key: 'type_' + i, name: t.type_name, color: t.badge_color }));
+  const shownNames = new Set(rankedTypes.map(t => t.type_name));
+  const hasOther = Object.keys(typeTotals).some(name => !shownNames.has(name) && typeTotals[name] > 0);
+  if (hasOther) typeColumns.push({ key: 'type_other', name: '其他類型', color: 'secondary' });
+  salespeopleWithStats.forEach(sp => {
+    const m = typeAmountsBySp[sp.id] || {};
+    typeColumns.forEach(col => {
+      sp[col.key] = col.key === 'type_other'
+        ? Object.entries(m).filter(([n]) => !shownNames.has(n)).reduce((s, [, a]) => s + a, 0)
+        : (m[col.name] || 0);
+    });
   });
 
   // 排序
@@ -30,11 +72,9 @@ router.get('/', (req, res) => {
     'name': 'name',
     'status': 'status',
     'project_count': 'project_count',
-    'total_amount': 'total_amount',
-    'lab_amount': 'lab_amount',
-    'ad_amount': 'ad_amount',
-    'project_amount': 'project_amount'
+    'total_amount': 'total_amount'
   };
+  typeColumns.forEach(col => { sortFieldMap[col.key] = col.key; });
 
   const sortField = sortFieldMap[sortBy] || 'name';
   salespeopleWithStats.sort((a, b) => {
@@ -85,21 +125,17 @@ router.get('/', (req, res) => {
     name: getSortLink('name'),
     status: getSortLink('status'),
     project_count: getSortLink('project_count'),
-    total_amount: getSortLink('total_amount'),
-    lab_amount: getSortLink('lab_amount'),
-    ad_amount: getSortLink('ad_amount'),
-    project_amount: getSortLink('project_amount')
+    total_amount: getSortLink('total_amount')
   };
+  typeColumns.forEach(col => { sortLinks[col.key] = getSortLink(col.key); });
 
   const sortIcons = {
     name: getSortIcon('name'),
     status: getSortIcon('status'),
     project_count: getSortIcon('project_count'),
-    total_amount: getSortIcon('total_amount'),
-    lab_amount: getSortIcon('lab_amount'),
-    ad_amount: getSortIcon('ad_amount'),
-    project_amount: getSortIcon('project_amount')
+    total_amount: getSortIcon('total_amount')
   };
+  typeColumns.forEach(col => { sortIcons[col.key] = getSortIcon(col.key); });
 
   res.render('salespeople/index', {
     title: '業務管理',
@@ -107,7 +143,8 @@ router.get('/', (req, res) => {
     years,
     selectedYear: selectedYear || 'all', // 傳遞給視圖，'all' 表示全部年度
     sortLinks,
-    sortIcons
+    sortIcons,
+    typeColumns
   });
 });
 
@@ -149,6 +186,7 @@ router.get('/:id/transfer-projects', requireEditPermission, (req, res) => {
     activeSalespeople,
     allProjects,
     years,
+    typeColorMap: getTypeColorMap(),
     success: req.query.success ? decodeURIComponent(req.query.success) : null,
     error: req.query.error   ? decodeURIComponent(req.query.error)   : null
   });
@@ -229,6 +267,7 @@ router.get('/:id', (req, res) => {
     projects,
     bonuses,
     performance,
+    typeColorMap: getTypeColorMap(),
     years,
     selectedYear: selectedYear || 'all',
     success: req.query.success ? decodeURIComponent(req.query.success) : null,

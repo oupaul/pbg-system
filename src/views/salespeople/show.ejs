@@ -88,7 +88,7 @@ ${typeof error   !== 'undefined' && error   ? '<div class="alert alert-danger  a
                 <tr onclick="location.href='/projects/${p.id}'" style="cursor: pointer;">
                   <td><code>${p.project_code}</code></td>
                   <td>
-                    <span class="badge bg-${p.project_type === '食驗室' ? 'primary' : p.project_type === '純廣' ? 'success' : 'info'}">
+                    <span class="badge bg-${typeof typeColorMap !== 'undefined' && typeColorMap[p.project_type] ? typeColorMap[p.project_type] : 'info'}">
                       ${p.project_type}
                     </span>
                   </td>

@@ -211,20 +211,31 @@ const Salesperson = {
     let sql = `
       SELECT 
         COUNT(DISTINCT p.id) as project_count,
-        COALESCE(SUM(p.price_with_tax), 0) as total_amount,
-        COALESCE(SUM(CASE WHEN p.project_type = '食驗室' THEN p.price_with_tax ELSE 0 END), 0) as lab_amount,
-        COALESCE(SUM(CASE WHEN p.project_type = '純廣' THEN p.price_with_tax ELSE 0 END), 0) as ad_amount,
-        COALESCE(SUM(CASE WHEN p.project_type = '專案' THEN p.price_with_tax ELSE 0 END), 0) as project_amount
+        COALESCE(SUM(p.price_with_tax), 0) as total_amount
       FROM projects p
       WHERE p.salesperson_id = ?
     `;
     
-    if (year) {
-      sql += ` AND p.contract_year = ?`;
-      return db.prepare(sql).get(id, year);
-    } else {
-      return db.prepare(sql).get(id);
-    }
+    const result = year ? db.prepare(sql + ` AND p.contract_year = ?`).get(id, year) : db.prepare(sql).get(id);
+    // 各專案類型的金額不寫死類型名稱，改依實際資料分組：{ 類型名稱: 金額 }
+    result.type_amounts = this.getTypeAmounts(year)[id] || {};
+    return result;
+  },
+
+  // 依專案類型分組的業績金額：{ 業務ID: { 類型名稱: 金額 } }（year 為空代表全部年度）
+  getTypeAmounts(year) {
+    const rows = year
+      ? db.prepare(`SELECT salesperson_id, project_type, COALESCE(SUM(price_with_tax), 0) AS amount
+                    FROM projects WHERE salesperson_id IS NOT NULL AND contract_year = ?
+                    GROUP BY salesperson_id, project_type`).all(year)
+      : db.prepare(`SELECT salesperson_id, project_type, COALESCE(SUM(price_with_tax), 0) AS amount
+                    FROM projects WHERE salesperson_id IS NOT NULL
+                    GROUP BY salesperson_id, project_type`).all();
+    const map = {};
+    rows.forEach(r => {
+      (map[r.salesperson_id] = map[r.salesperson_id] || {})[r.project_type || '未分類'] = r.amount;
+    });
+    return map;
   }
 };
 

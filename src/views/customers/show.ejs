@@ -132,7 +132,7 @@ ${success ? `
             <tr ${p._locked ? '' : `onclick="location.href='/projects/${p.id}'" style="cursor:pointer"`}>
               <td><code>${p.project_code}</code>${p._locked ? ' <i class="bi bi-lock-fill text-muted" title="無權限查看此專案"></i>' : ''}</td>
               <td>${p.project_name}</td>
-              <td><span class="badge bg-${p.project_type === '食驗室' ? 'primary' : p.project_type === '純廣' ? 'success' : 'info'}">${p.project_type}</span></td>
+              <td><span class="badge bg-${typeof typeColorMap !== 'undefined' && typeColorMap[p.project_type] ? typeColorMap[p.project_type] : 'info'}">${p.project_type}</span></td>
               <td>${p.salesperson_name || '-'}</td>
               <td class="text-end">${p._locked ? '<span class="text-muted">-</span>' : '' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + (p.price_with_tax || 0).toLocaleString()}</td>
               <td><span class="badge bg-${p.status === '已結案' ? 'secondary' : 'warning'}">${p.status}</span></td>

@@ -221,7 +221,7 @@ function renderTable(projects) {
     '合計 <strong class="text-primary">' + CURRENCY_SYMBOL + Math.round(totalAmount).toLocaleString() + '</strong>，' +
     '未開票 <strong class="text-warning">' + CURRENCY_SYMBOL + Math.round(totalUninvoiced).toLocaleString() + '</strong>';
 
-  const typeColorMap = { '食驗室': 'primary', '純廣': 'success' };
+  const typeColorMap = ${JSON.stringify(typeof typeColorMap !== 'undefined' ? typeColorMap : {})};
   const statusColorMap = { '已結案': 'secondary', '取消': 'danger', '未結案': 'warning' };
 
   tbody.innerHTML = projects.map(p => {
