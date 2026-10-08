@@ -112,10 +112,52 @@ function parseActivityDate(raw) {
   return null;
 }
 
+// 獎金明細工作表名稱（匯出/範本/匯入共用）
+const BONUS_SHEET_NAME = '獎金明細';
+
+// 舊版 39 欄版面的獎金欄位對照（僅供相容原公司的歷史 Excel；新版檔案這些欄位不存在，自然不會產生獎金）。
+// 只要該欄有值就建立，不再依專案類型判斷。獎金類型須存在於「獎金類型管理」。
+const LEGACY_BONUS_COLUMNS = [
+  { bonus_type: '食驗室獎金', base: 26, amount: 27, date: 25, baseOnlyCounts: true },
+  { bonus_type: '純廣獎金', base: 28, amount: 29, date: 25, baseOnlyCounts: true },
+  { bonus_type: '專案簽約獎金', base: 30, amount: 32, date: 31, percentage: 20 },
+  { bonus_type: '專案結案獎金', base: 30, amount: 34, date: 33, percentage: 80 },
+  { bonus_type: '開發獎金', base: null, amount: 36, date: 35 }
+];
+const LEGACY_BONUS_TIER_COL = 24;
+
+function hasValue(v) {
+  return v !== null && v !== undefined && v !== '';
+}
+
 class ExcelImportService {
   constructor() {
     this.importLog = [];
     this.errors = [];
+    this.resetDedupe();
+  }
+
+  // 重複匯入防護：同一份檔案重複匯入時，內容完全相同的發票/收款/獎金不重複建立。
+  // 以「鍵」計數而不是單純比對有無：檔案內本來就有兩筆完全相同的合法資料（例如同日同額兩次收款）
+  // 第一次匯入兩筆都要建立；重新匯入時，資料庫已有幾筆就略過幾筆。
+  resetDedupe() {
+    this.fileKeyCounts = {};
+    this.createdKeyCounts = {};
+    this.duplicateCount = 0;
+  }
+
+  isDuplicateRow(key, dbCount) {
+    this.fileKeyCounts[key] = (this.fileKeyCounts[key] || 0) + 1;
+    const preExisting = dbCount - (this.createdKeyCounts[key] || 0);
+    if (this.fileKeyCounts[key] <= preExisting) {
+      this.duplicateCount++;
+      return true;
+    }
+    return false;
+  }
+
+  markCreated(key) {
+    this.createdKeyCounts[key] = (this.createdKeyCounts[key] || 0) + 1;
   }
 
   log(message) {
@@ -132,6 +174,7 @@ class ExcelImportService {
   async importExcel(filePath) {
     this.importLog = [];
     this.errors = [];
+    this.resetDedupe();
     
     this.log(`開始匯入: ${filePath}`);
 
@@ -146,6 +189,8 @@ class ExcelImportService {
         customers: 0,
         bonuses: 0
       };
+
+      const bonusSheets = [];
 
       workbook.eachSheet((worksheet, sheetId) => {
         const sheetName = worksheet.name;
@@ -358,6 +403,12 @@ class ExcelImportService {
           return;
         }
 
+        // 獎金明細需等所有專案工作表處理完才能比對專案
+        if (sheetName === BONUS_SHEET_NAME) {
+          bonusSheets.push(data);
+          return;
+        }
+
         try {
           const sheetResults = this.processSheet(data, sheetName);
           results.projects += sheetResults.projects || 0;
@@ -372,7 +423,16 @@ class ExcelImportService {
         }
       });
 
-      this.log('匯入完成');
+      for (const bonusData of bonusSheets) {
+        try {
+          results.bonuses += this.processBonusSheet(bonusData);
+        } catch (bonusErr) {
+          this.error(`處理工作表 ${BONUS_SHEET_NAME} 時發生錯誤: ${bonusErr.message}`);
+        }
+      }
+
+      results.duplicates = this.duplicateCount;
+      this.log(`匯入完成${this.duplicateCount ? `（略過 ${this.duplicateCount} 筆已存在的重複資料）` : ''}`);
       
       // 即使有錯誤，也返回結果（部分成功）
       const hasErrors = this.errors.length > 0;
@@ -445,26 +505,11 @@ class ExcelImportService {
       BANK_DEPOSIT: 17,      // 銀行存款匯入金額
       PAYMENT_DIFF: 18,      // 收款差異
       PRICE_WITHOUT_TAX: 19, // 價格(未稅)
-      RECOG_MONTH: 20,       // 業績認列月份
-      RECOG_AMOUNT: 21,      // 認列業績金額(含稅)
-      UNRECOG_AMOUNT: 22,    // 未認列業績金額(含稅)
-      RECOG_NOTAX: 23,       // 認列業績金額(未稅)
-      BONUS_TIER: 24,        // 獎金級距%
-      LAB_BONUS_DATE: 25,    // 食驗室/純廣獎金發放日期
-      LAB_NOTAX: 26,         // 食驗室未稅(不扣成本)
-      LAB_BONUS: 27,         // 食驗室獎金(不扣成本)
-      AD_NOTAX: 28,          // 純廣未稅90%(扣成本10%)
-      AD_BONUS: 29,          // 純廣獎金(扣成本10%)
-      PROJ_NOTAX: 30,        // 專案未稅60%(扣成本40%)
-      PROJ_SIGN_DATE: 31,    // 專案簽約獎金發放日期
-      PROJ_SIGN_BONUS: 32,   // 專案簽約獎金20%
-      PROJ_CLOSE_DATE: 33,   // 專案結案獎金發放日期
-      PROJ_CLOSE_BONUS: 34,  // 專案結案獎金80%
-      DEV_BONUS_DATE: 35,    // 開發獎金發放日期
-      DEV_BONUS: 36,         // 開發獎金
-      MARKETING_ALLOC: 37,   // 行銷部佔比金額
-      BRAND_ALLOC: 38        // 品牌部佔比金額
+      // 索引 20 以後為舊版版面的認列/獎金/佔比欄位：獎金見 LEGACY_BONUS_COLUMNS，其餘匯入時忽略
     };
+
+    // 有效專案類型：每個工作表只查一次
+    const validTypes = db.prepare('SELECT type_name FROM project_types WHERE is_active = 1').all().map(t => t.type_name);
 
     // 用於追蹤當前專案
     let currentProject = null;
@@ -787,31 +832,9 @@ class ExcelImportService {
               this.log(`第 ${i + 1} 行：專案類型為空，使用當前專案類型: ${projectType}`);
             }
             
-            // 清理和驗證專案類型
+            // 類型一律完全比對「專案類型管理」的啟用類型（只去除前後空白，不做別名轉換）
             if (projectType) {
-              // 移除所有空白字符
-              projectType = projectType.replace(/\s+/g, '');
-              // 標準化類型名稱
-              if (projectType === '食驗室' || projectType === '實驗室') {
-                projectType = '食驗室';
-              } else if (projectType === '純廣' || projectType === '純廣告') {
-                projectType = '純廣';
-              } else if (projectType === '專案' || projectType === '專案類型' || projectType === '標案') {
-                // 「標案」映射到「專案」類型
-                projectType = '專案';
-              }
-            }
-            
-            // 驗證專案類型是否有效（從資料庫讀取）
-            let validTypes = [];
-            try {
-              const db = require('../models/db');
-              const types = db.prepare('SELECT type_name FROM project_types WHERE is_active = 1').all();
-              validTypes = types.map(t => t.type_name);
-            } catch (err) {
-              // 如果表不存在，使用預設類型
-              console.warn('無法從資料庫讀取專案類型，使用預設類型:', err.message);
-              validTypes = ['食驗室', '純廣', '專案'];
+              projectType = projectType.trim();
             }
             
             if (!projectType || !validTypes.includes(projectType)) {
@@ -1056,14 +1079,26 @@ class ExcelImportService {
         try {
           const invoiceDate = parseROCDate(row[COLS.INVOICE_DATE]);
           if (invoiceDate) {
-        Invoice.create({
-          project_id: currentProjectId,
-          invoice_date: invoiceDate,
-          invoice_number: row[COLS.INVOICE_NUMBER] ? String(row[COLS.INVOICE_NUMBER]).trim() : null,
-          amount_with_tax: cleanNumber(row[COLS.INVOICE_AMOUNT]) || 0,
-          _skipOverInvoiceCheck: true  // 匯入歷史資料，跳過超額開票驗證
-        });
-        results.invoices++;
+            const invoiceNumber = row[COLS.INVOICE_NUMBER] ? String(row[COLS.INVOICE_NUMBER]).trim() : null;
+            const invoiceAmount = cleanNumber(row[COLS.INVOICE_AMOUNT]) || 0;
+            // 去重：有發票號碼用「專案＋號碼」；沒號碼用「專案＋日期＋金額」（只比對未刪除）
+            const invKey = invoiceNumber ? `inv|${currentProjectId}|${invoiceNumber}` : `inv|${currentProjectId}|${invoiceDate}|${invoiceAmount}`;
+            const invCount = invoiceNumber
+              ? db.prepare('SELECT COUNT(*) c FROM invoices WHERE project_id = ? AND invoice_number = ? AND deleted_at IS NULL').get(currentProjectId, invoiceNumber).c
+              : db.prepare('SELECT COUNT(*) c FROM invoices WHERE project_id = ? AND invoice_number IS NULL AND invoice_date = ? AND amount_with_tax = ? AND deleted_at IS NULL').get(currentProjectId, invoiceDate, invoiceAmount).c;
+            if (this.isDuplicateRow(invKey, invCount)) {
+              this.log(`第 ${i + 1} 行：發票${invoiceNumber ? ` ${invoiceNumber}` : ''}已存在，略過`);
+            } else {
+              Invoice.create({
+                project_id: currentProjectId,
+                invoice_date: invoiceDate,
+                invoice_number: invoiceNumber,
+                amount_with_tax: invoiceAmount,
+                _skipOverInvoiceCheck: true  // 匯入歷史資料，跳過超額開票驗證
+              });
+              this.markCreated(invKey);
+              results.invoices++;
+            }
           }
         } catch (err) {
           this.error(`第 ${i + 1} 行：處理發票時發生錯誤: ${err.message}`);
@@ -1088,15 +1123,29 @@ class ExcelImportService {
               }
             }
             
-            Payment.create({
-              project_id: currentProjectId,
-              invoice_id: invoiceId,
-              payment_date: paymentDate,
-              bank_deposit_amount: cleanNumber(row[COLS.BANK_DEPOSIT]) || 0,
-              payment_difference: cleanNumber(row[COLS.PAYMENT_DIFF]) || 0,
-              difference_type: row[COLS.PAYMENT_DIFF] ? '匯費' : null
-            });
-            results.payments++;
+            const depositAmount = cleanNumber(row[COLS.BANK_DEPOSIT]) || 0;
+            const differenceAmount = cleanNumber(row[COLS.PAYMENT_DIFF]) || 0;
+            // 去重：同專案＋發票＋收款日期＋金額＋差異（只比對未刪除）
+            const payKey = `pay|${currentProjectId}|${invoiceId || ''}|${paymentDate}|${depositAmount}|${differenceAmount}`;
+            const payCount = db.prepare(`
+              SELECT COUNT(*) c FROM payments
+              WHERE project_id = ? AND invoice_id IS ? AND payment_date = ?
+                AND bank_deposit_amount = ? AND payment_difference = ? AND deleted_at IS NULL
+            `).get(currentProjectId, invoiceId, paymentDate, depositAmount, differenceAmount).c;
+            if (this.isDuplicateRow(payKey, payCount)) {
+              this.log(`第 ${i + 1} 行：收款（${paymentDate}、${depositAmount}）已存在，略過`);
+            } else {
+              Payment.create({
+                project_id: currentProjectId,
+                invoice_id: invoiceId,
+                payment_date: paymentDate,
+                bank_deposit_amount: depositAmount,
+                payment_difference: differenceAmount,
+                difference_type: row[COLS.PAYMENT_DIFF] ? '匯費' : null
+              });
+              this.markCreated(payKey);
+              results.payments++;
+            }
           }
         } catch (err) {
           this.error(`第 ${i + 1} 行：處理收款時發生錯誤: ${err.message}`);
@@ -1107,10 +1156,11 @@ class ExcelImportService {
     return results;
   }
 
-  // 處理獎金資訊
+  // 處理獎金資訊（舊版 39 欄版面相容）：欄位對照見 LEGACY_BONUS_COLUMNS，與專案類型無關，有填就建立。
+  // 新版檔案的獎金放在「獎金明細」工作表（processBonusSheet）。
   processBonus(row, COLS, project, salesperson, results) {
     // 解析獎金級距資訊
-    const bonusTierStr = row[COLS.BONUS_TIER];
+    const bonusTierStr = row[LEGACY_BONUS_TIER_COL];
     let bonusStatus = '待發放';
     let forfeitureReason = null;
 
@@ -1120,83 +1170,154 @@ class ExcelImportService {
       forfeitureReason = bonusTierStr;
     }
 
-    // 依專案類型建立獎金記錄
-    if (project.project_type === '食驗室') {
-      if (row[COLS.LAB_NOTAX] !== null || row[COLS.LAB_BONUS] !== null) {
-        Bonus.create({
-          project_id: project.id,
-          salesperson_id: salesperson.id,
-          bonus_type: '食驗室獎金',
-          base_amount: cleanNumber(row[COLS.LAB_NOTAX]),
-          bonus_amount: cleanNumber(row[COLS.LAB_BONUS]),
-          payment_date: parseROCDate(row[COLS.LAB_BONUS_DATE]),
-          status: bonusStatus,
-          forfeiture_reason: forfeitureReason
-        });
-        results.bonuses++;
-      }
-    } else if (project.project_type === '純廣') {
-      if (row[COLS.AD_NOTAX] !== null || row[COLS.AD_BONUS] !== null) {
-        Bonus.create({
-          project_id: project.id,
-          salesperson_id: salesperson.id,
-          bonus_type: '純廣獎金',
-          base_amount: cleanNumber(row[COLS.AD_NOTAX]),
-          bonus_amount: cleanNumber(row[COLS.AD_BONUS]),
-          payment_date: parseROCDate(row[COLS.LAB_BONUS_DATE]),
-          status: bonusStatus,
-          forfeiture_reason: forfeitureReason
-        });
-        results.bonuses++;
-      }
-    } else if (project.project_type === '專案') {
-      // 專案簽約獎金
-      if (row[COLS.PROJ_SIGN_BONUS] !== null) {
-        Bonus.create({
-          project_id: project.id,
-          salesperson_id: salesperson.id,
-          bonus_type: '專案簽約獎金',
-          base_amount: cleanNumber(row[COLS.PROJ_NOTAX]),
-          bonus_percentage: 20,
-          bonus_amount: cleanNumber(row[COLS.PROJ_SIGN_BONUS]),
-          payment_date: parseROCDate(row[COLS.PROJ_SIGN_DATE]),
-          status: bonusStatus,
-          forfeiture_reason: forfeitureReason
-        });
-        results.bonuses++;
-      }
+    for (const col of LEGACY_BONUS_COLUMNS) {
+      const hasAmount = hasValue(row[col.amount]);
+      const hasBase = col.base !== null && hasValue(row[col.base]);
+      // 食驗室/純廣獎金原本只填未稅基礎也算一筆；其餘需有獎金金額
+      if (!hasAmount && !(col.baseOnlyCounts && hasBase)) continue;
 
-      // 專案結案獎金
-      if (row[COLS.PROJ_CLOSE_BONUS] !== null) {
+      try {
+        const bonusAmount = cleanNumber(row[col.amount]);
+        const paymentDate = parseROCDate(row[col.date]);
+        // 去重（與「獎金明細」同規則）：重複匯入同一份舊版檔案不會讓獎金翻倍
+        const bonusKey = `bonus|${project.id}|${salesperson.id}|${col.bonus_type}|${bonusAmount}|${paymentDate || ''}`;
+        const bonusCount = db.prepare(`
+          SELECT COUNT(*) c FROM bonus_calculations
+          WHERE project_id = ? AND salesperson_id = ? AND bonus_type = ?
+            AND bonus_amount = ? AND IFNULL(payment_date, '') = ?
+        `).get(project.id, salesperson.id, col.bonus_type, bonusAmount, paymentDate || '').c;
+        if (this.isDuplicateRow(bonusKey, bonusCount)) {
+          this.log(`專案 ${project.project_code}：「${col.bonus_type}」已存在，略過`);
+          continue;
+        }
         Bonus.create({
           project_id: project.id,
           salesperson_id: salesperson.id,
-          bonus_type: '專案結案獎金',
-          base_amount: cleanNumber(row[COLS.PROJ_NOTAX]),
-          bonus_percentage: 80,
-          bonus_amount: cleanNumber(row[COLS.PROJ_CLOSE_BONUS]),
-          payment_date: parseROCDate(row[COLS.PROJ_CLOSE_DATE]),
+          bonus_type: col.bonus_type,
+          base_amount: col.base !== null ? cleanNumber(row[col.base]) : 0,
+          bonus_percentage: col.percentage,
+          bonus_amount: bonusAmount,
+          payment_date: paymentDate,
           status: bonusStatus,
           forfeiture_reason: forfeitureReason
         });
+        this.markCreated(bonusKey);
         results.bonuses++;
+      } catch (bonusErr) {
+        this.error(`專案 ${project.project_code}：建立「${col.bonus_type}」失敗: ${bonusErr.message}`);
       }
     }
+  }
 
-    // 開發獎金
-    if (row[COLS.DEV_BONUS] !== null) {
-      Bonus.create({
-        project_id: project.id,
-        salesperson_id: salesperson.id,
-        bonus_type: '開發獎金',
-        base_amount: 0,
-        bonus_amount: cleanNumber(row[COLS.DEV_BONUS]),
-        payment_date: parseROCDate(row[COLS.DEV_BONUS_DATE]),
-        status: bonusStatus,
-        forfeiture_reason: forfeitureReason
-      });
-      results.bonuses++;
+  // 處理「獎金明細」工作表：一筆獎金一列，支援任意獎金類型與筆數。回傳成功建立的筆數。
+  // 欄位：專案編號 | 類型 | 客戶編號 | 專案名稱 | 業務 | 獎金類型 | 計算基礎(未稅) | 比例% | 獎金金額 | 發放日期 | 狀態 | 充公原因
+  processBonusSheet(data) {
+    const validStatuses = ['待發放', '已發放', '充公'];
+    let created = 0;
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (!Array.isArray(row)) continue;
+      const text = (idx) => {
+        const v = safeExtractText(row[idx]);
+        return v === null ? null : v;
+      };
+
+      const projectCode = text(0);
+      const bonusTypeName = text(5);
+      // 空白列（以及重複的標題列）直接略過
+      if (!projectCode && !bonusTypeName) continue;
+      if (projectCode === '專案編號') continue;
+
+      const rowLabel = `${BONUS_SHEET_NAME} 第 ${i + 1} 行`;
+      try {
+        if (!projectCode) { this.error(`${rowLabel}：缺少專案編號，跳過`); continue; }
+        if (!bonusTypeName) { this.error(`${rowLabel}：缺少獎金類型，跳過`); continue; }
+
+        const projectType = text(1);
+        if (!projectType) { this.error(`${rowLabel}：缺少專案類型，跳過`); continue; }
+
+        // 客戶（可空：專案本身沒有客戶時）
+        const customerCode = text(2);
+        let customerId = null;
+        if (customerCode) {
+          const customer = Customer.findByCode(customerCode);
+          if (!customer) { this.error(`${rowLabel}：找不到客戶編號「${customerCode}」，跳過`); continue; }
+          customerId = customer.id;
+        }
+
+        const project = Project.findByCodeTypeCustomerAndName(projectCode, projectType, customerId, text(3));
+        if (!project) {
+          this.error(`${rowLabel}：找不到專案（專案編號 ${projectCode}、類型 ${projectType}${customerCode ? `、客戶 ${customerCode}` : ''}），跳過`);
+          continue;
+        }
+
+        // 獎金對象：有填業務姓名用該業務，留空用專案的業務
+        let salespersonId = project.salesperson_id;
+        const salespersonName = text(4);
+        if (salespersonName) {
+          const sp = db.prepare('SELECT id FROM salespeople WHERE name = ?').get(salespersonName);
+          if (!sp) { this.error(`${rowLabel}：找不到業務「${salespersonName}」，跳過`); continue; }
+          salespersonId = sp.id;
+        }
+        if (!salespersonId) { this.error(`${rowLabel}：專案沒有業務且未填業務，跳過`); continue; }
+
+        const status = text(10) || '待發放';
+        if (!validStatuses.includes(status)) {
+          this.error(`${rowLabel}：狀態「${status}」無效，只能是 ${validStatuses.join('、')}，跳過`);
+          continue;
+        }
+
+        const dateRaw = row[9];
+        let paymentDate = null;
+        if (hasValue(dateRaw)) {
+          paymentDate = parseActivityDate(dateRaw);
+          if (!paymentDate) { this.error(`${rowLabel}：發放日期「${dateRaw}」格式無法辨識，跳過`); continue; }
+        }
+
+        for (const [idx, label] of [[6, '計算基礎'], [7, '比例'], [8, '獎金金額']]) {
+          if (hasValue(row[idx]) && isNaN(row[idx])) {
+            this.error(`${rowLabel}：${label}「${row[idx]}」不是數字，跳過`);
+            throw new Error('__skip__');
+          }
+        }
+
+        const baseAmount = cleanNumber(row[6]);
+        const percentage = cleanNumber(row[7]);
+        const bonusAmount = cleanNumber(row[8]);
+
+        // 去重：同專案＋業務＋獎金類型＋金額＋發放日期已存在就略過（重複匯入不會翻倍）
+        const bonusKey = `bonus|${project.id}|${salespersonId}|${bonusTypeName}|${bonusAmount}|${paymentDate || ''}`;
+        const bonusCount = db.prepare(`
+          SELECT COUNT(*) c FROM bonus_calculations
+          WHERE project_id = ? AND salesperson_id = ? AND bonus_type = ?
+            AND bonus_amount = ? AND IFNULL(payment_date, '') = ?
+        `).get(project.id, salespersonId, bonusTypeName, bonusAmount, paymentDate || '').c;
+        if (this.isDuplicateRow(bonusKey, bonusCount)) {
+          this.log(`${rowLabel}：相同獎金已存在，略過`);
+          continue;
+        }
+
+        Bonus.create({
+          project_id: project.id,
+          salesperson_id: salespersonId,
+          bonus_type: bonusTypeName,
+          base_amount: baseAmount,
+          bonus_percentage: percentage,
+          bonus_amount: bonusAmount,
+          payment_date: paymentDate,
+          status,
+          forfeiture_reason: status === '充公' ? text(11) : null
+        });
+        this.markCreated(bonusKey);
+        created++;
+      } catch (err) {
+        if (err.message !== '__skip__') {
+          this.error(`${rowLabel}：${err.message}`);
+        }
+      }
     }
+    return created;
   }
 
   // 客戶/廠商批次匯入（管理者專用）：直接呼叫 Customer.create()，不經過新增客戶的審核流程
