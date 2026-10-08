@@ -2,6 +2,11 @@
   function escapeHtml(str) {
     return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
+  function escapeAttr(str) {
+    return (str || '').toString().replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  // 從業務詳情頁「建立登入帳號」帶入的預設值（新增模式才有）
+  const pf = (typeof prefill !== 'undefined' && prefill) ? prefill : null;
 %>
 <%- include('../layout', { title: title, body: `
 <div class="row mb-4">
@@ -36,7 +41,7 @@ ${error ? `
 
         <div class="col-md-6">
           <label class="form-label">姓名 <span class="text-danger">*</span></label>
-          <input type="text" name="name" class="form-control" value="${user ? user.name : ''}" required>
+          <input type="text" name="name" class="form-control" value="${escapeAttr(user ? user.name : (pf ? pf.name : ''))}" required>
         </div>
 
         <div class="col-md-6">
@@ -58,7 +63,7 @@ ${error ? `
               return roleList.map(r =>
                 '<option value="' + r.role_key + '"' +
                 ' data-scope="' + (r.project_view_scope || 'all') + '"' +
-                (user && user.role === r.role_key ? ' selected' : '') +
+                ((user && user.role === r.role_key) || (!user && pf && pf.role === r.role_key) ? ' selected' : '') +
                 '>' + r.role_name + '</option>'
               ).join('');
             })()}
@@ -70,14 +75,14 @@ ${error ? `
         <div class="col-md-6" id="salespersonField" style="display: none;">
           <label class="form-label">關聯業務員 <span class="text-danger">*</span></label>
           <select name="salesperson_id" class="form-select" id="salespersonSelect">
-            <option value="">請選擇業務員</option>
+            <option value="new"${(!user && !pf) || (user && !user.salesperson_id) ? ' selected' : ''}>＋ 建立新業務人員（使用上方姓名）</option>
             ${salespeople.map(sp =>
               '<option value="' + sp.id + '"' +
-              (user && user.salesperson_id == sp.id ? ' selected' : '') +
-              '>' + sp.name + '</option>'
+              ((user && user.salesperson_id == sp.id) || (!user && pf && pf.salesperson_id == sp.id) ? ' selected' : '') +
+              '>' + escapeHtml(sp.name) + '</option>'
             ).join('')}
           </select>
-          <small class="text-muted">業務員角色必須關聯一位業務人員</small>
+          <small class="text-muted">業務員角色必須關聯一位業務人員：選「建立新業務人員」會自動以姓名建立；若該業務已存在（例如歷史資料匯入），請改選既有業務</small>
         </div>
 
         <!-- 指派可見業務（role.project_view_scope = assigned 時顯示） -->
@@ -147,10 +152,10 @@ function onRoleChange() {
   if (role === 'salesperson' || scope === 'own') {
     salespersonField.style.display = 'block';
     salespersonSelect.required = true;
+    if (!salespersonSelect.value) salespersonSelect.value = 'new';
   } else {
     salespersonField.style.display = 'none';
     salespersonSelect.required = false;
-    salespersonSelect.value = '';
   }
 
   // Show multi-salesperson assignment only for 'assigned' scope

@@ -261,9 +261,16 @@ router.get('/:id', (req, res) => {
   // 業績統計
   const performance = Salesperson.getPerformance(salesperson.id, selectedYear);
 
+  // 已綁定此業務的登入帳號（供詳情頁顯示／提供「建立登入帳號」捷徑）
+  let linkedUsers = [];
+  try {
+    linkedUsers = db.prepare('SELECT id, username, name, is_active FROM users WHERE salesperson_id = ? ORDER BY id').all(salesperson.id);
+  } catch (err) { /* 舊版資料庫沒有 salesperson_id 欄位時略過 */ }
+
   res.render('salespeople/show', {
     title: salesperson.name,
     salesperson,
+    linkedUsers,
     projects,
     bonuses,
     performance,

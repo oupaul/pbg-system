@@ -47,6 +47,19 @@ function saveAssignedSalespersonIds(userId, ids) {
   })();
 }
 
+// 業務員角色的「建立新業務人員」選項：表單 salesperson_id 傳 'new' 代表以使用者姓名新建一位業務
+const NEW_SALESPERSON = 'new';
+
+// 檢查「以使用者姓名新建業務」是否可行；回傳錯誤訊息或 null
+function checkNewSalespersonName(name) {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return '姓名不可為空白';
+  if (Salesperson.findByName(trimmed)) {
+    return `已有同名業務人員「${trimmed}」，請在「關聯業務員」下拉選單改選既有業務，或將姓名改成不同名稱`;
+  }
+  return null;
+}
+
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 // 使用者列表（僅管理員）
@@ -72,9 +85,16 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
 
 // 新增使用者表單（僅管理員）
 router.get('/new', requireAuth, requireAdmin, (req, res) => {
+  // 從業務詳情頁「建立登入帳號」帶入：預填姓名、角色與關聯業務
+  let prefill = null;
+  if (req.query.salesperson_id) {
+    const sp = Salesperson.findById(parseInt(req.query.salesperson_id));
+    if (sp) prefill = { name: sp.name, salesperson_id: sp.id, role: 'salesperson' };
+  }
   res.render('users/form', {
     title: '新增使用者',
     user: null,
+    prefill,
     salespeople: Salesperson.findAll(true),
     roles: getRoles(),
     assignedSalespersonIds: [],
@@ -102,9 +122,21 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
     return res.redirect('/users/new?error=' + encodeURIComponent('業務員角色必須關聯一位業務人員'));
   }
 
+  let createdSalespersonId = null;
   try {
     if (User.findByUsername(username)) {
       return res.redirect('/users/new?error=' + encodeURIComponent('使用者名稱已存在'));
+    }
+
+    // 「建立新業務人員」：先建立業務再綁定；使用者建立失敗時會把剛建立的業務移除，不留半套資料
+    let linkedSalespersonId = role === 'salesperson' ? salesperson_id : null;
+    if (role === 'salesperson' && salesperson_id === NEW_SALESPERSON) {
+      const nameError = checkNewSalespersonName(name);
+      if (nameError) {
+        return res.redirect('/users/new?error=' + encodeURIComponent(nameError));
+      }
+      createdSalespersonId = Salesperson.create({ name: name.trim(), userInfo: getUserInfo(req) });
+      linkedSalespersonId = createdSalespersonId;
     }
 
     const userId = await User.create({
@@ -112,7 +144,7 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
       password,
       name,
       role: role || 'user',
-      salesperson_id: role === 'salesperson' ? salesperson_id : null,
+      salesperson_id: linkedSalespersonId,
       is_active: 1,
       email: email || null,
       line_user_id: line_user_id || null
@@ -126,13 +158,17 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
 
     AuditLogService.logCreate('users', userId, {
       username, name, role: role || 'user',
-      salesperson_id: role === 'salesperson' ? salesperson_id : null,
+      salesperson_id: linkedSalespersonId,
       is_active: 1
     }, getUserInfo(req));
 
     res.redirect('/users?success=' + encodeURIComponent(`使用者 ${name} 已成功建立`));
   } catch (err) {
     console.error('建立使用者失敗:', err);
+    if (createdSalespersonId) {
+      try { db.prepare('DELETE FROM salespeople WHERE id = ?').run(createdSalespersonId); }
+      catch (cleanupErr) { console.error('移除剛建立的業務人員失敗:', cleanupErr); }
+    }
     res.redirect('/users/new?error=' + encodeURIComponent('建立使用者失敗：' + err.message));
   }
 });
@@ -173,10 +209,27 @@ router.post('/:id', requireAuth, requireAdmin, async (req, res) => {
     return res.redirect(`/users/${userId}/edit?error=` + encodeURIComponent('業務員角色必須關聯一位業務人員'));
   }
 
+  // 先驗證密碼長度，再建立新業務，避免驗證失敗時留下孤兒業務
+  if (password && password.length > 0 && password.length < 6) {
+    return res.redirect(`/users/${userId}/edit?error=` + encodeURIComponent('密碼長度至少需要 6 個字元'));
+  }
+
+  // 「建立新業務人員」：以此使用者姓名新建一位業務並綁定
+  let linkedSalespersonId = role === 'salesperson' ? salesperson_id : null;
+  let createdSalespersonId = null;
+  if (role === 'salesperson' && salesperson_id === NEW_SALESPERSON) {
+    const nameError = checkNewSalespersonName(name);
+    if (nameError) {
+      return res.redirect(`/users/${userId}/edit?error=` + encodeURIComponent(nameError));
+    }
+    createdSalespersonId = Salesperson.create({ name: name.trim(), userInfo: getUserInfo(req) });
+    linkedSalespersonId = createdSalespersonId;
+  }
+
   const updateData = {
     name,
     role: role || 'user',
-    salesperson_id: role === 'salesperson' ? salesperson_id : null,
+    salesperson_id: linkedSalespersonId,
     is_active: is_active === '1' ? 1 : 0,
     email: email || null,
     line_user_id: line_user_id || null
@@ -216,10 +269,18 @@ router.post('/:id', requireAuth, requireAdmin, async (req, res) => {
 
       res.redirect('/users?success=' + encodeURIComponent(`使用者 ${name} 已成功更新`));
     } else {
+      if (createdSalespersonId) {
+        try { db.prepare('DELETE FROM salespeople WHERE id = ?').run(createdSalespersonId); }
+        catch (cleanupErr) { console.error('移除剛建立的業務人員失敗:', cleanupErr); }
+      }
       res.redirect(`/users/${userId}/edit?error=` + encodeURIComponent('更新失敗，請確認資料是否正確'));
     }
   } catch (err) {
     console.error('更新使用者失敗:', err);
+    if (createdSalespersonId) {
+      try { db.prepare('DELETE FROM salespeople WHERE id = ?').run(createdSalespersonId); }
+      catch (cleanupErr) { console.error('移除剛建立的業務人員失敗:', cleanupErr); }
+    }
     res.redirect(`/users/${userId}/edit?error=` + encodeURIComponent('更新使用者失敗：' + err.message));
   }
 });

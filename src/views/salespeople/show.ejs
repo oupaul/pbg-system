@@ -13,6 +13,13 @@
       </ol>
     </nav>
     <h1 class="h3 mt-2">${salesperson.name}</h1>
+    ${typeof linkedUsers !== 'undefined' && linkedUsers.length > 0 ? `
+      <div class="text-muted small"><i class="bi bi-person-badge"></i> 登入帳號：${linkedUsers.map(u => escapeHtml(u.username) + (u.is_active ? '' : '（已停用）')).join('、')}</div>
+    ` : (locals.isAdmin ? `
+      <div class="small"><span class="text-muted">尚無登入帳號</span>
+        <a href="/users/new?salesperson_id=${salesperson.id}" class="ms-2"><i class="bi bi-person-plus"></i> 建立登入帳號</a>
+      </div>
+    ` : '')}
   </div>
   <div class="col-auto d-flex gap-2 align-items-center">
     ${locals.canEdit ? `
