@@ -222,6 +222,23 @@ router.get('/export', requireAdmin, async (req, res) => {
   }
 });
 
+// 客戶活動紀錄匯出（管理者專用，比照批次匯入）；欄位與匯入範本一致，可直接重新匯入
+router.get('/export-activities', requireAdmin, async (req, res) => {
+  try {
+    const workbook = ExcelExportService.exportActivities();
+    const buffer = await ExcelExportService.writeToBuffer(workbook);
+    const nodeBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+    const filename = `客戶活動紀錄_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    res.setHeader('Content-Length', nodeBuffer.length);
+    res.send(nodeBuffer);
+  } catch (err) {
+    console.error('匯出客戶活動紀錄失敗:', err);
+    res.redirect('/customers?error=' + encodeURIComponent(err.message));
+  }
+});
+
 // 客戶/廠商批次匯入範本下載（管理者專用）
 router.get('/import/template', requireAdmin, async (req, res) => {
   try {

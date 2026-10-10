@@ -42,6 +42,9 @@ const CUSTOMER_HEADERS = [
   '聯絡人姓名', '聯絡電話', '聯絡Email', '銀行', '銀行帳號', '地址'
 ];
 const CUSTOMER_COLUMN_WIDTHS = [12, 12, 24, 12, 10, 10, 14, 10, 10, 14, 12, 14, 22, 14, 18, 30];
+// 活動紀錄欄位（匯出與匯入範本共用，順序需與 ExcelImportService.importActivities 的 COLS 一致）
+const ACTIVITY_HEADERS = ['客戶編號', '公司名稱', '活動日期', '活動類型', '活動內容', '關聯銷售機會', '記錄人'];
+const ACTIVITY_COLUMN_WIDTHS = [12, 24, 14, 12, 50, 24, 12];
 const BONUS_SHEET_NAME = '獎金明細';
 const BONUS_HEADERS = [
   '專案編號', '類型', '客戶編號', '專案名稱', '業務', '獎金類型',
@@ -664,13 +667,44 @@ class ExcelExportService {
     return workbook;
   }
 
+  // 客戶活動紀錄匯出：欄位與「活動紀錄匯入範本」一致，可直接重新匯入（已軟刪除的不匯出）。
+  exportActivities() {
+    const rows = db.prepare(`
+      SELECT c.customer_code, c.company_name, a.activity_date, a.activity_type, a.content,
+             p.opportunity_name, a.created_by
+      FROM activities a
+      JOIN customers c ON c.id = a.customer_id
+      LEFT JOIN pipelines p ON p.id = a.pipeline_id
+      WHERE a.deleted_at IS NULL AND c.deleted_at IS NULL
+      ORDER BY c.customer_code, a.activity_date, a.id
+    `).all();
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('活動紀錄');
+    worksheet.addRow(ACTIVITY_HEADERS);
+    for (const r of rows) {
+      worksheet.addRow([
+        r.customer_code || '',
+        r.company_name || '',
+        r.activity_date ? String(r.activity_date).slice(0, 10) : '',
+        r.activity_type || '',
+        r.content || '',
+        r.opportunity_name || '',
+        r.created_by || ''
+      ]);
+    }
+    styleHeaderRow(worksheet);
+    ACTIVITY_COLUMN_WIDTHS.forEach((w, i) => { worksheet.getColumn(i + 1).width = w; });
+    worksheet.getColumn('A').numFmt = '@';
+    return workbook;
+  }
+
   // 客戶活動紀錄批次匯入範本（管理者專用）
   generateActivityTemplate() {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('活動紀錄');
 
-    const headers = ['客戶編號', '公司名稱', '活動日期', '活動類型', '活動內容', '關聯銷售機會', '記錄人'];
-    worksheet.addRow(headers);
+    worksheet.addRow(ACTIVITY_HEADERS);
     const headerRow = worksheet.getRow(1);
     headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
@@ -685,7 +719,7 @@ class ExcelExportService {
     worksheet.addRow(['CU001', 'XX股份有限公司', '2026-03-01', firstType, '拜訪客戶討論明年度合作方案', '', '王小明']);
     worksheet.addRow(['', 'YY企業有限公司', '115/03/05', firstType, '電話追蹤報價進度', 'YY年度專案', '']);
 
-    [12, 24, 14, 12, 50, 24, 12].forEach((w, i) => { worksheet.getColumn(i + 1).width = w; });
+    ACTIVITY_COLUMN_WIDTHS.forEach((w, i) => { worksheet.getColumn(i + 1).width = w; });
     worksheet.views = [{ state: 'frozen', ySplit: 1 }];
 
     const typeListStr = activeTypes.length ? activeTypes.map(t => `「${t}」`).join('、') : '（目前尚未設定任何活動類型，匯入時會依 Excel 內容自動建立）';

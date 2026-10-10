@@ -32,8 +32,11 @@
       <button class="btn btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#activityImportModal">
         <i class="bi bi-clock-history"></i> 匯入活動紀錄
       </button>
+      <a href="/customers/export-activities" class="btn btn-outline-secondary me-2" title="匯出所有客戶的活動紀錄（Excel，僅管理者）">
+        <i class="bi bi-clock-history"></i> 匯出活動紀錄
+      </a>
       <a href="${buildFilterLink({}).replace('/customers', '/customers/export')}" class="btn btn-outline-secondary me-2" title="依目前的搜尋與篩選條件匯出 Excel（含銀行帳號，僅管理者）">
-        <i class="bi bi-download"></i> 匯出
+        <i class="bi bi-download"></i> 匯出客戶/廠商
       </a>
     ` : ''}
     ${locals.canEditCrm ? `
