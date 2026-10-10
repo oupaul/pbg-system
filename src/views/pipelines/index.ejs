@@ -20,6 +20,7 @@
     <h1 class="h3"><i class="bi bi-bullseye"></i> 銷售機會管理</h1>
   </div>
   <div class="col-auto">
+    ${locals.canEdit ? '<a href="/pipelines/export' + (statusFilter ? '?status=' + encodeURIComponent(statusFilter) : '') + '" class="btn btn-outline-secondary me-2" title="依目前的狀態篩選匯出 Excel"><i class="bi bi-download"></i> 匯出</a>' : ''}
     ${locals.canEditCrm ? '<a href="/pipelines/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 新增銷售機會</a>' : ''}
   </div>
 </div>

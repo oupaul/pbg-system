@@ -45,6 +45,12 @@ const CUSTOMER_COLUMN_WIDTHS = [12, 12, 24, 12, 10, 10, 14, 10, 10, 14, 12, 14, 
 // 活動紀錄欄位（匯出與匯入範本共用，順序需與 ExcelImportService.importActivities 的 COLS 一致）
 const ACTIVITY_HEADERS = ['客戶編號', '公司名稱', '活動日期', '活動類型', '活動內容', '關聯銷售機會', '記錄人'];
 const ACTIVITY_COLUMN_WIDTHS = [12, 24, 14, 12, 50, 24, 12];
+// 銷售機會匯出欄位
+const PIPELINE_HEADERS = [
+  '客戶編號', '公司名稱', '商機名稱', '預估專案類型', '預估金額', '成交機率%', '預計成交月份', '狀態', '流失原因',
+  '業務', '負責人員', '已轉專案編號', '轉專案日期', '活動紀錄筆數', '備註', '建立日期', '更新日期'
+];
+const PIPELINE_COLUMN_WIDTHS = [12, 24, 28, 16, 14, 10, 12, 10, 20, 12, 12, 16, 12, 10, 40, 12, 12];
 const BONUS_SHEET_NAME = '獎金明細';
 const BONUS_HEADERS = [
   '專案編號', '類型', '客戶編號', '專案名稱', '業務', '獎金類型',
@@ -695,6 +701,47 @@ class ExcelExportService {
     }
     styleHeaderRow(worksheet);
     ACTIVITY_COLUMN_WIDTHS.forEach((w, i) => { worksheet.getColumn(i + 1).width = w; });
+    worksheet.getColumn('A').numFmt = '@';
+    return workbook;
+  }
+
+  // 銷售機會匯出：pipelines 為 Pipeline.findAll 的結果（已排除軟刪除，含客戶/業務/負責人名稱）。
+  // 另外補上已轉換專案的編號與活動紀錄筆數；日期欄位統一輸出西元格式。
+  exportPipelines(pipelines, filterLabel = '') {
+    const projectCodeById = {};
+    const activityCountById = {};
+    try {
+      db.prepare('SELECT id, project_code FROM projects').all().forEach(p => { projectCodeById[p.id] = p.project_code; });
+      db.prepare('SELECT pipeline_id, COUNT(*) AS c FROM activities WHERE pipeline_id IS NOT NULL AND deleted_at IS NULL GROUP BY pipeline_id')
+        .all().forEach(a => { activityCountById[a.pipeline_id] = a.c; });
+    } catch (e) { /* 資料表不存在時略過 */ }
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet(filterLabel ? `銷售機會-${filterLabel}` : '銷售機會');
+    worksheet.addRow(PIPELINE_HEADERS);
+    for (const p of pipelines) {
+      worksheet.addRow([
+        p.customer_code || '',
+        p.customer_name || '',
+        p.opportunity_name || '',
+        p.project_type || '',
+        p.estimated_amount !== null && p.estimated_amount !== undefined ? Math.round(p.estimated_amount) : '',
+        p.win_probability !== null && p.win_probability !== undefined ? p.win_probability : '',
+        p.expected_close_year_month || '',
+        p.status || '',
+        p.lost_reason || '',
+        p.salesperson_name || '',
+        p.owner_user_name || '',
+        p.converted_project_id ? (projectCodeById[p.converted_project_id] || '') : '',
+        p.converted_at ? String(p.converted_at).slice(0, 10) : '',
+        activityCountById[p.id] || 0,
+        p.notes || '',
+        p.created_at ? String(p.created_at).slice(0, 10) : '',
+        p.updated_at ? String(p.updated_at).slice(0, 10) : ''
+      ]);
+    }
+    styleHeaderRow(worksheet);
+    PIPELINE_COLUMN_WIDTHS.forEach((w, i) => { worksheet.getColumn(i + 1).width = w; });
     worksheet.getColumn('A').numFmt = '@';
     return workbook;
   }

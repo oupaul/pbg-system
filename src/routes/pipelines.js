@@ -11,7 +11,8 @@ const PipelineAmountOptions = require('./pipelineAmountOptions');
 const ActivityTypes = require('./activityTypes');
 const PipelineStatuses = require('./pipelineStatuses');
 const { getUserInfo } = require('../utils/authHelper');
-const { requireEditPermission, requireCrmEditPermission } = require('../middleware/auth');
+const { requireEditPermission, requireCrmEditPermission, requireImportExport } = require('../middleware/auth');
+const ExcelExportService = require('../services/ExcelExportService');
 const cache = require('../services/CacheService');
 const { WIN_PROBABILITY_STAGE_LABELS } = require('../constants');
 const NotificationService = require('../services/NotificationService');
@@ -204,6 +205,25 @@ router.get('/', (req, res) => {
       message: '載入銷售機會列表時發生錯誤',
       error: process.env.NODE_ENV === 'development' ? err : {}
     });
+  }
+});
+
+// 銷售機會匯出（需有匯入匯出權限，與「匯入/匯出」頁相同）；沿用列表頁目前的狀態篩選
+router.get('/export', requireImportExport, async (req, res) => {
+  try {
+    const status = req.query.status || '';
+    const pipelines = Pipeline.findAll({ status: status || undefined }, req.user);
+    const workbook = ExcelExportService.exportPipelines(Array.isArray(pipelines) ? pipelines : [], status);
+    const buffer = await ExcelExportService.writeToBuffer(workbook);
+    const nodeBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+    const filename = `銷售機會${status ? '_' + status : ''}_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    res.setHeader('Content-Length', nodeBuffer.length);
+    res.send(nodeBuffer);
+  } catch (err) {
+    console.error('匯出銷售機會失敗:', err);
+    res.redirect('/pipelines?error=' + encodeURIComponent(err.message));
   }
 });
 
