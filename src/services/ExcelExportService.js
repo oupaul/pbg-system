@@ -51,6 +51,11 @@ const PIPELINE_HEADERS = [
   '業務', '負責人員', '已轉專案編號', '轉專案日期', '活動紀錄筆數', '備註', '建立日期', '更新日期'
 ];
 const PIPELINE_COLUMN_WIDTHS = [12, 24, 28, 16, 14, 10, 12, 10, 20, 12, 12, 16, 12, 10, 40, 12, 12];
+// 業務績效匯出欄位（與業務績效儀表板一致）
+const SALES_PERFORMANCE_HEADERS = [
+  '業務', '專案數', '專案金額', '已開發票', '未開發票', '已收款', '未收款',
+  '總獎金', '已發放', '待發放', '洽談中銷售機會', '預估金額'
+];
 const BONUS_SHEET_NAME = '獎金明細';
 const BONUS_HEADERS = [
   '專案編號', '類型', '客戶編號', '專案名稱', '業務', '獎金類型',
@@ -743,6 +748,74 @@ class ExcelExportService {
     styleHeaderRow(worksheet);
     PIPELINE_COLUMN_WIDTHS.forEach((w, i) => { worksheet.getColumn(i + 1).width = w; });
     worksheet.getColumn('A').numFmt = '@';
+    return workbook;
+  }
+
+  // 業務績效匯出：與業務績效儀表板同一份彙總資料（SalesPerformanceService），加上合計列、
+  // 銷售機會總覽，以及依專案類型（取自實際資料，不寫死類型名稱）拆分的業績金額。
+  exportSalesPerformance(year = null) {
+    const SalesPerformanceService = require('./SalesPerformanceService');
+    const Salesperson = require('../models/Salesperson');
+    const performance = SalesPerformanceService.getPerformanceBySalesperson(year);
+    const pipelineSummary = SalesPerformanceService.getPipelineSummary();
+    const yearLabel = year ? `${year}年度` : '全部年度';
+    const suffix = year ? `-${year}` : '-全部';
+
+    const workbook = new ExcelJS.Workbook();
+
+    // 1. 業務績效彙總（欄位與儀表板一致）
+    const ws = workbook.addWorksheet(`業務績效${suffix}`);
+    ws.addRow(SALES_PERFORMANCE_HEADERS);
+    const totals = { project_count: 0, total_price: 0, total_invoiced: 0, uninvoiced_amount: 0, total_received: 0, total_unpaid: 0, total_bonus: 0, paid_bonus: 0, pending_bonus: 0, pipeline_count: 0, pipeline_amount: 0 };
+    for (const p of performance) {
+      Object.keys(totals).forEach(k => { totals[k] += p[k] || 0; });
+      ws.addRow([
+        p.name, p.project_count || 0,
+        formatCurrency(p.total_price || 0), formatCurrency(p.total_invoiced || 0), formatCurrency(p.uninvoiced_amount || 0),
+        formatCurrency(p.total_received || 0), formatCurrency(p.total_unpaid || 0),
+        formatCurrency(p.total_bonus || 0), formatCurrency(p.paid_bonus || 0), formatCurrency(p.pending_bonus || 0),
+        p.pipeline_count || 0, formatCurrency(p.pipeline_amount || 0)
+      ]);
+    }
+    const totalRow = ws.addRow([
+      '合計', totals.project_count,
+      formatCurrency(totals.total_price), formatCurrency(totals.total_invoiced), formatCurrency(totals.uninvoiced_amount),
+      formatCurrency(totals.total_received), formatCurrency(totals.total_unpaid),
+      formatCurrency(totals.total_bonus), formatCurrency(totals.paid_bonus), formatCurrency(totals.pending_bonus),
+      totals.pipeline_count, formatCurrency(totals.pipeline_amount)
+    ]);
+    totalRow.font = { bold: true };
+    styleHeaderRow(ws);
+    [14, 8, 14, 14, 14, 14, 14, 14, 14, 14, 12, 14].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+    // 2. 依專案類型拆分的專案金額（含稅）
+    const typeAmounts = Salesperson.getTypeAmounts(year);
+    const typeNames = [...new Set(Object.values(typeAmounts).flatMap(m => Object.keys(m)))].sort((a, b) => a.localeCompare(b, 'zh-TW'));
+    const wsType = workbook.addWorksheet(`依專案類型${suffix}`);
+    wsType.addRow(['業務', ...typeNames, '合計']);
+    for (const p of performance) {
+      const m = typeAmounts[p.id] || {};
+      const amounts = typeNames.map(n => formatCurrency(m[n] || 0));
+      wsType.addRow([p.name, ...amounts, formatCurrency(typeNames.reduce((sum, n) => sum + (m[n] || 0), 0))]);
+    }
+    styleHeaderRow(wsType);
+    wsType.getColumn(1).width = 14;
+    for (let i = 0; i <= typeNames.length; i++) wsType.getColumn(i + 2).width = 16;
+
+    // 3. 銷售機會總覽
+    const wsPipe = workbook.addWorksheet('銷售機會總覽');
+    wsPipe.addRow(['項目', '筆數', '預估金額']);
+    wsPipe.addRow(['洽談中（全公司，不分年度）', pipelineSummary.open_count, formatCurrency(pipelineSummary.open_amount)]);
+    wsPipe.addRow(['已成交但尚未轉入專案', pipelineSummary.won_pending_count, formatCurrency(pipelineSummary.won_pending_amount)]);
+    styleHeaderRow(wsPipe);
+    [30, 10, 16].forEach((w, i) => { wsPipe.getColumn(i + 1).width = w; });
+
+    ws.insertRow(1, [`業務績效（${yearLabel}）`]);
+    ws.getRow(1).font = { bold: true, size: 13 };
+    ws.getRow(2).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    ws.getRow(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
+    ws.getRow(2).alignment = { vertical: 'middle', horizontal: 'center' };
+    ws.views = [{ state: 'frozen', ySplit: 2 }];
     return workbook;
   }
 

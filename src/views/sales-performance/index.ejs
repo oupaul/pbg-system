@@ -3,7 +3,10 @@
   <div class="col">
     <h1 class="h3"><i class="bi bi-graph-up"></i> 業務績效儀表板</h1>
   </div>
-  <div class="col-auto">
+  <div class="col-auto d-flex gap-2">
+    <a href="/sales-performance/export${selectedYear !== 'all' ? '?year=' + selectedYear : ''}" class="btn btn-outline-secondary" title="依目前選擇的年度匯出 Excel">
+      <i class="bi bi-download"></i> 匯出
+    </a>
     <form class="d-flex" method="get">
       <select name="year" class="form-select" onchange="this.form.submit()">
         <option value="all" ${selectedYear === 'all' ? 'selected' : ''}>全部年度</option>

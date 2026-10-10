@@ -6,6 +6,7 @@ const router = express.Router();
 const Project = require('../models/Project');
 const SalesPerformanceService = require('../services/SalesPerformanceService');
 const db = require('../models/db');
+const ExcelExportService = require('../services/ExcelExportService');
 
 // 儀表板上「洽談中/已成交」快速連結要連到目前實際設定的狀態名稱，改名後連結才不會失效
 function getStatusLinkNames() {
@@ -38,6 +39,27 @@ router.get('/', (req, res) => {
     selectedYear: selectedYear ? selectedYear : 'all',
     ...getStatusLinkNames()
   });
+});
+
+// 業務績效匯出（與儀表板相同的存取條件：project_view_scope 為 'all' 的角色）；沿用年度篩選
+router.get('/export', async (req, res) => {
+  if (!req.user || req.user.project_view_scope !== 'all') {
+    return res.status(403).render('error', { message: '無權限存取業務績效頁面', error: {} });
+  }
+  try {
+    const selectedYear = req.query.year && req.query.year !== 'all' ? parseInt(req.query.year) : null;
+    const workbook = ExcelExportService.exportSalesPerformance(selectedYear);
+    const buffer = await ExcelExportService.writeToBuffer(workbook);
+    const nodeBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+    const filename = `業務績效_${selectedYear || '全部年度'}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    res.setHeader('Content-Length', nodeBuffer.length);
+    res.send(nodeBuffer);
+  } catch (err) {
+    console.error('匯出業務績效失敗:', err);
+    res.redirect('/sales-performance?error=' + encodeURIComponent(err.message));
+  }
 });
 
 module.exports = router;
