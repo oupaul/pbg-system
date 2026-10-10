@@ -89,6 +89,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
       settings: settings,
       settingsObj: settingsObj,
       allUsers: User.findActive(),
+      customFavicon: !!require('./branding').getCustomFavicon(),
       success: req.query.success || '',
       error: req.query.error || ''
     });

@@ -46,6 +46,8 @@ console.log('[啟動] Session 配置完成');
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
+// 自訂分頁圖示（/favicon.ico）：登入頁也要能載入，所以放在登入檢查之前
+app.use(require('./routes/branding').publicRouter);
 
 // 設定EJS模板引擎
 console.log('[啟動] 設定EJS模板引擎...');
@@ -128,6 +130,9 @@ app.use((req, res, next) => {
   // 銷售機會成交機率階段對照表，供所有視圖使用（EJS 樣板無法直接 require，改由此處統一注入）
   res.locals.winProbabilityStages = WIN_PROBABILITY_STAGES;
   res.locals.winProbabilityStageLabels = WIN_PROBABILITY_STAGE_LABELS;
+
+  // 分頁圖示網址（帶版本參數，管理員換圖後瀏覽器會重新抓取）
+  res.locals.faviconHref = '/favicon.ico?v=' + getSystemSetting('favicon_version', 0);
 
   // 目前路徑，供導覽列標示當前所在頁面使用
   res.locals.currentPath = req.path;
@@ -258,6 +263,7 @@ try {
   app.use('/login-history', requireAuth, loginHistoryRoutes);
   app.use('/users', requireAuth, userRoutes);
   app.use('/backup-restore', requireAuth, backupRestoreRoutes);
+  app.use('/settings/favicon', require('./routes/branding').settingsRouter);
   app.use('/settings', requireAuth, settingsRoutes);
   app.use('/project-types', requireAuth, projectTypesRoutes);
   app.use('/pipeline-amount-options', requireAuth, pipelineAmountOptionsRoutes);
