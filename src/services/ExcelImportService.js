@@ -8,6 +8,7 @@ const Customer = require('../models/Customer');
 const Activity = require('../models/Activity');
 const AuditLogService = require('./AuditLogService');
 const Bonus = require('../models/Bonus');
+const Cost = require('../models/Cost');
 const dayjs = require('dayjs');
 
 // 轉換民國年日期
@@ -1408,6 +1409,152 @@ class ExcelImportService {
     } catch (err) {
       this.error(`匯入失敗: ${err.message}`);
       return { success: false, createdCount, skippedCount, error: err.message, errors: this.errors, errorCount: this.errors.length, log: this.importLog };
+    }
+  }
+
+  // 成本明細批次匯入：一列一筆成本，用專案編號（必要時加類型/客戶編號/專案名稱）對應專案。
+  // 欄位：專案編號 | 類型 | 客戶編號 | 專案名稱 | 進項編號 | 成本名稱 | 成本日期 | 成本類型 | 費用類別 | 廠商 | 付款辦法 | 付款條件 | 下單狀態 | 預估金額 | 實際金額 | 備註
+  // 成本類型/費用類別/付款辦法/付款條件/下單狀態不在管理清單內時整列報錯（由 Cost.create 驗證）；
+  // 廠商以廠商編號或公司名稱比對「廠商/兩者皆是」身份的資料，找不到整列報錯。
+  async importCosts(filePath, userInfo) {
+    this.importLog = [];
+    this.errors = [];
+    this.resetDedupe();
+    this.log(`開始匯入成本明細: ${filePath}`);
+
+    const COLS = {
+      PROJECT_CODE: 0, PROJECT_TYPE: 1, CUSTOMER_CODE: 2, PROJECT_NAME: 3, ITEM_CODE: 4, ITEM_NAME: 5, COST_DATE: 6,
+      COST_TYPE: 7, COST_CATEGORY: 8, VENDOR: 9, PAYMENT_METHOD: 10, PAYMENT_TERM: 11, ORDER_STATUS: 12,
+      ESTIMATED: 13, ACTUAL: 14, NOTES: 15
+    };
+    let createdCount = 0;
+    let failedCount = 0;
+
+    const fail = (rowNumber, label, message) => {
+      failedCount++;
+      this.error(`第 ${rowNumber} 列${label ? `（${label}）` : ''}：${message}`);
+    };
+    const parseAmount = (raw) => {
+      if (raw === null || raw === undefined || raw === '') return 0;
+      if (typeof raw === 'object') raw = raw.result !== undefined ? raw.result : (raw.text !== undefined ? raw.text : raw.value);
+      const n = Number(String(raw).replace(/[,\s$]/g, ''));
+      return isNaN(n) ? null : n;
+    };
+    const buildResult = (success) => ({
+      success, createdCount, duplicateCount: this.duplicateCount, failedCount,
+      errors: this.errors, errorCount: this.errors.length
+    });
+
+    try {
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.readFile(filePath);
+      const worksheet = workbook.getWorksheet('成本明細') || workbook.worksheets[0];
+      if (!worksheet) {
+        this.error('找不到工作表，請確認上傳的是有效的 Excel 檔案');
+        return buildResult(false);
+      }
+
+      for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
+        const excelRow = worksheet.getRow(rowNumber);
+        const cell = (idx) => excelRow.getCell(idx + 1).value;
+        const text = (idx) => safeExtractText(cell(idx));
+
+        const projectCode = text(COLS.PROJECT_CODE);
+        const itemName = text(COLS.ITEM_NAME);
+        const itemCode = text(COLS.ITEM_CODE);
+        // 空白列略過
+        if (!projectCode && !itemName && !itemCode) continue;
+        const label = itemName || itemCode || projectCode || '';
+
+        try {
+          // 1. 對應專案
+          if (!projectCode) { fail(rowNumber, label, '缺少專案編號'); continue; }
+          let candidates = Project.findAllByCode(projectCode);
+          const projectType = text(COLS.PROJECT_TYPE);
+          const customerCode = text(COLS.CUSTOMER_CODE);
+          const projectName = text(COLS.PROJECT_NAME);
+          if (projectType) candidates = candidates.filter(p => p.project_type === projectType);
+          if (customerCode) {
+            const customer = db.prepare('SELECT id FROM customers WHERE customer_code = ? AND deleted_at IS NULL').get(customerCode);
+            if (!customer) { fail(rowNumber, label, `找不到客戶編號「${customerCode}」`); continue; }
+            candidates = candidates.filter(p => p.customer_id === customer.id);
+          }
+          if (projectName) candidates = candidates.filter(p => p.project_name === projectName);
+          if (candidates.length === 0) { fail(rowNumber, label, `找不到專案（專案編號 ${projectCode}${projectType ? `、類型 ${projectType}` : ''}${customerCode ? `、客戶 ${customerCode}` : ''}${projectName ? `、專案名稱 ${projectName}` : ''}）`); continue; }
+          if (candidates.length > 1) { fail(rowNumber, label, `專案編號「${projectCode}」對應到 ${candidates.length} 個專案，請補填類型、客戶編號或專案名稱以指定專案`); continue; }
+          const project = candidates[0];
+
+          // 2. 必填與格式
+          if (!itemName) { fail(rowNumber, label, '成本名稱為必填欄位'); continue; }
+          const rawDate = cell(COLS.COST_DATE);
+          let costDate = null;
+          if (rawDate !== null && rawDate !== undefined && rawDate !== '') {
+            costDate = parseActivityDate(rawDate);
+            if (!costDate) { fail(rowNumber, label, `成本日期「${rawDate}」格式無法辨識`); continue; }
+          }
+          const estimated = parseAmount(cell(COLS.ESTIMATED));
+          const actual = parseAmount(cell(COLS.ACTUAL));
+          if (estimated === null) { fail(rowNumber, label, `預估金額「${cell(COLS.ESTIMATED)}」不是數字`); continue; }
+          if (actual === null) { fail(rowNumber, label, `實際金額「${cell(COLS.ACTUAL)}」不是數字`); continue; }
+
+          // 3. 廠商（編號或公司名稱）
+          let vendorId = null;
+          const vendorText = text(COLS.VENDOR);
+          if (vendorText) {
+            const vendorWhere = `deleted_at IS NULL AND party_type IN ('廠商', '兩者皆是')`;
+            let vendor = db.prepare(`SELECT id FROM customers WHERE customer_code = ? AND ${vendorWhere}`).get(vendorText);
+            if (!vendor) {
+              const matches = db.prepare(`SELECT id FROM customers WHERE company_name = ? AND ${vendorWhere}`).all(vendorText);
+              if (matches.length > 1) { fail(rowNumber, label, `廠商「${vendorText}」對應到 ${matches.length} 筆資料，請改填廠商編號`); continue; }
+              vendor = matches[0];
+            }
+            if (!vendor) { fail(rowNumber, label, `找不到廠商「${vendorText}」（需為身份是「廠商」或「兩者皆是」的資料，可先用客戶/廠商批次匯入建立）`); continue; }
+            vendorId = vendor.id;
+          }
+
+          // 4. 去重：有進項編號用「專案＋進項編號」，否則用「專案＋成本名稱＋日期＋預估＋實際金額」
+          const dedupeKey = itemCode
+            ? `cost|${project.id}|code|${itemCode}`
+            : `cost|${project.id}|${itemName}|${costDate || ''}|${estimated}|${actual}`;
+          const dedupeCount = itemCode
+            ? db.prepare('SELECT COUNT(*) c FROM costs WHERE project_id = ? AND item_code = ?').get(project.id, itemCode).c
+            : db.prepare(`SELECT COUNT(*) c FROM costs WHERE project_id = ? AND TRIM(IFNULL(item_name, '')) = ? AND IFNULL(cost_date, '') = ?
+                AND IFNULL(estimated_amount, 0) = ? AND IFNULL(actual_amount, 0) = ?`).get(project.id, itemName, costDate || '', estimated, actual).c;
+          if (this.isDuplicateRow(dedupeKey, dedupeCount)) {
+            this.log(`第 ${rowNumber} 列（${label}）：成本已存在，略過`);
+            continue;
+          }
+
+          // 5. 建立（成本類型/費用類別/付款辦法/付款條件/下單狀態由 Cost.create 驗證是否存在且啟用）
+          Cost.create({
+            project_id: project.id,
+            item_code: itemCode,
+            item_name: itemName,
+            cost_date: costDate,
+            cost_type: text(COLS.COST_TYPE),
+            cost_category: text(COLS.COST_CATEGORY),
+            vendor_id: vendorId,
+            payment_method: text(COLS.PAYMENT_METHOD),
+            payment_term: text(COLS.PAYMENT_TERM),
+            order_status: text(COLS.ORDER_STATUS),
+            estimated_amount: estimated,
+            actual_amount: actual,
+            notes: text(COLS.NOTES),
+            userInfo
+          });
+          this.markCreated(dedupeKey);
+          createdCount++;
+        } catch (rowErr) {
+          fail(rowNumber, label, rowErr.message);
+        }
+      }
+
+      this.log(`成本明細匯入完成：新增 ${createdCount} 筆，略過重複 ${this.duplicateCount} 筆，失敗 ${failedCount} 筆`);
+      return buildResult(true);
+    } catch (err) {
+      this.error(`匯入失敗: ${err.message}`);
+      console.error('成本明細匯入錯誤:', err);
+      return buildResult(false);
     }
   }
 

@@ -14,6 +14,13 @@ ${result ? `
   <div class="alert alert-${result.success ? (result.warning ? 'warning' : 'success') : 'danger'} alert-dismissible fade show">
     <h5>${result.success ? (result.warning ? '⚠️ 匯入完成（有錯誤）' : '✅ 匯入成功！') : '❌ 匯入失敗'}</h5>
     ${result.success ? `
+      ${result.kind === 'costs' ? `
+      <ul class="mb-0">
+        <li>成本明細: 新增 ${result.results.costs || 0} 筆</li>
+        <li class="text-muted">略過已存在的重複資料: ${result.results.duplicates || 0} 筆</li>
+        <li class="${result.results.failed ? 'text-danger' : 'text-muted'}">失敗: ${result.results.failed || 0} 列</li>
+      </ul>
+      ` : `
       <ul class="mb-0">
         <li>專案: ${result.results.projects || 0} 筆</li>
         <li>發票: ${result.results.invoices || 0} 筆</li>
@@ -23,6 +30,7 @@ ${result ? `
         <li>客戶: ${result.results.customers || 0} 筆</li>
         ${result.results.duplicates ? `<li class="text-muted">略過已存在的重複資料（發票/收款/獎金）: ${result.results.duplicates} 筆</li>` : ''}
       </ul>
+      `}
       ${result.warning ? `<p class="mb-0 mt-2 text-warning"><strong>${result.warning}</strong></p>` : ''}
       ${result.errorCount > 0 ? `
         <details class="mt-2">
@@ -146,6 +154,27 @@ ${result ? `
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-4">
+  <div class="card-header bg-warning">
+    <i class="bi bi-cash-coin"></i> 成本明細批次匯入
+  </div>
+  <div class="card-body">
+    <p class="text-muted mb-2">一列一筆成本，用「專案編號」對應專案（同編號有多個專案時再加類型、客戶編號或專案名稱）。成本類型、費用類別、付款辦法、付款條件、下單狀態需為系統管理清單內的值；廠商需為已建立的廠商。重複匯入同一份檔案時，已存在的成本會自動略過。</p>
+    <div class="d-flex gap-3 flex-wrap align-items-end">
+      <a href="/import-export/template/costs" class="btn btn-outline-warning btn-sm">
+        <i class="bi bi-download"></i> 下載成本明細範本
+      </a>
+      <form action="/import-export/import-costs" method="POST" enctype="multipart/form-data" class="d-flex gap-2 align-items-end">
+        <div>
+          <label class="form-label small mb-1">選擇檔案</label>
+          <input type="file" name="file" class="form-control form-control-sm" accept=".xlsx,.xls" required>
+        </div>
+        <button type="submit" class="btn btn-warning btn-sm"><i class="bi bi-cloud-upload"></i> 匯入成本明細</button>
+      </form>
     </div>
   </div>
 </div>

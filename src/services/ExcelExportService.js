@@ -549,6 +549,82 @@ class ExcelExportService {
     return workbook;
   }
 
+  // 成本明細批次匯入範本（選項值皆取自系統目前啟用的管理清單）
+  generateCostTemplate() {
+    const workbook = new ExcelJS.Workbook();
+    const readNames = (table, column) => {
+      try {
+        return db.prepare(`SELECT ${column} AS name FROM ${table} WHERE is_active = 1 ORDER BY display_order, ${column}`).all().map(r => r.name);
+      } catch (e) {
+        return [];
+      }
+    };
+    const costTypes = readNames('cost_types', 'type_name');
+    const categories = readNames('cost_categories', 'category_name');
+    const methods = readNames('payment_methods', 'method_name');
+    const terms = readNames('payment_terms', 'term_name');
+    const statuses = readNames('order_statuses', 'status_name');
+    const pick = (list, n) => list.length > 0 ? list[n % list.length] : '';
+    const listStr = (list, manage) => list.length > 0 ? list.map(v => `「${v}」`).join('、') : `（尚未設定，請先到「${manage}」新增；不填也可以）`;
+
+    let vendorName = '';
+    try {
+      const v = db.prepare(`SELECT customer_code, company_name FROM customers WHERE deleted_at IS NULL AND party_type IN ('廠商', '兩者皆是') ORDER BY id LIMIT 1`).get();
+      if (v) vendorName = v.customer_code || v.company_name;
+    } catch (e) { /* 忽略 */ }
+    let sampleProject = { project_code: 'PJ20240706', project_type: '', customer_code: '', project_name: '' };
+    try {
+      const p = db.prepare(`SELECT p.project_code, p.project_type, p.project_name, c.customer_code FROM projects p LEFT JOIN customers c ON c.id = p.customer_id ORDER BY p.id DESC LIMIT 1`).get();
+      if (p) sampleProject = { project_code: p.project_code, project_type: p.project_type || '', customer_code: p.customer_code || '', project_name: p.project_name || '' };
+    } catch (e) { /* 忽略 */ }
+
+    const headers = [
+      '專案編號', '類型', '客戶編號', '專案名稱', '進項編號', '成本名稱', '成本日期',
+      '成本類型', '費用類別', '廠商', '付款辦法', '付款條件', '下單狀態', '預估金額', '實際金額', '備註'
+    ];
+    const worksheet = workbook.addWorksheet('成本明細');
+    worksheet.addRow(headers);
+    worksheet.addRow([
+      sampleProject.project_code, '', '', '', 'PJ-C-001', '範例成本 A', '113/09/25',
+      pick(costTypes, 0), pick(categories, 0), vendorName, pick(methods, 0), pick(terms, 0), pick(statuses, 0), 8925, 0, '範例備註'
+    ]);
+    worksheet.addRow([
+      sampleProject.project_code, '', '', '', '', '範例成本 B', '2026-03-01',
+      pick(costTypes, 1), pick(categories, 1), '', '', '', '', 28245, 28000, ''
+    ]);
+    styleHeaderRow(worksheet);
+    [14, 10, 12, 24, 20, 24, 12, 12, 12, 16, 12, 12, 12, 12, 12, 24].forEach((w, i) => { worksheet.getColumn(i + 1).width = w; });
+
+    const info = workbook.addWorksheet('填寫說明');
+    info.addRow(['欄位名稱', '說明', '必填']);
+    info.addRow(['專案編號', '成本所屬專案的專案編號', '是']);
+    info.addRow(['類型 / 客戶編號 / 專案名稱', '同一專案編號對應到多個專案時（例如同編號不同類型或不同客戶），用這三欄指定是哪一個；只有一個專案時可留空', '否']);
+    info.addRow(['進項編號', '採購/進項的唯一識別碼；有填時，同專案相同進項編號視為同一筆，重複匯入會略過', '否']);
+    info.addRow(['成本名稱', '這筆成本的名稱', '是']);
+    info.addRow(['成本日期', '民國年（113/09/25）或西元年（2026-09-25）皆可', '否']);
+    info.addRow(['成本類型', `需為系統啟用的成本類型：${listStr(costTypes, '成本類型管理')}`, '否']);
+    info.addRow(['費用類別', `需為系統啟用的費用類別：${listStr(categories, '費用類別管理')}`, '否']);
+    info.addRow(['廠商', '廠商編號或公司名稱；需為系統中身份是「廠商」或「兩者皆是」的資料，找不到會整列報錯（可先用客戶/廠商批次匯入建立）', '否']);
+    info.addRow(['付款辦法', `需為系統啟用的付款辦法：${listStr(methods, '付款辦法管理')}`, '否']);
+    info.addRow(['付款條件', `需為系統啟用的付款條件：${listStr(terms, '付款條件管理')}`, '否']);
+    info.addRow(['下單狀態', `需為系統啟用的下單狀態：${listStr(statuses, '下單狀態管理')}`, '否']);
+    info.addRow(['預估金額 / 實際金額', '數字，不需千分位；留空視為 0', '否']);
+    info.addRow(['備註', '自由文字', '否']);
+    info.addRow(['']);
+    info.addRow(['注意事項：']);
+    info.addRow(['1. 成本類型、費用類別、付款辦法、付款條件、下單狀態若不在上述清單內，該列會失敗並說明原因；請先到對應的管理頁新增，或修正 Excel 後重新匯入']);
+    info.addRow(['2. 有進項編號時以「專案＋進項編號」判斷重複；沒有進項編號時以「專案＋成本名稱＋日期＋預估金額＋實際金額」判斷。重複的成本會略過，不會覆蓋既有資料']);
+    info.addRow(['3. 失敗的列不影響其他列，修正後可重新匯入同一份檔案（已匯入的會被視為重複略過）']);
+    const infoHeader = info.getRow(1);
+    infoHeader.font = { bold: true };
+    infoHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE7E6E6' } };
+    info.getColumn(1).width = 28;
+    info.getColumn(2).width = 80;
+    info.getColumn(3).width = 8;
+
+    return workbook;
+  }
+
   // 客戶活動紀錄批次匯入範本（管理者專用）
   generateActivityTemplate() {
     const workbook = new ExcelJS.Workbook();

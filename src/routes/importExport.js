@@ -5,6 +5,7 @@ const ExcelImportService = require('../services/ExcelImportService');
 const ExcelExportService = require('../services/ExcelExportService');
 const PdfExportService = require('../services/PdfExportService');
 const Project = require('../models/Project');
+const { getUserInfo } = require('../utils/authHelper');
 
 module.exports = function(upload) {
   const router = express.Router();
@@ -78,6 +79,63 @@ module.exports = function(upload) {
     } catch (err) {
       console.error('下載範例檔案錯誤:', err);
       res.redirect('/import-export?error=' + encodeURIComponent(err.message));
+    }
+  });
+
+  // 成本明細批次匯入範本
+  router.get('/template/costs', async (req, res) => {
+    try {
+      const workbook = ExcelExportService.generateCostTemplate();
+      const buffer = await ExcelExportService.writeToBuffer(workbook);
+      const encodedFilename = encodeURIComponent('成本明細匯入範本.xlsx').replace(/'/g, '%27');
+      const nodeBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFilename}`);
+      res.setHeader('Content-Length', nodeBuffer.length);
+      res.send(nodeBuffer);
+    } catch (err) {
+      console.error('下載成本明細匯入範本失敗:', err);
+      res.redirect('/import-export?error=' + encodeURIComponent(err.message));
+    }
+  });
+
+  // 成本明細批次匯入
+  router.post('/import-costs', upload.single('file'), async (req, res) => {
+    let filePath = null;
+    const cleanup = () => {
+      if (filePath && fs.existsSync(filePath)) {
+        try { fs.unlinkSync(filePath); } catch (unlinkErr) { console.error('刪除暫存檔失敗:', unlinkErr); }
+      }
+    };
+    try {
+      if (!req.file) {
+        return res.redirect('/import-export?error=' + encodeURIComponent('請選擇檔案'));
+      }
+      filePath = req.file.path;
+      const result = await ExcelImportService.importCosts(filePath, getUserInfo(req));
+      cleanup();
+
+      const clip = (v) => {
+        const msg = (typeof v === 'object' && v !== null) ? (v.message || String(v)) : String(v);
+        return msg.length > 200 ? msg.substring(0, 200) + '...' : msg;
+      };
+      const limitedResult = {
+        kind: 'costs',
+        success: result.success !== false,
+        results: { costs: result.createdCount || 0, duplicates: result.duplicateCount || 0, failed: result.failedCount || 0 },
+        errorCount: result.errorCount || 0,
+        errors: (result.errors || []).slice(0, 50).map(clip),
+        warning: (result.failedCount || 0) > 0 ? `有 ${result.failedCount} 列匯入失敗，其餘已完成` : null
+      };
+      let resultStr = encodeURIComponent(JSON.stringify(limitedResult));
+      if (resultStr.length > 2000) {
+        resultStr = encodeURIComponent(JSON.stringify({ ...limitedResult, errors: limitedResult.errors.slice(0, 8) }));
+      }
+      res.redirect('/import-export?result=' + resultStr);
+    } catch (err) {
+      console.error('成本明細批次匯入錯誤:', err);
+      cleanup();
+      res.redirect('/import-export?error=' + encodeURIComponent(err.message || '匯入過程中發生未知錯誤'));
     }
   });
 
