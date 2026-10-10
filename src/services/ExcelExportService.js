@@ -28,6 +28,13 @@ const PROJECT_HEADERS = [
   '收款日期', '銀行存款匯入金額', '收款差異', '價格(未稅)'
 ];
 
+const COST_SHEET_NAME = '成本明細';
+// 成本明細欄位（匯出與匯入範本共用，順序需與 ExcelImportService.processCostWorksheet 的 COLS 一致）
+const COST_HEADERS = [
+  '專案編號', '類型', '客戶編號', '專案名稱', '進項編號', '成本名稱', '成本日期',
+  '成本類型', '費用類別', '廠商', '付款辦法', '付款條件', '下單狀態', '預估金額', '實際金額', '備註'
+];
+const COST_COLUMN_WIDTHS = [14, 10, 12, 24, 20, 24, 12, 12, 12, 16, 12, 12, 12, 12, 12, 24];
 const BONUS_SHEET_NAME = '獎金明細';
 const BONUS_HEADERS = [
   '專案編號', '類型', '客戶編號', '專案名稱', '業務', '獎金類型',
@@ -219,6 +226,34 @@ class ExcelExportService {
     }
     styleHeaderRow(bonusSheet);
     BONUS_COLUMN_WIDTHS.forEach((w, i) => { bonusSheet.getColumn(i + 1).width = w; });
+
+    // 成本明細：該年度所有專案的全部成本，欄位與「成本明細匯入範本」一致，可直接重新匯入
+    const costRows = db.prepare(`
+      SELECT p.project_code, p.project_type, p.project_name, c.customer_code,
+             co.item_code, co.item_name, co.cost_date, co.cost_type, co.cost_category,
+             v.customer_code AS vendor_code, co.payment_method, co.payment_term, co.order_status,
+             co.estimated_amount, co.actual_amount, co.notes
+      FROM costs co
+      JOIN projects p ON co.project_id = p.id
+      LEFT JOIN customers c ON p.customer_id = c.id
+      LEFT JOIN customers v ON co.vendor_id = v.id
+      WHERE p.contract_year = ?
+      ORDER BY p.contract_month, p.project_code, co.cost_date, co.id
+    `).all(year);
+
+    const costSheet = workbook.addWorksheet(COST_SHEET_NAME);
+    costSheet.addRow(COST_HEADERS);
+    for (const co of costRows) {
+      costSheet.addRow([
+        co.project_code, co.project_type, co.customer_code || '', co.project_name || '',
+        co.item_code || '', co.item_name || '', co.cost_date ? formatROCDate(co.cost_date) : '',
+        co.cost_type || '', co.cost_category || '', co.vendor_code || '',
+        co.payment_method || '', co.payment_term || '', co.order_status || '',
+        formatCurrency(co.estimated_amount), formatCurrency(co.actual_amount), co.notes || ''
+      ]);
+    }
+    styleHeaderRow(costSheet);
+    COST_COLUMN_WIDTHS.forEach((w, i) => { costSheet.getColumn(i + 1).width = w; });
 
     return workbook;
   }
@@ -532,6 +567,7 @@ class ExcelExportService {
     infoSheet.addRow(['7. 標示「匯出計算欄位，匯入時忽略」的欄位填入任何值均無效，系統不會讀取']);
     infoSheet.addRow([`8. 獎金請填在「${BONUS_SHEET_NAME}」工作表，同一專案可有多筆、任意獎金類型；重複匯入同一份檔案時，內容完全相同的獎金會自動略過`]);
     infoSheet.addRow([`9. 獎金類型需為系統「獎金類型管理」中啟用的名稱：${bonusTypeListStr}`]);
+    infoSheet.addRow([`10. 成本請填在「${COST_SHEET_NAME}」工作表（欄位與用法見「成本明細匯入範本」）；匯入時會在專案處理完成後依專案編號對應`]);
 
     // 設定說明工作表樣式（兩段表頭）
     infoSheet.eachRow((row) => {
@@ -578,12 +614,8 @@ class ExcelExportService {
       if (p) sampleProject = { project_code: p.project_code, project_type: p.project_type || '', customer_code: p.customer_code || '', project_name: p.project_name || '' };
     } catch (e) { /* 忽略 */ }
 
-    const headers = [
-      '專案編號', '類型', '客戶編號', '專案名稱', '進項編號', '成本名稱', '成本日期',
-      '成本類型', '費用類別', '廠商', '付款辦法', '付款條件', '下單狀態', '預估金額', '實際金額', '備註'
-    ];
-    const worksheet = workbook.addWorksheet('成本明細');
-    worksheet.addRow(headers);
+    const worksheet = workbook.addWorksheet(COST_SHEET_NAME);
+    worksheet.addRow(COST_HEADERS);
     worksheet.addRow([
       sampleProject.project_code, '', '', '', 'PJ-C-001', '範例成本 A', '113/09/25',
       pick(costTypes, 0), pick(categories, 0), vendorName, pick(methods, 0), pick(terms, 0), pick(statuses, 0), 8925, 0, '範例備註'
@@ -593,7 +625,7 @@ class ExcelExportService {
       pick(costTypes, 1), pick(categories, 1), '', '', '', '', 28245, 28000, ''
     ]);
     styleHeaderRow(worksheet);
-    [14, 10, 12, 24, 20, 24, 12, 12, 12, 16, 12, 12, 12, 12, 12, 24].forEach((w, i) => { worksheet.getColumn(i + 1).width = w; });
+    COST_COLUMN_WIDTHS.forEach((w, i) => { worksheet.getColumn(i + 1).width = w; });
 
     const info = workbook.addWorksheet('填寫說明');
     info.addRow(['欄位名稱', '說明', '必填']);

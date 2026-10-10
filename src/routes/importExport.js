@@ -154,7 +154,7 @@ module.exports = function(upload) {
       res.setTimeout(600000);
       
       console.log('開始匯入 Excel 檔案:', filePath);
-      const result = await ExcelImportService.importExcel(filePath);
+      const result = await ExcelImportService.importExcel(filePath, getUserInfo(req));
       console.log('匯入完成，結果:', {
         success: result.success,
         projects: result.results?.projects || 0,

@@ -26,9 +26,10 @@ ${result ? `
         <li>發票: ${result.results.invoices || 0} 筆</li>
         <li>收款: ${result.results.payments || 0} 筆</li>
         <li>獎金: ${result.results.bonuses || 0} 筆</li>
+        ${result.results.costs ? `<li>成本明細: ${result.results.costs} 筆</li>` : ''}
         <li>業務: ${result.results.salespeople || 0} 筆</li>
         <li>客戶: ${result.results.customers || 0} 筆</li>
-        ${result.results.duplicates ? `<li class="text-muted">略過已存在的重複資料（發票/收款/獎金）: ${result.results.duplicates} 筆</li>` : ''}
+        ${result.results.duplicates ? `<li class="text-muted">略過已存在的重複資料（發票/收款/獎金/成本）: ${result.results.duplicates} 筆</li>` : ''}
       </ul>
       `}
       ${result.warning ? `<p class="mb-0 mt-2 text-warning"><strong>${result.warning}</strong></p>` : ''}
@@ -184,7 +185,7 @@ ${result ? `
     <i class="bi bi-question-circle"></i> Excel格式說明
   </div>
   <div class="card-body">
-    <p>匯入的Excel檔案「專案總表」工作表應包含以下欄位（依序）；獎金請放在另一張「獎金明細」工作表（建議先下載範本，範例與說明會依系統目前啟用的專案類型、獎金類型產生）：</p>
+    <p>匯入的Excel檔案「專案總表」工作表應包含以下欄位（依序）；獎金請放在另一張「獎金明細」工作表、成本請放在「成本明細」工作表（建議先下載範本，範例與說明會依系統目前啟用的專案類型、獎金類型產生）：</p>
     <div class="table-responsive">
       <table class="table table-sm table-bordered">
         <thead class="table-light">
