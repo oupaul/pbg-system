@@ -5,10 +5,24 @@ const ExcelImportService = require('../services/ExcelImportService');
 const ExcelExportService = require('../services/ExcelExportService');
 const PdfExportService = require('../services/PdfExportService');
 const Project = require('../models/Project');
+const db = require('../models/db');
 const { getUserInfo } = require('../utils/authHelper');
 
 module.exports = function(upload) {
   const router = express.Router();
+
+  // 發票明細匯出依「發票日期」年度篩選，年度清單取自實際有發票的年份（所有 render 都需要，統一放 locals）
+  router.use((req, res, next) => {
+    try {
+      res.locals.invoiceYears = db.prepare(`
+        SELECT DISTINCT substr(invoice_date, 1, 4) AS y FROM invoices
+        WHERE deleted_at IS NULL AND invoice_date IS NOT NULL AND length(invoice_date) >= 4 ORDER BY y DESC
+      `).all().map(r => r.y);
+    } catch (err) {
+      res.locals.invoiceYears = [];
+    }
+    next();
+  });
 
   // 匯入匯出頁面
   router.get('/', (req, res) => {
@@ -338,6 +352,24 @@ module.exports = function(upload) {
       res.send(nodeBuffer);
     } catch (err) {
       console.error('匯出獎金報表錯誤:', err);
+      res.redirect('/import-export?error=' + encodeURIComponent(err.message));
+    }
+  });
+
+  // 發票明細匯出（year 為 'all' 代表全部年度；依發票日期年度篩選）
+  router.get('/export/invoices/:year', async (req, res) => {
+    try {
+      const year = /^\d{4}$/.test(req.params.year) ? parseInt(req.params.year) : null;
+      const workbook = ExcelExportService.exportInvoices(year);
+      const buffer = await ExcelExportService.writeToBuffer(workbook);
+      const encodedFilename = encodeURIComponent(`發票明細_${year || '全部'}.xlsx`).replace(/'/g, '%27');
+      const nodeBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFilename}`);
+      res.setHeader('Content-Length', nodeBuffer.length);
+      res.send(nodeBuffer);
+    } catch (err) {
+      console.error('匯出發票明細錯誤:', err);
       res.redirect('/import-export?error=' + encodeURIComponent(err.message));
     }
   });

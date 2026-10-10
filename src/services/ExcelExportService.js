@@ -56,6 +56,12 @@ const SALES_PERFORMANCE_HEADERS = [
   '業務', '專案數', '專案金額', '已開發票', '未開發票', '已收款', '未收款',
   '總獎金', '已發放', '待發放', '洽談中銷售機會', '預估金額'
 ];
+// 發票明細匯出欄位
+const INVOICE_HEADERS = [
+  '發票日期', '發票號碼', '狀態', '專案編號', '類型', '專案名稱', '客戶編號', '公司名稱', '業務',
+  '含稅金額', '折讓金額', '認列金額', '已收款金額', '預計收款日', '作廢日期', '作廢原因', '重開發票號碼', '原發票號碼'
+];
+const INVOICE_COLUMN_WIDTHS = [12, 14, 10, 14, 10, 28, 12, 22, 10, 12, 10, 12, 12, 12, 12, 20, 14, 14];
 const BONUS_SHEET_NAME = '獎金明細';
 const BONUS_HEADERS = [
   '專案編號', '類型', '客戶編號', '專案名稱', '業務', '獎金類型',
@@ -816,6 +822,63 @@ class ExcelExportService {
     ws.getRow(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
     ws.getRow(2).alignment = { vertical: 'middle', horizontal: 'center' };
     ws.views = [{ state: 'frozen', ySplit: 2 }];
+    return workbook;
+  }
+
+  // 發票明細匯出：一張發票一列（已軟刪除的不匯出），依「發票日期」的年度篩選，year 為空代表全部。
+  // 含作廢/折讓狀態；認列金額 = 含稅金額 - 折讓金額；已收款金額為「有關聯到此發票」的收款加總。
+  exportInvoices(year = null) {
+    const rows = db.prepare(`
+      SELECT i.id, i.invoice_date, i.invoice_number, i.amount_with_tax, i.allowance_amount, i.status,
+             i.expected_payment_date, i.voided_at, i.void_reason,
+             p.project_code, p.project_type, p.project_name,
+             c.customer_code, c.company_name,
+             s.name AS salesperson_name,
+             r.invoice_number AS replacement_number,
+             o.invoice_number AS original_number,
+             COALESCE((SELECT SUM(pay.bank_deposit_amount) FROM payments pay
+                       WHERE pay.invoice_id = i.id AND pay.deleted_at IS NULL), 0) AS received_amount
+      FROM invoices i
+      JOIN projects p ON i.project_id = p.id
+      LEFT JOIN customers c ON p.customer_id = c.id
+      LEFT JOIN salespeople s ON p.salesperson_id = s.id
+      LEFT JOIN invoices r ON i.replacement_invoice_id = r.id
+      LEFT JOIN invoices o ON i.original_invoice_id = o.id
+      WHERE i.deleted_at IS NULL ${year ? "AND substr(i.invoice_date, 1, 4) = ?" : ''}
+      ORDER BY i.invoice_date, i.invoice_number, i.id
+    `).all(...(year ? [String(year)] : []));
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet(year ? `發票明細-${year}` : '發票明細-全部');
+    worksheet.addRow(INVOICE_HEADERS);
+    let totalAmount = 0;
+    let totalRecognized = 0;
+    for (const r of rows) {
+      const isValid = !r.status || r.status === '有效';
+      const recognized = isValid ? (r.amount_with_tax || 0) - (r.allowance_amount || 0) : 0;
+      if (isValid) { totalAmount += r.amount_with_tax || 0; totalRecognized += recognized; }
+      worksheet.addRow([
+        r.invoice_date ? formatROCDate(r.invoice_date) : '',
+        r.invoice_number || '',
+        r.status || '有效',
+        r.project_code, r.project_type || '', r.project_name || '',
+        r.customer_code || '', r.company_name || '', r.salesperson_name || '',
+        formatCurrency(r.amount_with_tax || 0),
+        formatCurrency(r.allowance_amount || 0),
+        formatCurrency(recognized),
+        formatCurrency(r.received_amount || 0),
+        r.expected_payment_date ? formatROCDate(r.expected_payment_date) : '',
+        r.voided_at ? String(r.voided_at).slice(0, 10) : '',
+        r.void_reason || '',
+        r.replacement_number || '',
+        r.original_number || ''
+      ]);
+    }
+    const totalRow = worksheet.addRow(['合計（僅計有效發票）', '', '', '', '', '', '', '', '', formatCurrency(totalAmount), '', formatCurrency(totalRecognized)]);
+    totalRow.font = { bold: true };
+    styleHeaderRow(worksheet);
+    INVOICE_COLUMN_WIDTHS.forEach((w, i) => { worksheet.getColumn(i + 1).width = w; });
+    worksheet.getColumn('B').numFmt = '@';
     return workbook;
   }
 

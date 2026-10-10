@@ -112,6 +112,23 @@ ${result ? `
         </div>
         
         <hr>
+
+        <div class="mb-4">
+          <h6>發票明細</h6>
+          <p class="small text-muted">一張發票一列，含作廢/折讓狀態、已收款金額（依發票日期年度）</p>
+          <div class="d-flex gap-2 flex-wrap">
+            <a href="/import-export/export/invoices/all" class="btn btn-outline-success" title="Excel 全部年度">
+              <i class="bi bi-file-earmark-excel"></i> 全部
+            </a>
+            ${(typeof invoiceYears !== 'undefined' ? invoiceYears : []).map(y => `
+              <a href="/import-export/export/invoices/${y}" class="btn btn-outline-success" title="Excel">
+                <i class="bi bi-file-earmark-excel"></i> ${y}年
+              </a>
+            `).join('')}
+          </div>
+        </div>
+
+        <hr>
         
         <div class="mb-4">
           <h6>獎金報表</h6>
