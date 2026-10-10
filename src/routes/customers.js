@@ -197,6 +197,31 @@ router.get('/', (req, res) => {
   }
 });
 
+// 客戶/廠商資料匯出（管理者專用：內含銀行帳號等敏感資料）；沿用列表頁目前的搜尋與篩選條件
+router.get('/export', requireAdmin, async (req, res) => {
+  try {
+    const filters = {
+      status: req.query.status || '',
+      party_type: req.query.party_type || '',
+      vendor_type: req.query.vendor_type || ''
+    };
+    const keyword = (req.query.search || '').trim();
+    const customers = keyword ? Customer.search(keyword, filters, req.user) : Customer.findAll(filters, req.user);
+
+    const workbook = ExcelExportService.exportCustomers(Array.isArray(customers) ? customers : []);
+    const buffer = await ExcelExportService.writeToBuffer(workbook);
+    const nodeBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+    const filename = `客戶廠商資料_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    res.setHeader('Content-Length', nodeBuffer.length);
+    res.send(nodeBuffer);
+  } catch (err) {
+    console.error('匯出客戶/廠商資料失敗:', err);
+    res.redirect('/customers?error=' + encodeURIComponent(err.message));
+  }
+});
+
 // 客戶/廠商批次匯入範本下載（管理者專用）
 router.get('/import/template', requireAdmin, async (req, res) => {
   try {

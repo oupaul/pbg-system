@@ -35,6 +35,13 @@ const COST_HEADERS = [
   '成本類型', '費用類別', '廠商', '付款辦法', '付款條件', '下單狀態', '預估金額', '實際金額', '備註'
 ];
 const COST_COLUMN_WIDTHS = [14, 10, 12, 24, 20, 24, 12, 12, 12, 16, 12, 12, 12, 12, 12, 24];
+// 客戶/廠商欄位（匯出與匯入範本共用，順序需與 ExcelImportService.importCustomers 的 COLS 一致）
+const CUSTOMER_HEADERS = [
+  '客戶編號', '統一編號', '公司名稱', '客戶/廠商類型', '廠商類型',
+  '客戶等級', '產業別', '往來狀態', '新/舊客戶', '客戶關係負責人',
+  '聯絡人姓名', '聯絡電話', '聯絡Email', '銀行', '銀行帳號', '地址'
+];
+const CUSTOMER_COLUMN_WIDTHS = [12, 12, 24, 12, 10, 10, 14, 10, 10, 14, 12, 14, 22, 14, 18, 30];
 const BONUS_SHEET_NAME = '獎金明細';
 const BONUS_HEADERS = [
   '專案編號', '類型', '客戶編號', '專案名稱', '業務', '獎金類型',
@@ -711,16 +718,46 @@ class ExcelExportService {
     return workbook;
   }
 
+  // 客戶/廠商資料匯出：欄位與「客戶/廠商批次匯入範本」一致，可直接重新匯入。
+  // customers 為 Customer.findAll/search 的結果（已排除軟刪除、含 owner_salesperson_name）。
+  // 內含銀行帳號等敏感資料，呼叫端必須限制為管理者。
+  exportCustomers(customers) {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('客戶廠商總表');
+    worksheet.addRow(CUSTOMER_HEADERS);
+    for (const c of customers) {
+      worksheet.addRow([
+        c.customer_code || '',
+        c.tax_id || '',
+        c.company_name || '',
+        c.party_type || '客戶',
+        c.vendor_type || '',
+        c.customer_level || '',
+        c.industry || '',
+        c.status || '',
+        c.is_new_customer ? '新客戶' : '舊客戶',
+        c.owner_salesperson_name || '',
+        c.contact_name || '',
+        c.contact_phone || '',
+        c.contact_email || '',
+        c.bank_name || '',
+        c.bank_account || '',
+        c.address || ''
+      ]);
+    }
+    styleHeaderRow(worksheet);
+    CUSTOMER_COLUMN_WIDTHS.forEach((width, index) => { worksheet.getColumn(index + 1).width = width; });
+    // 統編、客戶編號、銀行帳號等長數字當文字存放，避免 Excel 開啟時轉成科學記號或掉前導零
+    ['A', 'B', 'L', 'O'].forEach(col => { worksheet.getColumn(col).numFmt = '@'; });
+    return workbook;
+  }
+
   // 客戶/廠商批次匯入範本（管理者專用），欄位對應 Customer.create() 支援的欄位
   generateCustomerTemplate() {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('客戶廠商總表');
 
-    const headers = [
-      '客戶編號', '統一編號', '公司名稱', '客戶/廠商類型', '廠商類型',
-      '客戶等級', '產業別', '往來狀態', '新/舊客戶', '客戶關係負責人',
-      '聯絡人姓名', '聯絡電話', '聯絡Email', '銀行', '銀行帳號', '地址'
-    ];
+    const headers = CUSTOMER_HEADERS;
 
     const exampleRow1 = [
       'CU001', '12345678', 'XX股份有限公司', '客戶', '',
@@ -742,8 +779,7 @@ class ExcelExportService {
     worksheet.addRow(exampleRow1);
     worksheet.addRow(exampleRow2);
 
-    const columnWidths = [12, 12, 24, 12, 10, 10, 14, 10, 10, 14, 12, 14, 22, 14, 18, 30];
-    columnWidths.forEach((width, index) => {
+    CUSTOMER_COLUMN_WIDTHS.forEach((width, index) => {
       worksheet.getColumn(index + 1).width = width;
     });
 
