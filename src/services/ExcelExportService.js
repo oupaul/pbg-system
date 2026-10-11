@@ -255,33 +255,53 @@ class ExcelExportService {
     BONUS_COLUMN_WIDTHS.forEach((w, i) => { bonusSheet.getColumn(i + 1).width = w; });
 
     // 成本明細：該年度所有專案的全部成本，欄位與「成本明細匯入範本」一致，可直接重新匯入
-    const costRows = db.prepare(`
-      SELECT p.project_code, p.project_type, p.project_name, c.customer_code,
+    this._addCostSheet(workbook, COST_SHEET_NAME, 'WHERE p.contract_year = ?', [year]);
+
+    return workbook;
+  }
+
+  // 在 workbook 加入「成本明細」工作表：欄位前 16 欄與匯入範本一致（可直接重新匯入），
+  // 之後多的欄位（廠商名稱、專案狀態）僅供閱讀，匯入時會被忽略。where 為含 JOIN 別名 p/co 的 WHERE 子句。
+  _addCostSheet(workbook, sheetName, where, params) {
+    const rows = db.prepare(`
+      SELECT p.project_code, p.project_type, p.project_name, p.status AS project_status, c.customer_code,
              co.item_code, co.item_name, co.cost_date, co.cost_type, co.cost_category,
-             v.customer_code AS vendor_code, co.payment_method, co.payment_term, co.order_status,
+             v.customer_code AS vendor_code, v.company_name AS vendor_name,
+             co.payment_method, co.payment_term, co.order_status,
              co.estimated_amount, co.actual_amount, co.notes
       FROM costs co
       JOIN projects p ON co.project_id = p.id
       LEFT JOIN customers c ON p.customer_id = c.id
       LEFT JOIN customers v ON co.vendor_id = v.id
-      WHERE p.contract_year = ?
-      ORDER BY p.contract_month, p.project_code, co.cost_date, co.id
-    `).all(year);
+      ${where}
+      ORDER BY p.contract_year, p.contract_month, p.project_code, co.cost_date, co.id
+    `).all(...params);
 
-    const costSheet = workbook.addWorksheet(COST_SHEET_NAME);
-    costSheet.addRow(COST_HEADERS);
-    for (const co of costRows) {
-      costSheet.addRow([
+    const sheet = workbook.addWorksheet(sheetName);
+    sheet.addRow([...COST_HEADERS, '廠商名稱', '專案狀態']);
+    for (const co of rows) {
+      sheet.addRow([
         co.project_code, co.project_type, co.customer_code || '', co.project_name || '',
         co.item_code || '', co.item_name || '', co.cost_date ? formatROCDate(co.cost_date) : '',
         co.cost_type || '', co.cost_category || '', co.vendor_code || '',
         co.payment_method || '', co.payment_term || '', co.order_status || '',
-        formatCurrency(co.estimated_amount), formatCurrency(co.actual_amount), co.notes || ''
+        formatCurrency(co.estimated_amount), formatCurrency(co.actual_amount), co.notes || '',
+        co.vendor_name || '', co.project_status || ''
       ]);
     }
-    styleHeaderRow(costSheet);
-    COST_COLUMN_WIDTHS.forEach((w, i) => { costSheet.getColumn(i + 1).width = w; });
+    styleHeaderRow(sheet);
+    [...COST_COLUMN_WIDTHS, 20, 10].forEach((w, i) => { sheet.getColumn(i + 1).width = w; });
+    return sheet;
+  }
 
+  // 成本明細匯出：依「成本日期」年度篩選（year 為空代表全部，含沒有日期的成本）。
+  // 不加合計列，確保匯出檔可直接重新匯入。
+  exportCosts(year = null) {
+    const workbook = new ExcelJS.Workbook();
+    this._addCostSheet(
+      workbook, year ? `${COST_SHEET_NAME}-${year}` : `${COST_SHEET_NAME}-全部`,
+      year ? "WHERE substr(co.cost_date, 1, 4) = ?" : '', year ? [String(year)] : []
+    );
     return workbook;
   }
 

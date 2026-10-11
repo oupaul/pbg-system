@@ -129,6 +129,23 @@ ${result ? `
         </div>
 
         <hr>
+
+        <div class="mb-4">
+          <h6>成本明細</h6>
+          <p class="small text-muted">一筆成本一列（依成本日期年度；沒有日期的成本只在「全部」），匯出檔可直接用上方的成本明細匯入重新匯入</p>
+          <div class="d-flex gap-2 flex-wrap">
+            <a href="/import-export/export/costs/all" class="btn btn-outline-success" title="Excel 全部">
+              <i class="bi bi-file-earmark-excel"></i> 全部
+            </a>
+            ${(typeof costYears !== 'undefined' ? costYears : []).map(y => `
+              <a href="/import-export/export/costs/${y}" class="btn btn-outline-success" title="Excel">
+                <i class="bi bi-file-earmark-excel"></i> ${y}年
+              </a>
+            `).join('')}
+          </div>
+        </div>
+
+        <hr>
         
         <div class="mb-4">
           <h6>獎金報表</h6>

@@ -11,15 +11,20 @@ const { getUserInfo } = require('../utils/authHelper');
 module.exports = function(upload) {
   const router = express.Router();
 
-  // 發票明細匯出依「發票日期」年度篩選，年度清單取自實際有發票的年份（所有 render 都需要，統一放 locals）
+  // 發票/成本明細匯出依「發票日期/成本日期」年度篩選，年度清單取自實際有資料的年份（所有 render 都需要，統一放 locals）
   router.use((req, res, next) => {
     try {
       res.locals.invoiceYears = db.prepare(`
         SELECT DISTINCT substr(invoice_date, 1, 4) AS y FROM invoices
         WHERE deleted_at IS NULL AND invoice_date IS NOT NULL AND length(invoice_date) >= 4 ORDER BY y DESC
       `).all().map(r => r.y);
+      res.locals.costYears = db.prepare(`
+        SELECT DISTINCT substr(cost_date, 1, 4) AS y FROM costs
+        WHERE cost_date IS NOT NULL AND length(cost_date) >= 4 ORDER BY y DESC
+      `).all().map(r => r.y);
     } catch (err) {
       res.locals.invoiceYears = [];
+      res.locals.costYears = [];
     }
     next();
   });
@@ -370,6 +375,24 @@ module.exports = function(upload) {
       res.send(nodeBuffer);
     } catch (err) {
       console.error('匯出發票明細錯誤:', err);
+      res.redirect('/import-export?error=' + encodeURIComponent(err.message));
+    }
+  });
+
+  // 成本明細匯出（year 為 'all' 代表全部；依成本日期年度篩選，匯出檔可直接用「成本明細匯入」重新匯入）
+  router.get('/export/costs/:year', async (req, res) => {
+    try {
+      const year = /^\d{4}$/.test(req.params.year) ? parseInt(req.params.year) : null;
+      const workbook = ExcelExportService.exportCosts(year);
+      const buffer = await ExcelExportService.writeToBuffer(workbook);
+      const encodedFilename = encodeURIComponent(`成本明細_${year || '全部'}.xlsx`).replace(/'/g, '%27');
+      const nodeBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFilename}`);
+      res.setHeader('Content-Length', nodeBuffer.length);
+      res.send(nodeBuffer);
+    } catch (err) {
+      console.error('匯出成本明細錯誤:', err);
       res.redirect('/import-export?error=' + encodeURIComponent(err.message));
     }
   });
