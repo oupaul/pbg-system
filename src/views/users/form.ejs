@@ -46,8 +46,8 @@ ${error ? `
 
         <div class="col-md-6">
           <label class="form-label">${user ? '新密碼' : '密碼'} ${user ? '' : '<span class="text-danger">*</span>'}</label>
-          <input type="password" name="password" class="form-control" ${user ? '' : 'required'} minlength="6">
-          ${user ? '<small class="text-muted">留空則不修改密碼，至少 6 個字元</small>' : '<small class="text-muted">至少 6 個字元</small>'}
+          <input type="password" name="password" class="form-control" ${user ? '' : 'required'} minlength="10">
+          ${user ? '<small class="text-muted">留空則不修改密碼，至少 10 個字元</small>' : '<small class="text-muted">至少 10 個字元</small>'}
         </div>
 
         <div class="col-md-6">

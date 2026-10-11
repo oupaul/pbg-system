@@ -46,6 +46,15 @@ const checkAuth = (req, res, next) => {
   next();
 };
 
+// 強制變更預設密碼：帳號被標記 must_change_password（目前只有全新安裝時建立的預設
+// admin 帳號會是 1）時，除了修改密碼頁本身與登出以外，一律導向修改密碼頁——
+// 避免帳號留著固定的預設密碼卻忘記改掉。
+const enforcePasswordChange = (req, res, next) => {
+  if (!req.user || !req.user.must_change_password) return next();
+  if (req.path === '/change-password' || req.path === '/logout') return next();
+  res.redirect('/change-password');
+};
+
 // Uses roles table (can_edit) so custom roles work correctly.
 const requireEditPermission = (req, res, next) => {
   if (!req.user) return res.status(401).json({ error: '未登入' });
@@ -167,7 +176,79 @@ const requireAdmin = (req, res, next) => {
   return res.status(403).json({ error: '權限不足', message: '此功能僅限管理員使用' });
 };
 
+// 密碼雜湊的指紋（存在 session 裡）：使用者改密碼或管理員重設密碼後指紋會變，
+// 其他已登入的 session 下一次請求就會失效，不會讓舊登入狀態在改密碼後繼續有效。
+function passwordFingerprint(passwordHash) {
+  return require('crypto').createHash('sha256').update(String(passwordHash || '')).digest('hex').slice(0, 16);
+}
+
+// 閒置登出等「背景輪詢」不算使用者活動，否則開著頁面的分頁會讓 session 永遠不會閒置過期
+function isBackgroundRequest(req) {
+  return req.method === 'GET' && req.path === '/notifications/poll';
+}
+
+// 每次請求都以資料庫為準重新驗證 session 中的使用者：
+// 帳號被停用、被刪除、密碼被改、角色或業務關聯被調整，都立即生效，不用等 session 過期。
+// 另外在伺服器端強制閒置逾時（前端的閒置登出只是 JavaScript，可以被繞過或關掉）。
+// 回傳 false 代表已經回應（session 失效），呼叫端不可再 next()。
+function revalidateSession(req, res) {
+  const sessionUser = req.session && req.session.user;
+  if (!sessionUser) return true;
+
+  let row = null;
+  try {
+    const db = require('../models/db');
+    try {
+      row = db.prepare('SELECT id, username, name, role, salesperson_id, is_active, must_change_password, password_hash FROM users WHERE id = ?').get(sessionUser.id);
+    } catch {
+      // 舊資料庫尚未執行 must_change_password migration 時的退路：不能因此整個停用 session 驗證
+      row = db.prepare('SELECT id, username, name, role, salesperson_id, is_active, password_hash FROM users WHERE id = ?').get(sessionUser.id);
+    }
+  } catch { /* 查詢失敗時不踢人，沿用 session 內容 */ return true; }
+
+  let invalid = !row || !row.is_active;
+  if (!invalid) {
+    const fingerprint = passwordFingerprint(row.password_hash);
+    if (sessionUser.pwv && sessionUser.pwv !== fingerprint) invalid = true;
+    else if (!sessionUser.pwv) sessionUser.pwv = fingerprint; // 舊 session 第一次補上指紋
+  }
+
+  // 伺服器端閒置逾時：系統設定的閒置分鐘數 + 5 分鐘緩衝（0 代表不限制）
+  if (!invalid) {
+    try {
+      const db = require('../models/db');
+      const setting = db.prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'idle_timeout_minutes'").get();
+      const idleMinutes = setting ? parseInt(setting.setting_value, 10) : 30;
+      const now = Date.now();
+      if (idleMinutes > 0 && req.session.lastActivity && now - req.session.lastActivity > (idleMinutes + 5) * 60 * 1000) {
+        invalid = true;
+      } else if (!isBackgroundRequest(req) && (!req.session.lastActivity || now - req.session.lastActivity > 30 * 1000)) {
+        req.session.lastActivity = now;
+      }
+    } catch { /* 忽略 */ }
+  }
+
+  if (invalid) {
+    req.session.destroy(() => {
+      if (req.path === '/login' || req.path === '/logout') return res.redirect('/login');
+      if (req.accepts('html')) return res.redirect('/login?redirect=' + encodeURIComponent(req.originalUrl || req.url));
+      return res.status(401).json({ error: '登入已失效，請重新登入' });
+    });
+    return false;
+  }
+
+  // 以資料庫為準更新 session 內的使用者資料（角色、姓名、業務關聯、強制改密碼旗標）
+  sessionUser.username = row.username;
+  sessionUser.name = row.name;
+  sessionUser.role = row.role;
+  sessionUser.salesperson_id = row.salesperson_id || null;
+  sessionUser.must_change_password = !!row.must_change_password;
+  req.user = sessionUser;
+  return true;
+}
+
 const setUserPermissions = (req, res, next) => {
+  if (!revalidateSession(req, res)) return;
   if (req.user) {
     try {
       const User = require('../models/User');
@@ -250,8 +331,10 @@ const setUserPermissions = (req, res, next) => {
 };
 
 module.exports = {
+  passwordFingerprint,
   requireAuth,
   checkAuth,
+  enforcePasswordChange,
   requireEditPermission,
   requireCrmEditPermission,
   requireDeletePermission,

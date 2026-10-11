@@ -71,6 +71,11 @@ const User = {
     db.prepare(`UPDATE users SET last_active_at = datetime('now', 'localtime') WHERE id = ?`).run(id);
   },
 
+  // 清除強制變更密碼旗標（帳號完成首次密碼變更後呼叫）
+  clearMustChangePassword(id) {
+    db.prepare(`UPDATE users SET must_change_password = 0 WHERE id = ?`).run(id);
+  },
+
   // 取得最近 N 分鐘內有活動的啟用中使用者（視為「目前線上」）
   findOnline(minutes) {
     return db.prepare(`

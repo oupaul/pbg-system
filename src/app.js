@@ -32,16 +32,21 @@ const sessionSecret = process.env.SESSION_SECRET || require('crypto').randomByte
 if (!process.env.SESSION_SECRET) {
   console.warn('[安全警告] SESSION_SECRET 未設定！本次使用臨時隨機金鑰，重啟後所有 session 將失效。正式部署請確認 deploy.sh 已設定此環境變數。');
 }
+const SqliteSessionStore = require('./services/SqliteSessionStore');
 app.use(session({
   secret: sessionSecret,
+  store: new SqliteSessionStore(), // 重啟/部署後不會把所有人登出，也不吃記憶體
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // 設定為 false，除非您已配置 HTTPS（否則 session cookie 無法在 HTTP 下工作）
+    secure: 'auto',    // 經 HTTPS（含 Nginx 轉送 X-Forwarded-Proto，搭配 trust proxy）時自動加 Secure；純 HTTP 內網仍可使用
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 小時
+    sameSite: 'lax',   // 跨站 POST 不帶 cookie（CSRF 第一道防線）
+    maxAge: 24 * 60 * 60 * 1000 // 24 小時絕對上限；閒置逾時由 middleware/auth.js 依系統設定在伺服器端強制
   }
 }));
+// CSRF 第二道防線：驗證改變資料的請求來自本站（Origin/Referer）
+app.use(require('./middleware/csrfOriginCheck'));
 console.log('[啟動] Session 配置完成');
 
 // 中間件
@@ -64,7 +69,7 @@ console.log('[啟動] ✓ EJS模板引擎設定完成');
 
 // 載入認證中間件
 console.log('[啟動] 載入認證中間件...');
-const { requireAuth, requireImportExport, setUserPermissions } = require('./middleware/auth');
+const { requireAuth, requireImportExport, setUserPermissions, enforcePasswordChange } = require('./middleware/auth');
 console.log('[啟動] ✓ 認證中間件載入完成');
 
 // 載入部署配置
@@ -152,6 +157,9 @@ app.use((req, res, next) => {
 
 // 設定用戶權限標記（必須在設定 req.user 之後）
 app.use(setUserPermissions);
+
+// 強制變更預設密碼（必須在設定 req.user 之後，且在所有路由之前）
+app.use(enforcePasswordChange);
 
 // 載入路由
 console.log('[啟動] 開始載入路由模組...');
@@ -370,7 +378,10 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // 啟動伺服器
-const server = app.listen(PORT, () => {
+// 預設監聽所有網卡（維持原行為）；正式環境建議在 systemd 設定 BIND_HOST=127.0.0.1，
+// 只讓同機的 Nginx 轉送進來，避免有人繞過 Nginx 直連 3000 埠並偽造 X-Forwarded-For 規避登入限速
+const listenArgs = process.env.BIND_HOST ? [PORT, process.env.BIND_HOST] : [PORT];
+const server = app.listen(...listenArgs, () => {
   console.log(`\n🚀 專案開立發票業績認列獎金計算總表系統`);
   console.log(`   運行於 http://localhost:${PORT}`);
   console.log(`   環境: ${process.env.NODE_ENV || 'development'}\n`);

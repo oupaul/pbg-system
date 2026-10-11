@@ -6,6 +6,7 @@ const ReceivablesAgingService = require('../services/ReceivablesAgingService');
 const ActivityReminderService = require('../services/ActivityReminderService');
 const Role = require('../models/Role');
 const cache = require('../services/CacheService');
+const { getVisibleSalespersonIds } = require('../utils/projectScope');
 
 // 取得使用者角色的儀表板檢視模式
 function getDashboardViewMode(user) {
@@ -122,8 +123,10 @@ router.get('/', (req, res) => {
   const selectedYear = req.query.year && req.query.year !== 'all' ? parseInt(req.query.year) : null;
 
   // 業務員儀表板僅顯示自己負責的專案（admin/user/boss 仍看得到全公司資料）
-  const salespersonId = (req.user && req.user.project_view_scope === 'own' && req.user.salesperson_id)
-    ? req.user.salesperson_id : null;
+  // 依專案檢視範圍限制（預設拒絕）：全部→不限制；自己→限自己；指派／無／未綁業務→找不到任何資料（-1 不會對應任何業務）
+  const visibleSalespersonIds = getVisibleSalespersonIds(req.user);
+  const salespersonId = visibleSalespersonIds === null ? null
+    : (visibleSalespersonIds.length === 1 ? visibleSalespersonIds[0] : -1);
   const spCondP = salespersonId ? ' AND p.salesperson_id = ?' : '';
   const spCondPlain = salespersonId ? ' AND salesperson_id = ?' : '';
   const spCondV = salespersonId ? ' AND v.salesperson_id = ?' : '';
@@ -382,10 +385,8 @@ router.get('/', (req, res) => {
   let overdueInvoiceProjects = []; // 已超過設定月份的專案
   
   // 開票提醒：包含所有專案（含獨立加總業務）；業務員僅見自己負責專案
-  const notifSalespersonCond = (req.user && req.user.project_view_scope === 'own' && req.user.salesperson_id)
-    ? ' AND v.salesperson_id = ?' : '';
-  const notifSalespersonParam = (req.user && req.user.project_view_scope === 'own' && req.user.salesperson_id)
-    ? req.user.salesperson_id : null;
+  const notifSalespersonCond = salespersonId ? ' AND v.salesperson_id = ?' : '';
+  const notifSalespersonParam = salespersonId ? salespersonId : null;
   if (notificationEnabled) {
     const overdueParams = notifSalespersonParam != null ? [currentYearMonth, notifSalespersonParam] : [currentYearMonth];
     overdueInvoiceProjects = db.prepare(`
@@ -439,7 +440,7 @@ router.get('/', (req, res) => {
       const reminderSetting = db.prepare('SELECT setting_value FROM system_settings WHERE setting_key = ?').get('payment_reminder_days');
       if (reminderSetting) paymentReminderDays = parseInt(reminderSetting.setting_value, 10) || 7;
     } catch (e) { /* use default */ }
-    const salespersonFilter = (req.user.project_view_scope === 'own' && req.user.salesperson_id) ? req.user.salesperson_id : null;
+    const salespersonFilter = salespersonId; // 與上方儀表板相同的範圍限制
     paymentReminder = ReceivablesAgingService.getPaymentReminder(paymentReminderDays, null, salespersonFilter);
   }
 

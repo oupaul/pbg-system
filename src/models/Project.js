@@ -36,9 +36,14 @@ const Project = {
       const scope = user.project_view_scope ||
         (user.role === ROLES.SALESPERSON ? PROJECT_VIEW_SCOPE.OWN : PROJECT_VIEW_SCOPE.ALL);
 
-      if (scope === PROJECT_VIEW_SCOPE.OWN && user.salesperson_id) {
-        conditions += ` AND salesperson_id = ?`;
-        params.push(user.salesperson_id);
+      if (scope === PROJECT_VIEW_SCOPE.OWN) {
+        // 範圍為「自己」但帳號沒有綁定業務：一律看不到任何專案（預設拒絕，不是放行全部）
+        if (user.salesperson_id) {
+          conditions += ` AND salesperson_id = ?`;
+          params.push(user.salesperson_id);
+        } else {
+          conditions += ` AND 1=0`;
+        }
       } else if (scope === PROJECT_VIEW_SCOPE.ASSIGNED) {
         const ids = getAssignedSalespersonIds(user.id);
         if (ids.length > 0) {
@@ -200,8 +205,9 @@ const Project = {
       const scope = user.project_view_scope ||
         (user.role === ROLES.SALESPERSON ? PROJECT_VIEW_SCOPE.OWN : PROJECT_VIEW_SCOPE.ALL);
 
-      if (scope === PROJECT_VIEW_SCOPE.OWN && user.salesperson_id) {
-        if (project.salesperson_id !== user.salesperson_id) return null;
+      if (scope === PROJECT_VIEW_SCOPE.OWN) {
+        // 未綁定業務的「自己」範圍預設拒絕
+        if (!user.salesperson_id || project.salesperson_id !== user.salesperson_id) return null;
       } else if (scope === PROJECT_VIEW_SCOPE.ASSIGNED) {
         const ids = getAssignedSalespersonIds(user.id);
         if (!ids.includes(project.salesperson_id)) return null;

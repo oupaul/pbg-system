@@ -53,6 +53,7 @@ function migrateUserRoles() {
             role TEXT DEFAULT 'user',
             salesperson_id INTEGER,
             is_active INTEGER DEFAULT 1,
+            must_change_password INTEGER DEFAULT 0 CHECK(must_change_password IN (0, 1)),
             created_at TEXT DEFAULT (datetime('now', 'localtime')),
             updated_at TEXT DEFAULT (datetime('now', 'localtime')),
             last_login TEXT,
@@ -61,20 +62,18 @@ function migrateUserRoles() {
         `);
         console.log('✓ 新表 users_new 已創建');
 
-        // 2. 複製資料
-        if (columns.includes('salesperson_id')) {
-          db.exec(`
-            INSERT INTO users_new (id, username, password_hash, name, role, salesperson_id, is_active, created_at, updated_at, last_login)
-            SELECT id, username, password_hash, name, role, salesperson_id, is_active, created_at, updated_at, last_login
-            FROM users
-          `);
-        } else {
-          db.exec(`
-            INSERT INTO users_new (id, username, password_hash, name, role, is_active, created_at, updated_at, last_login)
-            SELECT id, username, password_hash, name, role, is_active, created_at, updated_at, last_login
-            FROM users
-          `);
-        }
+        // 2. 複製資料（依實際存在的欄位動態組出清單，避免日後新增欄位時被這裡的重建遺漏）
+        const copyColumns = ['id', 'username', 'password_hash', 'name', 'role'];
+        if (columns.includes('salesperson_id')) copyColumns.push('salesperson_id');
+        copyColumns.push('is_active');
+        if (columns.includes('must_change_password')) copyColumns.push('must_change_password');
+        copyColumns.push('created_at', 'updated_at', 'last_login');
+        const copyColumnList = copyColumns.join(', ');
+        db.exec(`
+          INSERT INTO users_new (${copyColumnList})
+          SELECT ${copyColumnList}
+          FROM users
+        `);
         console.log('✓ 資料已複製');
 
         // 3. 刪除舊表

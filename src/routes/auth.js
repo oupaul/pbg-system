@@ -5,7 +5,17 @@ const LoginHistory = require('../models/LoginHistory');
 const GeoIpService = require('../services/GeoIpService');
 const AuditLogService = require('../services/AuditLogService');
 const { getUserInfo } = require('../utils/authHelper');
-const { loginRateLimiter, resetOnSuccess } = require('../middleware/rateLimiter');
+const { loginRateLimiter, resetOnSuccess, accountLockedMinutes, recordAccountFailure, clearAccountFailures } = require('../middleware/rateLimiter');
+const { passwordFingerprint } = require('../middleware/auth');
+
+// 帳號不存在時也做一次等量的雜湊運算，避免從回應時間差判斷帳號是否存在
+let dummyHashPromise = null;
+function burnPasswordCheck(password) {
+  if (!dummyHashPromise) dummyHashPromise = User.hashPassword('timing-equalizer-not-a-real-password');
+  return dummyHashPromise.then(hash => User.verifyPassword(password, hash)).catch(() => false);
+}
+const LOGIN_FAIL_MESSAGE = '帳號或密碼錯誤';
+const PASSWORD_MIN_LENGTH = 10;
 
 // 只允許相對路徑重新導向，防止 open redirect
 function safeRedirect(redirect) {
@@ -65,13 +75,19 @@ router.post('/login', loginRateLimiter, async (req, res) => {
     return res.redirect(`/login?error=${encodeURIComponent('請輸入帳號和密碼')}&redirect=${encodeURIComponent(redirect)}`);
   }
 
+  // 帳號層級的失敗鎖定（連續失敗多次後暫時鎖定，不論帳號是否存在）
+  const lockedMinutes = accountLockedMinutes(username);
+  if (lockedMinutes > 0) {
+    return res.redirect(`/login?error=${encodeURIComponent(`登入失敗次數過多，此帳號已暫時鎖定，請 ${lockedMinutes} 分鐘後再試`)}&redirect=${encodeURIComponent(redirect)}`);
+  }
+
   // 查找用戶
-  console.log('[登入] 查找用戶:', username);
   const user = User.findByUsername(username);
   
   if (!user) {
-    console.log('[登入] 用戶不存在:', username);
-    return res.redirect(`/login?error=${encodeURIComponent('帳號或密碼錯誤')}&redirect=${encodeURIComponent(redirect)}`);
+    await burnPasswordCheck(password);
+    recordAccountFailure(username);
+    return res.redirect(`/login?error=${encodeURIComponent(LOGIN_FAIL_MESSAGE)}&redirect=${encodeURIComponent(redirect)}`);
   }
 
   console.log('[登入] 用戶找到，ID:', user.id, '啟用狀態:', user.is_active);
@@ -82,7 +98,8 @@ router.post('/login', loginRateLimiter, async (req, res) => {
   
   if (!passwordValid) {
     console.log('[登入] 密碼驗證失敗');
-    return res.redirect(`/login?error=${encodeURIComponent('帳號或密碼錯誤')}&redirect=${encodeURIComponent(redirect)}`);
+    recordAccountFailure(username);
+    return res.redirect(`/login?error=${encodeURIComponent(LOGIN_FAIL_MESSAGE)}&redirect=${encodeURIComponent(redirect)}`);
   }
 
   // 檢查帳號是否啟用
@@ -93,6 +110,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
 
   // 登入成功 — 清除速率限制計數
   resetOnSuccess(req.ip || req.connection.remoteAddress || 'unknown');
+  clearAccountFailures(username);
 
   // 記錄登入紀錄（失敗不影響登入流程本身）
   try {
@@ -103,24 +121,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
     console.error('[登入] 記錄登入紀錄失敗:', err);
   }
 
-  // 登入成功，設置 session
-  console.log('[登入] 登入成功，設置 session');
-  
-  // 獲取完整的用戶資訊（包含 salesperson_id）
-  // User 已經在檔案開頭引入，不需要重複引入
-  const fullUser = User.findById(user.id);
-  
-  req.session.user = {
-    id: user.id,
-    username: user.username,
-    name: user.name,
-    role: user.role,
-    salesperson_id: fullUser?.salesperson_id || null
-  };
-  
-  console.log('[登入] Session 設置完成，用戶:', req.session.user);
-
-  // 如果密碼是舊的 SHA256 格式，自動升級為 argon2id
+  // 如果密碼是舊的 SHA256 格式，自動升級為 argon2id（要在建立 session 前完成，session 內的密碼指紋才會是最終版本）
   const isOldSHA256 = user.password_hash && user.password_hash.length === 64 && /^[a-f0-9]{64}$/i.test(user.password_hash);
 
   if (isOldSHA256) {
@@ -134,15 +135,34 @@ router.post('/login', loginRateLimiter, async (req, res) => {
     }
   }
 
-  // 更新最後登入時間
-  User.updateLastLogin(user.id);
-  
-  console.log('[登入] 最後登入時間已更新');
-  console.log('[登入] 重定向到:', redirect);
-  console.log('[登入] Session 最終狀態:', req.session.user);
+  // 獲取完整的用戶資訊（包含 salesperson_id）與最新的密碼雜湊（用來產生 session 的密碼指紋）
+  const fullUser = User.findById(user.id);
+  const freshHash = require('../models/db').prepare('SELECT password_hash FROM users WHERE id = ?').get(user.id);
 
-  // 重定向到原始請求的頁面或首頁（已驗證為相對路徑）
-  res.redirect(redirect);
+  // 登入成功：換發新的 session ID（防止 session fixation），再寫入使用者資料
+  req.session.regenerate((regenErr) => {
+    if (regenErr) {
+      console.error('[登入] 重新產生 session 失敗:', regenErr);
+      return res.redirect(`/login?error=${encodeURIComponent('登入失敗，請稍後再試')}`);
+    }
+
+    req.session.user = {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      role: user.role,
+      salesperson_id: fullUser?.salesperson_id || null,
+      must_change_password: !!fullUser?.must_change_password,
+      pwv: passwordFingerprint(freshHash ? freshHash.password_hash : user.password_hash)
+    };
+    req.session.lastActivity = Date.now();
+
+    // 更新最後登入時間
+    User.updateLastLogin(user.id);
+
+    // 確保 session 已寫入再導向（已驗證為站內相對路徑）
+    req.session.save(() => res.redirect(redirect));
+  });
 });
 
 // 登出
@@ -155,14 +175,9 @@ router.post('/logout', (req, res) => {
   });
 });
 
-// 登出（GET 請求也支援）
+// 登出只接受 POST（GET 登出可被任意網頁用 <img src="/logout"> 強迫登出）；GET 一律導回首頁
 router.get('/logout', (req, res) => {
-  req.session.destroy((err) => {
-    if (err) {
-      console.error('登出時發生錯誤:', err);
-    }
-    res.redirect('/login');
-  });
+  res.redirect('/');
 });
 
 // 修改密碼頁面（需要登入）
@@ -170,7 +185,8 @@ router.get('/change-password', require('../middleware/auth').requireAuth, (req, 
   res.render('auth/change-password', {
     title: '修改密碼',
     error: req.query.error || '',
-    success: req.query.success || ''
+    success: req.query.success || '',
+    forced: !!req.session.user?.must_change_password
   });
 });
 
@@ -188,8 +204,8 @@ router.post('/change-password', require('../middleware/auth').requireAuth, async
     return res.redirect('/change-password?error=' + encodeURIComponent('新密碼與確認密碼不一致'));
   }
 
-  if (newPassword.length < 6) {
-    return res.redirect('/change-password?error=' + encodeURIComponent('新密碼長度至少需要 6 個字元'));
+  if (newPassword.length < PASSWORD_MIN_LENGTH) {
+    return res.redirect('/change-password?error=' + encodeURIComponent(`新密碼長度至少需要 ${PASSWORD_MIN_LENGTH} 個字元`));
   }
 
   // 取得當前用戶（使用原始查詢，不檢查 is_active）
@@ -214,16 +230,25 @@ router.post('/change-password', require('../middleware/auth').requireAuth, async
     
     const success = await User.updatePassword(userId, newPassword);
     console.log(`[修改密碼] 更新結果: ${success}`);
-    
+
     if (success) {
+      // 清除強制變更密碼旗標（若有的話），避免改完密碼還被導回這頁
+      User.clearMustChangePassword(userId);
+      if (req.session.user) {
+        req.session.user.must_change_password = false;
+        // 密碼雜湊已變，更新本 session 的密碼指紋（其他裝置的舊 session 會因指紋不符而失效）
+        const updated = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId);
+        if (updated) req.session.user.pwv = passwordFingerprint(updated.password_hash);
+      }
+
       // 記錄密碼變更到審計日誌
       if (oldUser) {
-        AuditLogService.logUpdate('users', userId, 
-          { password: '[舊密碼]' }, 
-          { password: '[已更新]' }, 
+        AuditLogService.logUpdate('users', userId,
+          { password: '[舊密碼]' },
+          { password: '[已更新]' },
           getUserInfo(req));
       }
-      
+
       res.redirect('/change-password?success=' + encodeURIComponent('密碼修改成功'));
     } else {
       // 如果 changes 為 0，可能是用戶不存在或 ID 不匹配

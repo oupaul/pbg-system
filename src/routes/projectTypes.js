@@ -134,17 +134,17 @@ router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
   }
   
   // 檢查是否有專案使用此類型，如果停用
-  if (is_active === '0' || is_active === 0) {
+  const active = (is_active === '1' || is_active === 1 || is_active === 'true') ? 1 : 0;
+  if (active === 0) {
     const projectsUsing = db.prepare('SELECT COUNT(*) as count FROM projects WHERE project_type = ?').get(existing.type_name);
     if (projectsUsing.count > 0) {
       return res.redirect('/project-types?error=' + encodeURIComponent(`無法停用：仍有 ${projectsUsing.count} 個專案使用此類型`));
     }
   }
-  
+
   try {
     const order = display_order ? parseInt(display_order, 10) : existing.display_order || 0;
     const color = badge_color || 'info';
-    const active = (is_active === '1' || is_active === 1 || is_active === 'true') ? 1 : 0;
     const showInDashboard = (show_in_dashboard === '1' || show_in_dashboard === 1 || show_in_dashboard === 'true') ? 1 : 0;
     const showSeparateDashboard = (show_separate_dashboard === '1' || show_separate_dashboard === 1 || show_separate_dashboard === 'true') ? 1 : 0;
     

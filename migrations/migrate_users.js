@@ -38,6 +38,7 @@ async function migrate() {
       name TEXT NOT NULL,
       role TEXT DEFAULT 'user' CHECK(role IN ('admin', 'user')),
       is_active INTEGER DEFAULT 1,
+      must_change_password INTEGER DEFAULT 0 CHECK(must_change_password IN (0, 1)),
       created_at TEXT DEFAULT (datetime('now', 'localtime')),
       updated_at TEXT DEFAULT (datetime('now', 'localtime')),
       last_login TEXT
@@ -67,14 +68,14 @@ async function migrate() {
     }
     
     db.run(`
-      INSERT INTO users (username, password_hash, name, role, is_active)
-      VALUES (?, ?, ?, ?, ?)
-    `, ['admin', passwordHash, '系統管理員', 'admin', 1]);
-    
+      INSERT INTO users (username, password_hash, name, role, is_active, must_change_password)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, ['admin', passwordHash, '系統管理員', 'admin', 1, 1]);
+
     console.log('✓ 創建預設管理員帳號：');
     console.log('  帳號：admin');
     console.log('  密碼：admin123');
-    console.log('  ⚠️  請在首次登入後立即修改密碼！');
+    console.log('  ⚠️  已標記為必須在首次登入後立即修改密碼！');
   }
 
   // 儲存資料庫

@@ -46,6 +46,7 @@ function migrateRemoveUserRoleCheck() {
             role TEXT DEFAULT 'user',
             salesperson_id INTEGER,
             is_active INTEGER DEFAULT 1,
+            must_change_password INTEGER DEFAULT 0 CHECK(must_change_password IN (0, 1)),
             created_at TEXT DEFAULT (datetime('now', 'localtime')),
             updated_at TEXT DEFAULT (datetime('now', 'localtime')),
             last_login TEXT,

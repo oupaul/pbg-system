@@ -7,7 +7,7 @@ const db = require('../models/db');
 const { getUserInfo } = require('../utils/authHelper');
 const safeRedirect = require('../utils/safeRedirect');
 const { requireEditPermission } = require('../middleware/auth');
-const { requireProjectScopeFromBody, requireProjectScopeFromRecord, userCanAccessProject } = require('../utils/projectScope');
+const { requireProjectScopeFromBody, requireProjectScopeFromRecord, userCanAccessProject, getVisibleSalespersonIds } = require('../utils/projectScope');
 
 // 寫入獎金需要編輯權限，且操作的專案必須在使用者的專案範圍內
 const bonusScope = requireProjectScopeFromRecord(id => Bonus.findById(id));
@@ -21,25 +21,41 @@ router.get('/', (req, res) => {
   const sortBy = req.query.sortBy || 'salesperson_name';
   const sortOrder = req.query.sortOrder || 'ASC';
 
-  // 角色過濾邏輯
+  // 角色過濾邏輯：依專案檢視範圍限制可看到的業務（自己／指派／無；預設拒絕）
+  const visibleIds = getVisibleSalespersonIds(req.user); // null = 不限制
   let salespersonFilter = '';
   let filterParams = [selectedYear];
-  
-  if (req.user && req.user.project_view_scope === 'own' && req.user.salesperson_id) {
-    // 業務員只能看到自己的獎金
-    salespersonFilter = ' AND b.salesperson_id = ?';
-    filterParams.push(req.user.salesperson_id);
+
+  if (visibleIds !== null) {
+    salespersonFilter = visibleIds.length
+      ? ` AND b.salesperson_id IN (${visibleIds.map(() => '?').join(',')})`
+      : ' AND 1=0';
+    filterParams.push(...visibleIds);
   }
 
-  // 獎金統計
-  const stats = req.user && req.user.project_view_scope === 'own' && req.user.salesperson_id
-    ? Bonus.getStatisticsBySalesperson(selectedYear, req.user.salesperson_id)
-    : Bonus.getStatistics(selectedYear);
-  
+  // 獎金統計（有範圍限制時逐一業務查詢後依獎金類型合併）
+  let stats;
+  if (visibleIds === null) {
+    stats = Bonus.getStatistics(selectedYear);
+  } else {
+    const merged = {};
+    visibleIds.forEach(id => {
+      Bonus.getStatisticsBySalesperson(selectedYear, id).forEach(r => {
+        const m = merged[r.bonus_type] || (merged[r.bonus_type] = { bonus_type: r.bonus_type, count: 0, total_amount: 0, paid_amount: 0, pending_amount: 0, forfeited_amount: 0 });
+        m.count += r.count || 0;
+        m.total_amount += r.total_amount || 0;
+        m.paid_amount += r.paid_amount || 0;
+        m.pending_amount += r.pending_amount || 0;
+        m.forfeited_amount += r.forfeited_amount || 0;
+      });
+    });
+    stats = Object.values(merged);
+  }
+
   // 業務獎金彙總
-  const salespersonSummary = req.user && req.user.project_view_scope === 'own' && req.user.salesperson_id
-    ? Bonus.getSalespersonSummary(selectedYear).filter(s => s.salesperson_id === req.user.salesperson_id)
-    : Bonus.getSalespersonSummary(selectedYear);
+  const salespersonSummary = visibleIds === null
+    ? Bonus.getSalespersonSummary(selectedYear)
+    : Bonus.getSalespersonSummary(selectedYear).filter(s => visibleIds.includes(s.id));
 
   // 允許的排序欄位
   const allowedSortFields = {

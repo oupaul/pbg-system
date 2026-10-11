@@ -48,7 +48,23 @@ function requireNumericParam(param = 'id') {
   };
 }
 
+// 使用者可看到哪些業務的資料：null 代表不限制（範圍為「全部」）；陣列代表只限這些業務（可能是空陣列＝都看不到）。
+// 預設拒絕：範圍為「自己」但沒綁定業務、範圍為「指派」但沒有指派任何人，都回傳空陣列。
+function getVisibleSalespersonIds(user) {
+  if (!user) return [];
+  const scope = user.project_view_scope || 'all';
+  if (scope === 'all') return null;
+  if (scope === 'own') return user.salesperson_id ? [user.salesperson_id] : [];
+  if (scope === 'assigned') {
+    try {
+      return db.prepare('SELECT salesperson_id FROM user_salesperson_access WHERE user_id = ?').all(user.id).map(r => r.salesperson_id);
+    } catch { return []; }
+  }
+  return [];
+}
+
 module.exports = {
+  getVisibleSalespersonIds,
   userCanAccessProject,
   requireProjectScopeFromBody,
   requireProjectScopeFromParam,
