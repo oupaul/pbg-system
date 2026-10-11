@@ -1,6 +1,6 @@
 <%
   function escapeHtml(str) {
-    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return (str || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 %>
 <%- include('../layout', { body: `
@@ -53,8 +53,8 @@ ${success ? `
             return `
             <tr>
               <td><span class="badge bg-secondary">${targetLabels[r.target_type] || r.target_type}</span></td>
-              <td>${r.target_link ? '<a href="' + r.target_link + '" target="_blank">' + (r.target_summary || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + ' <i class="bi bi-box-arrow-up-right small"></i></a>' : (r.target_summary || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
-              <td>${r.requested_by_name || '-'}</td>
+              <td>${r.target_link ? '<a href="' + r.target_link + '" target="_blank">' + (r.target_summary || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;') + ' <i class="bi bi-box-arrow-up-right small"></i></a>' : (r.target_summary || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}</td>
+              <td>${escapeHtml(r.requested_by_name || '-')}</td>
               <td>${r.requested_at}</td>
               ${stepCell}
               <td class="text-end">
@@ -86,7 +86,7 @@ ${(requests || []).map(r => `
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            <p class="mb-2">${(r.target_summary || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+            <p class="mb-2">${(r.target_summary || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}</p>
             <label class="form-label">駁回原因（選填，會留給申請人參考）</label>
             <textarea name="review_note" class="form-control" rows="3"></textarea>
           </div>

@@ -56,14 +56,14 @@ ${payments.length === 0 ? `
           ${payments.map(p => `
             <tr>
               <td>${p.payment_date || '-'}</td>
-              <td><code>${p.project_code || '-'}</code></td>
-              <td>${p.project_name || '-'}</td>
+              <td><code>${escapeHtml(p.project_code || '-')}</code></td>
+              <td>${escapeHtml(p.project_name || '-')}</td>
               <td>
-                <span class="badge bg-${typeColorMap[p.project_type] || 'info'}">${p.project_type || '-'}</span>
+                <span class="badge bg-${typeColorMap[p.project_type] || 'info'}">${escapeHtml(p.project_type || '-')}</span>
               </td>
-              <td>${p.company_name || '-'}${p.customer_code ? ' (' + p.customer_code + ')' : ''}</td>
-              <td>${p.salesperson_name || '-'}</td>
-              <td><code>${p.invoice_number || '-'}</code></td>
+              <td>${escapeHtml(p.company_name || '-')}${p.customer_code ? ' (' + escapeHtml(p.customer_code) + ')' : ''}</td>
+              <td>${escapeHtml(p.salesperson_name || '-')}</td>
+              <td><code>${escapeHtml(p.invoice_number || '-')}</code></td>
               <td class="text-end fw-bold text-success">
                 ${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(p.bank_deposit_amount || 0).toLocaleString()}
               </td>
@@ -73,7 +73,7 @@ ${payments.length === 0 ? `
                   ${p.difference_type ? '<br><small class="text-muted">' + p.difference_type + '</small>' : ''}
                 ` : '-'}
               </td>
-              <td>${p.notes || '-'}</td>
+              <td>${escapeHtml(p.notes || '-')}</td>
               <td>
                 <a href="/projects/${p.project_id}" class="btn btn-sm btn-outline-primary">
                   <i class="bi bi-arrow-right"></i> 查看專案

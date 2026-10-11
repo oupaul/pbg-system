@@ -1,6 +1,6 @@
 <%
   function escapeHtml(str) {
-    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return (str || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
   const localRoles = roles || [];
 %>
@@ -76,7 +76,7 @@ ${localRoles.length === 0 ? `
                   <input type="hidden" name="direction" value="down">
                   <button type="submit" class="btn btn-sm btn-outline-secondary" ${idx === steps.length - 1 ? 'disabled' : ''} title="下移"><i class="bi bi-arrow-down"></i></button>
                 </form>
-                <button type="button" class="btn btn-sm btn-outline-primary" onclick="editStep(${s.id}, '${type}', '${s.role_key}', '${escapeHtml(s.step_name || '').replace(/'/g, "\\'")}', ${s.is_active})">
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="editStep(${s.id}, '${type}', '${s.role_key}', '${jsAttr(s.step_name || '')}', ${s.is_active})">
                   <i class="bi bi-pencil"></i>
                 </button>
                 <form action="/approval-chains/delete/${s.id}" method="POST" style="display:inline" onsubmit="return confirm('確定要刪除此關卡？')">

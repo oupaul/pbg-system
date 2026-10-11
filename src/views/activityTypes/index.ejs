@@ -1,6 +1,6 @@
 <%
   function escapeHtml(str) {
-    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return (str || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
   const badgeColors = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark'];
   const colorNames = {
@@ -62,7 +62,7 @@ ${success ? `
               <td>${badgePreview} <small class="text-muted">(${colorDescription})</small></td>
               <td>${t.is_active === 1 ? '<span class="badge bg-success">啟用</span>' : '<span class="badge bg-secondary">停用</span>'}</td>
               <td>
-                <button type="button" class="btn btn-sm btn-outline-primary" onclick="editType(${t.id}, '${escapeHtml(t.type_name).replace(/'/g, "\\'")}', '${t.badge_color}', ${t.display_order}, ${t.is_active})">
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="editType(${t.id}, '${jsAttr(t.type_name)}', '${t.badge_color}', ${t.display_order}, ${t.is_active})">
                   <i class="bi bi-pencil"></i> 編輯
                 </button>
                 <form action="/activity-types/delete/${t.id}" method="POST" style="display:inline" onsubmit="return confirm('確定要刪除此活動類型？\\n\\n注意：如果有活動紀錄使用此類型，將無法刪除。')">

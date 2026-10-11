@@ -34,32 +34,16 @@ module.exports = function(upload) {
     const years = Project.getYears();
     let result = null;
     
-    // 安全地解析結果參數
-    if (req.query.result) {
-      try {
-        const decoded = decodeURIComponent(req.query.result);
-        result = JSON.parse(decoded);
-      } catch (parseErr) {
-        console.error('解析匯入結果失敗:', parseErr.message);
-        console.error('原始參數:', req.query.result?.substring(0, 100));
-        // 解析失敗時，嘗試從 error 參數取得錯誤訊息
-        if (req.query.error) {
-          result = {
-            success: false,
-            error: decodeURIComponent(req.query.error)
-          };
-        } else {
-          result = {
-            success: false,
-            error: '匯入結果解析失敗，但匯入可能已成功完成'
-          };
-        }
-      }
+    // 匯入結果改放 session（一次性顯示後即清除），不再從網址參數解析 JSON：
+    // 網址參數可被任何人偽造成惡意內容，且匯入結果可能含 Excel 內容
+    if (req.session && req.session.importResult) {
+      result = req.session.importResult;
+      delete req.session.importResult;
     } else if (req.query.error) {
       // 如果有 error 參數，建立錯誤結果
       result = {
         success: false,
-        error: decodeURIComponent(req.query.error)
+        error: String(req.query.error)
       };
     }
 
@@ -150,7 +134,8 @@ module.exports = function(upload) {
       if (resultStr.length > 2000) {
         resultStr = encodeURIComponent(JSON.stringify({ ...limitedResult, errors: limitedResult.errors.slice(0, 8) }));
       }
-      res.redirect('/import-export?result=' + resultStr);
+      req.session.importResult = limitedResult;
+      res.redirect('/import-export');
     } catch (err) {
       console.error('成本明細批次匯入錯誤:', err);
       cleanup();
@@ -257,7 +242,8 @@ module.exports = function(upload) {
           resultStr = encodeURIComponent(JSON.stringify(simplifiedResult));
         }
         
-        res.redirect('/import-export?result=' + resultStr);
+        req.session.importResult = limitedResult;
+      res.redirect('/import-export');
       } catch (redirectErr) {
         console.error('重定向錯誤:', redirectErr);
         console.error('錯誤堆疊:', redirectErr.stack);

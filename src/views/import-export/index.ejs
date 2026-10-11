@@ -1,6 +1,6 @@
 <%
   function escapeHtml(str) {
-    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return (str || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 %>
 <%- include('../layout', { body: `
@@ -32,12 +32,12 @@ ${result ? `
         ${result.results.duplicates ? `<li class="text-muted">略過已存在的重複資料（發票/收款/獎金/成本）: ${result.results.duplicates} 筆</li>` : ''}
       </ul>
       `}
-      ${result.warning ? `<p class="mb-0 mt-2 text-warning"><strong>${result.warning}</strong></p>` : ''}
+      ${result.warning ? `<p class="mb-0 mt-2 text-warning"><strong>${escapeHtml(result.warning)}</strong></p>` : ''}
       ${result.errorCount > 0 ? `
         <details class="mt-2">
           <summary class="text-danger cursor-pointer">查看錯誤詳情 (${result.errorCount} 個錯誤)</summary>
           <ul class="mt-2 mb-0 small">
-            ${result.errors.slice(0, 20).map(err => `<li>${err.message || err}</li>`).join('')}
+            ${result.errors.slice(0, 20).map(err => `<li>${escapeHtml(err.message || err)}</li>`).join('')}
             ${result.errors.length > 20 ? `<li>... 還有 ${result.errors.length - 20} 個錯誤</li>` : ''}
           </ul>
         </details>
@@ -47,7 +47,7 @@ ${result ? `
         <details class="mt-2">
           <summary>查看錯誤詳情</summary>
           <ul class="mt-2 mb-0 small">
-            ${result.errors.slice(0, 10).map(err => `<li>${err.message || err}</li>`).join('')}
+            ${result.errors.slice(0, 10).map(err => `<li>${escapeHtml(err.message || err)}</li>`).join('')}
           </ul>
         </details>
       ` : ''}

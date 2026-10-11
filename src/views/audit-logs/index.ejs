@@ -132,7 +132,7 @@
                     </div>
                   ` : ''}
                 </td>
-                <td>${log.user_info || '-'}</td>
+                <td>${escapeHtml(log.user_info || '-')}</td>
               </tr>
             `).join('')}
           </tbody>

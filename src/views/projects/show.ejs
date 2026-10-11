@@ -56,7 +56,7 @@ ${typeof error !== 'undefined' && error ? '<div class="alert alert-danger alert-
               <ul class="list-unstyled mb-0 small">
                 ${attachments.map(a => {
                   const isDeleted = !!a.deleted_at;
-                  const fullName = (a.original_filename || '').replace(/</g, '&lt;');
+                  const fullName = escapeHtml(a.original_filename || '');
                   const displayName = fullName.length > 18 ? fullName.substring(0, 18) + '…' : fullName;
                   const isPDF = (a.mime_type === 'application/pdf') || (fullName.toLowerCase().endsWith('.pdf'));
                   const linkTarget = isPDF ? ' target="_blank"' : '';
@@ -232,7 +232,7 @@ ${locals.canEdit ? `
 <script>
 // 套用獎金級距：依選擇的級距比例/成本扣除率重新算出計算基礎與獎金金額
 function applyBonusTier(select) {
-  const priceWithoutTax = ${JSON.stringify(project.price_without_tax || 0)};
+  const priceWithoutTax = ${jsonForScript(project.price_without_tax || 0)};
   const option = select.options[select.selectedIndex];
   const baseInput = document.getElementById('bonusBaseAmount');
   const percentageInput = document.getElementById('bonusPercentage');
@@ -707,8 +707,8 @@ ${locals.canEdit ? `
               <td class="text-end fw-bold">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(b.bonus_amount || 0).toLocaleString()}</td>
               <td>${b.payment_date || '-'}</td>
               <td>
-                <span class="badge bg-${b.status === '已發放' ? 'success' : b.status === '充公' ? 'danger' : 'warning'}">${b.status}</span>
-                ${b.forfeiture_reason ? '<br><small class="text-muted">' + b.forfeiture_reason + '</small>' : ''}
+                <span class="badge bg-${b.status === '已發放' ? 'success' : b.status === '充公' ? 'danger' : 'warning'}">${escapeHtml(b.status)}</span>
+                ${b.forfeiture_reason ? '<br><small class="text-muted">' + escapeHtml(b.forfeiture_reason) + '</small>' : ''}
               </td>
               <td class="text-end">
                 ${locals.canEdit ? '<button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editBonusModal' + b.id + '"><i class="bi bi-pencil"></i></button>' : ''}
@@ -846,7 +846,7 @@ ${locals.canEdit ? `
               <option value="">-- 選擇發票 --</option>
               ${(typeof invoiceUnpaidSummary !== 'undefined' ? invoiceUnpaidSummary : []).filter(s => s.isValid !== false).map(s => {
                 const unpaidLabel = s.unpaid > 0 ? `，未收 ${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${s.unpaid.toLocaleString()}` : '，已收齊';
-                return `<option value="${s.invoice_id}">${s.invoice_number} (總額 ${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${s.amount.toLocaleString()}${unpaidLabel})</option>`;
+                return `<option value="${s.invoice_id}">${escapeHtml(s.invoice_number)} (總額 ${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${s.amount.toLocaleString()}${unpaidLabel})</option>`;
               }).join('')}
             </select>
             <small class="text-muted d-block mt-1">支援一筆發票分多次收款，可重複選擇同一發票</small>
@@ -924,8 +924,8 @@ ${locals.canEdit ? `
             <select name="vendor_id" class="form-select">
               <option value="">-- 不指定廠商 --</option>
               ${typeof vendors !== 'undefined' && vendors ? vendors.map(v => {
-                const companyName = (v.company_name || '').replace(/"/g, '&quot;');
-                const customerCode = (v.customer_code || '').replace(/"/g, '&quot;');
+                const companyName = escapeHtml(v.company_name);
+                const customerCode = escapeHtml(v.customer_code);
                 return '<option value="' + v.id + '">' + companyName + ' (' + customerCode + ')</option>';
               }).join('') : ''}
             </select>
@@ -1015,8 +1015,8 @@ ${typeof costs !== 'undefined' && costs.length ? costs.map(cost => `
             <select name="vendor_id" class="form-select">
               <option value="">-- 不指定廠商 --</option>
               ${typeof vendors !== 'undefined' && vendors ? vendors.map(v => {
-                const companyName = (v.company_name || '').replace(/"/g, '&quot;');
-                const customerCode = (v.customer_code || '').replace(/"/g, '&quot;');
+                const companyName = escapeHtml(v.company_name);
+                const customerCode = escapeHtml(v.customer_code);
                 const selected = cost.vendor_id == v.id ? 'selected' : '';
                 return '<option value="' + v.id + '" ' + selected + '>' + companyName + ' (' + customerCode + ')</option>';
               }).join('') : ''}
@@ -1053,7 +1053,7 @@ ${typeof costs !== 'undefined' && costs.length ? costs.map(cost => `
           </div>
           <div class="mb-3">
             <label class="form-label">備註</label>
-            <textarea name="notes" class="form-control" rows="2">${cost.notes || ''}</textarea>
+            <textarea name="notes" class="form-control" rows="2">${escapeHtml(cost.notes || '')}</textarea>
           </div>
         </div>
         <div class="modal-footer">
@@ -1084,7 +1084,7 @@ ${locals.canEdit ? `
             <select name="bonus_type" class="form-select" required>
               <option value="">-- 選擇類型 --</option>
               ${typeof bonusTypes !== 'undefined' && bonusTypes ? bonusTypes.map(t => {
-                const safeName = (t.type_name || '').replace(/"/g, '&quot;');
+                const safeName = escapeHtml(t.type_name);
                 return '<option value="' + safeName + '">' + h(t.type_name) + '</option>';
               }).join('') : ''}
             </select>
@@ -1151,7 +1151,7 @@ ${invoices.map(inv => `
           </div>
           <div class="mb-3">
             <label class="form-label">發票號碼</label>
-            <input type="text" name="invoice_number" class="form-control" value="${inv.invoice_number || ''}" placeholder="XX12345678">
+            <input type="text" name="invoice_number" class="form-control" value="${escapeHtml(inv.invoice_number || '')}" placeholder="XX12345678">
           </div>
           <div class="mb-3">
             <label class="form-label">預計收款日</label>
@@ -1195,7 +1195,7 @@ ${payments.map(pay => `
                 const isCurrent = s.invoice_id == pay.invoice_id;
                 const unpaidLabel = s.unpaid > 0 ? `，未收 ${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${s.unpaid.toLocaleString()}` : '，已收齊';
                 const suffix = !s.isValid ? ' (已作廢/折讓)' : '';
-                return `<option value="${s.invoice_id}" ${isCurrent ? 'selected' : ''}>${s.invoice_number} (總額 ${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${s.amount.toLocaleString()}${unpaidLabel})${suffix}</option>`;
+                return `<option value="${s.invoice_id}" ${isCurrent ? 'selected' : ''}>${escapeHtml(s.invoice_number)} (總額 ${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${s.amount.toLocaleString()}${unpaidLabel})${suffix}</option>`;
               }).join('')}
             </select>
           </div>
@@ -1218,7 +1218,7 @@ ${payments.map(pay => `
           </div>
           <div class="mb-3">
             <label class="form-label">備註</label>
-            <textarea name="notes" class="form-control" rows="2">${pay.notes || ''}</textarea>
+            <textarea name="notes" class="form-control" rows="2">${escapeHtml(pay.notes || '')}</textarea>
           </div>
         </div>
         <div class="modal-footer">
@@ -1275,7 +1275,7 @@ ${bonuses.map(b => `
           </div>
           <div class="mb-3">
             <label class="form-label">充公原因</label>
-            <textarea name="forfeiture_reason" class="form-control" rows="2">${b.forfeiture_reason || ''}</textarea>
+            <textarea name="forfeiture_reason" class="form-control" rows="2">${escapeHtml(b.forfeiture_reason || '')}</textarea>
             <small class="text-muted">僅在狀態為「充公」時填寫</small>
           </div>
         </div>

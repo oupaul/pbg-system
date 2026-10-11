@@ -172,7 +172,7 @@ router.get('/', (req, res) => {
     unpaid: req.query.unpaid === 'true' || req.query.unpaid === true,
     overdue_unpaid: req.query.overdue_unpaid === 'true' || req.query.overdue_unpaid === true,
     completed: req.query.completed === 'true' || req.query.completed === true,
-    invoice_year: req.query.invoice_year || null, // 發票年度篩選
+    invoice_year: /^\d{4}$/.test(String(req.query.invoice_year || '')) ? String(req.query.invoice_year) : null, // 發票年度篩選（只接受 4 位數年份，避免反射到頁面）
     sortBy: req.query.sortBy || 'contract_year',
     sortOrder: req.query.sortOrder || 'DESC'
   };
@@ -337,7 +337,7 @@ router.get('/invoice-detail', (req, res) => {
     unpaid: req.query.unpaid === 'true',
     overdue_unpaid: req.query.overdue_unpaid === 'true',
     completed: req.query.completed === 'true',
-    invoice_year: req.query.invoice_year || null,
+    invoice_year: /^\d{4}$/.test(String(req.query.invoice_year || '')) ? String(req.query.invoice_year) : null,
     sortBy: 'contract_year',
     sortOrder: 'DESC'
   };
@@ -546,8 +546,19 @@ router.get('/:id/attachments/:attachmentId/download', (req, res) => {
     if (!fs.existsSync(filePath)) return res.status(404).send('檔案不存在');
     const name = encodeURIComponent(row.original_filename).replace(/'/g, '%27');
     const mimeType = row.mime_type || 'application/octet-stream';
-    const isPDF = mimeType === 'application/pdf';
-    res.setHeader('Content-Type', mimeType);
+    // 只有「宣稱是 PDF 且檔頭確實是 %PDF-」才 inline 預覽，其餘一律強制下載（避免上傳偽裝檔案在站內被瀏覽器執行）
+    let isPDF = false;
+    if (mimeType === 'application/pdf') {
+      try {
+        const fd = fs.openSync(filePath, 'r');
+        const head = Buffer.alloc(5);
+        fs.readSync(fd, head, 0, 5, 0);
+        fs.closeSync(fd);
+        isPDF = head.toString('latin1') === '%PDF-';
+      } catch (e) { isPDF = false; }
+    }
+    res.setHeader('Content-Type', isPDF ? 'application/pdf' : (mimeType === 'application/pdf' ? 'application/octet-stream' : mimeType));
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     // PDF 使用 inline 預覽，其他檔案使用 attachment 下載
     res.setHeader('Content-Disposition', `${isPDF ? 'inline' : 'attachment'}; filename*=UTF-8''${name}`);
     res.sendFile(path.resolve(filePath));

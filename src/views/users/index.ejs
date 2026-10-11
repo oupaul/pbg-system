@@ -1,6 +1,6 @@
 <%
   function escapeHtml(str) {
-    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return (str || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 %>
 <%- include('../layout', { title: '使用者管理', body: `
@@ -52,8 +52,8 @@ ${success ? `
             ${users.map(user => `
               <tr>
                 <td>${user.id}</td>
-                <td><code>${user.username}</code></td>
-                <td>${user.name}</td>
+                <td><code>${escapeHtml(user.username)}</code></td>
+                <td>${escapeHtml(user.name)}</td>
                 <td>
                   ${(() => {
                     const roleName = typeof rolesMap !== 'undefined' && rolesMap[user.role] ? rolesMap[user.role] : user.role;
@@ -65,7 +65,7 @@ ${success ? `
                   })()}
                 </td>
                 <td>
-                  ${user.salesperson_name ? '<span class="badge bg-light text-dark">' + user.salesperson_name + '</span>' : '-'}
+                  ${user.salesperson_name ? '<span class="badge bg-light text-dark">' + escapeHtml(user.salesperson_name) + '</span>' : '-'}
                 </td>
                 <td>
                   ${user.is_active ? `

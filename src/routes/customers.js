@@ -51,14 +51,11 @@ router.get('/', (req, res) => {
     // 廠商類型篩選（個人/公司，僅在篩選廠商時有意義）
     const vendorTypeFilter = req.query.vendor_type || '';
 
-    // 批次匯入結果（比照 import-export 頁面的做法，塞在 query string 裡導回本頁顯示）
+    // 批次匯入結果放在 session，顯示一次後清除（不從網址參數解析，避免被偽造內容）
     let importResult = null;
-    if (req.query.importResult) {
-      try {
-        importResult = JSON.parse(decodeURIComponent(req.query.importResult));
-      } catch (parseErr) {
-        console.error('解析客戶批次匯入結果失敗:', parseErr.message);
-      }
+    if (req.session && req.session.importResult) {
+      importResult = req.session.importResult;
+      delete req.session.importResult;
     }
 
     // 客戶/廠商資料對所有登入者開放（僅專案依權限範圍過濾），根據是否有搜尋關鍵字決定使用哪個方法
@@ -289,7 +286,8 @@ router.post('/import', requireAdmin, customerImportUpload.single('file'), async 
     if (resultStr.length > 2000) {
       resultStr = encodeURIComponent(JSON.stringify({ ...limitedResult, errors: limitedResult.errors.slice(0, 10) }));
     }
-    res.redirect('/customers?importResult=' + resultStr);
+    req.session.importResult = limitedResult;
+    res.redirect('/customers');
   } catch (err) {
     console.error('客戶批次匯入錯誤:', err);
     if (filePath && fs.existsSync(filePath)) {
@@ -354,7 +352,8 @@ router.post('/import-activities', requireAdmin, customerImportUpload.single('fil
         ...limitedResult, errors: limitedResult.errors.slice(0, 8), warnings: limitedResult.warnings.slice(0, 5), createdTypes: limitedResult.createdTypes.slice(0, 10)
       }));
     }
-    res.redirect('/customers?importResult=' + resultStr);
+    req.session.importResult = limitedResult;
+    res.redirect('/customers');
   } catch (err) {
     console.error('活動紀錄批次匯入錯誤:', err);
     if (filePath && fs.existsSync(filePath)) {

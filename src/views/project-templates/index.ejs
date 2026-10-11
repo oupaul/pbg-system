@@ -31,10 +31,10 @@ ${typeof error !== 'undefined' && error ? '<div class="alert alert-danger alert-
         <tbody>
           ${templates.map(t => `
             <tr>
-              <td><strong>${(t.name || '').replace(/</g, '&lt;')}</strong>${t.description ? '<br><small class="text-muted">' + (t.description || '').replace(/</g, '&lt;') + '</small>' : ''}</td>
-              <td>${t.project_type || '-'}</td>
-              <td>${t.salesperson_name || '-'}</td>
-              <td>${t.customer_name || '-'}</td>
+              <td><strong>${escapeHtml(t.name || '')}</strong>${t.description ? '<br><small class="text-muted">' + escapeHtml(t.description || '') + '</small>' : ''}</td>
+              <td>${escapeHtml(t.project_type || '-')}</td>
+              <td>${escapeHtml(t.salesperson_name || '-')}</td>
+              <td>${escapeHtml(t.customer_name || '-')}</td>
               <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(t.price_with_tax || 0).toLocaleString()}</td>
               <td class="text-end">
                 <a href="/projects/new?from_template=${t.id}" class="btn btn-sm btn-success"><i class="bi bi-plus-circle"></i> 從此建立專案</a>

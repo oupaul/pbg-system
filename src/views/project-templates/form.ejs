@@ -16,11 +16,11 @@ ${typeof error !== 'undefined' && error ? '<div class="alert alert-danger mb-4">
       <div class="row g-3">
         <div class="col-md-6">
           <label class="form-label">範本名稱 <span class="text-danger">*</span></label>
-          <input type="text" name="name" class="form-control" value="${template ? (template.name || '').replace(/"/g, '&quot;') : ''}" required>
+          <input type="text" name="name" class="form-control" value="${template ? escapeHtml(template.name) : ''}" required>
         </div>
         <div class="col-md-6">
           <label class="form-label">說明（選填）</label>
-          <input type="text" name="description" class="form-control" value="${template ? (template.description || '').replace(/"/g, '&quot;') : ''}" placeholder="例如：常態型專案範本">
+          <input type="text" name="description" class="form-control" value="${template ? escapeHtml(template.description) : ''}" placeholder="例如：常態型專案範本">
         </div>
         <div class="col-md-4">
           <label class="form-label">專案類型</label>
@@ -28,7 +28,7 @@ ${typeof error !== 'undefined' && error ? '<div class="alert alert-danger mb-4">
             <option value="">-- 選擇類型 --</option>
             ${typeof projectTypes !== 'undefined' && projectTypes ? projectTypes.map(type => {
               const selected = template && template.project_type === type.type_name ? 'selected' : '';
-              return '<option value="' + type.type_name + '" ' + selected + '>' + type.type_name + '</option>';
+              return '<option value="' + escapeHtml(type.type_name) + '" ' + selected + '>' + escapeHtml(type.type_name) + '</option>';
             }).join('') : '<option value="食驗室">食驗室</option><option value="純廣">純廣</option><option value="專案">專案</option>'}
           </select>
         </div>
@@ -36,19 +36,19 @@ ${typeof error !== 'undefined' && error ? '<div class="alert alert-danger mb-4">
           <label class="form-label">業務人員</label>
           <select name="salesperson_id" class="form-select">
             <option value="">-- 選擇業務 --</option>
-            ${(salespeople || []).map(s => { const selected = template && template.salesperson_id == s.id ? 'selected' : ''; return '<option value="' + s.id + '" ' + selected + '>' + (s.name || '').replace(/"/g, '&quot;') + '</option>'; }).join('')}
+            ${(salespeople || []).map(s => { const selected = template && template.salesperson_id == s.id ? 'selected' : ''; return '<option value="' + s.id + '" ' + selected + '>' + escapeHtml(s.name) + '</option>'; }).join('')}
           </select>
         </div>
         <div class="col-md-4">
           <label class="form-label">客戶</label>
           <select name="customer_id" class="form-select">
             <option value="">-- 選擇客戶 --</option>
-            ${(customers || []).map(c => { const selected = template && template.customer_id == c.id ? 'selected' : ''; return '<option value="' + c.id + '" ' + selected + '>' + (c.company_name || '').replace(/"/g, '&quot;') + ' (' + (c.customer_code || '') + ')</option>'; }).join('')}
+            ${(customers || []).map(c => { const selected = template && template.customer_id == c.id ? 'selected' : ''; return '<option value="' + c.id + '" ' + selected + '>' + escapeHtml(c.company_name) + ' (' + escapeHtml(c.customer_code || '') + ')</option>'; }).join('')}
           </select>
         </div>
         <div class="col-12">
           <label class="form-label">專案名稱（預設）</label>
-          <input type="text" name="project_name" class="form-control" value="${template ? (template.project_name || '').replace(/"/g, '&quot;') : ''}" placeholder="從範本建立專案時可帶入">
+          <input type="text" name="project_name" class="form-control" value="${template ? escapeHtml(template.project_name) : ''}" placeholder="從範本建立專案時可帶入">
         </div>
         <div class="col-md-3">
           <label class="form-label">新客戶</label>
@@ -71,7 +71,7 @@ ${typeof error !== 'undefined' && error ? '<div class="alert alert-danger mb-4">
         </div>
         <div class="col-12">
           <label class="form-label">備註</label>
-          <textarea name="notes" class="form-control" rows="2">${template ? (template.notes || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</textarea>
+          <textarea name="notes" class="form-control" rows="2">${template ? (template.notes || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;') : ''}</textarea>
         </div>
       </div>
       <hr class="my-4">

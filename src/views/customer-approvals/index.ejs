@@ -1,7 +1,7 @@
 <%
   const WIN_PROBABILITY_STAGES = typeof winProbabilityStages !== 'undefined' ? winProbabilityStages : [];
   function escapeHtml(str) {
-    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return (str || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 %>
 <%- include('../layout', { body: `
@@ -61,11 +61,11 @@ ${success ? `
                 ${r.vendor_type ? '<span class="badge bg-secondary">' + r.vendor_type + '</span>' : ''}
                 ${r.pipeline_opportunity_name ? '<span class="badge bg-warning text-dark d-block mt-1"><i class="bi bi-bullseye"></i> 含銷售機會</span>' : ''}
               </td>
-              <td>${(r.company_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
-              <td><code>${r.customer_code}</code>${r.tax_id ? ' / ' + r.tax_id : ''}</td>
-              <td>${r.owner_salesperson_name || '-'}</td>
-              <td>${r.contact_name || '-'}</td>
-              <td>${r.requested_by_name || '-'}</td>
+              <td>${(r.company_name || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}</td>
+              <td><code>${escapeHtml(r.customer_code)}</code>${r.tax_id ? ' / ' + r.tax_id : ''}</td>
+              <td>${escapeHtml(r.owner_salesperson_name || '-')}</td>
+              <td>${escapeHtml(r.contact_name || '-')}</td>
+              <td>${escapeHtml(r.requested_by_name || '-')}</td>
               <td>${r.requested_at}</td>
               ${stepCell}
               <td class="text-end">
@@ -97,7 +97,7 @@ ${(requests || []).map(r => {
       <div class="modal-content">
         <form action="/customer-approvals/${r.id}/approve" method="POST" onsubmit="return confirm('確定要核准並建立這筆資料嗎？')">
           <div class="modal-header">
-            <h5 class="modal-title"><i class="bi bi-pencil-square"></i> 編輯並核准：${(r.company_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</h5>
+            <h5 class="modal-title"><i class="bi bi-pencil-square"></i> 編輯並核准：${(r.company_name || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
@@ -200,7 +200,7 @@ ${(requests || []).map(r => {
                 <div class="col-md-6">
                   <label class="form-label">預估專案類型（可複選）</label>
                   <select name="pipeline_project_type" class="form-select" multiple>
-                    ${(projectTypes || []).map(t => '<option value="' + esc(t.type_name) + '" ' + (selectedPipelineTypes.includes(t.type_name) ? 'selected' : '') + '>' + t.type_name + '</option>').join('')}
+                    ${(projectTypes || []).map(t => '<option value="' + esc(t.type_name) + '" ' + (selectedPipelineTypes.includes(t.type_name) ? 'selected' : '') + '>' + escapeHtml(t.type_name) + '</option>').join('')}
                   </select>
                 </div>
                 <div class="col-md-3">
@@ -226,7 +226,7 @@ ${(requests || []).map(r => {
                 </div>
                 <div class="col-12">
                   <label class="form-label">備註</label>
-                  <textarea name="pipeline_notes" class="form-control" rows="2">${(r.pipeline_notes || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+                  <textarea name="pipeline_notes" class="form-control" rows="2">${(r.pipeline_notes || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}</textarea>
                 </div>
               </div>
             ` : ''}
@@ -252,7 +252,7 @@ ${(requests || []).map(r => `
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            <p class="mb-2">${(r.company_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}（${r.customer_code}）${r.pipeline_opportunity_name ? '<br><small class="text-muted">銷售機會：' + (r.pipeline_opportunity_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '（一併駁回）</small>' : ''}</p>
+            <p class="mb-2">${(r.company_name || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}（${escapeHtml(r.customer_code)}）${r.pipeline_opportunity_name ? '<br><small class="text-muted">銷售機會：' + (r.pipeline_opportunity_name || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '（一併駁回）</small>' : ''}</p>
             <label class="form-label">駁回原因（選填，會留給申請人參考）</label>
             <textarea name="review_note" class="form-control" rows="3"></textarea>
           </div>

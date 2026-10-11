@@ -53,7 +53,7 @@
         <tbody>
           ${salespeople.map(s => `
               <tr onclick="location.href='/salespeople/${s.id}?year=${selectedYear === 'all' ? 'all' : selectedYear}'" style="cursor:pointer">
-              <td><strong>${s.name}</strong></td>
+              <td><strong>${escapeHtml(s.name)}</strong></td>
               <td>
                 <span class="badge bg-${s.status === 'active' ? 'success' : s.status === 'resigned' ? 'danger' : 'secondary'}">
                   ${s.status === 'active' ? '在職' : s.status === 'resigned' ? '離職' : '停用'}

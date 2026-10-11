@@ -18,6 +18,9 @@ console.log('[啟動] Express 應用程式建立完成，PORT:', PORT);
 // IP，而不是 Nginx 自己的位址。若部署拓樸改成有多層代理，這裡要跟著調整。
 app.set('trust proxy', 1);
 
+// 基本安全標頭（nosniff、X-Frame-Options、Referrer-Policy、HTTPS 時的 HSTS）
+app.use(require('./middleware/securityHeaders'));
+
 // 設定檔案上傳
 const upload = multer({
   dest: path.join(__dirname, '..', 'uploads'),
@@ -133,6 +136,13 @@ app.use((req, res, next) => {
 
   // 分頁圖示網址（帶版本參數，管理員換圖後瀏覽器會重新抓取）
   res.locals.faviconHref = '/favicon.ico?v=' + getSystemSetting('favicon_version', 0);
+
+  // 統一的 HTML 跳脫函式，供所有視圖使用（view 內若自行宣告同名函式則以自己的為準）
+  res.locals.escapeHtml = require('./utils/escapeHtml');
+  // 放進 onclick="fn('...')" 這類「HTML 屬性內的單引號 JS 字串」的值
+  res.locals.jsAttr = require('./utils/escapeHtml').jsAttr;
+  // 嵌入 <script>／HTML 屬性的 JSON 序列化（跳脫 < > & ' 與 U+2028/9）
+  res.locals.jsonForScript = require('./utils/jsonForScript');
 
   // 目前路徑，供導覽列標示當前所在頁面使用
   res.locals.currentPath = req.path;

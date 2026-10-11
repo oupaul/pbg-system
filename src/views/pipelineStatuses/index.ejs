@@ -1,6 +1,6 @@
 <%
   function escapeHtml(str) {
-    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return (str || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
   const badgeColors = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark'];
   const colorNames = {
@@ -66,7 +66,7 @@ ${success ? `
               <td>${s.is_lost === 1 ? '<i class="bi bi-x-circle-fill text-danger"></i>' : ''}</td>
               <td>${s.is_active === 1 ? '<span class="badge bg-success">啟用</span>' : '<span class="badge bg-secondary">停用</span>'}</td>
               <td>
-                <button type="button" class="btn btn-sm btn-outline-primary" onclick="editStatus(${s.id}, '${escapeHtml(s.status_name).replace(/'/g, "\\'")}', '${s.badge_color}', ${s.display_order}, ${s.is_active}, ${s.is_won}, ${s.is_lost})">
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="editStatus(${s.id}, '${jsAttr(s.status_name)}', '${s.badge_color}', ${s.display_order}, ${s.is_active}, ${s.is_won}, ${s.is_lost})">
                   <i class="bi bi-pencil"></i> 編輯
                 </button>
                 <form action="/pipeline-statuses/delete/${s.id}" method="POST" style="display:inline" onsubmit="return confirm('確定要刪除此狀態？\\n\\n注意：如果有銷售機會使用此狀態，將無法刪除。')">

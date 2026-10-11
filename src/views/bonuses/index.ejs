@@ -1,6 +1,6 @@
 <%
   function escapeHtml(str) {
-    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return (str || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 %>
 <%- include('../layout', { body: `
@@ -55,7 +55,7 @@ ${success ? '<div class="alert alert-success alert-dismissible fade show" role="
         <tbody>
           ${(salespersonSummary || []).map(s => `
             <tr onclick="location.href='/salespeople/${s.id}?year=${selectedYear}'" style="cursor:pointer">
-              <td><strong>${s.name}</strong></td>
+              <td><strong>${escapeHtml(s.name)}</strong></td>
               <td class="text-center">${s.project_count || 0}</td>
               <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(s.total_bonus || 0).toLocaleString()}</td>
               <td class="text-end text-success">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(s.paid_bonus || 0).toLocaleString()}</td>
@@ -132,15 +132,15 @@ ${success ? '<div class="alert alert-success alert-dismissible fade show" role="
             ${(bonuses || []).map(b => `
               <tr>
                 ${locals.canEdit ? '<td><input type="checkbox" name="bonus_ids[]" value="' + b.id + '" class="form-check-input bonus-checkbox" onchange="updateSelectedCount()"></td>' : ''}
-                <td>${b.salesperson_name}</td>
-                <td><a href="/projects/${b.project_id}"><code>${b.project_code}</code></a></td>
-                <td>${b.project_name}</td>
-                <td><span class="badge bg-${typeof typeColorMap !== 'undefined' && typeColorMap[b.project_type] ? typeColorMap[b.project_type] : (b.project_type === '食驗室' ? 'primary' : b.project_type === '純廣' ? 'success' : 'info')}">${b.project_type}</span></td>
+                <td>${escapeHtml(b.salesperson_name)}</td>
+                <td><a href="/projects/${b.project_id}"><code>${escapeHtml(b.project_code)}</code></a></td>
+                <td>${escapeHtml(b.project_name)}</td>
+                <td><span class="badge bg-${typeof typeColorMap !== 'undefined' && typeColorMap[b.project_type] ? typeColorMap[b.project_type] : (b.project_type === '食驗室' ? 'primary' : b.project_type === '純廣' ? 'success' : 'info')}">${escapeHtml(b.project_type)}</span></td>
                 <td>${b.bonus_type}</td>
                 <td class="text-end fw-bold">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(b.bonus_amount || 0).toLocaleString()}</td>
                 <td>${b.payment_date || '-'}</td>
                 <td>
-                  <span class="badge bg-${b.status === '已發放' ? 'success' : b.status === '充公' ? 'danger' : 'warning'}">${b.status}</span>
+                  <span class="badge bg-${b.status === '已發放' ? 'success' : b.status === '充公' ? 'danger' : 'warning'}">${escapeHtml(b.status)}</span>
                 </td>
               </tr>
             `).join('') || '<tr><td colspan="${locals.canEdit ? 9 : 8}" class="text-center text-muted py-3">尚無獎金記錄</td></tr>'}

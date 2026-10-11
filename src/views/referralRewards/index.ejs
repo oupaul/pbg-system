@@ -1,6 +1,6 @@
 <%
   function escapeHtml(str) {
-    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return (str || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 %>
 <%- include('../layout', { body: `
@@ -51,7 +51,7 @@ ${success ? '<div class="alert alert-success alert-dismissible fade show" role="
               <td>${r.project_code ? escapeHtml(r.project_code) : '<span class="text-muted">-</span>'}</td>
               <td>${recipientLabel}</td>
               <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(r.reward_amount || 0).toLocaleString()}</td>
-              <td><span class="badge bg-${statusBadge}">${r.status}</span></td>
+              <td><span class="badge bg-${statusBadge}">${escapeHtml(r.status)}</span></td>
             </tr>
           `;
           }).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">尚無轉介紹獎勵記錄</td></tr>'}

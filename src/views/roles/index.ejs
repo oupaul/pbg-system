@@ -1,6 +1,6 @@
 <%
   function escapeHtml(str) {
-    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return (str || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 %>
 <%- include('../layout', { body: `
@@ -76,10 +76,10 @@
                   <td>${index + 1}</td>
                   <td><code>${role.role_key}</code></td>
                   <td>
-                    <strong>${role.role_name}</strong>
+                    <strong>${escapeHtml(role.role_name)}</strong>
                     ${role.is_system_role ? '<span class="badge bg-info ms-2">系統</span>' : ''}
                   </td>
-                  <td class="text-muted">${role.description || '-'}</td>
+                  <td class="text-muted">${escapeHtml(role.description || '-')}</td>
                   <td class="text-center">
                     ${role.users_count > 0 ? `
                       <a href="/roles/${role.id}" class="badge bg-primary">${role.users_count} 人</a>
@@ -108,7 +108,7 @@
                         <i class="bi bi-pencil"></i>
                       </a>
                       ${!role.is_system_role ? `
-                        <button type="button" class="btn btn-outline-danger" onclick="deleteRole(${role.id}, '${role.role_name}')" title="刪除">
+                        <button type="button" class="btn btn-outline-danger" onclick="deleteRole(${role.id}, '${jsAttr(role.role_name)}')" title="刪除">
                           <i class="bi bi-trash"></i>
                         </button>
                       ` : `

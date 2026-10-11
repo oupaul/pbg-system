@@ -3,7 +3,7 @@
   const WIN_PROBABILITY_STAGE_LABELS = typeof winProbabilityStageLabels !== 'undefined' ? winProbabilityStageLabels : {};
   // 商機名稱、客戶/業務姓名皆為自由文字欄位，輸出前需跳脫，避免儲存型 XSS
   function escapeHtml(str) {
-    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return (str || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
   // 狀態操作按鈕要送出「贏單」「輸單」「其餘（洽談中）」狀態各自實際的名稱，
   // 而不是寫死「已成交」/「已流失」/「洽談中」字串，改名後按鈕才會繼續正確運作
@@ -49,7 +49,7 @@ ${success ? `
 
 ${pendingDeletion ? `
   <div class="alert alert-warning">
-    <i class="bi bi-hourglass-split"></i> 已送出刪除申請，等待管理員審核中（申請人：${pendingDeletion.requested_by_name || '-'}，時間：${pendingDeletion.requested_at}）
+    <i class="bi bi-hourglass-split"></i> 已送出刪除申請，等待管理員審核中（申請人：${escapeHtml(pendingDeletion.requested_by_name || '-')}，時間：${pendingDeletion.requested_at}）
   </div>
 ` : ''}
 
@@ -102,7 +102,7 @@ ${pendingDeletion ? `
 ${pipeline.notes ? `
 <div class="card mb-4">
   <div class="card-header"><i class="bi bi-card-text"></i> 備註</div>
-  <div class="card-body"><p class="mb-0" style="white-space: pre-wrap;">${pipeline.notes.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p></div>
+  <div class="card-body"><p class="mb-0" style="white-space: pre-wrap;">${pipeline.notes.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}</p></div>
 </div>
 ` : ''}
 
@@ -143,7 +143,7 @@ ${pipeline.notes ? `
         <li class="list-group-item d-flex justify-content-between align-items-start">
           <div>
             <span class="badge bg-${(typeof activityTypeColorMap !== 'undefined' && activityTypeColorMap[a.activity_type]) || 'secondary'} me-2">${escapeHtml(a.activity_type)}</span>
-            <span>${a.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
+            <span>${a.content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}</span>
             <div class="text-muted small mt-1">${a.activity_date} · ${escapeHtml(a.created_by) || 'system'}</div>
           </div>
           ${deleteControl}
@@ -160,7 +160,7 @@ ${pipeline.converted_project_id ? `
   <div class="card-body">
     <p class="mb-2">此銷售機會已於 ${pipeline.converted_at} 轉入專案：</p>
     <a href="/projects/${convertedProject ? convertedProject.id : pipeline.converted_project_id}" class="btn btn-primary">
-      <i class="bi bi-folder"></i> ${convertedProject ? convertedProject.project_code + ' - ' + convertedProject.project_name : '查看專案'}
+      <i class="bi bi-folder"></i> ${convertedProject ? escapeHtml(convertedProject.project_code + ' - ' + convertedProject.project_name) : '查看專案'}
     </a>
   </div>
 </div>
@@ -273,6 +273,6 @@ document.addEventListener('DOMContentLoaded', function() {
 ` : ''}
 
 ${pipeline.status === lostStatusName && pipeline.lost_reason ? `
-<div class="alert alert-secondary"><strong>流失原因：</strong>${pipeline.lost_reason.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+<div class="alert alert-secondary"><strong>流失原因：</strong>${pipeline.lost_reason.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}</div>
 ` : ''}
 ` }) %>

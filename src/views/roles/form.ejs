@@ -74,7 +74,7 @@
                 name="description" 
                 rows="3"
                 placeholder="簡單描述此角色的職責和權限..."
-              >${role ? (role.description || '') : ''}</textarea>
+              >${role ? escapeHtml(role.description || '') : ''}</textarea>
             </div>
 
             <!-- 排序 -->

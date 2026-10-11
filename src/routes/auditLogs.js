@@ -368,7 +368,9 @@ router.get('/export', (req, res) => {
 
   const csvEscape = (val) => {
     if (val === null || val === undefined) return '';
-    const s = String(val);
+    let s = String(val);
+    // 防止 CSV/Excel 公式注入：字串開頭是 = + - @ 或 Tab/Enter 時，在前面加單引號讓 Excel 當成文字
+    if (typeof val === 'string' && /^[=+\-@\t\r]/.test(s)) s = "'" + s;
     if (s.includes('"') || s.includes(',') || s.includes('\n') || s.includes('\r')) {
       return '"' + s.replace(/"/g, '""') + '"';
     }

@@ -1,6 +1,6 @@
 <%
   function escapeHtml(str) {
-    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return (str || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 %>
 <%- include('../layout', { title: title, body: `
@@ -9,7 +9,7 @@
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb mb-0">
         <li class="breadcrumb-item"><a href="/salespeople">業務管理</a></li>
-        <li class="breadcrumb-item"><a href="/salespeople/${salesperson.id}">${salesperson.name}</a></li>
+        <li class="breadcrumb-item"><a href="/salespeople/${salesperson.id}">${escapeHtml(salesperson.name)}</a></li>
         <li class="breadcrumb-item active">整批移轉專案</li>
       </ol>
     </nav>
@@ -36,7 +36,7 @@ ${error ? '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"
         <div class="card-header"><i class="bi bi-person-dash"></i> 來源業務</div>
         <div class="card-body">
           <div class="d-flex align-items-center gap-2">
-            <span class="fs-5 fw-bold">${salesperson.name}</span>
+            <span class="fs-5 fw-bold">${escapeHtml(salesperson.name)}</span>
             <span class="badge bg-${salesperson.status === 'active' ? 'success' : 'danger'}">
               ${salesperson.status === 'active' ? '在職' : salesperson.status === 'resigned' ? '離職' : '停用'}
             </span>
@@ -50,7 +50,7 @@ ${error ? '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"
         <div class="card-body">
           <select name="to_salesperson_id" id="toSalespersonId" class="form-select" required onchange="updatePreview()">
             <option value="">-- 請選擇接手業務 --</option>
-            ${activeSalespeople.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('')}
+            ${activeSalespeople.map(s => '<option value="' + s.id + '">' + escapeHtml(s.name) + '</option>').join('')}
           </select>
         </div>
       </div>
@@ -148,7 +148,7 @@ ${error ? '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"
 
 <script>
 // 從後端注入所有專案資料（供前端過濾）
-const ALL_PROJECTS = ${JSON.stringify(allProjects.map(p => ({
+const ALL_PROJECTS = ${jsonForScript(allProjects.map(p => ({
   id: p.id,
   project_code: p.project_code || '',
   project_name: p.project_name || '',
@@ -160,7 +160,7 @@ const ALL_PROJECTS = ${JSON.stringify(allProjects.map(p => ({
   uninvoiced_amount: p.uninvoiced_amount || 0
 }))
 )};
-const CURRENCY_SYMBOL = ${JSON.stringify(typeof currencySymbol !== 'undefined' ? currencySymbol : '$')};
+const CURRENCY_SYMBOL = ${jsonForScript(typeof currencySymbol !== 'undefined' ? currencySymbol : '$')};
 
 // 初始化計數
 (function initCounts() {
@@ -221,19 +221,19 @@ function renderTable(projects) {
     '合計 <strong class="text-primary">' + CURRENCY_SYMBOL + Math.round(totalAmount).toLocaleString() + '</strong>，' +
     '未開票 <strong class="text-warning">' + CURRENCY_SYMBOL + Math.round(totalUninvoiced).toLocaleString() + '</strong>';
 
-  const typeColorMap = ${JSON.stringify(typeof typeColorMap !== 'undefined' ? typeColorMap : {})};
+  const typeColorMap = ${jsonForScript(typeof typeColorMap !== 'undefined' ? typeColorMap : {})};
   const statusColorMap = { '已結案': 'secondary', '取消': 'danger', '未結案': 'warning' };
 
   tbody.innerHTML = projects.map(p => {
     const typeColor   = typeColorMap[p.project_type]   || 'info';
     const statusColor = statusColorMap[p.status]        || 'warning';
     const uninvClass  = p.uninvoiced_amount > 0 ? 'text-warning' : 'text-muted';
-    const name        = (p.project_name || '-').replace(/</g, '&lt;');
+    const name        = escapeHtml(p.project_name || '-');
     return '<tr onclick="window.open(\\'/projects/' + p.id + '\\', \\'_blank\\')" style="cursor:pointer" title="點擊在新頁籤開啟">' +
-      '<td><code>' + p.project_code + '</code></td>' +
+      '<td><code>' + escapeHtml(p.project_code) + '</code></td>' +
       '<td class="small">' + name + '</td>' +
-      '<td><span class="badge bg-' + typeColor + '">' + p.project_type + '</span></td>' +
-      '<td><span class="badge bg-' + statusColor + '">' + p.status + '</span></td>' +
+      '<td><span class="badge bg-' + escapeHtml(typeColor) + '">' + escapeHtml(p.project_type) + '</span></td>' +
+      '<td><span class="badge bg-' + escapeHtml(statusColor) + '">' + escapeHtml(p.status) + '</span></td>' +
       '<td class="text-center">' + p.contract_year + '</td>' +
       '<td class="text-end">' + CURRENCY_SYMBOL + Math.round(p.price_with_tax).toLocaleString() + '</td>' +
       '<td class="text-end ' + uninvClass + '">' +

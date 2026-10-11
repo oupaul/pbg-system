@@ -1,6 +1,6 @@
 <%
   function escapeHtml(str) {
-    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return (str || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 %>
 <%- include('../layout', { body: `
@@ -9,7 +9,7 @@
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb mb-0">
         <li class="breadcrumb-item"><a href="/pipelines">銷售機會管理</a></li>
-        <li class="breadcrumb-item"><a href="/pipelines/${pipeline.id}">${(pipeline.opportunity_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</a></li>
+        <li class="breadcrumb-item"><a href="/pipelines/${pipeline.id}">${(pipeline.opportunity_name || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}</a></li>
         <li class="breadcrumb-item active">轉入專案</li>
       </ol>
     </nav>
@@ -53,7 +53,7 @@ ${error ? `
               const estimatedTypes = (pipeline.project_type || '').split(',').map(t => t.trim()).filter(Boolean);
               return projectTypes.map(type => {
                 const selected = estimatedTypes.length === 1 && estimatedTypes[0] === type.type_name ? 'selected' : '';
-                return '<option value="' + type.type_name + '" ' + selected + '>' + type.type_name + '</option>';
+                return '<option value="' + escapeHtml(type.type_name) + '" ' + selected + '>' + escapeHtml(type.type_name) + '</option>';
               }).join('');
             })()}
           </select>
@@ -61,12 +61,12 @@ ${error ? `
 
         <div class="col-12">
           <label class="form-label">專案名稱 <span class="text-danger">*</span></label>
-          <input type="text" name="project_name" class="form-control" value="${(pipeline.opportunity_name || '').replace(/"/g, '&quot;')}" required>
+          <input type="text" name="project_name" class="form-control" value="${escapeHtml(pipeline.opportunity_name)}" required>
         </div>
 
         <div class="col-md-4">
           <label class="form-label">客戶</label>
-          <input type="text" class="form-control" value="${(pipeline.customer_name || '').replace(/"/g, '&quot;')}" disabled>
+          <input type="text" class="form-control" value="${escapeHtml(pipeline.customer_name)}" disabled>
           <small class="form-text text-muted">沿用商機的客戶，不可變更</small>
         </div>
         <div class="col-md-4">
@@ -87,7 +87,7 @@ ${error ? `
 
         <div class="col-12">
           <label class="form-label">備註</label>
-          <textarea name="notes" class="form-control" rows="3">${(pipeline.notes || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+          <textarea name="notes" class="form-control" rows="3">${(pipeline.notes || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}</textarea>
         </div>
       </div>
 

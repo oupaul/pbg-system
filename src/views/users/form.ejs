@@ -1,9 +1,9 @@
 <%
   function escapeHtml(str) {
-    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return (str || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
   function escapeAttr(str) {
-    return (str || '').toString().replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return (str || '').toString().replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
   // 從業務詳情頁「建立登入帳號」帶入的預設值（新增模式才有）
   const pf = (typeof prefill !== 'undefined' && prefill) ? prefill : null;
@@ -32,7 +32,7 @@ ${error ? `
         <div class="col-md-6">
           <label class="form-label">使用者名稱 <span class="text-danger">*</span></label>
           ${user ? `
-            <input type="text" class="form-control" value="${user.username}" disabled>
+            <input type="text" class="form-control" value="${escapeHtml(user.username)}" disabled>
             <small class="text-muted">使用者名稱無法修改</small>
           ` : `
             <input type="text" name="username" class="form-control" value="" required>
@@ -64,7 +64,7 @@ ${error ? `
                 '<option value="' + r.role_key + '"' +
                 ' data-scope="' + (r.project_view_scope || 'all') + '"' +
                 ((user && user.role === r.role_key) || (!user && pf && pf.role === r.role_key) ? ' selected' : '') +
-                '>' + r.role_name + '</option>'
+                '>' + escapeHtml(r.role_name) + '</option>'
               ).join('');
             })()}
           </select>
@@ -94,7 +94,7 @@ ${error ? `
                 const checked = (typeof assignedSalespersonIds !== 'undefined' && assignedSalespersonIds.includes(sp.id)) ? 'checked' : '';
                 return '<div class="form-check">' +
                   '<input class="form-check-input" type="checkbox" name="assigned_salespeople" value="' + sp.id + '" id="sp_' + sp.id + '" ' + checked + '>' +
-                  '<label class="form-check-label" for="sp_' + sp.id + '">' + sp.name + '</label>' +
+                  '<label class="form-check-label" for="sp_' + sp.id + '">' + escapeHtml(sp.name) + '</label>' +
                   '</div>';
               }).join('')
             }

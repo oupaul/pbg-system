@@ -52,7 +52,7 @@ ${locals.isReadOnly ? '<div class="alert alert-info mb-4"><i class="bi bi-info-c
           <option value="">全部</option>
           ${typeof projectTypes !== 'undefined' && projectTypes ? projectTypes.map(type => {
             const selected = filters.type === type.type_name ? 'selected' : '';
-            return '<option value="' + type.type_name + '" ' + selected + '>' + type.type_name + '</option>';
+            return '<option value="' + escapeHtml(type.type_name) + '" ' + selected + '>' + escapeHtml(type.type_name) + '</option>';
           }).join('') : '<option value="食驗室" ${filters.type === \'食驗室\' ? \'selected\' : \'\'}>食驗室</option><option value="純廣" ${filters.type === \'純廣\' ? \'selected\' : \'\'}>純廣</option><option value="專案" ${filters.type === \'專案\' ? \'selected\' : \'\'}>專案</option>'}
         </select>
       </div>
@@ -62,7 +62,7 @@ ${locals.isReadOnly ? '<div class="alert alert-info mb-4"><i class="bi bi-info-c
           <option value="">全部</option>
           ${typeof salesModes !== 'undefined' && salesModes ? salesModes.map(m => {
             const selected = filters.sales_mode === m.mode_name ? 'selected' : '';
-            return '<option value="' + m.mode_name.replace(/"/g, '&quot;') + '" ' + selected + '>' + m.mode_name.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</option>';
+            return '<option value="' + m.mode_name.replace(/"/g, '&quot;') + '" ' + selected + '>' + m.mode_name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '</option>';
           }).join('') : ''}
         </select>
       </div>
@@ -71,8 +71,8 @@ ${locals.isReadOnly ? '<div class="alert alert-info mb-4"><i class="bi bi-info-c
         <select name="salesperson" class="form-select">
           <option value="">全部</option>
           ${salespeople.map(s => {
-            const label = s.name + (s.status && s.status !== 'active' ? ' (離職)' : '');
-            return `<option value="${s.name}" ${filters.salesperson === s.name ? 'selected' : ''}>${label}</option>`;
+            const label = escapeHtml(s.name) + (s.status && s.status !== 'active' ? ' (離職)' : '');
+            return `<option value="${escapeHtml(s.name)}" ${filters.salesperson === s.name ? 'selected' : ''}>${label}</option>`;
           }).join('')}
         </select>
       </div>
@@ -85,7 +85,7 @@ ${locals.isReadOnly ? '<div class="alert alert-info mb-4"><i class="bi bi-info-c
       </div>
       <div class="col-md-2">
         <label class="form-label">關鍵字</label>
-        <input type="text" name="keyword" class="form-control" value="${filters.keyword || ''}" placeholder="專案編號/名稱/公司">
+        <input type="text" name="keyword" class="form-control" value="${escapeHtml(filters.keyword || '')}" placeholder="專案編號/名稱/公司">
       </div>
       ${filters.uninvoiced ? `
         <input type="hidden" name="uninvoiced" value="true">
@@ -100,7 +100,7 @@ ${locals.isReadOnly ? '<div class="alert alert-info mb-4"><i class="bi bi-info-c
         <input type="hidden" name="completed" value="true">
       ` : ''}
       ${filters.invoice_year ? `
-        <input type="hidden" name="invoice_year" value="${filters.invoice_year}">
+        <input type="hidden" name="invoice_year" value="${escapeHtml(filters.invoice_year)}">
       ` : ''}
       <div class="col-md-2 d-flex align-items-end">
         <button type="submit" class="btn btn-secondary w-100"><i class="bi bi-search"></i> 搜尋</button>
@@ -277,21 +277,21 @@ ${salespersonStats ? `
               : (p.total_invoiced || 0) - (p.total_received || 0) - (p.sales_discount || 0);
             return `
             <tr onclick="location.href='/projects/${p.id}'" style="cursor:pointer">
-              <td><code>${p.project_code}</code></td>
+              <td><code>${escapeHtml(p.project_code)}</code></td>
               <td>${p.contract_month || '-'}月</td>
               <td>${p.expected_invoice_year_month ? '<small class="text-primary">' + p.expected_invoice_year_month + '</small>' : '<span class="text-muted">-</span>'}</td>
-              <td><span class="badge bg-${typeof typeColorMap !== 'undefined' && typeColorMap[p.project_type] ? typeColorMap[p.project_type] : (p.project_type === '食驗室' ? 'primary' : p.project_type === '純廣' ? 'success' : 'info')}">${p.project_type}</span></td>
-              <td>${p.sales_mode ? '<span class="badge bg-' + ((typeof salesModeColorMap !== 'undefined' && salesModeColorMap[p.sales_mode]) || 'secondary') + '">' + String(p.sales_mode).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>' : '<span class="text-muted">-</span>'}</td>
-              <td>${p.salesperson_name || '-'}</td>
-              <td>${p.company_name || '-'}</td>
-              <td>${p.project_name}</td>
+              <td><span class="badge bg-${typeof typeColorMap !== 'undefined' && typeColorMap[p.project_type] ? typeColorMap[p.project_type] : (p.project_type === '食驗室' ? 'primary' : p.project_type === '純廣' ? 'success' : 'info')}">${escapeHtml(p.project_type)}</span></td>
+              <td>${p.sales_mode ? '<span class="badge bg-' + ((typeof salesModeColorMap !== 'undefined' && salesModeColorMap[p.sales_mode]) || 'secondary') + '">' + String(p.sales_mode).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '</span>' : '<span class="text-muted">-</span>'}</td>
+              <td>${escapeHtml(p.salesperson_name || '-')}</td>
+              <td>${escapeHtml(p.company_name || '-')}</td>
+              <td>${escapeHtml(p.project_name)}</td>
               <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(p.price_with_tax || 0).toLocaleString()}</td>
               <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${displayInvoiced.toLocaleString()}</td>
               <td class="text-end"><span class="text-info">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${((p.price_with_tax || 0) - (p.total_invoiced || 0)).toLocaleString()}</span></td>
               <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${displayReceived.toLocaleString()}</td>
               <td class="text-end"><span class="${unpaidAmount > 0 ? 'text-danger fw-bold' : 'text-muted'}">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${unpaidAmount.toLocaleString()}</span></td>
               <td>
-                <span class="badge bg-${p.status === '已結案' ? 'secondary' : p.status === '取消' ? 'danger' : 'warning'}">${p.status}</span>
+                <span class="badge bg-${p.status === '已結案' ? 'secondary' : p.status === '取消' ? 'danger' : 'warning'}">${escapeHtml(p.status)}</span>
                 ${p.is_new_customer ? '<span class="badge bg-success ms-1">新</span>' : ''}
               </td>
             </tr>
@@ -368,7 +368,7 @@ function showInvoiceDetailModal() {
   fetch('/projects/invoice-detail?' + params.toString())
     .then(r => r.json())
     .then(data => {
-      const currencySymbolJs = ${JSON.stringify(typeof currencySymbol !== 'undefined' ? currencySymbol : '$')};
+      const currencySymbolJs = ${jsonForScript(typeof currencySymbol !== 'undefined' ? currencySymbol : '$')};
       const fmt = n => currencySymbolJs + Math.round(n || 0).toLocaleString();
       if (!data.invoices || data.invoices.length === 0) {
         body.innerHTML = '<p class="text-center text-muted py-5"><i class="bi bi-inbox fs-3 d-block mb-2"></i>無符合條件的發票明細</p>';
@@ -380,10 +380,10 @@ function showInvoiceDetailModal() {
         const unpaid = net - (inv.paid_amount || 0);
         return '<tr>' +
           '<td>' + (inv.invoice_date || '-') + '</td>' +
-          '<td><code>' + (inv.invoice_number || '-') + '</code></td>' +
-          '<td><code>' + inv.project_code + '</code></td>' +
-          '<td class="text-truncate" style="max-width:160px" title="' + inv.project_name + '">' + inv.project_name + '</td>' +
-          '<td>' + (inv.salesperson_name || '-') + '</td>' +
+          '<td><code>' + escapeHtml(inv.invoice_number || '-') + '</code></td>' +
+          '<td><code>' + escapeHtml(inv.project_code) + '</code></td>' +
+          '<td class="text-truncate" style="max-width:160px" title="' + escapeHtml(inv.project_name) + '">' + escapeHtml(inv.project_name) + '</td>' +
+          '<td>' + escapeHtml(inv.salesperson_name || '-') + '</td>' +
           '<td class="text-end">' + fmt(inv.amount_with_tax) + '</td>' +
           '<td class="text-end">' + (inv.allowance_amount ? fmt(inv.allowance_amount) : '-') + '</td>' +
           '<td class="text-end fw-semibold">' + fmt(net) + '</td>' +

@@ -6,7 +6,7 @@
       <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>
           <i class="bi bi-shield-check"></i> 
-          ${role.role_name}
+          ${escapeHtml(role.role_name)}
           ${role.is_system_role ? '<span class="badge bg-info ms-2">系統角色</span>' : ''}
           ${role.is_active ? '<span class="badge bg-success ms-2">啟用</span>' : '<span class="badge bg-secondary ms-2">停用</span>'}
         </h2>
@@ -35,11 +35,11 @@
                 </tr>
                 <tr>
                   <td><strong>角色名稱：</strong></td>
-                  <td>${role.role_name}</td>
+                  <td>${escapeHtml(role.role_name)}</td>
                 </tr>
                 <tr>
                   <td><strong>描述：</strong></td>
-                  <td>${role.description || '無'}</td>
+                  <td>${escapeHtml(role.description || '無')}</td>
                 </tr>
                 <tr>
                   <td><strong>顯示順序：</strong></td>
@@ -198,8 +198,8 @@
                     <div class="list-group-item px-0">
                       <div class="d-flex justify-content-between align-items-center">
                         <div>
-                          <strong>${u.name}</strong>
-                          <div class="text-muted small">@${u.username}</div>
+                          <strong>${escapeHtml(u.name)}</strong>
+                          <div class="text-muted small">@${escapeHtml(u.username)}</div>
                         </div>
                         <div>
                           ${u.is_active ? 
@@ -253,7 +253,7 @@
 
 <script>
 function deleteRole() {
-  if (!confirm('確定要刪除角色「${role.role_name}」嗎？\\n\\n刪除後角色將被停用，但不會永久刪除。')) {
+  if (!confirm('確定要刪除角色「${escapeHtml(role.role_name)}」嗎？\\n\\n刪除後角色將被停用，但不會永久刪除。')) {
     return;
   }
 

@@ -14,7 +14,7 @@
       <div class="row g-3">
         <div class="col-md-2">
           <label class="form-label">專案編號 <span class="text-danger">*</span></label>
-          <input type="text" name="project_code" class="form-control" value="${project ? (project.project_code || '') : ''}" required>
+          <input type="text" name="project_code" class="form-control" value="${project ? escapeHtml(project.project_code || '') : ''}" required>
         </div>
         <div class="col-md-2">
           <label class="form-label">簽約年度 <span class="text-danger">*</span></label>
@@ -40,7 +40,7 @@
             <option value="">-- 選擇類型 --</option>
             ${typeof projectTypes !== 'undefined' && projectTypes ? projectTypes.map(type => {
               const selected = project && project.project_type === type.type_name ? 'selected' : '';
-              return '<option value="' + type.type_name + '" ' + selected + '>' + type.type_name + '</option>';
+              return '<option value="' + escapeHtml(type.type_name) + '" ' + selected + '>' + escapeHtml(type.type_name) + '</option>';
             }).join('') : '<option value="食驗室">食驗室</option><option value="純廣">純廣</option><option value="專案">專案</option>'}
           </select>
           ${locals.isAdmin ? '<small class="form-text text-muted">找不到類型？<a href="#" id="quickAddTypeLink" class="text-primary">快速新增</a></small>' : ''}
@@ -62,7 +62,7 @@
             <option value="">-- 未分群 --</option>
             ${typeof reportGroups !== 'undefined' && reportGroups ? reportGroups.map(g => {
               const selected = project && project.report_group_id == g.id ? 'selected' : '';
-              const name = (g.name || '').replace(/"/g, '&quot;');
+              const name = escapeHtml(g.name);
               return '<option value="' + g.id + '" ' + selected + '>' + name + '</option>';
             }).join('') : ''}
           </select>
@@ -70,19 +70,19 @@
         </div>
         <div class="col-md-2">
           <label class="form-label">合約年限</label>
-          <input type="text" name="contract_term" class="form-control" value="${project ? (project.contract_term || '').replace(/"/g, '&quot;') : ''}" placeholder="例如：1年、3年">
+          <input type="text" name="contract_term" class="form-control" value="${project ? escapeHtml(project.contract_term) : ''}" placeholder="例如：1年、3年">
         </div>
 
         <div class="col-12">
           <label class="form-label">專案名稱 <span class="text-danger">*</span></label>
-          <input type="text" name="project_name" class="form-control" value="${project ? (project.project_name || '').replace(/"/g, '&quot;') : ''}" required>
+          <input type="text" name="project_name" class="form-control" value="${project ? escapeHtml(project.project_name) : ''}" required>
         </div>
         
         <div class="col-md-4">
           <label class="form-label">業務人員</label>
           <select name="salesperson_id" id="salesperson_id" class="form-select select2-dropdown">
             <option value="">-- 選擇業務 --</option>
-            ${salespeople.map(s => { const selected = project && project.salesperson_id == s.id ? 'selected' : ''; const name = (s.name || '').replace(/"/g, '&quot;'); return '<option value="' + s.id + '" ' + selected + '>' + name + '</option>'; }).join('')}
+            ${salespeople.map(s => { const selected = project && project.salesperson_id == s.id ? 'selected' : ''; const name = escapeHtml(s.name); return '<option value="' + s.id + '" ' + selected + '>' + name + '</option>'; }).join('')}
           </select>
           <small class="form-text text-muted">可以輸入名稱快速篩選</small>
         </div>
@@ -92,7 +92,7 @@
             <div class="flex-grow-1">
               <select name="customer_id" id="customer_id" class="form-select select2-dropdown">
                 <option value="">-- 選擇客戶 --</option>
-                ${customers.map(c => { const selected = project && project.customer_id == c.id ? 'selected' : ''; const companyName = (c.company_name || '').replace(/"/g, '&quot;'); const customerCode = (c.customer_code || '').replace(/"/g, '&quot;'); return '<option value="' + c.id + '" ' + selected + '>' + companyName + ' (' + customerCode + ')</option>'; }).join('')}
+                ${customers.map(c => { const selected = project && project.customer_id == c.id ? 'selected' : ''; const companyName = escapeHtml(c.company_name); const customerCode = escapeHtml(c.customer_code); return '<option value="' + c.id + '" ' + selected + '>' + companyName + ' (' + customerCode + ')</option>'; }).join('')}
               </select>
               <small class="form-text text-muted">找不到客戶？<a href="#" id="quickAddCustomerLink" class="text-primary">快速新增</a></small>
             </div>
@@ -131,7 +131,7 @@
         
         <div class="col-12">
           <label class="form-label">備註</label>
-          <textarea name="notes" class="form-control" rows="3">${project ? (project.notes || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</textarea>
+          <textarea name="notes" class="form-control" rows="3">${project ? escapeHtml(project.notes || '') : ''}</textarea>
         </div>
       </div>
       
@@ -234,7 +234,7 @@ ${locals.isAdmin ? `
 
 <script>
 // 自動計算未稅金額（稅率取自「系統設定 → 公司基本資料」，未設定時預設5%）
-const TAX_RATE = ${JSON.stringify(typeof taxRate !== 'undefined' && taxRate != null ? taxRate : 5)};
+const TAX_RATE = ${jsonForScript(typeof taxRate !== 'undefined' && taxRate != null ? taxRate : 5)};
 function calculateWithoutTax() {
   const withTax = document.querySelector('input[name="price_with_tax"]').value;
   const withoutTax = Math.round(withTax / (1 + TAX_RATE / 100));
@@ -300,7 +300,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (result.success) {
           // 新增成功，添加到 Select2 並選擇
           const customer = result.customer;
-          const displayText = customer.company_name + ' (' + customer.customer_code + ')';
+          const displayText = customer.company_name + ' (' + escapeHtml(customer.customer_code) + ')';
 
           // 使用 jQuery 添加新選項並選擇
           const newOption = new Option(displayText, customer.id, true, true);

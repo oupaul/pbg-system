@@ -1,6 +1,6 @@
 <%
   function escapeHtml(str) {
-    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return (str || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 %>
 <%- include('../layout', { title: salesperson.name, body: `
@@ -9,10 +9,10 @@
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb mb-0">
         <li class="breadcrumb-item"><a href="/salespeople">業務管理</a></li>
-        <li class="breadcrumb-item active">${salesperson.name}</li>
+        <li class="breadcrumb-item active">${escapeHtml(salesperson.name)}</li>
       </ol>
     </nav>
-    <h1 class="h3 mt-2">${salesperson.name}</h1>
+    <h1 class="h3 mt-2">${escapeHtml(salesperson.name)}</h1>
     ${typeof linkedUsers !== 'undefined' && linkedUsers.length > 0 ? `
       <div class="text-muted small"><i class="bi bi-person-badge"></i> 登入帳號：${linkedUsers.map(u => escapeHtml(u.username) + (u.is_active ? '' : '（已停用）')).join('、')}</div>
     ` : (locals.isAdmin ? `
@@ -93,16 +93,16 @@ ${typeof error   !== 'undefined' && error   ? '<div class="alert alert-danger  a
             <tbody>
               ${projects.length === 0 ? '<tr><td colspan="4" class="text-center text-muted py-3">尚無專案</td></tr>' : projects.map(p => `
                 <tr onclick="location.href='/projects/${p.id}'" style="cursor: pointer;">
-                  <td><code>${p.project_code}</code></td>
+                  <td><code>${escapeHtml(p.project_code)}</code></td>
                   <td>
                     <span class="badge bg-${typeof typeColorMap !== 'undefined' && typeColorMap[p.project_type] ? typeColorMap[p.project_type] : 'info'}">
-                      ${p.project_type}
+                      ${escapeHtml(p.project_type)}
                     </span>
                   </td>
                   <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(p.price_with_tax || 0).toLocaleString()}</td>
                   <td>
                     <span class="badge bg-${p.status === '已結案' ? 'secondary' : 'warning'}">
-                      ${p.status}
+                      ${escapeHtml(p.status)}
                     </span>
                   </td>
                 </tr>
@@ -131,12 +131,12 @@ ${typeof error   !== 'undefined' && error   ? '<div class="alert alert-danger  a
             <tbody>
               ${bonuses.length === 0 ? '<tr><td colspan="4" class="text-center text-muted py-3">尚無獎金</td></tr>' : bonuses.map(b => `
                 <tr>
-                  <td><a href="/projects/${b.project_id}"><code>${b.project_code}</code></a></td>
+                  <td><a href="/projects/${b.project_id}"><code>${escapeHtml(b.project_code)}</code></a></td>
                   <td>${b.bonus_type}</td>
                   <td class="text-end fw-bold">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(b.bonus_amount || 0).toLocaleString()}</td>
                   <td>
                     <span class="badge bg-${b.status === '已發放' ? 'success' : b.status === '充公' ? 'danger' : 'warning'}">
-                      ${b.status}
+                      ${escapeHtml(b.status)}
                     </span>
                   </td>
                 </tr>
@@ -156,7 +156,7 @@ ${typeof error   !== 'undefined' && error   ? '<div class="alert alert-danger  a
       <div class="row g-3">
         <div class="col-md-4">
           <label class="form-label">姓名</label>
-          <input type="text" name="name" class="form-control" value="${salesperson.name}" required>
+          <input type="text" name="name" class="form-control" value="${escapeHtml(salesperson.name)}" required>
         </div>
         <div class="col-md-4">
           <label class="form-label">狀態</label>

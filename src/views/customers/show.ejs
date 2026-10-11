@@ -1,7 +1,7 @@
 <%
   // 公司名稱、客戶編號、商機名稱皆為自由文字欄位，輸出前需跳脫，避免儲存型 XSS
   function escapeHtml(str) {
-    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return (str || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 %>
 <%- include('../layout', { body: `
@@ -20,7 +20,7 @@
       ${customer.customer_level ? '<span class="badge bg-' + ((typeof customerLevelColorMap !== 'undefined' && customerLevelColorMap[customer.customer_level]) || 'secondary') + ' align-middle">' + escapeHtml(customer.customer_level) + '級</span>' : ''}
       <span class="badge bg-${(typeof customerStatusColorMap !== 'undefined' && customerStatusColorMap[customer.status]) || 'secondary'} align-middle">${escapeHtml(customer.status || '往來中')}</span>
     </h1>
-    ${customer.industry ? '<p class="text-muted mb-0"><i class="bi bi-building"></i> ' + customer.industry.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>' : ''}
+    ${customer.industry ? '<p class="text-muted mb-0"><i class="bi bi-building"></i> ' + customer.industry.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '</p>' : ''}
   </div>
 </div>
 
@@ -51,7 +51,7 @@ ${success ? `
     <div class="card">
       <div class="card-body">
         <h6 class="text-muted">統一編號</h6>
-        <p class="fs-5 mb-0">${customer.tax_id || '-'}</p>
+        <p class="fs-5 mb-0">${escapeHtml(customer.tax_id || '-')}</p>
       </div>
     </div>
   </div>
@@ -59,7 +59,7 @@ ${success ? `
     <div class="card">
       <div class="card-body">
         <h6 class="text-muted"><i class="bi bi-person-badge"></i> 客戶關係負責人（使用者）</h6>
-        <p class="fs-5 mb-0">${customer.owner_salesperson_name || '-'}</p>
+        <p class="fs-5 mb-0">${escapeHtml(customer.owner_salesperson_name || '-')}</p>
       </div>
     </div>
   </div>
@@ -67,8 +67,8 @@ ${success ? `
     <div class="card">
       <div class="card-body">
         <h6 class="text-muted"><i class="bi bi-person-lines-fill"></i> 客戶聯絡窗口（對方）</h6>
-        <p class="fs-5 mb-0">${customer.contact_name || '-'}</p>
-        <p class="text-muted small mb-0">${customer.contact_phone || ''}${customer.contact_phone && customer.contact_email ? ' · ' : ''}${customer.contact_email || ''}</p>
+        <p class="fs-5 mb-0">${escapeHtml(customer.contact_name || '-')}</p>
+        <p class="text-muted small mb-0">${escapeHtml(customer.contact_phone || '')}${customer.contact_phone && customer.contact_email ? ' · ' : ''}${escapeHtml(customer.contact_email || '')}</p>
       </div>
     </div>
   </div>
@@ -76,7 +76,7 @@ ${success ? `
     <div class="card">
       <div class="card-body">
         <h6 class="text-muted"><i class="bi bi-geo-alt"></i> 地址</h6>
-        <p class="fs-5 mb-0">${(customer.address || '-').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+        <p class="fs-5 mb-0">${(customer.address || '-').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}</p>
       </div>
     </div>
   </div>
@@ -130,12 +130,12 @@ ${success ? `
         <tbody>
           ${projects.map(p => `
             <tr ${p._locked ? '' : `onclick="location.href='/projects/${p.id}'" style="cursor:pointer"`}>
-              <td><code>${p.project_code}</code>${p._locked ? ' <i class="bi bi-lock-fill text-muted" title="無權限查看此專案"></i>' : ''}</td>
-              <td>${p.project_name}</td>
-              <td><span class="badge bg-${typeof typeColorMap !== 'undefined' && typeColorMap[p.project_type] ? typeColorMap[p.project_type] : 'info'}">${p.project_type}</span></td>
-              <td>${p.salesperson_name || '-'}</td>
+              <td><code>${escapeHtml(p.project_code)}</code>${p._locked ? ' <i class="bi bi-lock-fill text-muted" title="無權限查看此專案"></i>' : ''}</td>
+              <td>${escapeHtml(p.project_name)}</td>
+              <td><span class="badge bg-${typeof typeColorMap !== 'undefined' && typeColorMap[p.project_type] ? typeColorMap[p.project_type] : 'info'}">${escapeHtml(p.project_type)}</span></td>
+              <td>${escapeHtml(p.salesperson_name || '-')}</td>
               <td class="text-end">${p._locked ? '<span class="text-muted">-</span>' : '' + (typeof currencySymbol !== 'undefined' ? currencySymbol : '$') + (p.price_with_tax || 0).toLocaleString()}</td>
-              <td><span class="badge bg-${p.status === '已結案' ? 'secondary' : 'warning'}">${p.status}</span></td>
+              <td><span class="badge bg-${p.status === '已結案' ? 'secondary' : 'warning'}">${escapeHtml(p.status)}</span></td>
             </tr>
           `).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">尚無專案</td></tr>'}
         </tbody>
@@ -215,7 +215,7 @@ ${success ? `
               <td>${r.project_code ? escapeHtml(r.project_code) : '<span class="text-muted">-</span>'}</td>
               <td>${recipientLabel}</td>
               <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(r.reward_amount || 0).toLocaleString()}</td>
-              <td><span class="badge bg-${statusBadge}">${r.status}</span></td>
+              <td><span class="badge bg-${statusBadge}">${escapeHtml(r.status)}</span></td>
               <td class="text-end">
                 ${locals.canEditCrm ? '<button type="button" class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editReferralModal' + r.id + '"><i class="bi bi-pencil"></i></button>' : ''}
                 ${deleteControl}
@@ -268,7 +268,7 @@ ${success ? `
         <li class="list-group-item d-flex justify-content-between align-items-start">
           <div>
             <span class="badge bg-${(typeof activityTypeColorMap !== 'undefined' && activityTypeColorMap[a.activity_type]) || 'secondary'} me-2">${escapeHtml(a.activity_type)}</span>
-            <span>${a.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
+            <span>${a.content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}</span>
             <div class="text-muted small mt-1">${a.activity_date} · ${escapeHtml(a.created_by) || 'system'}${a.opportunity_name ? ' · 商機：' + escapeHtml(a.opportunity_name) : ''}</div>
           </div>
           ${deleteControl}
@@ -305,15 +305,15 @@ ${locals.canEditCrm ? `
         </div>
         <div class="col-md-4">
           <label class="form-label">客戶編號</label>
-          <input type="text" name="customer_code" class="form-control" value="${(customer.customer_code || '').replace(/"/g, '&quot;')}" required>
+          <input type="text" name="customer_code" class="form-control" value="${escapeHtml(customer.customer_code)}" required>
         </div>
         <div class="col-md-4">
           <label class="form-label">統一編號</label>
-          <input type="text" name="tax_id" class="form-control" value="${customer.tax_id || ''}" maxlength="8">
+          <input type="text" name="tax_id" class="form-control" value="${escapeHtml(customer.tax_id || '')}" maxlength="8">
         </div>
         <div class="col-md-4">
           <label class="form-label">公司名稱</label>
-          <input type="text" name="company_name" class="form-control" value="${(customer.company_name || '').replace(/"/g, '&quot;')}" required>
+          <input type="text" name="company_name" class="form-control" value="${escapeHtml(customer.company_name)}" required>
         </div>
         <div class="col-md-4">
           <label class="form-label">客戶關係負責人（使用者）</label>
@@ -321,33 +321,33 @@ ${locals.canEditCrm ? `
             <option value="">-- 選擇使用者 --</option>
             ${(staffUsers || []).map(u => {
               const selected = customer.owner_salesperson_id == u.id ? 'selected' : '';
-              return '<option value="' + u.id + '" ' + selected + '>' + (u.name || '').replace(/"/g, '&quot;') + '</option>';
+              return '<option value="' + u.id + '" ' + selected + '>' + escapeHtml(u.name) + '</option>';
             }).join('')}
           </select>
         </div>
         <div class="col-md-4">
           <label class="form-label">聯絡人（對方窗口）</label>
-          <input type="text" name="contact_name" class="form-control" value="${(customer.contact_name || '').replace(/"/g, '&quot;')}">
+          <input type="text" name="contact_name" class="form-control" value="${escapeHtml(customer.contact_name)}">
         </div>
         <div class="col-md-4">
           <label class="form-label">聯絡電話</label>
-          <input type="text" name="contact_phone" class="form-control" value="${(customer.contact_phone || '').replace(/"/g, '&quot;')}">
+          <input type="text" name="contact_phone" class="form-control" value="${escapeHtml(customer.contact_phone)}">
         </div>
         <div class="col-md-4">
           <label class="form-label">聯絡信箱</label>
-          <input type="email" name="contact_email" class="form-control" value="${(customer.contact_email || '').replace(/"/g, '&quot;')}">
+          <input type="email" name="contact_email" class="form-control" value="${escapeHtml(customer.contact_email)}">
         </div>
         <div class="col-md-4">
           <label class="form-label">銀行名稱</label>
-          <input type="text" name="bank_name" class="form-control" value="${(customer.bank_name || '').replace(/"/g, '&quot;')}">
+          <input type="text" name="bank_name" class="form-control" value="${escapeHtml(customer.bank_name)}">
         </div>
         <div class="col-md-4">
           <label class="form-label">銀行帳號</label>
-          <input type="text" name="bank_account" class="form-control" value="${(customer.bank_account || '').replace(/"/g, '&quot;')}">
+          <input type="text" name="bank_account" class="form-control" value="${escapeHtml(customer.bank_account)}">
         </div>
         <div class="col-md-8">
           <label class="form-label">地址</label>
-          <input type="text" name="address" class="form-control" value="${(customer.address || '').replace(/"/g, '&quot;')}">
+          <input type="text" name="address" class="form-control" value="${escapeHtml(customer.address)}">
         </div>
         <div class="col-md-4">
           <label class="form-label">客戶等級</label>
@@ -362,7 +362,7 @@ ${locals.canEditCrm ? `
         </div>
         <div class="col-md-4">
           <label class="form-label">產業別</label>
-          <input type="text" name="industry" class="form-control" value="${(customer.industry || '').replace(/"/g, '&quot;')}">
+          <input type="text" name="industry" class="form-control" value="${escapeHtml(customer.industry)}">
         </div>
         <div class="col-md-4">
           <label class="form-label">往來狀態</label>
@@ -408,8 +408,8 @@ ${locals.canEditCrm ? `
             <select name="referred_customer_id" id="referredCustomerSelect" class="form-select select2-dropdown">
               <option value="">-- 尚未成立/不指定 --</option>
               ${(allCustomers || []).filter(c => c.id !== customer.id).map(c => {
-                const companyName = (c.company_name || '').replace(/"/g, '&quot;');
-                const customerCode = (c.customer_code || '').replace(/"/g, '&quot;');
+                const companyName = escapeHtml(c.company_name);
+                const customerCode = escapeHtml(c.customer_code);
                 return '<option value="' + c.id + '">' + companyName + ' (' + customerCode + ')</option>';
               }).join('')}
             </select>
@@ -426,7 +426,7 @@ ${locals.canEditCrm ? `
             <label class="form-label">員工</label>
             <select name="recipient_user_id" class="form-select select2-dropdown">
               <option value="">-- 選擇員工 --</option>
-              ${(staffUsers || []).map(u => '<option value="' + u.id + '">' + (u.name || '').replace(/"/g, '&quot;') + '</option>').join('')}
+              ${(staffUsers || []).map(u => '<option value="' + u.id + '">' + escapeHtml(u.name) + '</option>').join('')}
             </select>
           </div>
           <div class="mb-3">
@@ -532,7 +532,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
       if (result.success) {
         const c = result.customer;
-        const displayText = c.company_name + ' (' + c.customer_code + ')';
+        const displayText = c.company_name + ' (' + escapeHtml(c.customer_code) + ')';
         const newOption = new Option(displayText, c.id, true, true);
         $('#referredCustomerSelect').append(newOption).trigger('change');
 
@@ -574,8 +574,8 @@ ${(referralRewards || []).map(r => `
             <select name="referred_customer_id" class="form-select select2-dropdown">
               <option value="">-- 尚未成立/不指定 --</option>
               ${(allCustomers || []).filter(c => c.id !== customer.id).map(c => {
-                const companyName = (c.company_name || '').replace(/"/g, '&quot;');
-                const customerCode = (c.customer_code || '').replace(/"/g, '&quot;');
+                const companyName = escapeHtml(c.company_name);
+                const customerCode = escapeHtml(c.customer_code);
                 const selected = r.referred_customer_id === c.id ? 'selected' : '';
                 return '<option value="' + c.id + '" ' + selected + '>' + companyName + ' (' + customerCode + ')</option>';
               }).join('')}
@@ -594,7 +594,7 @@ ${(referralRewards || []).map(r => `
               <option value="">-- 選擇員工 --</option>
               ${(staffUsers || []).map(u => {
                 const selected = r.recipient_user_id === u.id ? 'selected' : '';
-                return '<option value="' + u.id + '" ' + selected + '>' + (u.name || '').replace(/"/g, '&quot;') + '</option>';
+                return '<option value="' + u.id + '" ' + selected + '>' + escapeHtml(u.name) + '</option>';
               }).join('')}
             </select>
           </div>
@@ -612,11 +612,11 @@ ${(referralRewards || []).map(r => `
           </div>
           <div class="mb-3">
             <label class="form-label">充公原因</label>
-            <textarea name="forfeiture_reason" class="form-control" rows="2">${r.forfeiture_reason || ''}</textarea>
+            <textarea name="forfeiture_reason" class="form-control" rows="2">${escapeHtml(r.forfeiture_reason || '')}</textarea>
           </div>
           <div class="mb-3">
             <label class="form-label">備註</label>
-            <textarea name="notes" class="form-control" rows="2">${r.notes || ''}</textarea>
+            <textarea name="notes" class="form-control" rows="2">${escapeHtml(r.notes || '')}</textarea>
           </div>
         </div>
         <div class="modal-footer">

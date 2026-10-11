@@ -1,6 +1,6 @@
 <%
   function escapeHtml(str) {
-    return (str || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return (str || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 %>
 <%- include('../layout', { body: `
@@ -31,8 +31,8 @@ ${error ? `
             ${customers.map(c => {
               const selectedCustomerId = pipeline ? pipeline.customer_id : presetCustomerId;
               const selected = selectedCustomerId && selectedCustomerId == c.id ? 'selected' : '';
-              const companyName = (c.company_name || '').replace(/"/g, '&quot;');
-              const customerCode = (c.customer_code || '').replace(/"/g, '&quot;');
+              const companyName = escapeHtml(c.company_name);
+              const customerCode = escapeHtml(c.customer_code);
               return '<option value="' + c.id + '" ' + selected + '>' + companyName + ' (' + customerCode + ')</option>';
             }).join('')}
           </select>
@@ -47,14 +47,14 @@ ${error ? `
             <option value="">-- 選擇業務 --</option>
             ${salespeople.map(s => {
               const selected = pipeline && pipeline.salesperson_id == s.id ? 'selected' : '';
-              const name = (s.name || '').replace(/"/g, '&quot;');
+              const name = escapeHtml(s.name);
               return '<option value="' + s.id + '" ' + selected + '>' + name + '</option>';
             }).join('')}
           </select>
         </div>
         <div class="col-12">
           <label class="form-label">銷售機會名稱 <span class="text-danger">*</span></label>
-          <input type="text" name="opportunity_name" class="form-control" value="${pipeline ? (pipeline.opportunity_name || '').replace(/"/g, '&quot;') : ''}" required>
+          <input type="text" name="opportunity_name" class="form-control" value="${pipeline ? escapeHtml(pipeline.opportunity_name) : ''}" required>
         </div>
 
         <div class="col-md-6">
@@ -64,8 +64,8 @@ ${error ? `
               ${projectTypes.map(type => {
                 const selectedTypes = pipeline && pipeline.project_type ? pipeline.project_type.split(',').map(t => t.trim()) : [];
                 const selected = selectedTypes.includes(type.type_name) ? 'selected' : '';
-                const safeName = (type.type_name || '').replace(/"/g, '&quot;');
-                return '<option value="' + safeName + '" ' + selected + '>' + type.type_name + '</option>';
+                const safeName = escapeHtml(type.type_name);
+                return '<option value="' + safeName + '" ' + selected + '>' + escapeHtml(type.type_name) + '</option>';
               }).join('')}
             </select>
           ` : '<div class="border rounded p-2"><span class="text-muted small">尚無可選類型，請先於「專案類型管理」新增</span></div>'}
@@ -145,7 +145,7 @@ ${error ? `
 
         <div class="col-12">
           <label class="form-label">備註</label>
-          <textarea name="notes" class="form-control" rows="3">${pipeline ? (pipeline.notes || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</textarea>
+          <textarea name="notes" class="form-control" rows="3">${pipeline ? (pipeline.notes || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;') : ''}</textarea>
         </div>
       </div>
 
@@ -388,7 +388,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
           if (result.success) {
             const customer = result.customer;
-            const displayText = customer.company_name + ' (' + customer.customer_code + ')';
+            const displayText = customer.company_name + ' (' + escapeHtml(customer.customer_code) + ')';
             const newOption = new Option(displayText, customer.id, true, true);
             $('#customer_id').append(newOption).trigger('change');
             quickAddModal.hide();
