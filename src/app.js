@@ -172,7 +172,6 @@ try {
   console.log('[啟動] ✓ auditLogs 路由載入完成');
   const loginHistoryRoutes = require('./routes/loginHistory');
   console.log('[啟動] ✓ loginHistory 路由載入完成');
-  const apiRoutes = require('./routes/api');
   console.log('[啟動] ✓ api 路由載入完成');
   const userRoutes = require('./routes/users');
   console.log('[啟動] ✓ users 路由載入完成');
@@ -288,7 +287,8 @@ try {
   app.use('/search', requireAuth, require('./routes/search'));
   app.use('/health', requireAuth, healthRoutes);
   app.use('/roles', requireAuth, roleRoutes);
-  app.use('/api', requireAuth, apiRoutes);
+  // /api 路由（routes/api.js）已停用：前端沒有任何呼叫，且該路由缺少編輯權限與專案範圍檢查，
+  // 會讓任何登入者讀取全公司專案/獎金/客戶資料（含銀行帳號）。若日後需要，須先補上權限與範圍過濾再掛載。
   app.use('/', requireAuth, indexRoutes);
   console.log('[啟動] ✓ 所有路由設定完成');
 } catch (err) {

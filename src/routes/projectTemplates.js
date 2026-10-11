@@ -4,6 +4,7 @@ const ProjectTemplate = require('../models/ProjectTemplate');
 const Salesperson = require('../models/Salesperson');
 const Customer = require('../models/Customer');
 const db = require('../models/db');
+const { requireEditPermission } = require('../middleware/auth');
 
 function getActiveProjectTypes() {
   try {
@@ -43,7 +44,7 @@ router.get('/new', (req, res) => {
 });
 
 // 建立範本
-router.post('/', (req, res) => {
+router.post('/', requireEditPermission, (req, res) => {
   try {
     if (!(req.body.name || '').trim()) {
       return res.redirect('/project-templates/new?error=' + encodeURIComponent('範本名稱為必填'));
@@ -90,7 +91,7 @@ router.get('/:id/edit', (req, res) => {
 });
 
 // 更新範本
-router.post('/:id', (req, res) => {
+router.post('/:id', requireEditPermission, (req, res) => {
   try {
     const template = ProjectTemplate.findById(req.params.id);
     if (!template) {
@@ -121,7 +122,7 @@ router.post('/:id', (req, res) => {
 });
 
 // 刪除範本
-router.post('/:id/delete', (req, res) => {
+router.post('/:id/delete', requireEditPermission, (req, res) => {
   try {
     ProjectTemplate.delete(req.params.id);
     res.redirect('/project-templates?success=' + encodeURIComponent('範本已刪除'));

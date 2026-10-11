@@ -360,14 +360,15 @@ router.post('/:id/activities/:activityId/delete', requireCrmEditPermission, (req
       return res.status(404).render('error', { title: '找不到銷售機會', message: '找不到此銷售機會', error: {} });
     }
 
+    // 活動必須屬於網址中的銷售機會，避免用任意 activityId 刪除/申請刪除他人的活動
+    const activity = Activity.findById(req.params.activityId);
+    if (!activity || String(activity.pipeline_id) !== String(req.params.id)) {
+      return res.redirect(`/pipelines/${req.params.id}?error=` + encodeURIComponent('找不到此活動紀錄'));
+    }
+
     if (req.user.canDelete) {
       Activity.softDelete(req.params.activityId, getUserInfo(req));
       return res.redirect(`/pipelines/${req.params.id}`);
-    }
-
-    const activity = Activity.findById(req.params.activityId);
-    if (!activity) {
-      return res.redirect(`/pipelines/${req.params.id}?error=` + encodeURIComponent('找不到此活動紀錄'));
     }
 
     const existing = DeletionRequest.findPendingByTarget('activity', activity.id);

@@ -5,6 +5,7 @@ const Project = require('../models/Project');
 const Bonus = require('../models/Bonus');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireEditPermission } = require('../middleware/auth');
+const { PROJECT_VIEW_SCOPE } = require('../constants');
 const cache = require('../services/CacheService');
 const db = require('../models/db');
 
@@ -24,8 +25,21 @@ function getTypeColorMap() {
   return map;
 }
 
+// 業務列表與詳情含全公司的業績與獎金：列表僅限專案檢視範圍為「全部」的角色；
+// 詳情只能看範圍內的業務（自己／指派的業務），不能靠猜 id 看別人的業績與獎金
+function canViewAllSalespeople(user) {
+  return !!user && (user.project_view_scope || PROJECT_VIEW_SCOPE.ALL) === PROJECT_VIEW_SCOPE.ALL;
+}
+function canViewSalesperson(user, salespersonId) {
+  return Project._isInScope({ salesperson_id: parseInt(salespersonId, 10) }, user);
+}
+function denyView(req, res) {
+  return res.status(403).render('error', { title: '權限不足', message: '您沒有權限查看此業務的資料', error: {} });
+}
+
 // 業務列表
 router.get('/', (req, res) => {
+  if (!canViewAllSalespeople(req.user)) return denyView(req, res);
   const salespeople = Salesperson.findAll(true);
   const years = Project.getYears();
   const yearFilter = req.query.year;
@@ -149,7 +163,7 @@ router.get('/', (req, res) => {
 });
 
 // 新增業務
-router.post('/', (req, res) => {
+router.post('/', requireEditPermission, (req, res) => {
   try {
     Salesperson.create({
       name: req.body.name,
@@ -235,6 +249,7 @@ router.post('/:id/transfer-projects', requireEditPermission, (req, res) => {
 
 // 業務詳情
 router.get('/:id', (req, res) => {
+  if (!canViewSalesperson(req.user, req.params.id)) return denyView(req, res);
   const salesperson = Salesperson.findById(req.params.id);
   if (!salesperson) {
     return res.status(404).render('error', { 
@@ -253,7 +268,7 @@ router.get('/:id', (req, res) => {
   const projects = Project.findAll({
     year: selectedYear,
     salesperson: salesperson.name
-  });
+  }, req.user);
 
   // 業務的獎金
   const bonuses = Bonus.findBySalesperson(salesperson.id, selectedYear);
@@ -283,7 +298,7 @@ router.get('/:id', (req, res) => {
 });
 
 // 更新業務
-router.post('/:id', (req, res) => {
+router.post('/:id', requireEditPermission, (req, res) => {
   try {
     Salesperson.update(req.params.id, {
       name: req.body.name,

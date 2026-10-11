@@ -5,6 +5,12 @@ const Project = require('../models/Project');
 const Salesperson = require('../models/Salesperson');
 const db = require('../models/db');
 const { getUserInfo } = require('../utils/authHelper');
+const safeRedirect = require('../utils/safeRedirect');
+const { requireEditPermission } = require('../middleware/auth');
+const { requireProjectScopeFromBody, requireProjectScopeFromRecord, userCanAccessProject } = require('../utils/projectScope');
+
+// 寫入獎金需要編輯權限，且操作的專案必須在使用者的專案範圍內
+const bonusScope = requireProjectScopeFromRecord(id => Bonus.findById(id));
 
 // 獎金總覽
 router.get('/', (req, res) => {
@@ -132,7 +138,7 @@ router.get('/', (req, res) => {
 });
 
 // 新增獎金
-router.post('/', (req, res) => {
+router.post('/', requireEditPermission, requireProjectScopeFromBody, (req, res) => {
   try {
     Bonus.create({
       project_id: req.body.project_id,
@@ -155,7 +161,7 @@ router.post('/', (req, res) => {
 });
 
 // 更新獎金狀態
-router.post('/:id', (req, res) => {
+router.post('/:id', requireEditPermission, bonusScope, (req, res) => {
   try {
     const bonus = Bonus.findById(req.params.id);
     if (!bonus) {
@@ -175,13 +181,13 @@ router.post('/:id', (req, res) => {
       forfeiture_reason: req.body.forfeiture_reason || null
     });
 
-    const redirectTo = req.body.redirect || `/projects/${bonus.project_id}`;
+    const redirectTo = safeRedirect(req.body.redirect, `/projects/${bonus.project_id}`);
     res.redirect(redirectTo);
   } catch (err) {
     console.error(err);
     const bonus = Bonus.findById(req.params.id);
     if (bonus) {
-      const redirectTo = req.body.redirect || `/projects/${bonus.project_id}`;
+      const redirectTo = safeRedirect(req.body.redirect, `/projects/${bonus.project_id}`);
       res.redirect(redirectTo + '?error=' + encodeURIComponent(err.message));
     } else {
       res.redirect('/projects?error=' + encodeURIComponent(err.message));
@@ -190,7 +196,7 @@ router.post('/:id', (req, res) => {
 });
 
 // 批次更新獎金狀態
-router.post('/batch-update', (req, res) => {
+router.post('/batch-update', requireEditPermission, (req, res) => {
   try {
     const ids = req.body.ids;
     const status = req.body.status;
@@ -200,6 +206,13 @@ router.post('/batch-update', (req, res) => {
       return res.status(400).json({ error: '請選擇要更新的獎金' });
     }
 
+    // 先全部檢查範圍再更新，任何一筆不在範圍內就整批拒絕
+    for (const id of ids) {
+      const bonus = Bonus.findById(id);
+      if (bonus && !userCanAccessProject(req.user, bonus.project_id)) {
+        return res.status(403).json({ error: '部分獎金所屬專案不在您的權限範圍內' });
+      }
+    }
     for (const id of ids) {
       Bonus.update(id, { status, payment_date: paymentDate });
     }
@@ -212,7 +225,7 @@ router.post('/batch-update', (req, res) => {
 });
 
 // 批次刪除獎金（需要刪除權限）
-router.post('/batch-delete', (req, res) => {
+router.post('/batch-delete', requireEditPermission, (req, res) => {
   if (!req.user || !req.user.canDelete) {
     return res.redirect('/bonuses?error=' + encodeURIComponent('權限不足'));
   }
@@ -233,7 +246,7 @@ router.post('/batch-delete', (req, res) => {
     idsToDelete.forEach(id => {
       try {
         const bonus = Bonus.findById(id);
-        if (bonus) {
+        if (bonus && userCanAccessProject(req.user, bonus.project_id)) {
           Bonus.delete(id, getUserInfo(req));
           deletedCount++;
         } else {
@@ -257,7 +270,7 @@ router.post('/batch-delete', (req, res) => {
 });
 
 // 刪除獎金
-router.post('/:id/delete', (req, res) => {
+router.post('/:id/delete', requireEditPermission, bonusScope, (req, res) => {
   try {
     const bonus = Bonus.findById(req.params.id);
     if (!bonus) {

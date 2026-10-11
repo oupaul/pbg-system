@@ -14,6 +14,10 @@ const Customer = require('../models/Customer');
 const SettingsRoutes = require('./settings');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireEditPermission } = require('../middleware/auth');
+const { requireProjectScopeFromParam, requireNumericParam } = require('../utils/projectScope');
+
+// 操作專案附件／刪除專案前，必須確認專案在使用者的範圍內（避免猜 id 改到他人專案）
+const projectScope = requireProjectScopeFromParam('id');
 const AuditLogService = require('../services/AuditLogService');
 const cache = require('../services/CacheService');
 
@@ -26,8 +30,9 @@ const uploadAttachment = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => cb(null, attachmentsDir),
     filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname) || '';
-      const name = `project_${req.params.id}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}${ext}`;
+      // 縱深防禦：id 只留數字、副檔名只接受英數字，儲存檔名不含任何路徑字元
+      const ext = /^\.[A-Za-z0-9]{1,10}$/.test(path.extname(file.originalname)) ? path.extname(file.originalname) : '';
+      const name = `project_${String(req.params.id).replace(/\D/g, '')}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}${ext}`;
       cb(null, name);
     }
   }),
@@ -553,7 +558,7 @@ router.get('/:id/attachments/:attachmentId/download', (req, res) => {
 });
 
 // 專案附件軟刪除（需編輯權限）
-router.post('/:id/attachments/:attachmentId/delete', requireEditPermission, (req, res) => {
+router.post('/:id/attachments/:attachmentId/delete', requireEditPermission, requireNumericParam('id'), projectScope, (req, res) => {
   try {
     const row = db.prepare('SELECT * FROM project_attachments WHERE id = ? AND project_id = ?').get(req.params.attachmentId, req.params.id);
     if (!row) return res.redirect(`/projects/${req.params.id}?error=` + encodeURIComponent('找不到附件'));
@@ -569,7 +574,7 @@ router.post('/:id/attachments/:attachmentId/delete', requireEditPermission, (req
 });
 
 // 專案附件還原（需編輯權限）
-router.post('/:id/attachments/:attachmentId/restore', requireEditPermission, (req, res) => {
+router.post('/:id/attachments/:attachmentId/restore', requireEditPermission, requireNumericParam('id'), projectScope, (req, res) => {
   try {
     const row = db.prepare('SELECT * FROM project_attachments WHERE id = ? AND project_id = ?').get(req.params.attachmentId, req.params.id);
     if (!row) return res.redirect(`/projects/${req.params.id}?error=` + encodeURIComponent('找不到附件'));
@@ -586,7 +591,7 @@ router.post('/:id/attachments/:attachmentId/restore', requireEditPermission, (re
 });
 
 // 專案附件上傳（需編輯權限）
-router.post('/:id/attachments', requireEditPermission, uploadAttachment.single('file'), (req, res) => {
+router.post('/:id/attachments', requireEditPermission, requireNumericParam('id'), projectScope, uploadAttachment.single('file'), (req, res) => {
   if (!req.file) return res.redirect(`/projects/${req.params.id}?error=` + encodeURIComponent('請選擇檔案'));
   try {
     const displayName = fixFilenameEncoding(req.file.originalname || req.file.filename);
@@ -889,7 +894,7 @@ router.post('/:id', requireEditPermission, (req, res) => {
 });
 
 // 更新預計開立發票年月（需要編輯權限）
-router.post('/:id/update-expected-invoice', requireEditPermission, (req, res) => {
+router.post('/:id/update-expected-invoice', requireEditPermission, projectScope, (req, res) => {
   try {
     console.log('='.repeat(60));
     console.log('[更新預計開票] 開始處理');
@@ -950,7 +955,7 @@ router.post('/:id/update-expected-invoice', requireEditPermission, (req, res) =>
 });
 
 // 刪除專案（需要編輯權限）
-router.post('/:id/delete', requireEditPermission, (req, res) => {
+router.post('/:id/delete', requireEditPermission, projectScope, (req, res) => {
   try {
     Project.delete(req.params.id);
     cache.delByPrefix('dashboard:');

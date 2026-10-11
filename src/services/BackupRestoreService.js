@@ -1,8 +1,15 @@
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
 const { promisify } = require('util');
 const fs = require('fs');
 const path = require('path');
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
+
+// 備份檔名白名單：只接受純檔名（不含路徑字元），避免用 ../ 指到備份目錄外的任意檔案
+const BACKUP_FILE_NAME_PATTERN = /^(backup_|uninstall_backup_)[A-Za-z0-9._-]+\.tar\.gz$/;
+function isValidBackupFileName(name) {
+  return typeof name === 'string' && BACKUP_FILE_NAME_PATTERN.test(name) && !name.includes('..');
+}
 const progressService = require('./BackupProgressService');
 
 const PROJECT_DIR = process.cwd();
@@ -416,6 +423,11 @@ class BackupRestoreService {
    */
   static async restoreBackup(backupFileName, operationId = null) {
     const opId = operationId || progressService.generateOperationId();
+
+    if (!isValidBackupFileName(backupFileName)) {
+      progressService.setProgress(opId, { status: 'error', operation: 'restore', progress: 0, message: '備份檔案名稱不合法' });
+      throw new Error('備份檔案名稱不合法');
+    }
     
     try {
       // 設置初始進度
@@ -797,6 +809,9 @@ class BackupRestoreService {
    * 刪除備份檔案
    */
   static async deleteBackup(backupFileName) {
+    if (!isValidBackupFileName(backupFileName)) {
+      return { success: false, error: '備份檔案名稱不合法' };
+    }
     try {
       // 查找備份檔案
       let backupPath = null;
@@ -817,7 +832,8 @@ class BackupRestoreService {
 
       // 安裝環境需要 root 權限刪除
       if (isInstalled()) {
-        await execAsync(`sudo rm -f "${backupPath}"`);
+        // 不經過 shell：檔名已通過白名單驗證，仍以參數陣列傳遞避免任何注入
+        await execFileAsync('sudo', ['rm', '-f', '--', backupPath]);
       } else {
         fs.unlinkSync(backupPath);
       }
@@ -866,5 +882,6 @@ class BackupRestoreService {
 }
 
 module.exports = BackupRestoreService;
+module.exports.isValidBackupFileName = isValidBackupFileName;
 
 

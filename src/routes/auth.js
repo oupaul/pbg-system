@@ -9,7 +9,7 @@ const { loginRateLimiter, resetOnSuccess } = require('../middleware/rateLimiter'
 
 // 只允許相對路徑重新導向，防止 open redirect
 function safeRedirect(redirect) {
-  if (typeof redirect === 'string' && /^\/(?!\/)/.test(redirect)) return redirect;
+  if (typeof redirect === 'string' && /^\/(?![\/\\])/.test(redirect) && !/[\u0000-\u001f]/.test(redirect)) return redirect;
   return '/';
 }
 

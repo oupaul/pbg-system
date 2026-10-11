@@ -106,6 +106,9 @@ router.post('/restore', async (req, res) => {
         error: '請選擇要還原的備份檔案'
       });
     }
+    if (!BackupRestoreService.isValidBackupFileName(backupFile)) {
+      return res.status(400).json({ success: false, error: '備份檔案名稱不合法' });
+    }
 
     // 異步執行還原，立即返回操作 ID
     const operationId = BackupRestoreService.generateOperationId ? 
@@ -157,6 +160,9 @@ router.post('/delete', async (req, res) => {
     const { backupFile } = req.body;
     if (!backupFile) {
       return res.redirect('/backup-restore?error=' + encodeURIComponent('請選擇要刪除的備份檔案'));
+    }
+    if (!BackupRestoreService.isValidBackupFileName(backupFile)) {
+      return res.redirect('/backup-restore?error=' + encodeURIComponent('備份檔案名稱不合法'));
     }
 
     const result = await BackupRestoreService.deleteBackup(backupFile);

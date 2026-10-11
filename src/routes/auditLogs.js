@@ -6,7 +6,12 @@ const Customer = require('../models/Customer');
 const Invoice = require('../models/Invoice');
 const dayjs = require('dayjs');
 
+const { requireAdmin } = require('../middleware/auth');
+
 const router = express.Router();
+
+// 修改記錄含使用者、角色、金額異動等資料，僅限管理員查看與匯出
+router.use(requireAdmin);
 
 // 資料庫欄位對應中文顯示名稱（供修改記錄易讀）
 const FIELD_LABELS = {

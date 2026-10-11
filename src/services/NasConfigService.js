@@ -50,12 +50,31 @@ class NasConfigService {
       if (!config.host || !config.path) {
         throw new Error('NAS 主機和路徑為必填項');
       }
+
+      // 這些欄位會直接組進 ssh/rsync/scp 的參數：只接受安全字元，且不可以 "-" 開頭（避免被當成選項，
+      // 例如 -oProxyCommand=... 可執行任意指令）
+      if (!/^[A-Za-z0-9][A-Za-z0-9.\-]*$/.test(String(config.host))) {
+        throw new Error('NAS 主機格式不正確（只能包含英數字、點與連字號）');
+      }
+      if (config.username && !/^[A-Za-z0-9_][A-Za-z0-9._-]*$/.test(String(config.username))) {
+        throw new Error('NAS 使用者名稱格式不正確');
+      }
+      if (!/^\/[A-Za-z0-9._/@+-]*$/.test(String(config.path)) || String(config.path).split('/').includes('..')) {
+        throw new Error('NAS 路徑必須是以 / 開頭的絕對路徑，且不可包含 .. 或特殊字元');
+      }
+      const port = config.port === undefined || config.port === '' ? 22 : parseInt(config.port, 10);
+      if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        throw new Error('NAS 連接埠必須是 1–65535 的整數');
+      }
+      if (config.protocol && !['rsync', 'scp'].includes(config.protocol)) {
+        throw new Error('NAS 傳輸協定只能是 rsync 或 scp');
+      }
       
       // 保存設定（不保存密碼到檔案，使用環境變數或加密）
       const configToSave = {
         enabled: config.enabled || false,
         host: config.host,
-        port: config.port || 22,
+        port,
         username: config.username,
         path: config.path,
         protocol: config.protocol || 'rsync', // rsync 或 scp

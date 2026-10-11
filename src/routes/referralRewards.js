@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const ReferralReward = require('../models/ReferralReward');
 const { getUserInfo } = require('../utils/authHelper');
+const safeRedirect = require('../utils/safeRedirect');
 const { requireCrmEditPermission } = require('../middleware/auth');
 
 // 轉介紹獎勵總覽
@@ -60,13 +61,13 @@ router.post('/:id', requireCrmEditPermission, (req, res) => {
       userInfo: getUserInfo(req)
     });
 
-    const redirectTo = req.body.redirect || `/customers/${reward.referring_customer_id}`;
+    const redirectTo = safeRedirect(req.body.redirect, `/customers/${reward.referring_customer_id}`);
     res.redirect(redirectTo);
   } catch (err) {
     console.error(err);
     const reward = ReferralReward.findById(req.params.id);
     if (reward) {
-      const redirectTo = req.body.redirect || `/customers/${reward.referring_customer_id}`;
+      const redirectTo = safeRedirect(req.body.redirect, `/customers/${reward.referring_customer_id}`);
       res.redirect(redirectTo + '?error=' + encodeURIComponent(err.message));
     } else {
       res.redirect('/referral-rewards?error=' + encodeURIComponent(err.message));
@@ -82,7 +83,7 @@ router.post('/:id/delete', requireCrmEditPermission, (req, res) => {
       return res.status(404).json({ error: '找不到轉介紹獎勵記錄' });
     }
 
-    const redirectTo = req.body.redirect || `/customers/${reward.referring_customer_id}`;
+    const redirectTo = safeRedirect(req.body.redirect, `/customers/${reward.referring_customer_id}`);
     ReferralReward.delete(req.params.id, getUserInfo(req));
 
     res.redirect(redirectTo);

@@ -105,7 +105,9 @@
             <ul class="dropdown-menu">
               <li><a class="dropdown-item <%= navActive('/project-templates') %>" href="/project-templates"><i class="bi bi-file-earmark-text"></i> 專案範本</a></li>
               <li><a class="dropdown-item <%= navActive('/import-export') %>" href="/import-export"><i class="bi bi-arrow-left-right"></i> 匯入/匯出</a></li>
+              <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
               <li><a class="dropdown-item <%= navActive('/audit-logs') %>" href="/audit-logs"><i class="bi bi-clock-history"></i> 修改記錄</a></li>
+              <% } %>
               <li><a class="dropdown-item <%= navActive('/salespeople') %>" href="/salespeople"><i class="bi bi-people"></i> 業務管理</a></li>
               <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
               <li><hr class="dropdown-divider"></li>

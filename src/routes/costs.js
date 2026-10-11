@@ -2,9 +2,14 @@ const express = require('express');
 const router = express.Router();
 const Cost = require('../models/Cost');
 const { getUserInfo } = require('../utils/authHelper');
+const { requireEditPermission } = require('../middleware/auth');
+const { requireProjectScopeFromBody, requireProjectScopeFromRecord } = require('../utils/projectScope');
+
+// 寫入成本需要編輯權限，且操作的專案必須在使用者的專案範圍內
+const costScope = requireProjectScopeFromRecord(id => Cost.findById(id));
 
 // 新增成本
-router.post('/', (req, res) => {
+router.post('/', requireEditPermission, requireProjectScopeFromBody, (req, res) => {
   try {
     Cost.create({
       project_id: req.body.project_id,
@@ -31,7 +36,7 @@ router.post('/', (req, res) => {
 });
 
 // 更新成本
-router.post('/:id', (req, res) => {
+router.post('/:id', requireEditPermission, costScope, (req, res) => {
   try {
     const cost = Cost.findById(req.params.id);
     if (!cost) {
@@ -71,7 +76,7 @@ router.post('/:id', (req, res) => {
 });
 
 // 刪除成本
-router.post('/:id/delete', (req, res) => {
+router.post('/:id/delete', requireEditPermission, costScope, (req, res) => {
   try {
     const cost = Cost.findById(req.params.id);
     if (!cost) {

@@ -604,14 +604,15 @@ router.post('/:id/activities/:activityId/delete', requireCrmEditPermission, (req
       return res.status(404).render('error', { message: '找不到客戶', error: {} });
     }
 
+    // 活動必須屬於網址中的客戶，避免用任意 activityId 刪除/申請刪除他人客戶的活動
+    const activity = Activity.findById(req.params.activityId);
+    if (!activity || String(activity.customer_id) !== String(req.params.id)) {
+      return res.redirect(`/customers/${req.params.id}?error=` + encodeURIComponent('找不到此活動紀錄'));
+    }
+
     if (req.user.canDelete) {
       Activity.softDelete(req.params.activityId, getUserInfo(req));
       return res.redirect(`/customers/${req.params.id}`);
-    }
-
-    const activity = Activity.findById(req.params.activityId);
-    if (!activity) {
-      return res.redirect(`/customers/${req.params.id}?error=` + encodeURIComponent('找不到此活動紀錄'));
     }
 
     const existing = DeletionRequest.findPendingByTarget('activity', activity.id);

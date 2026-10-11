@@ -3,9 +3,14 @@ const router = express.Router();
 const Payment = require('../models/Payment');
 const { getUserInfo } = require('../utils/authHelper');
 const cache = require('../services/CacheService');
+const { requireEditPermission } = require('../middleware/auth');
+const { requireProjectScopeFromBody, requireProjectScopeFromRecord } = require('../utils/projectScope');
+
+// 寫入收款需要編輯權限，且操作的專案必須在使用者的專案範圍內
+const paymentScope = requireProjectScopeFromRecord(id => Payment.findById(id));
 
 // 新增收款
-router.post('/', (req, res) => {
+router.post('/', requireEditPermission, requireProjectScopeFromBody, (req, res) => {
   try {
     Payment.create({
       project_id: req.body.project_id,
@@ -27,7 +32,7 @@ router.post('/', (req, res) => {
 });
 
 // 更新收款
-router.post('/:id', (req, res) => {
+router.post('/:id', requireEditPermission, paymentScope, (req, res) => {
   try {
     const payment = Payment.findById(req.params.id);
     if (!payment) {
@@ -61,7 +66,7 @@ router.post('/:id', (req, res) => {
 });
 
 // 刪除收款（軟刪除）
-router.post('/:id/delete', (req, res) => {
+router.post('/:id/delete', requireEditPermission, paymentScope, (req, res) => {
   try {
     const payment = Payment.findById(req.params.id);
     if (!payment) {
@@ -79,7 +84,7 @@ router.post('/:id/delete', (req, res) => {
 });
 
 // 還原收款
-router.post('/:id/restore', (req, res) => {
+router.post('/:id/restore', requireEditPermission, paymentScope, (req, res) => {
   try {
     const payment = Payment.findById(req.params.id);
     if (!payment) {
