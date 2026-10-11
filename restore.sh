@@ -4,6 +4,9 @@
 # 注意：不要使用 set -e，因為我們需要捕獲錯誤並正確處理
 # set -e
 
+# 還原過程產生的暫存檔、快照含資料庫與設定：預設只有擁有者可讀寫
+umask 077
+
 # 顏色定義
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -348,13 +351,27 @@ log "在還原前先備份現有資料..."
 TEMP_BACKUP="${BACKUP_DIR}/temp_backup_before_restore_$(date +'%Y%m%d_%H%M%S').tar.gz"
 mkdir -p "${PROJECT_DIR}/temp_restore_backup"
 if [ -f "${PROJECT_DIR}/data/invoice_bonus.db" ]; then
-    cp "${PROJECT_DIR}/data/invoice_bonus.db" "${PROJECT_DIR}/temp_restore_backup/invoice_bonus.db"
+    # 服務此時仍在運行：不能直接 cp 運作中的 WAL 資料庫（可能撕裂/過期），改用 SQLite 線上備份取得一致的快照
+    if command -v sqlite3 >/dev/null 2>&1; then
+        sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" ".timeout 10000" ".backup '${PROJECT_DIR}/temp_restore_backup/invoice_bonus.db'" \
+            || error "還原前的資料庫快照失敗，已中止還原（現有資料未被更動）"
+    elif command -v node >/dev/null 2>&1 && [ -f "${PROJECT_DIR}/scripts/sqlite-backup.js" ]; then
+        (cd "${PROJECT_DIR}" && node scripts/sqlite-backup.js "${PROJECT_DIR}/data/invoice_bonus.db" "${PROJECT_DIR}/temp_restore_backup/invoice_bonus.db") \
+            || error "還原前的資料庫快照失敗，已中止還原（現有資料未被更動）"
+    else
+        error "找不到 sqlite3 或 node，無法在還原前建立一致的資料庫快照，已中止還原"
+    fi
 fi
 if [ -d "${PROJECT_DIR}/uploads" ] && [ "$(ls -A ${PROJECT_DIR}/uploads 2>/dev/null)" ]; then
     cp -r "${PROJECT_DIR}/uploads" "${PROJECT_DIR}/temp_restore_backup/" 2>/dev/null || true
 fi
+if [ -d "${PROJECT_DIR}/data/branding" ]; then
+    mkdir -p "${PROJECT_DIR}/temp_restore_backup/data"
+    cp -R "${PROJECT_DIR}/data/branding" "${PROJECT_DIR}/temp_restore_backup/data/" 2>/dev/null || true
+fi
 cd "${PROJECT_DIR}"
-tar -czf "$TEMP_BACKUP" -C "${PROJECT_DIR}/temp_restore_backup" . 2>/dev/null || true
+tar -czf "$TEMP_BACKUP" -C "${PROJECT_DIR}/temp_restore_backup" . || error "還原前快照壓縮失敗，已中止還原"
+chmod 600 "$TEMP_BACKUP" 2>/dev/null || true
 rm -rf "${PROJECT_DIR}/temp_restore_backup"
 if [ -f "$TEMP_BACKUP" ]; then
     log "現有資料已備份至: $(basename $TEMP_BACKUP)"
@@ -527,11 +544,7 @@ if [ -n "$DB_SOURCE" ] && [ -f "$DB_SOURCE" ]; then
     # 確保目標目錄存在
     mkdir -p "${PROJECT_DIR}/data" || error "無法創建資料目錄: ${PROJECT_DIR}/data"
     
-    # 如果目標檔案存在，先備份
-    if [ -f "${PROJECT_DIR}/data/invoice_bonus.db" ]; then
-        log "備份現有資料庫..."
-        mv "${PROJECT_DIR}/data/invoice_bonus.db" "${PROJECT_DIR}/data/invoice_bonus.db.backup_$(date +'%Y%m%d_%H%M%S')" || warning "無法備份現有資料庫"
-    fi
+    # （現有資料庫的保留副本改在「服務停止之後」處理：服務還在運行時搬動資料庫檔案會讓它繼續寫入已被改名的檔案）
     
     # 處理服務狀態
     # ⚠️ 重要：better-sqlite3 需要重啟服務才能載入還原的資料庫
@@ -591,6 +604,15 @@ if [ -n "$DB_SOURCE" ] && [ -f "$DB_SOURCE" ]; then
     # 複製資料庫檔案
     log "複製資料庫檔案從 $DB_SOURCE 到 ${PROJECT_DIR}/data/invoice_bonus.db"
     
+    # 服務已停止：把現有資料庫連同 -wal/-shm 一起改名保留（WAL 內可能有尚未合併的最新資料，不能只留主檔）
+    SAFETY_TS=$(date +'%Y%m%d_%H%M%S')
+    for DB_EXT in "" "-wal" "-shm"; do
+        if [ -f "${PROJECT_DIR}/data/invoice_bonus.db${DB_EXT}" ]; then
+            mv "${PROJECT_DIR}/data/invoice_bonus.db${DB_EXT}" "${PROJECT_DIR}/data/invoice_bonus.db.backup_${SAFETY_TS}${DB_EXT}" || warning "無法保留現有資料庫檔案 ${DB_EXT}"
+        fi
+    done
+    log "現有資料庫已保留為 invoice_bonus.db.backup_${SAFETY_TS}（含 WAL）"
+
     # 如果目標檔案存在，先移除（確保完全替換）
     # ⚠️ 重要：必須同時移除 WAL 和 SHM，否則還原後 sqlite3 會讀取到錯誤資料
     log "移除現有資料庫檔案和 WAL/SHM 檔案..."
@@ -607,7 +629,7 @@ if [ -n "$DB_SOURCE" ] && [ -f "$DB_SOURCE" ]; then
     sync 2>/dev/null || true
     
     # 設置正確的權限和所有權
-    chmod 644 "${PROJECT_DIR}/data/invoice_bonus.db" || warning "無法設置資料庫檔案權限"
+    chmod 600 "${PROJECT_DIR}/data/invoice_bonus.db" || warning "無法設置資料庫檔案權限"
     chown ${CURRENT_USER}:${CURRENT_USER} "${PROJECT_DIR}/data/invoice_bonus.db" 2>/dev/null || true
     
     # 驗證還原後的資料庫檔案
@@ -627,6 +649,15 @@ if [ -n "$DB_SOURCE" ] && [ -f "$DB_SOURCE" ]; then
     fi
     
     log "✓ 資料庫檔案複製成功"
+
+    # 完整性檢查：還原後的資料庫必須通過 PRAGMA integrity_check，否則保留還原前的資料庫並中止
+    if command -v sqlite3 >/dev/null 2>&1; then
+        RESTORE_INTEGRITY=$(sqlite3 -readonly "${PROJECT_DIR}/data/invoice_bonus.db" "PRAGMA integrity_check;" 2>&1 | head -1)
+        if [ "$RESTORE_INTEGRITY" != "ok" ]; then
+            error "還原的資料庫完整性檢查失敗（$RESTORE_INTEGRITY）。還原前的資料庫已保留為 ${PROJECT_DIR}/data/invoice_bonus.db.backup_${SAFETY_TS}，請改用其他備份或手動復原"
+        fi
+        log "✓ 還原的資料庫通過完整性檢查"
+    fi
     
     DB_SIZE=$(du -h "${PROJECT_DIR}/data/invoice_bonus.db" | cut -f1)
     log "資料庫還原完成，大小: $DB_SIZE"
@@ -804,6 +835,18 @@ else
     info "備份中沒有上傳檔案或上傳檔案目錄不存在"
 fi
 
+# 還原自訂品牌檔（例如自訂的瀏覽器分頁圖示，存放在 data/branding/）
+BRANDING_SOURCE=""
+if [ -d "$RESTORE_FULL_DIR/data/branding" ]; then
+    BRANDING_SOURCE="$RESTORE_FULL_DIR/data/branding"
+elif [ -d "$TEMP_DIR/data/branding" ]; then
+    BRANDING_SOURCE="$TEMP_DIR/data/branding"
+fi
+if [ -n "$BRANDING_SOURCE" ] && [ "$(ls -A "$BRANDING_SOURCE" 2>/dev/null)" ]; then
+    mkdir -p "${PROJECT_DIR}/data/branding" && cp -R "$BRANDING_SOURCE"/. "${PROJECT_DIR}/data/branding/" 2>/dev/null \
+        && log "品牌檔還原完成" || warning "品牌檔還原失敗"
+fi
+
 # 還原設定檔
 log "還原設定檔..."
 if [ -f "$RESTORE_FULL_DIR/.env" ]; then
@@ -813,7 +856,7 @@ if [ -f "$RESTORE_FULL_DIR/.env" ]; then
         cp "${PROJECT_DIR}/.env" "${PROJECT_DIR}/.env.backup_$(date +'%Y%m%d_%H%M%S')" || warning "無法備份現有 .env"
     fi
     cp "$RESTORE_FULL_DIR/.env" "${PROJECT_DIR}/.env" || warning ".env 檔案還原失敗"
-    chmod 644 "${PROJECT_DIR}/.env" || warning "無法設置 .env 檔案權限"
+    chmod 600 "${PROJECT_DIR}/.env" || warning "無法設置 .env 檔案權限"
     log ".env 檔案還原完成"
 else
     info "備份中沒有 .env 檔案"
@@ -851,7 +894,7 @@ if [ -f "${PROJECT_DIR}/data/invoice_bonus.db" ]; then
         log "✓ 資料庫檔案驗證成功，大小: $FINAL_SIZE bytes"
         
         # 確保資料庫檔案權限正確
-        chmod 644 "${PROJECT_DIR}/data/invoice_bonus.db" || warning "無法設置資料庫檔案權限"
+        chmod 600 "${PROJECT_DIR}/data/invoice_bonus.db" || warning "無法設置資料庫檔案權限"
         chown ${CURRENT_USER}:${CURRENT_USER} "${PROJECT_DIR}/data/invoice_bonus.db" 2>/dev/null || true
         
         # 如果 sqlite3 可用，驗證資料庫結構

@@ -39,13 +39,32 @@ Node.js + Express + SQLite（`better-sqlite3`）的發票／業績獎金／CRM �
 
 ## `update.sh` 目前的行為（供改動前參考）
 
-`update.sh` 已加上：更新前顯示明確版本來源（GitHub commit hash，不只是不可靠的 `package.json` version 欄位）、更新前要求手動確認並提醒先跑 `backup.sh`（可用 `SKIP_UPDATE_CONFIRM=1` 跳過供全自動情境使用）、deploy.sh 失敗會停止並印出排查方式、部署完成後呼叫 `scripts/health-check.sh` 打 `GET /login` 驗證服務真的有回應（而不是只看 `systemctl is-active`）。**沒有自動回滾**——失敗時腳本只會停下來給出資訊，不會自己嘗試修復或還原。
+`update.sh` 已加上：更新前顯示明確版本來源（GitHub commit hash，不只是不可靠的 `package.json` version 欄位）、更新前要求手動確認並提醒先跑 `backup.sh`（可用 `SKIP_UPDATE_CONFIRM=1` 跳過供全自動情境使用）、deploy.sh 失敗會停止並印出排查方式、部署完成後呼叫 `scripts/health-check.sh`（優先打 `GET /healthz`，會實際讀一次資料庫；舊版沒有該端點時退回 `GET /login`）驗證服務真的有回應。
+
+- `rsync --delete` 的排除清單包含這台主機專屬的 `.env`、`.env.*`、`deploy.config.sh`、`deploy.config.json`、`nas_config.json`（異地備份設定存在安裝目錄根），不會被更新刪掉
+- 同步程式碼前會把目前的程式碼（不含 node_modules、data、uploads、backups）打包存到 `<安裝目錄>-backups/code_before_update_*.tar.gz`，保留最近 3 份；失敗訊息會附上回滾指令。**仍然沒有自動回滾**，回滾需手動解開快照並視情況用 `data/invoice_bonus.db.backup-*` 還原資料庫
 
 ## `deploy.sh` 已修的風險
 
 - migration 失敗（`node migrations/runner.js` 非 0）現在會停止部署、不啟動服務，而不是印警告後繼續（`runner.js` 本身已經是「失敗的 migration 不標記完成、下次重跑會自動重試」，所以停下來是安全的，不會卡住進度）
 - 停服務時的 `kill -9`（含首次安裝那個分支）現在會先確認佔用該 port 的程序指令包含 `app.js` 才殺，且都改用 `${PORT}` 而非寫死 3000；驗證失敗會停止部署並印出 PID／指令，不會誤殺無關程序
-- `npm audit fix`（不含 `--force`）預設會在每次部署時自動執行——這只會套用 npm 認定不含破壞性變更的修復；需要 `--force` 才能修的項目（代表會有破壞性變更，例如降版某個依賴）不會自動套用，會印出來但需要人工評估後手動執行。可設定 `SKIP_AUDIT_FIX=1` 完全跳過
+- 依賴以 `package-lock.json` 鎖定（已提交，不再 gitignore），部署使用 `npm ci` 讓每家公司的主機得到完全相同的版本；有鎖定檔時**不會**在主機上自動 `npm audit fix`（會讓各主機版本漂移）——漏洞請在開發環境執行 `npm audit fix`、測試後提交更新的鎖定檔，需要在主機強制執行時設定 `RUN_AUDIT_FIX=1`；沒有鎖定檔時維持舊行為（`npm install` + 自動 audit fix，`SKIP_AUDIT_FIX=1` 可略過）。`package.json` 有 `engines`（Node >=20 <25）與 `.nvmrc`（22）；Node 26 與 better-sqlite3 的 ABI 不相容
+- 部署前的資料庫備份與 `migrations/runner.js` 執行前的快照（`data/invoice_bonus.db.pre-migrate-*`，保留最近 3 份，`SKIP_MIGRATION_SNAPSHOT=1` 可略過）都改用 SQLite 線上備份（`.backup`／`VACUUM INTO`），並檢查 `PRAGMA integrity_check`；備份失敗就中止，不再在沒有備份時變更資料庫。`runner.js` 遇到第一個失敗的 migration 就停止，不再繼續執行後面可能依賴它的 migration
+
+## 備份與還原
+
+- `backup.sh` 用 `sqlite3 .backup`（沒有 sqlite3 時改用 `scripts/sqlite-backup.js`）產生一致的資料庫備份並檢查完整性，**不再直接 `cp` 運作中的 WAL 資料庫**；備份含 `data/branding/`（自訂分頁圖示）；`umask 077`，備份目錄 700、備份檔 600
+- 備份完成後若「備份還原」頁面已啟用 NAS 同步，會呼叫 `scripts/nas-sync.js` 同步一份到 NAS（異地備份，失敗只警告）；NAS 設定欄位有格式驗證（拒絕以 `-` 開頭的主機/使用者，避免 ssh 參數注入），rsync 也會使用設定的連接埠
+- `restore.sh` 還原前用線上備份取得一致快照（失敗就中止還原），服務停止後才把現有資料庫連同 `-wal`／`-shm` 一起改名保留，還原後檢查 `PRAGMA integrity_check`，DB 與 `.env` 權限為 600
+- 這些腳本只做過語法檢查與核心指令（`.backup`、`scripts/sqlite-backup.js`、migration 快照）的隔離測試，**尚未在真實主機上完整跑過一次備份→還原流程**；上線後請先在測試 VM 驗證
+
+## 執行期保護
+
+- `src/utils/asyncRoutes.js`：async 路由 handler 丟出的錯誤會交給全域錯誤處理（Express 4 預設會讓請求卡住）；production 的錯誤頁只顯示錯誤代碼，詳細訊息只在日誌
+- `SIGTERM`/`SIGINT` 會先停止接收請求再關閉資料庫（最多等 10 秒）；`GET /healthz` 不需登入、不建 session，會實際讀一次資料庫
+- `src/models/db.js`：`busy_timeout=5000`、`synchronous=NORMAL`；資料庫忙碌/鎖定/IO 錯誤/損毀不再被 `get()`/`all()` 當成「查無資料」吞掉（schema 差異類錯誤仍維持原本的容錯）；錯誤日誌不記錄 SQL 參數
+- Excel 專案匯入與成本明細匯入包在單一交易裡，單一工作表上限 20000 列
+- 自動測試：`npm test`（jest，`tests/`）目前涵蓋跳脫/重導/CSRF Origin 檢查/帳號鎖定/備份檔名白名單/NAS 設定驗證等純函式；尚無需要資料庫的整合測試
 
 ## 一個刻意沒修的風險：`deploy.sh` 裡的 ad-hoc `ALTER TABLE`
 

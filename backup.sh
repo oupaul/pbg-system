@@ -3,6 +3,9 @@
 
 set -e
 
+# 備份含資料庫（密碼雜湊、客戶與財務資料）與 .env：所有新建的檔案與目錄預設只有擁有者可讀寫
+umask 077
+
 # 顏色定義
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -137,7 +140,7 @@ if [ "$USE_INSTALL_BACKUP_DIR" -eq 1 ]; then
     # 確保備份目錄存在（需要 root 權限）
     if [ "$EUID" -eq 0 ]; then
         mkdir -p "$BACKUP_DIR"
-        chmod 755 "$BACKUP_DIR" || true
+        chmod 700 "$BACKUP_DIR" || true
     else
         # 如果不是 root，嘗試創建（可能失敗，但會在下一個 mkdir 中處理）
         mkdir -p "$BACKUP_DIR" 2>/dev/null || true
@@ -176,28 +179,28 @@ log "備份名稱: $BACKUP_NAME"
 log "備份資料庫..."
 DB_FILE="${PROJECT_DIR}/data/invoice_bonus.db"
 if [ -f "$DB_FILE" ]; then
-    # ⚠️ 重要：執行 WAL checkpoint，確保所有資料都寫入主檔案
-    if command -v sqlite3 >/dev/null 2>&1; then
-        log "執行 WAL checkpoint（合併 WAL 到主檔案）..."
-        sqlite3 "$DB_FILE" "PRAGMA wal_checkpoint(TRUNCATE);" 2>/dev/null || warning "WAL checkpoint 失敗，但繼續備份"
-    fi
-    
-    # 驗證資料庫檔案大小
+    # ⚠️ 重要：不能直接 cp 運作中的 WAL 資料庫（備份可能是撕裂或過期的複本，且沒有帶上 -wal 檔）。
+    # 使用 SQLite 線上備份：即使服務仍在寫入，也得到單一時間點、完整一致的複本。
     DB_FILE_SIZE=$(stat -f%z "$DB_FILE" 2>/dev/null || stat -c%s "$DB_FILE" 2>/dev/null || echo "0")
     if [ "$DB_FILE_SIZE" -lt 1000 ]; then
         warning "資料庫檔案過小 (${DB_FILE_SIZE} bytes)，可能為空或損壞"
     fi
-    
-    cp "$DB_FILE" "${BACKUP_PATH}/invoice_bonus.db" || error "資料庫備份失敗"
-    
-    # 驗證備份後的檔案
-    BACKUP_DB_SIZE=$(stat -f%z "${BACKUP_PATH}/invoice_bonus.db" 2>/dev/null || stat -c%s "${BACKUP_PATH}/invoice_bonus.db" 2>/dev/null || echo "0")
-    if [ "$BACKUP_DB_SIZE" -ne "$DB_FILE_SIZE" ]; then
-        error "資料庫備份失敗：檔案大小不一致 (原始: ${DB_FILE_SIZE}, 備份: ${BACKUP_DB_SIZE})"
+
+    if command -v sqlite3 >/dev/null 2>&1; then
+        log "使用 sqlite3 線上備份（一致性備份）..."
+        sqlite3 "$DB_FILE" ".timeout 10000" ".backup '${BACKUP_PATH}/invoice_bonus.db'" || error "資料庫備份失敗"
+        INTEGRITY=$(sqlite3 "${BACKUP_PATH}/invoice_bonus.db" "PRAGMA integrity_check;" 2>&1 | head -1)
+        [ "$INTEGRITY" = "ok" ] || error "備份檔完整性檢查失敗: $INTEGRITY"
+    elif command -v node >/dev/null 2>&1 && [ -f "${PROJECT_DIR}/scripts/sqlite-backup.js" ]; then
+        log "未安裝 sqlite3，改用 Node 線上備份（含完整性檢查）..."
+        (cd "$PROJECT_DIR" && node scripts/sqlite-backup.js "$DB_FILE" "${BACKUP_PATH}/invoice_bonus.db") || error "資料庫備份失敗"
+    else
+        error "找不到 sqlite3 或 node，無法產生一致的資料庫備份（不使用直接複製檔案以免備份損毀）"
     fi
-    
-    DB_SIZE=$(du -h "$DB_FILE" | cut -f1)
-    log "資料庫備份完成，大小: $DB_SIZE"
+    log "✓ 資料庫備份完成並通過完整性檢查"
+
+    DB_SIZE=$(du -h "${BACKUP_PATH}/invoice_bonus.db" | cut -f1)
+    log "資料庫備份大小: $DB_SIZE"
     
     # ⚠️ 重要：驗證資料庫內容時，使用備份檔案而不是原始檔案
     # 因為原始檔案可能還在被使用，統計結果可能不準確
@@ -264,11 +267,19 @@ log "備份上傳檔案..."
 UPLOADS_DIR="${PROJECT_DIR}/uploads"
 if [ -d "$UPLOADS_DIR" ] && [ "$(ls -A $UPLOADS_DIR 2>/dev/null)" ]; then
     mkdir -p "${BACKUP_PATH}/uploads"
-    cp -r "$UPLOADS_DIR"/* "${BACKUP_PATH}/uploads/" 2>/dev/null || warning "部分上傳檔案備份失敗"
+    cp -R "$UPLOADS_DIR"/. "${BACKUP_PATH}/uploads/" 2>/dev/null || warning "部分上傳檔案備份失敗"
     UPLOADS_COUNT=$(find "$UPLOADS_DIR" -type f | wc -l)
     log "上傳檔案備份完成，檔案數: $UPLOADS_COUNT"
 else
     info "上傳目錄為空或不存在，跳過備份"
+fi
+
+# 備份自訂品牌檔（例如自訂的瀏覽器分頁圖示，存放在 data/branding/，不在資料庫內）
+BRANDING_DIR="${PROJECT_DIR}/data/branding"
+if [ -d "$BRANDING_DIR" ] && [ "$(ls -A "$BRANDING_DIR" 2>/dev/null)" ]; then
+    mkdir -p "${BACKUP_PATH}/data/branding"
+    cp -R "$BRANDING_DIR"/. "${BACKUP_PATH}/data/branding/" 2>/dev/null || warning "品牌檔備份失敗"
+    log "品牌檔備份完成"
 fi
 
 # 備份設定檔（如果有的話）
@@ -303,6 +314,7 @@ cat > "$BACKUP_INFO" << EOF
 備份內容:
   - 資料庫: invoice_bonus.db
   - 上傳檔案: uploads/
+  - 品牌檔: data/branding/ (如果存在)
   - 設定檔: .env (如果存在)
   - 套件資訊: package.json, package-lock.json
 EOF
@@ -313,8 +325,15 @@ log "壓縮備份檔案..."
 cd "$BACKUP_DIR"
 tar -czf "${BACKUP_NAME}.tar.gz" "$BACKUP_NAME" || error "備份壓縮失敗"
 rm -rf "$BACKUP_NAME" || warning "無法刪除臨時備份目錄"
+chmod 600 "${BACKUP_NAME}.tar.gz" 2>/dev/null || true
 BACKUP_SIZE=$(du -h "${BACKUP_NAME}.tar.gz" | cut -f1)
 log "備份壓縮完成，大小: $BACKUP_SIZE"
+
+# 異地備份：若「備份還原」頁面已啟用 NAS 同步，備份完成後同步一份過去（失敗只警告，不影響本機備份）
+if command -v node >/dev/null 2>&1 && [ -f "${PROJECT_DIR}/scripts/nas-sync.js" ]; then
+    log "檢查異地備份（NAS）設定..."
+    (cd "$PROJECT_DIR" && node scripts/nas-sync.js "${BACKUP_DIR}/${BACKUP_NAME}.tar.gz") || warning "異地備份（NAS）同步失敗，本機備份已完成"
+fi
 
 # 清理舊備份（保留最近 10 個備份）
 log "清理舊備份..."

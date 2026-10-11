@@ -97,6 +97,7 @@ const MIGRATIONS = [
   'migrate_sales_modes',
   'migrate_search_settings',
   'migrate_must_change_password',
+  'migrate_system_logs_indexes',
 ];
 
 function run() {
@@ -134,11 +135,37 @@ function run() {
     console.log('');
   }
 
+  // 執行 migration 前先做一份資料庫快照（VACUUM INTO：一致、含 WAL 內容、不需停服務）。
+  // 約 20 支 migration 會重建核心資料表，萬一中途失敗可以用快照復原。快照失敗就中止，
+  // 不在沒有安全網的情況下變更資料庫（確定要略過時可設 SKIP_MIGRATION_SNAPSHOT=1）。
+  if (!process.env.SKIP_MIGRATION_SNAPSHOT && done.size > 0) {
+    try {
+      const stamp = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 17) + '-' + process.pid; // 精確到毫秒 + PID，同一秒內重複執行也不會撞名
+      const snapshotPath = path.join(path.dirname(DB_PATH), `invoice_bonus.db.pre-migrate-${stamp}`);
+      const snapDb = new Database(DB_PATH);
+      snapDb.exec(`VACUUM INTO '${snapshotPath.replace(/'/g, "''")}'`);
+      snapDb.close();
+      try { fs.chmodSync(snapshotPath, 0o600); } catch (e) { /* 忽略 */ }
+      console.log(`✓ 已建立 migration 前的資料庫快照: ${snapshotPath}`);
+      // 只保留最近 3 份快照
+      const old = fs.readdirSync(path.dirname(DB_PATH))
+        .filter(f => f.startsWith('invoice_bonus.db.pre-migrate-'))
+        .sort().reverse().slice(3);
+      old.forEach(f => { try { fs.unlinkSync(path.join(path.dirname(DB_PATH), f)); } catch (e) { /* 忽略 */ } });
+    } catch (err) {
+      console.error(`[錯誤] 無法建立 migration 前的資料庫快照: ${err.message}`);
+      console.error('為避免在沒有備份的情況下變更資料庫，已中止 migration（確定要略過請設定 SKIP_MIGRATION_SNAPSHOT=1）');
+      process.exit(1);
+    }
+  }
+
   let success = 0;
   let failed = 0;
   const failedList = [];
+  const skippedList = [];
 
-  for (const name of pending) {
+  for (let i = 0; i < pending.length; i++) {
+    const name = pending[i];
     const scriptPath = path.join(__dirname, `${name}.js`);
     if (!fs.existsSync(scriptPath)) {
       console.warn(`[警告] 找不到 migration 腳本: ${name}.js，跳過`);
@@ -154,9 +181,11 @@ function run() {
 
       success++;
     } catch {
-      console.error(`[警告] ${name} 執行失敗，將於下次重試`);
+      console.error(`[錯誤] ${name} 執行失敗，已停止後續 migration（後面的 migration 可能依賴它），下次執行會從這裡重試`);
       failed++;
       failedList.push(name);
+      skippedList.push(...pending.slice(i + 1));
+      break;
     }
   }
 
@@ -164,7 +193,7 @@ function run() {
   if (failed === 0) {
     console.log(`✓ migration 完成：執行 ${success} 個`);
   } else {
-    console.log(`migration 完成：${success} 個成功，${failed} 個失敗（${failedList.join(', ')}）`);
+    console.log(`migration 完成：${success} 個成功，${failed} 個失敗（${failedList.join(', ')}）${skippedList.length ? `，${skippedList.length} 個未執行` : ''}`);
     process.exit(1);
   }
 }

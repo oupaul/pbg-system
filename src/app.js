@@ -1,6 +1,8 @@
 console.log('[啟動] 開始載入應用程式...');
 
 const express = require('express');
+// 必須在定義任何路由之前執行：讓 async 路由 handler 的錯誤交給全域錯誤處理，而不是讓請求卡住
+require('./utils/asyncRoutes')();
 const path = require('path');
 const multer = require('multer');
 const session = require('express-session');
@@ -20,6 +22,18 @@ app.set('trust proxy', 1);
 
 // 基本安全標頭（nosniff、X-Frame-Options、Referrer-Policy、HTTPS 時的 HSTS）
 app.use(require('./middleware/securityHeaders'));
+
+// 存活/就緒檢查（不需登入、不建立 session）：只回傳 ok 或失敗，不含任何系統資訊；
+// 會實際讀一次資料庫，資料庫壞了或被鎖死時回 503，供 Nginx/監控/部署腳本判斷服務是否真的可用
+app.get('/healthz', (req, res) => {
+  try {
+    const row = require('./models/db').prepare('SELECT 1 AS ok').get();
+    if (row && row.ok === 1) return res.status(200).type('text/plain').send('ok');
+    return res.status(503).type('text/plain').send('db error');
+  } catch (err) {
+    return res.status(503).type('text/plain').send('db error');
+  }
+});
 
 // 設定檔案上傳
 const upload = multer({
@@ -317,13 +331,20 @@ try {
 
 // 錯誤處理
 app.use((err, req, res, next) => {
-  console.error('[錯誤處理] 捕獲到錯誤:', err.message);
+  const errorId = require('crypto').randomBytes(4).toString('hex');
+  console.error(`[錯誤處理] 捕獲到錯誤 (${errorId}):`, req.method, req.originalUrl, err.message);
   console.error('[錯誤處理] 錯誤堆疊:', err.stack);
+  if (res.headersSent) return next(err);
+  // 正式環境不把內部錯誤訊息（可能含 SQL 欄位名稱、路徑）回給使用者，只給錯誤代碼供查日誌
+  const isProduction = process.env.NODE_ENV === 'production';
+  const publicMessage = isProduction
+    ? `系統發生錯誤，請稍後再試（錯誤代碼：${errorId}）`
+    : '系統錯誤: ' + (err.message || '未知錯誤');
   try {
     res.status(500).render('error', { 
       title: '系統錯誤',
       user: req.session ? req.session.user : null,
-      message: '系統錯誤: ' + (err.message || '未知錯誤'),
+      message: publicMessage,
       error: process.env.NODE_ENV === 'development' ? err : {}
     });
   } catch (renderErr) {
@@ -335,7 +356,7 @@ app.use((err, req, res, next) => {
       <head><title>系統錯誤</title></head>
       <body>
         <h1>系統錯誤</h1>
-        <p>${process.env.NODE_ENV === 'development' ? err.message : '發生錯誤，請稍後再試'}</p>
+        <p>${process.env.NODE_ENV === 'development' ? String(err.message).replace(/</g, '&lt;') : '發生錯誤，請稍後再試（錯誤代碼：' + errorId + '）'}</p>
         <a href="/login">返回登入頁面</a>
       </body>
       </html>
@@ -374,8 +395,29 @@ process.on('uncaughtException', (err) => {
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('未處理的 Promise 拒絕:', reason);
+  console.error('未處理的 Promise 拒絕:', reason && reason.stack ? reason.stack : reason);
 });
+
+// 優雅關閉：systemd 重啟/停止（SIGTERM）時，先停止接收新連線、等進行中的請求結束，
+// 再關閉資料庫；最多等 10 秒，避免卡住 systemd。
+let shuttingDown = false;
+function gracefulShutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[關閉] 收到 ${signal}，停止接收新請求...`);
+  const forceTimer = setTimeout(() => {
+    console.error('[關閉] 等待逾時，強制結束');
+    process.exit(1);
+  }, 10000);
+  forceTimer.unref();
+  server.close(() => {
+    try { require('./models/db').close(); } catch (e) { /* 忽略 */ }
+    console.log('[關閉] 已正常關閉');
+    process.exit(0);
+  });
+}
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // 啟動伺服器
 // 預設監聽所有網卡（維持原行為）；正式環境建議在 systemd 設定 BIND_HOST=127.0.0.1，

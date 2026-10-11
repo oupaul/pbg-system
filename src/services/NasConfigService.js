@@ -194,9 +194,11 @@ class NasConfigService {
         if (config.protocol === 'rsync') {
           // 使用 rsync
           command = 'rsync';
+          // 使用設定的連接埠（原本 rsync 會忽略 port，一律連 22）；BatchMode 避免等待密碼提示而卡住
           args = [
             '-avz',
             '--progress',
+            '-e', `ssh -p ${parseInt(config.port, 10) || 22} -o BatchMode=yes -o ConnectTimeout=15`,
             backupFilePath,
             `${config.username}@${config.host}:${config.path}/`
           ];
@@ -204,7 +206,9 @@ class NasConfigService {
           // 使用 scp
           command = 'scp';
           args = [
-            '-P', config.port.toString(),
+            '-P', String(parseInt(config.port, 10) || 22),
+            '-o', 'BatchMode=yes',
+            '-o', 'ConnectTimeout=15',
             backupFilePath,
             `${config.username}@${config.host}:${config.path}/${backupFileName}`
           ];

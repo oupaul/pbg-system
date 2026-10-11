@@ -285,8 +285,15 @@ if [ -f "${PROJECT_DIR}/data/invoice_bonus.db" ]; then
     if [ -n "$TABLE_EXISTS" ]; then
         # 備份資料庫（無論是否需要更新，都先備份）
         BACKUP_PATH="${PROJECT_DIR}/data/invoice_bonus.db.backup-$(date +%Y%m%d_%H%M%S)"
-        cp "${PROJECT_DIR}/data/invoice_bonus.db" "$BACKUP_PATH"
-        log "資料庫已備份: $BACKUP_PATH"
+        # 使用 SQLite 線上備份（一致、含 WAL 內容）；不能直接 cp 運作中的 WAL 資料庫
+        if sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" ".timeout 10000" ".backup '${BACKUP_PATH}'" 2>/dev/null \
+           && [ "$(sqlite3 "$BACKUP_PATH" 'PRAGMA integrity_check;' 2>/dev/null | head -1)" = "ok" ]; then
+            chmod 600 "$BACKUP_PATH" 2>/dev/null || true
+            log "資料庫已備份（通過完整性檢查）: $BACKUP_PATH"
+        else
+            rm -f "$BACKUP_PATH" 2>/dev/null || true
+            error "部署前的資料庫備份失敗或未通過完整性檢查，為避免在沒有可用備份的情況下變更資料庫，已中止部署"
+        fi
         
         # 檢查 expected_invoice_year_month 欄位是否存在
         FIELD_EXISTS=$(sqlite3 "${PROJECT_DIR}/data/invoice_bonus.db" "PRAGMA table_info(projects);" 2>/dev/null | grep "expected_invoice_year_month" || echo "")
@@ -326,11 +333,24 @@ fi
 if [ -f "${PROJECT_DIR}/package.json" ]; then
     log "步驟 4/7: 檢查並更新依賴套件..."
     if [ "${PROJECT_DIR}/package.json" -nt "${PROJECT_DIR}/node_modules/.package-lock.json" ] 2>/dev/null || \
+       [ "${PROJECT_DIR}/package-lock.json" -nt "${PROJECT_DIR}/node_modules/.package-lock.json" ] 2>/dev/null || \
        [ ! -d "${PROJECT_DIR}/node_modules" ]; then
         log "檢測到 package.json 更新，重新安裝依賴..."
         cd "${PROJECT_DIR}"
-        npm install || error "依賴套件安裝失敗"
-        if [ -z "${SKIP_AUDIT_FIX:-}" ]; then
+        if [ -f "${PROJECT_DIR}/package-lock.json" ]; then
+            # 依鎖定檔安裝完全相同的版本：每家公司的 VM 都會得到同一份依賴（npm install 可能解析出不同版本）
+            npm ci || error "依賴套件安裝失敗（npm ci）。若 package-lock.json 與 package.json 不一致，請在開發環境執行 npm install 後重新提交鎖定檔"
+            if [ -z "${RUN_AUDIT_FIX:-}" ]; then
+                info "已依鎖定檔安裝（不在伺服器上自動修改依賴版本）。安全性漏洞請在開發環境執行 npm audit fix、測試後提交更新後的 package-lock.json；若要在此主機強制執行，設定 RUN_AUDIT_FIX=1"
+                npm audit --omit=dev 2>&1 | tail -8 || true
+            fi
+        else
+            warning "找不到 package-lock.json，改用 npm install（各主機的依賴版本可能不一致，建議提交鎖定檔）"
+            npm install || error "依賴套件安裝失敗"
+        fi
+        if [ -f "${PROJECT_DIR}/package-lock.json" ] && [ -z "${RUN_AUDIT_FIX:-}" ]; then
+            :
+        elif [ -z "${SKIP_AUDIT_FIX:-}" ]; then
             log "修復已知安全性漏洞（僅套用不需要 --force 的修復，不含破壞性變更）..."
             npm audit fix 2>&1 | tail -10 || true
             info "若上方仍列出需要 --force 才能修的項目，代表該修復含破壞性變更（例如降版某個依賴），不會自動套用，需手動評估後執行 npm audit fix --force"

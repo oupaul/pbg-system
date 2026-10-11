@@ -195,6 +195,18 @@ class ExcelImportService {
       const bonusSheets = [];
       const costSheets = [];
 
+      // 整個匯入包在單一交易裡（從這裡到 COMMIT 全是同步程式，不會與其他請求交錯）：
+      // 發生未預期的例外時整批回復，不會留下只匯入一半的專案/發票/獎金；
+      // 單一列的錯誤仍由各列自己的 try/catch 處理並繼續（與原本一致）。同時也大幅加快匯入速度。
+      const txDb = require('../models/db');
+      const rowLimit = 20000;
+      workbook.eachSheet((ws) => {
+        if (ws.rowCount > rowLimit) {
+          throw new Error(`工作表「${ws.name}」有 ${ws.rowCount} 列，超過單一匯入上限 ${rowLimit} 列，請拆分檔案後再匯入`);
+        }
+      });
+      txDb.exec('BEGIN IMMEDIATE');
+
       workbook.eachSheet((worksheet, sheetId) => {
         const sheetName = worksheet.name;
         
@@ -449,6 +461,8 @@ class ExcelImportService {
         }
       }
 
+      txDb.exec('COMMIT');
+
       results.duplicates = this.duplicateCount;
       this.log(`匯入完成${this.duplicateCount ? `（略過 ${this.duplicateCount} 筆已存在的重複資料）` : ''}`);
       
@@ -464,6 +478,7 @@ class ExcelImportService {
       };
 
     } catch (err) {
+      try { require('../models/db').exec('ROLLBACK'); } catch (rollbackErr) { /* 沒有進行中的交易 */ }
       this.error(`匯入失敗: ${err.message}`);
       console.error('匯入完整錯誤:', err);
       console.error('錯誤堆疊:', err.stack);
@@ -1572,7 +1587,18 @@ class ExcelImportService {
         return buildResult(false);
       }
 
-      const { createdCount, failedCount } = this.processCostWorksheet(worksheet, userInfo);
+      // 同步處理整張工作表，包成單一交易（失敗整批回復、也比逐筆提交快很多）
+      const costDb = require('../models/db');
+      if (worksheet.rowCount > 20000) throw new Error(`工作表有 ${worksheet.rowCount} 列，超過單一匯入上限 20000 列，請拆分檔案後再匯入`);
+      costDb.exec('BEGIN IMMEDIATE');
+      let createdCount, failedCount;
+      try {
+        ({ createdCount, failedCount } = this.processCostWorksheet(worksheet, userInfo));
+        costDb.exec('COMMIT');
+      } catch (txErr) {
+        try { costDb.exec('ROLLBACK'); } catch (e) { /* 忽略 */ }
+        throw txErr;
+      }
       this.log(`成本明細匯入完成：新增 ${createdCount} 筆，略過重複 ${this.duplicateCount} 筆，失敗 ${failedCount} 筆`);
       return buildResult(true, createdCount, failedCount);
     } catch (err) {

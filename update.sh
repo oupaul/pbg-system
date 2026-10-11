@@ -156,16 +156,40 @@ else
     info "SKIP_UPDATE_CONFIRM=1，略過更新前確認"
 fi
 
+# ── 更新前保留目前的程式碼（供回滾）──────────────────────────────
+# 只含程式碼（不含 node_modules、資料、上傳檔、備份），體積小；保留最近 3 份。
+CODE_SNAPSHOT_DIR="$(dirname "$INSTALL_DIR")/$(basename "$INSTALL_DIR")-backups"
+CODE_SNAPSHOT=""
+if mkdir -p "$CODE_SNAPSHOT_DIR" 2>/dev/null; then
+    chmod 700 "$CODE_SNAPSHOT_DIR" 2>/dev/null || true
+    CODE_SNAPSHOT="${CODE_SNAPSHOT_DIR}/code_before_update_$(date +'%Y%m%d_%H%M%S').tar.gz"
+    if (umask 077; tar -czf "$CODE_SNAPSHOT" -C "$INSTALL_DIR" \
+            --exclude=node_modules --exclude=data --exclude=uploads --exclude=backups --exclude='*.log' . 2>/dev/null); then
+        log "✓ 已保留更新前的程式碼: ${CODE_SNAPSHOT}"
+        ls -1t "${CODE_SNAPSHOT_DIR}"/code_before_update_*.tar.gz 2>/dev/null | tail -n +4 | xargs -r rm -f
+    else
+        warning "無法保留更新前的程式碼（不影響更新，但之後無法用它回滾）"
+        CODE_SNAPSHOT=""
+    fi
+fi
+ROLLBACK_HINT="回滾方式：sudo systemctl stop <service-name> && sudo tar -xzf ${CODE_SNAPSHOT:-<更新前程式碼快照>} -C ${INSTALL_DIR} && sudo systemctl start <service-name>（資料庫若已被新版 migration 變更，請同時用 data/invoice_bonus.db.backup-* 還原）"
+
 # ── 同步程式碼（保留資料、上傳檔案、設定）─────────────────────
 log "同步程式碼到 ${INSTALL_DIR}..."
 
+# 這些是「這台主機專屬」的設定與資料，rsync --delete 不可以動：
+#   .env／.env.backup*、deploy.config.json／deploy.config.sh、nas_config.json（異地備份設定，存在安裝目錄根）
 RSYNC_EXCLUDES=(
     'node_modules/'
     '.git/'
     'data/'
     'uploads/'
     'backups/'
+    '.env'
+    '.env.*'
     'deploy.config.sh'
+    'deploy.config.json'
+    'nas_config.json'
     '*.log'
     '*.db'
     '*.db-wal'
@@ -203,7 +227,7 @@ chmod +x deploy.sh
 if ! sudo SKIP_BACKUP_PROMPT=1 bash deploy.sh; then
     error "deploy.sh 執行失敗，更新已停止。請檢查上方輸出。
   - 資料庫備份（若有建立）：${INSTALL_DIR}/data/invoice_bonus.db.backup-*
-  - 程式碼本身沒有自動回滾機制，如需恢復舊版本，需重新從舊的 tag/commit 手動部署
+  - ${ROLLBACK_HINT}
   - 服務日誌：sudo journalctl -u <service-name> -n 50"
 fi
 
@@ -220,6 +244,7 @@ if [ -f "${INSTALL_DIR}/scripts/health-check.sh" ]; then
     sudo systemctl status <service-name>
     sudo journalctl -u <service-name> -n 50
   資料庫備份（若有建立）：${INSTALL_DIR}/data/invoice_bonus.db.backup-*
+  ${ROLLBACK_HINT}
   本腳本不會自動回滾，請視情況手動處理。"
     fi
 else

@@ -1,6 +1,6 @@
 # Dependencies
 node_modules/
-package-lock.json
+# package-lock.json 要提交：部署使用 npm ci 依鎖定檔安裝，讓每家公司的主機得到完全相同的依賴版本
 
 # Database and data files
 data/
