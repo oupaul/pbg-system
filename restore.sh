@@ -67,7 +67,7 @@ list_install_dirs() {
     
     # 返回選中的目錄
     while true; do
-        read -p "$(echo -e ${YELLOW}請選擇要還原到的安裝目錄編號 [1-${#dirs[@]}]，或按 q 取消:${NC}) " selection
+        read -p "$(echo -e ${YELLOW}請選擇要還原到的安裝目錄編號 [1-${#dirs[@]}]，或按 q 取消:${NC}) " selection || { echo "無法讀取輸入（沒有互動式終端機）。請在終端機執行，或使用 NON_INTERACTIVE=1" >&2; exit 1; }
         if [[ "$selection" =~ ^[Qq]$ ]]; then
             log "還原操作已取消" >&2
             exit 0
@@ -134,7 +134,7 @@ list_services() {
     
     # 返回選中的服務
     while true; do
-        read -p "$(echo -e ${YELLOW}請選擇要操作的服務編號 [1-${#services[@]}]，或按 s 跳過:${NC}) " selection
+        read -p "$(echo -e ${YELLOW}請選擇要操作的服務編號 [1-${#services[@]}]，或按 s 跳過:${NC}) " selection || { echo "無法讀取輸入（沒有互動式終端機）。請在終端機執行，或使用 NON_INTERACTIVE=1" >&2; exit 1; }
         if [[ "$selection" =~ ^[Ss]$ ]]; then
             return 1
         fi
@@ -147,8 +147,18 @@ list_services() {
     done
 }
 
-# 選擇安裝目錄
-SELECTED_INSTALL_DIR=$(list_install_dirs)
+# 選擇安裝目錄（非交互模式：NON_INTERACTIVE 有設定、或 stdin 不是終端機，例如網頁「備份還原」或排程呼叫，
+# 直接使用腳本所在目錄；否則互動選單在沒有輸入時會無限迴圈）
+if [ -n "$NON_INTERACTIVE" ] || [ ! -t 0 ]; then
+    if [ -f "${SCRIPT_DIR}/package.json" ]; then
+        SELECTED_INSTALL_DIR="$SCRIPT_DIR"
+        log "非交互模式，自動選擇安裝目錄: $SELECTED_INSTALL_DIR"
+    else
+        error "非交互模式下無法確定安裝目錄（${SCRIPT_DIR} 找不到 package.json）"
+    fi
+else
+    SELECTED_INSTALL_DIR=$(list_install_dirs)
+fi
 if [ -z "$SELECTED_INSTALL_DIR" ]; then
     error "未選擇安裝目錄"
 fi
@@ -210,7 +220,7 @@ echo "============================================"
 echo ""
 
 # 初始化 SERVICE_NAME 變數（將在選擇服務時設定）
-SERVICE_NAME=""
+SERVICE_NAME="${SERVICE_NAME:-}"  # 保留 deploy.config.sh 設定的服務名稱（沒有設定才在稍後互動選擇）
 
 # 列出所有備份檔案並返回陣列
 declare -a BACKUP_FILES_ARRAY
@@ -263,7 +273,7 @@ if [ -z "$1" ]; then
         fi
     else
     while true; do
-        read -p "$(echo -e ${YELLOW}請選擇要還原的備份編號 [1-${#BACKUP_FILES_ARRAY[@]}]，或按 q 取消:${NC}) " selection
+        read -p "$(echo -e ${YELLOW}請選擇要還原的備份編號 [1-${#BACKUP_FILES_ARRAY[@]}]，或按 q 取消:${NC}) " selection || { echo "無法讀取輸入（沒有互動式終端機）。請在終端機執行，或使用 NON_INTERACTIVE=1" >&2; exit 1; }
         if [[ "$selection" =~ ^[Qq]$ ]]; then
             log "還原操作已取消"
             exit 0
@@ -611,6 +621,7 @@ if [ -n "$DB_SOURCE" ] && [ -f "$DB_SOURCE" ]; then
             mv "${PROJECT_DIR}/data/invoice_bonus.db${DB_EXT}" "${PROJECT_DIR}/data/invoice_bonus.db.backup_${SAFETY_TS}${DB_EXT}" || warning "無法保留現有資料庫檔案 ${DB_EXT}"
         fi
     done
+    chmod 600 "${PROJECT_DIR}/data/invoice_bonus.db.backup_${SAFETY_TS}"* 2>/dev/null || true
     log "現有資料庫已保留為 invoice_bonus.db.backup_${SAFETY_TS}（含 WAL）"
 
     # 如果目標檔案存在，先移除（確保完全替換）

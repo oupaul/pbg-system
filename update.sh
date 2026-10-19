@@ -158,7 +158,9 @@ fi
 
 # ── 更新前保留目前的程式碼（供回滾）──────────────────────────────
 # 只含程式碼（不含 node_modules、資料、上傳檔、備份），體積小；保留最近 3 份。
-CODE_SNAPSHOT_DIR="$(dirname "$INSTALL_DIR")/$(basename "$INSTALL_DIR")-backups"
+# 與 backup.sh 使用同一個備份目錄（deploy.config.sh 的 BACKUP_DIR），沒有設定檔時才用「<安裝目錄>-backups」
+CODE_SNAPSHOT_DIR=$(grep -E '^BACKUP_DIR=' "${INSTALL_DIR}/deploy.config.sh" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"')
+[ -n "$CODE_SNAPSHOT_DIR" ] || CODE_SNAPSHOT_DIR="$(dirname "$INSTALL_DIR")/$(basename "$INSTALL_DIR")-backups"
 CODE_SNAPSHOT=""
 if mkdir -p "$CODE_SNAPSHOT_DIR" 2>/dev/null; then
     chmod 700 "$CODE_SNAPSHOT_DIR" 2>/dev/null || true

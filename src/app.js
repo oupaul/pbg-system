@@ -19,6 +19,8 @@ console.log('[啟動] Express 應用程式建立完成，PORT:', PORT);
 // 只信任最近這一層代理傳來的 X-Forwarded-For，req.ip 才會是真實使用者
 // IP，而不是 Nginx 自己的位址。若部署拓樸改成有多層代理，這裡要跟著調整。
 app.set('trust proxy', 1);
+// 不在回應標頭洩漏使用的框架（X-Powered-By: Express）
+app.disable('x-powered-by');
 
 // 基本安全標頭（nosniff、X-Frame-Options、Referrer-Policy、HTTPS 時的 HSTS）
 app.use(require('./middleware/securityHeaders'));
