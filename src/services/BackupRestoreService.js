@@ -44,6 +44,19 @@ function detectBackupDir(installDir) {
     return path.join(PROJECT_DIR, 'backups');
   }
   
+  // 優先使用 deploy.config.sh 的 BACKUP_DIR：備份/還原/更新腳本都以它為準，
+  // 網頁端也必須讀同一個目錄（deploy.sh 預設的備份目錄名稱是 invoice-bonus-backups，
+  // 不是「<安裝目錄名稱>-backups」；只靠目錄名稱猜測會在兩者並存時選錯、找不到備份）
+  try {
+    const configPath = path.join(installDir, 'deploy.config.sh');
+    if (fs.existsSync(configPath)) {
+      const match = fs.readFileSync(configPath, 'utf8').match(/^BACKUP_DIR="?([^"\n]+)"?\s*$/m);
+      if (match && match[1] && path.isAbsolute(match[1])) {
+        return match[1];
+      }
+    }
+  } catch (e) { /* 讀不到設定檔就用下面的猜測邏輯 */ }
+
   // 根據安裝目錄名稱生成備份目錄名稱
   const installDirName = path.basename(installDir);
   const backupDir = `/opt/${installDirName}-backups`;
@@ -421,6 +434,77 @@ class BackupRestoreService {
   /**
    * 執行還原
    */
+  /**
+   * 以獨立的 systemd 暫時性 unit 執行還原（見 restoreBackup 的說明）。
+   * 輸出寫入 /tmp/pbg-restore-<操作ID>.log；本函式輪詢該檔更新進度。還原過程中本服務會被 restore.sh 停止並重啟，
+   * 所以多半看不到最後的「完成」——這是預期行為，結果以日誌檔與 journalctl 為準。
+   */
+  static async restoreDetached({ scriptPath, backupPath, backupFileName, cwd, opId }) {
+    const { execFileSync, execFile } = require('child_process');
+    const unit = `pbg-restore-${Date.now()}`;
+    const logFile = `/tmp/pbg-restore-${opId}.log`;
+    fs.closeSync(fs.openSync(logFile, 'a', 0o600));
+
+    const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
+    const runnerArgs = [
+      '--unit', unit, '--collect', '--no-block', '--quiet',
+      '--setenv=NON_INTERACTIVE=1', `--setenv=BACKUP_FILE=${backupPath || backupFileName}`,
+      '-p', `StandardOutput=append:${logFile}`, '-p', `StandardError=append:${logFile}`,
+      `--working-directory=${cwd}`,
+      '/bin/bash', scriptPath, backupPath
+    ];
+    console.log('[還原] 使用 systemd-run 獨立執行還原:', unit, '日誌:', logFile);
+    try {
+      if (isRoot) execFileSync('systemd-run', runnerArgs, { stdio: 'pipe' });
+      else execFileSync('sudo', ['-n', 'systemd-run', ...runnerArgs], { stdio: 'pipe' });
+    } catch (e) {
+      const detail = (e.stderr ? e.stderr.toString() : e.message).trim();
+      throw new Error('無法啟動獨立的還原程序（systemd-run）: ' + detail);
+    }
+
+    progressService.setProgress(opId, {
+      status: 'running', operation: 'restore', progress: 20,
+      message: '還原已在背景執行，完成時系統會自動重新啟動，請稍候後重新整理頁面'
+    });
+
+    const steps = [
+      ['解壓備份檔案', 30, '正在解壓備份檔案...'],
+      ['還原資料庫', 50, '正在還原資料庫...'],
+      ['還原上傳檔案', 70, '正在還原上傳檔案...'],
+      ['進行最終驗證', 90, '正在驗證還原結果...']
+    ];
+    let offset = 0;
+    const deadline = Date.now() + 5 * 60 * 1000;
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 1000));
+      let chunk = '';
+      try {
+        const buf = fs.readFileSync(logFile);
+        chunk = buf.subarray(offset).toString();
+        offset = buf.length;
+      } catch (e) { /* 日誌讀不到就等下一輪 */ }
+      for (const [needle, pct, msg] of steps) {
+        if (chunk.includes(needle)) {
+          progressService.setProgress(opId, { status: 'running', operation: 'restore', progress: pct, message: msg });
+        }
+      }
+      if (chunk.includes('還原完成！')) {
+        progressService.setProgress(opId, {
+          status: 'completed', operation: 'restore', progress: 100,
+          message: '還原完成', result: { backupFile: backupFileName }
+        });
+        return { success: true, operationId: opId, message: '還原完成' };
+      }
+      const state = await new Promise(resolve => {
+        execFile('systemctl', ['is-active', unit], (err, out) => resolve((out || '').trim()));
+      });
+      if (state === 'failed') {
+        throw new Error('還原腳本執行失敗，請查看 ' + logFile + ' 或 journalctl -u ' + unit);
+      }
+    }
+    throw new Error('還原操作逾時（超過 5 分鐘），請查看 ' + logFile);
+  }
+
   static async restoreBackup(backupFileName, operationId = null) {
     const opId = operationId || progressService.generateOperationId();
 
@@ -525,6 +609,13 @@ class BackupRestoreService {
       console.log('[還原] 是否已安裝:', isInstalled());
       console.log('[還原] 操作ID:', opId);
       
+      // 在 systemd 服務下運行時：restore.sh 會「停止並重新啟動本服務」來安全替換資料庫檔案，
+      // 而以子程序方式執行的 restore.sh 屬於本服務的 cgroup，服務一停止就會連同它一起被 systemd 殺掉，
+      // 還原做到一半就中斷、服務也起不來。改用 systemd-run 建立獨立的暫時性 unit 執行，不受本服務停止影響。
+      if (isInstalled() && process.env.INVOCATION_ID && !process.env.PBG_RESTORE_NO_DETACH) {
+        return await BackupRestoreService.restoreDetached({ scriptPath, backupPath, backupFileName, cwd, opId });
+      }
+
       // 暫停自動保存，避免在還原過程中覆蓋資料庫檔案
       const db = require('../models/db');
       if (db && typeof db.pauseAutoSave === 'function') {
