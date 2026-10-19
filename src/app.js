@@ -70,6 +70,11 @@ console.log('[啟動] Session 配置完成');
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
+// 附件預覽（Excel）在瀏覽器端解析：直接提供 exceljs 套件內建的瀏覽器版（與伺服器端同一版本，不另外複製一份）
+app.get('/vendor/exceljs/exceljs.min.js', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.sendFile(path.join(__dirname, '..', 'node_modules', 'exceljs', 'dist', 'exceljs.min.js'));
+});
 // 自訂分頁圖示（/favicon.ico）：登入頁也要能載入，所以放在登入檢查之前
 app.use(require('./routes/branding').publicRouter);
 

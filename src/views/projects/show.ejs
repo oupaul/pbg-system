@@ -64,7 +64,9 @@ ${typeof error !== 'undefined' && error ? '<div class="alert alert-danger alert-
                   // 可預覽的類型（圖片／PDF／文字／CSV）：顯示預覽按鈕；實際類型由伺服器依檔案內容再驗證一次
                   const previewExt = (fullName.toLowerCase().match(/\.([a-z0-9]+)$/) || [])[1] || '';
                   const previewKind = ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(previewExt) ? 'image'
-                    : (previewExt === 'pdf' ? 'pdf' : (['txt', 'log', 'md', 'csv', 'tsv'].includes(previewExt) ? 'text' : ''));
+                    : (previewExt === 'pdf' ? 'pdf'
+                    : (['txt', 'log', 'md', 'csv', 'tsv'].includes(previewExt) ? 'text'
+                    : (previewExt === 'docx' ? 'docx' : (previewExt === 'xlsx' ? 'xlsx' : ''))));
                   const previewBtn = (!isDeleted && previewKind)
                     ? ' <button type="button" class="btn btn-sm btn-link p-0 attachment-preview-btn" data-project-id="' + project.id + '" data-attachment-id="' + a.id + '" data-kind="' + previewKind + '" data-name="' + fullName + '" title="預覽"><i class="bi bi-eye"></i></button>'
                     : '';
@@ -1315,102 +1317,6 @@ ${bonuses.map(b => `
     </div>
   </div>
 </div>
-<script>
-(function () {
-  var modalEl = document.getElementById('attachmentPreviewModal');
-  if (!modalEl) return;
-  var body = document.getElementById('attachmentPreviewBody');
-  var title = document.getElementById('attachmentPreviewTitle');
-  var note = document.getElementById('attachmentPreviewNote');
-  var dl = document.getElementById('attachmentPreviewDownload');
-  var modal = null;
-
-  function clearBody() { while (body.firstChild) body.removeChild(body.firstChild); note.textContent = ''; }
-  function showMessage(text, cls) {
-    var p = document.createElement('div');
-    p.className = 'p-4 text-center ' + (cls || 'text-muted');
-    p.textContent = text;
-    body.appendChild(p);
-  }
-
-  function renderCsv(data) {
-    var wrap = document.createElement('div');
-    wrap.className = 'table-responsive';
-    var table = document.createElement('table');
-    table.className = 'table table-sm table-bordered table-striped mb-0 small';
-    (data.rows || []).forEach(function (row, i) {
-      var tr = document.createElement('tr');
-      row.forEach(function (cell) {
-        var el = document.createElement(i === 0 ? 'th' : 'td');
-        el.textContent = cell;
-        tr.appendChild(el);
-      });
-      table.appendChild(tr);
-    });
-    wrap.appendChild(table);
-    body.appendChild(wrap);
-  }
-
-  function renderText(data) {
-    var pre = document.createElement('pre');
-    pre.className = 'p-3 mb-0 small';
-    pre.style.whiteSpace = 'pre-wrap';
-    pre.style.wordBreak = 'break-word';
-    pre.textContent = data.text || '';
-    body.appendChild(pre);
-  }
-
-  function openPreview(btn) {
-    var projectId = btn.getAttribute('data-project-id');
-    var attachmentId = btn.getAttribute('data-attachment-id');
-    var kind = btn.getAttribute('data-kind');
-    var name = btn.getAttribute('data-name') || '附件預覽';
-    var base = '/projects/' + projectId + '/attachments/' + attachmentId;
-    clearBody();
-    title.textContent = name;
-    dl.setAttribute('href', base + '/download');
-    if (!modal) modal = new bootstrap.Modal(modalEl);
-    modal.show();
-
-    if (kind === 'image') {
-      var img = document.createElement('img');
-      img.src = base + '/preview';
-      img.alt = name;
-      img.className = 'd-block mx-auto img-fluid';
-      img.onerror = function () { clearBody(); showMessage('此檔案無法預覽，請下載後開啟', 'text-danger'); };
-      body.appendChild(img);
-    } else if (kind === 'pdf') {
-      var frame = document.createElement('iframe');
-      frame.src = base + '/preview';
-      frame.title = name;
-      frame.style.width = '100%';
-      frame.style.height = '75vh';
-      frame.style.border = '0';
-      body.appendChild(frame);
-    } else {
-      showMessage('載入中...');
-      fetch(base + '/text', { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
-        .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
-        .then(function (r) {
-          clearBody();
-          if (!r.ok) { showMessage(r.data.error || '此檔案無法預覽，請下載後開啟', 'text-danger'); return; }
-          if (r.data.kind === 'csv') renderCsv(r.data); else renderText(r.data);
-          var parts = ['編碼：' + r.data.encoding];
-          if (r.data.truncated) parts.push('檔案較大，僅顯示前段內容，完整內容請下載');
-          if (r.data.columnsTruncated) parts.push('欄位過多，僅顯示前 40 欄');
-          note.textContent = parts.join('；');
-        })
-        .catch(function () { clearBody(); showMessage('預覽失敗，請稍後再試或下載後開啟', 'text-danger'); });
-    }
-  }
-
-  document.addEventListener('click', function (e) {
-    var btn = e.target.closest ? e.target.closest('.attachment-preview-btn') : null;
-    if (btn) { e.preventDefault(); openPreview(btn); }
-  });
-  // 關閉視窗時清空內容（停止 PDF/圖片載入，也不留下檔案內容在 DOM 中）
-  modalEl.addEventListener('hidden.bs.modal', clearBody);
-})();
-</script>
+<script src="/js/attachment-preview.js"></script>
 
 `}) %>

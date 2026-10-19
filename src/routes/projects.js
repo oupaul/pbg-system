@@ -15,7 +15,7 @@ const SettingsRoutes = require('./settings');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireEditPermission } = require('../middleware/auth');
 const { requireProjectScopeFromParam, requireNumericParam } = require('../utils/projectScope');
-const { detectPreviewKind, readTextPreview } = require('../utils/attachmentPreview');
+const { detectPreviewKind, readTextPreview, detectOfficeKind } = require('../utils/attachmentPreview');
 
 // 操作專案附件／刪除專案前，必須確認專案在使用者的範圍內（避免猜 id 改到他人專案）
 const projectScope = requireProjectScopeFromParam('id');
@@ -631,6 +631,28 @@ router.get('/:id/attachments/:attachmentId/text', (req, res) => {
   } catch (err) {
     console.error('附件文字預覽錯誤:', err);
     res.status(500).json({ error: '預覽失敗' });
+  }
+});
+
+// Word/Excel 預覽用：只提供「經驗證的 .docx/.xlsx 原始位元組」給前端在瀏覽器內解析。
+// 伺服器不解析、不執行檔案內容；先檢查 ZIP 結構與解壓縮後大小，擋掉損毀檔與解壓縮炸彈。
+router.get('/:id/attachments/:attachmentId/office', (req, res) => {
+  try {
+    const loaded = loadAttachmentForPreview(req, res);
+    if (!loaded) return;
+    const detected = detectOfficeKind(loaded.filePath, loaded.row.original_filename);
+    if (!detected) return res.status(415).send('此檔案無法預覽（不是正常的 .docx/.xlsx），請下載後開啟');
+    if (detected.tooLarge) {
+      return res.status(413).send(`檔案超過預覽上限（${Math.round(detected.maxBytes / 1024 / 1024)}MB），請下載後開啟`);
+    }
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Disposition', 'attachment; filename="preview.bin"');
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.sendFile(loaded.filePath);
+  } catch (err) {
+    console.error('附件 Office 預覽錯誤:', err);
+    res.status(500).send('預覽失敗');
   }
 });
 

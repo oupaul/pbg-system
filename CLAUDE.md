@@ -64,6 +64,7 @@ Node.js + Express + SQLite（`better-sqlite3`）的發票／業績獎金／CRM �
 - `SIGTERM`/`SIGINT` 會先停止接收請求再關閉資料庫（最多等 10 秒）；`GET /healthz` 不需登入、不建 session，會實際讀一次資料庫
 - `src/models/db.js`：`busy_timeout=5000`、`synchronous=NORMAL`；資料庫忙碌/鎖定/IO 錯誤/損毀不再被 `get()`/`all()` 當成「查無資料」吞掉（schema 差異類錯誤仍維持原本的容錯）；錯誤日誌不記錄 SQL 參數
 - Excel 專案匯入與成本明細匯入包在單一交易裡，單一工作表上限 20000 列
+- 附件線上預覽（專案頁）：以檔案內容（魔術位元組）判斷類型，不信任副檔名/MIME；SVG/HTML 一律不預覽。圖片/PDF/文字/CSV 由伺服器供應；Word（.docx）、Excel（.xlsx）由瀏覽器端解析（mammoth 為 `public/vendor/mammoth/` 內的 vendored 檔案，ExcelJS 由 `/vendor/exceljs/exceljs.min.js` 提供），伺服器只驗證 OOXML ZIP 結構（防 zip bomb：條目數／解壓總量上限）並以 `application/octet-stream` 回傳原始位元組（`/projects/:id/attachments/:attachmentId/office`）。Word 預覽經白名單消毒（`public/js/attachment-preview.js`），Excel 一律用 `textContent`；舊版 .doc/.xls 不支援預覽，只能下載
 - 自動測試：`npm test`（jest，`tests/`）目前涵蓋跳脫/重導/CSRF Origin 檢查/帳號鎖定/備份檔名白名單/NAS 設定驗證等純函式；尚無需要資料庫的整合測試
 
 ## 一個刻意沒修的風險：`deploy.sh` 裡的 ad-hoc `ALTER TABLE`

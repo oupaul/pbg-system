@@ -146,4 +146,68 @@ function readTextPreview(filePath, originalFilename, kind) {
   return result;
 }
 
-module.exports = { detectPreviewKind, readTextPreview, parseDelimited, sniffImageType, MAX_TEXT_BYTES };
+
+// ── Word（.docx）／Excel（.xlsx）預覽：檔案只在使用者的瀏覽器解析，伺服器只做「是不是正常的 OOXML」檢查 ──
+// 重點是防範解壓縮炸彈：.docx/.xlsx 其實是 ZIP，惡意檔案可以幾 KB 展開成數 GB 讓瀏覽器當掉，
+// 所以先讀 ZIP 中央目錄，累計「解壓後大小」與檔案數，超過上限就不提供預覽。
+const MAX_OFFICE_BYTES = { docx: 10 * 1024 * 1024, xlsx: 5 * 1024 * 1024 };
+const MAX_ZIP_ENTRIES = 3000;
+const MAX_ZIP_UNCOMPRESSED_TOTAL = 150 * 1024 * 1024;
+const MAX_ZIP_UNCOMPRESSED_ENTRY = 100 * 1024 * 1024;
+
+// 讀取 ZIP 中央目錄；回傳 { ok, names, totalUncompressed, reason }
+function inspectZip(buffer) {
+  if (buffer.length < 22 || buffer.readUInt32LE(0) !== 0x04034b50) return { ok: false, reason: '不是 ZIP 格式' };
+  // 找 End of Central Directory（從檔尾往回找，註解最長 65535 位元組）
+  let eocd = -1;
+  for (let i = buffer.length - 22; i >= Math.max(0, buffer.length - 22 - 65535); i--) {
+    if (buffer.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) return { ok: false, reason: '找不到 ZIP 中央目錄' };
+  const totalEntries = buffer.readUInt16LE(eocd + 10);
+  const cdOffset = buffer.readUInt32LE(eocd + 16);
+  if (totalEntries === 0xffff || cdOffset === 0xffffffff) return { ok: false, reason: '不支援 ZIP64' };
+  if (totalEntries > MAX_ZIP_ENTRIES) return { ok: false, reason: '壓縮檔內項目過多' };
+
+  const names = [];
+  let total = 0;
+  let pos = cdOffset;
+  for (let n = 0; n < totalEntries; n++) {
+    if (pos + 46 > buffer.length || buffer.readUInt32LE(pos) !== 0x02014b50) return { ok: false, reason: 'ZIP 中央目錄損毀' };
+    const uncompressed = buffer.readUInt32LE(pos + 24);
+    const nameLen = buffer.readUInt16LE(pos + 28);
+    const extraLen = buffer.readUInt16LE(pos + 30);
+    const commentLen = buffer.readUInt16LE(pos + 32);
+    if (pos + 46 + nameLen > buffer.length) return { ok: false, reason: 'ZIP 中央目錄損毀' };
+    const name = buffer.subarray(pos + 46, pos + 46 + nameLen).toString('utf8');
+    if (name.startsWith('/') || name.split('/').includes('..')) return { ok: false, reason: '壓縮檔含不安全的路徑' };
+    if (uncompressed > MAX_ZIP_UNCOMPRESSED_ENTRY) return { ok: false, reason: '壓縮檔內有過大的項目' };
+    total += uncompressed;
+    if (total > MAX_ZIP_UNCOMPRESSED_TOTAL) return { ok: false, reason: '解壓縮後總大小過大' };
+    names.push(name);
+    pos += 46 + nameLen + extraLen + commentLen;
+  }
+  return { ok: true, names, totalUncompressed: total };
+}
+
+// 回傳 { kind: 'docx'|'xlsx', maxBytes } 或 null：副檔名 + 檔案確實是正常 OOXML + 通過解壓縮炸彈檢查
+function detectOfficeKind(filePath, originalFilename) {
+  const ext = path.extname(originalFilename || '').toLowerCase();
+  const kind = ext === '.docx' ? 'docx' : (ext === '.xlsx' ? 'xlsx' : null);
+  if (!kind) return null;
+  let buffer;
+  try {
+    const stat = fs.statSync(filePath);
+    if (stat.size > MAX_OFFICE_BYTES[kind]) return { kind, tooLarge: true, maxBytes: MAX_OFFICE_BYTES[kind] };
+    buffer = fs.readFileSync(filePath);
+  } catch (e) {
+    return null;
+  }
+  const zip = inspectZip(buffer);
+  if (!zip.ok) return null;
+  const required = kind === 'docx' ? 'word/document.xml' : 'xl/workbook.xml';
+  if (!zip.names.includes('[Content_Types].xml') || !zip.names.includes(required)) return null;
+  return { kind, maxBytes: MAX_OFFICE_BYTES[kind] };
+}
+
+module.exports = { detectPreviewKind, readTextPreview, parseDelimited, sniffImageType, MAX_TEXT_BYTES, detectOfficeKind, inspectZip };
