@@ -239,7 +239,7 @@ if [ "$IS_FIRST_INSTALL" = false ]; then
         sleep 2
         
         # 檢查是否還有進程佔用服務的端口
-        PORT_PID=$(sudo lsof -ti:${PORT} 2>/dev/null || echo "")
+        PORT_PID=$(sudo lsof -ti TCP:${PORT} -sTCP:LISTEN 2>/dev/null || echo "")
         if [ -n "$PORT_PID" ]; then
             PORT_PROC_CMD=$(ps -p "$PORT_PID" -o args= 2>/dev/null || echo "")
             if echo "$PORT_PROC_CMD" | grep -q "app\.js"; then
@@ -263,7 +263,7 @@ if [ "$IS_FIRST_INSTALL" = false ]; then
 else
     log "步驟 1/6: 跳過（首次安裝無需停止服務）"
     # 即使是首次安裝，也檢查端口
-    PORT_PID=$(sudo lsof -ti:${PORT} 2>/dev/null || echo "")
+    PORT_PID=$(sudo lsof -ti TCP:${PORT} -sTCP:LISTEN 2>/dev/null || echo "")
     if [ -n "$PORT_PID" ]; then
         PORT_PROC_CMD=$(ps -p "$PORT_PID" -o args= 2>/dev/null || echo "")
         if echo "$PORT_PROC_CMD" | grep -q "app\.js"; then
