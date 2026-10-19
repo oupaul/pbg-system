@@ -9,13 +9,17 @@
 ### 一鍵安裝（從 GitHub）
 
 ```bash
-# 公開 Repo
-bash <(curl -fsSL https://raw.githubusercontent.com/oupaul/pbg-system/develop/setup.sh)
+# 公開 Repo（必須用 sudo bash -c "$(curl ...)"；sudo bash <(curl ...) 會因 /dev/fd 被關閉而失敗）
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/oupaul/pbg-system/develop/setup.sh)"
 
-# 私有 Repo（curl 本身也需帶 token）
+# 私有 Repo（curl 本身也需帶 token，並用 sudo 把 token 傳給 git clone）
 export GH_TOKEN=github_pat_xxxxxxxxxxxx
-bash <(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
-  https://raw.githubusercontent.com/oupaul/pbg-system/develop/setup.sh)
+sudo GH_TOKEN="$GH_TOKEN" bash -c "$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+  https://raw.githubusercontent.com/oupaul/pbg-system/develop/setup.sh)"
+
+# 指定 branch（腳本網址的 branch 與 DEPLOY_BRANCH 要一致，預設是 develop）
+sudo DEPLOY_BRANCH=develop-hzt bash -c "$(curl -fsSL \
+  https://raw.githubusercontent.com/oupaul/pbg-system/develop-hzt/setup.sh)"
 ```
 
 `setup.sh` 自動安裝 git、clone repo，並執行 `deploy.sh` 完成部署。

@@ -1,18 +1,20 @@
 #!/bin/bash
 # PBG 系統 - 全新主機一鍵安裝（從 GitHub）
 #
-# 用法：
+# 用法（必須用 sudo，且不能寫成 sudo bash <(curl ...)：
+#   sudo 會關閉行程替換產生的 /dev/fd/63，會出現「bash: /dev/fd/63: No such file or directory」）
+#
 #   公開 Repo:
-#     bash <(curl -fsSL https://raw.githubusercontent.com/oupaul/pbg-system/develop/setup.sh)
+#     sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/oupaul/pbg-system/develop/setup.sh)"
 #
-#   私有 Repo（curl 本身也需帶 token，支援 ghp_ 與 github_pat_ 格式）:
+#   私有 Repo（curl 本身也需帶 token，支援 ghp_ 與 github_pat_ 格式；token 要用 sudo 傳進去給 git clone 用）:
 #     export GH_TOKEN=github_pat_xxxxxxxxxxxx   # 或 ghp_xxxxxxxxxxxx
-#     bash <(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
-#       https://raw.githubusercontent.com/oupaul/pbg-system/develop/setup.sh)
+#     sudo GH_TOKEN="$GH_TOKEN" bash -c "$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+#       https://raw.githubusercontent.com/oupaul/pbg-system/develop/setup.sh)"
 #
-#   指定 branch:
-#     bash <(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
-#       https://raw.githubusercontent.com/oupaul/pbg-system/main/setup.sh)
+#   指定要部署的 branch（預設 develop；腳本網址裡的 branch 也要一併改成同一個）:
+#     sudo DEPLOY_BRANCH=develop-hzt bash -c "$(curl -fsSL \
+#       https://raw.githubusercontent.com/oupaul/pbg-system/develop-hzt/setup.sh)"
 
 set -e
 
@@ -41,7 +43,7 @@ echo ""
 
 # 需要 root
 if [ "$EUID" -ne 0 ]; then
-    error "請使用 sudo 執行：\n  sudo bash <(curl -fsSL ...)"
+    error "請使用 sudo 執行：\n  sudo bash -c \"\$(curl -fsSL <setup.sh 網址>)\"\n（不要寫成 sudo bash <(curl ...)，sudo 會讓 /dev/fd 失效）"
 fi
 
 # 安裝 git（若尚未安裝）

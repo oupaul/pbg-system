@@ -15,6 +15,7 @@ const SettingsRoutes = require('./settings');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireEditPermission } = require('../middleware/auth');
 const { requireProjectScopeFromParam, requireNumericParam } = require('../utils/projectScope');
+const { detectPreviewKind, readTextPreview } = require('../utils/attachmentPreview');
 
 // 操作專案附件／刪除專案前，必須確認專案在使用者的範圍內（避免猜 id 改到他人專案）
 const projectScope = requireProjectScopeFromParam('id');
@@ -565,6 +566,71 @@ router.get('/:id/attachments/:attachmentId/download', (req, res) => {
   } catch (err) {
     console.error('附件下載錯誤:', err);
     res.status(500).send('下載失敗');
+  }
+});
+
+// 附件預覽共用：驗證專案檢視權限、附件存在且未刪除、檔案存在；失敗時已回應並回傳 null
+function loadAttachmentForPreview(req, res) {
+  if (!/^\d+$/.test(String(req.params.id)) || !/^\d+$/.test(String(req.params.attachmentId))) {
+    res.status(400).send('無效的識別碼');
+    return null;
+  }
+  const project = Project.findById(req.params.id, req.user);
+  if (!project) { res.status(404).send('找不到專案或無權限'); return null; }
+  const row = db.prepare('SELECT * FROM project_attachments WHERE id = ? AND project_id = ?').get(req.params.attachmentId, req.params.id);
+  if (!row) { res.status(404).send('找不到附件'); return null; }
+  if (row.deleted_at) { res.status(410).send('此附件已刪除'); return null; }
+  const filePath = path.resolve(path.join(attachmentsDir, row.stored_filename));
+  if (!filePath.startsWith(path.resolve(attachmentsDir) + path.sep) || !fs.existsSync(filePath)) {
+    res.status(404).send('檔案不存在');
+    return null;
+  }
+  return { row, filePath };
+}
+
+// 附件預覽（圖片、PDF）：只有檔案內容經驗證確實是圖片/PDF 才 inline 顯示，Content-Type 由實際內容決定，
+// 不採用使用者上傳時宣稱的類型；其餘一律 415（前端不會對這些類型顯示預覽按鈕）
+router.get('/:id/attachments/:attachmentId/preview', (req, res) => {
+  try {
+    const loaded = loadAttachmentForPreview(req, res);
+    if (!loaded) return;
+    const detected = detectPreviewKind(loaded.filePath, loaded.row.original_filename);
+    if (!detected || (detected.kind !== 'image' && detected.kind !== 'pdf')) {
+      return res.status(415).send('此檔案類型不支援預覽，請下載後開啟');
+    }
+    const name = encodeURIComponent(loaded.row.original_filename).replace(/'/g, '%27');
+    res.setHeader('Content-Type', detected.contentType);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${name}`);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    if (detected.kind === 'image') {
+      // 圖片不需要執行任何內容：用 CSP sandbox 再多一層保險（PDF 檢視器需要插件，不能套用 sandbox）
+      res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+    }
+    res.sendFile(loaded.filePath);
+  } catch (err) {
+    console.error('附件預覽錯誤:', err);
+    res.status(500).send('預覽失敗');
+  }
+});
+
+// 附件文字/CSV 預覽：回傳 JSON（前端用 textContent 顯示，不當 HTML 解析），最多 256KB、CSV 最多 500 列
+router.get('/:id/attachments/:attachmentId/text', (req, res) => {
+  try {
+    const loaded = loadAttachmentForPreview(req, res);
+    if (!loaded) return;
+    const detected = detectPreviewKind(loaded.filePath, loaded.row.original_filename);
+    if (!detected || (detected.kind !== 'text' && detected.kind !== 'csv')) {
+      return res.status(415).json({ error: '此檔案類型不支援文字預覽，請下載後開啟' });
+    }
+    const result = readTextPreview(loaded.filePath, loaded.row.original_filename, detected.kind);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'no-store');
+    if (result.error) return res.status(422).json({ error: result.error });
+    res.json({ filename: loaded.row.original_filename, ...result });
+  } catch (err) {
+    console.error('附件文字預覽錯誤:', err);
+    res.status(500).json({ error: '預覽失敗' });
   }
 });
 
