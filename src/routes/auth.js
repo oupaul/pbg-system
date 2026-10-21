@@ -8,6 +8,7 @@ const { getUserInfo } = require('../utils/authHelper');
 const { loginRateLimiter, resetOnSuccess, accountLockedMinutes, recordAccountFailure, clearAccountFailures, twoFactorLockedMinutes, recordTwoFactorFailure, clearTwoFactorFailures } = require('../middleware/rateLimiter');
 const { passwordFingerprint } = require('../middleware/auth');
 const TwoFactor = require('../models/TwoFactor');
+const TrustedDevice = require('../models/TrustedDevice');
 
 // 帳號不存在時也做一次等量的雜湊運算，避免從回應時間差判斷帳號是否存在
 let dummyHashPromise = null;
@@ -119,7 +120,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
   if (isOldSHA256) {
     console.log('[登入] 檢測到舊的 SHA256 密碼格式，正在升級為 argon2id...');
     try {
-      await User.updatePassword(user.id, password);
+      await User.updatePassword(user.id, password, { keepTrustedDevices: true });
       console.log(`[登入] 密碼已成功升級為 argon2id`);
     } catch (err) {
       console.error('[登入] 密碼升級失敗:', err);
@@ -128,8 +129,14 @@ router.post('/login', loginRateLimiter, async (req, res) => {
   }
 
   // 已啟用雙因素驗證：密碼通過還不算登入成功，建立「等待第二步驗證」的暫時狀態（沒有 session.user，
-  // 所以任何需要登入的頁面都進不去），驗證碼通過後才完成登入
+  // 所以任何需要登入的頁面都進不去），驗證碼通過後才完成登入。
+  // 這台裝置若持有該使用者有效的「信任此裝置」憑證（先前通過驗證碼時勾選），才可略過第二步
   if (user.totp_enabled) {
+    const trusted = TrustedDevice.verify(user.id, req);
+    if (trusted) {
+      TwoFactor.audit('2fa_skipped_trusted_device', user.id, user.name || user.username, { device_id: trusted.id });
+      return finishLogin(req, res, user, redirect);
+    }
     return req.session.regenerate((regenErr) => {
       if (regenErr) {
         console.error('[登入] 重新產生 session 失敗:', regenErr);
@@ -198,7 +205,7 @@ router.get('/login/2fa', (req, res) => {
     return res.redirect(`/login?error=${encodeURIComponent('登入已逾時，請重新輸入帳號密碼')}`);
   }
   res.set('Cache-Control', 'no-store');
-  res.render('auth/two-factor', { title: '雙因素驗證', error: req.query.error || '' });
+  res.render('auth/two-factor', { title: '雙因素驗證', error: req.query.error || '', trustDays: TrustedDevice.getTrustDays() });
 });
 
 router.post('/login/2fa', loginRateLimiter, async (req, res) => {
@@ -236,6 +243,16 @@ router.post('/login/2fa', loginRateLimiter, async (req, res) => {
   clearTwoFactorFailures(lockKey);
   if (usedRecoveryCode) {
     TwoFactor.audit('2fa_recovery_code_used', user.id, user.name || user.username, { remaining: (TwoFactor.getStatus(user.id) || {}).recoveryCodesRemaining });
+  }
+  // 勾選「信任此裝置」：發憑證給這台裝置（用復原碼登入時不提供——多半是手機遺失的情況，不該順便信任這台）
+  if (req.body.trust_device === '1' && !usedRecoveryCode) {
+    const trust = TrustedDevice.create(user.id, { userAgent: req.get('User-Agent'), ip: req.ip });
+    if (trust) {
+      res.cookie(TrustedDevice.COOKIE_NAME, trust.token, {
+        httpOnly: true, sameSite: 'lax', secure: !!req.secure, path: '/', maxAge: trust.maxAgeMs
+      });
+      TwoFactor.audit('2fa_device_trusted', user.id, user.name || user.username, { days: Math.round(trust.maxAgeMs / 86400000) });
+    }
   }
   return finishLogin(req, res, user, pending.redirect);
 });

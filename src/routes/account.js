@@ -5,6 +5,7 @@ const db = require('../models/db');
 const User = require('../models/User');
 const Role = require('../models/Role');
 const TwoFactor = require('../models/TwoFactor');
+const TrustedDevice = require('../models/TrustedDevice');
 const totp = require('../utils/totp');
 const secretBox = require('../utils/secretBox');
 const { getUserInfo } = require('../utils/authHelper');
@@ -56,6 +57,9 @@ router.get('/security', (req, res) => {
     title: '帳號安全',
     status,
     required: roleRequires2fa(req.user.role),
+    trustDays: TrustedDevice.getTrustDays(),
+    devices: TrustedDevice.list(req.user.id).map(d => ({ ...d, label: TrustedDevice.describe(d.user_agent) })),
+    currentDeviceId: TrustedDevice.currentId(req.user.id, req),
     error: req.query.error || '',
     success: req.query.success || ''
   });
@@ -131,6 +135,25 @@ router.post('/security/2fa/recovery-codes', async (req, res) => {
   TwoFactor.audit('2fa_recovery_codes_regenerated', req.user.id, getUserInfo(req));
   res.set('Cache-Control', 'no-store');
   res.render('account/recovery-codes', { title: '復原碼', codes, firstTime: false });
+});
+
+// 撤銷單一信任裝置（必須是自己的）；撤銷的是目前這台時一併清掉 cookie
+router.post('/security/devices/:id/revoke', (req, res) => {
+  if (!/^\d+$/.test(req.params.id)) return redirectWithError(res, '無效的裝置');
+  const id = parseInt(req.params.id, 10);
+  const isCurrent = TrustedDevice.currentId(req.user.id, req) === id;
+  if (!TrustedDevice.revoke(req.user.id, id)) return redirectWithError(res, '找不到這台裝置');
+  if (isCurrent) res.clearCookie(TrustedDevice.COOKIE_NAME, { path: '/' });
+  TwoFactor.audit('2fa_device_revoked', req.user.id, getUserInfo(req), { device_id: id });
+  res.redirect(securityUrl('success=' + encodeURIComponent('已撤銷這台裝置的信任')));
+});
+
+// 撤銷全部信任裝置
+router.post('/security/devices/revoke-all', (req, res) => {
+  const count = TrustedDevice.revokeAll(req.user.id);
+  res.clearCookie(TrustedDevice.COOKIE_NAME, { path: '/' });
+  TwoFactor.audit('2fa_devices_revoked_all', req.user.id, getUserInfo(req), { count });
+  res.redirect(securityUrl('success=' + encodeURIComponent(`已撤銷全部信任裝置（${count} 台）`)));
 });
 
 module.exports = router;

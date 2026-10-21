@@ -6,6 +6,7 @@ const db = require('./db');
 const totp = require('../utils/totp');
 const secretBox = require('../utils/secretBox');
 const AuditLogService = require('../services/AuditLogService');
+const TrustedDevice = require('./TrustedDevice');
 
 const RECOVERY_CODE_COUNT = 10;
 // 復原碼字母表：去掉容易混淆的 I、O、0、1
@@ -55,6 +56,7 @@ const TwoFactor = {
         recovery_codes = ?, updated_at = datetime('now', 'localtime')
       WHERE id = ?
     `).run(secretBox.encrypt(secret), step, JSON.stringify(hashes), userId);
+    TrustedDevice.revokeAll(userId); // 新密鑰：先前信任的裝置一律失效
     return codes;
   },
 
@@ -107,6 +109,7 @@ const TwoFactor = {
         recovery_codes = NULL, updated_at = datetime('now', 'localtime')
       WHERE id = ?
     `).run(userId);
+    TrustedDevice.revokeAll(userId);
   },
 
   audit(action, userId, userInfo, detail = null) {

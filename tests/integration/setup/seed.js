@@ -105,10 +105,11 @@ async function main() {
   for (const name of ['u_2fa_login', 'u_2fa_lock', 'u_2fa_recovery', 'u_2fa_disable', 'u_2fa_regen', 'u_2fa_reset', 'u_2fa_unavail', 'u_2fa_iso']) {
     addUser(name, 'edit_only');
   }
+  for (const name of Array.from({ length: 16 }, (_, i) => `u_td_${i + 1}`)) addUser(name, 'edit_only'); // 信任裝置測試用，各自獨立
   addUser('u_req_a', 'req2fa');   // 角色強制、尚未啟用：登入後只能去設定頁
   addUser('u_req_b', 'req2fa');   // 同上，用來走完整個啟用流程
   addUser('u_req_c', 'req2fa');   // 角色強制且已啟用：不可停用
-  for (const name of ['u_2fa_login', 'u_2fa_lock', 'u_2fa_recovery', 'u_2fa_disable', 'u_2fa_regen', 'u_2fa_reset', 'u_2fa_iso', 'u_req_c']) enable2fa(name);
+  for (const name of ['u_2fa_login', 'u_2fa_lock', 'u_2fa_recovery', 'u_2fa_disable', 'u_2fa_regen', 'u_2fa_reset', 'u_2fa_iso', 'u_req_c', ...Array.from({ length: 16 }, (_, i) => `u_td_${i + 1}`)]) enable2fa(name);
   // 以另一把 SESSION_SECRET 加密的密鑰：模擬「還原到新主機後金鑰不同」，登入必須被拒絕（不是放行）
   const savedSecret = process.env.SESSION_SECRET;
   process.env.SESSION_SECRET = 'some-other-session-secret';

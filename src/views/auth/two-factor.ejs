@@ -34,6 +34,13 @@
                   style="letter-spacing: .3em;">
                 <div class="form-text">手機遺失或無法使用驗證器時，可以改輸入一組<strong>復原碼</strong>（格式 XXXXX-XXXXX，每組只能用一次）。</div>
               </div>
+              <% if (typeof trustDays !== 'undefined' && trustDays > 0) { %>
+              <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="trust_device" name="trust_device" value="1">
+                <label class="form-check-label" for="trust_device">在這台裝置上信任 <%= trustDays %> 天</label>
+                <div class="form-text">期間內在這台裝置登入只需要密碼。請<strong>勿在公用或共用的電腦</strong>勾選；改密碼、停用或重設雙因素驗證時會自動失效，也可隨時在「帳號安全」撤銷。</div>
+              </div>
+              <% } %>
               <button type="submit" class="btn btn-dark w-100"><i class="bi bi-box-arrow-in-right"></i> 驗證並登入</button>
             </form>
 

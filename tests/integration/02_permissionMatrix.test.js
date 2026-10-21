@@ -125,6 +125,8 @@ describeIntegration('寫入面（變更類路由）', () => {
       'POST /account/security/2fa/disable',
       'POST /account/security/2fa/enable',
       'POST /account/security/2fa/recovery-codes',
+      'POST /account/security/devices/:id/revoke',
+      'POST /account/security/devices/revoke-all',
       'POST /notifications/:id/read',
       'POST /notifications/mark-all-read'
     ]);
@@ -135,6 +137,8 @@ describeIntegration('寫入面（變更類路由）', () => {
       'POST /account/security/2fa/disable',
       'POST /account/security/2fa/enable',
       'POST /account/security/2fa/recovery-codes',
+      'POST /account/security/devices/:id/revoke',
+      'POST /account/security/devices/revoke-all',
       'POST /customers/',
       'POST /customers/:id',
       'POST /customers/:id/activities',

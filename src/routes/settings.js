@@ -140,6 +140,13 @@ router.post('/update', requireAuth, requireManageSettings, (req, res) => {
         }
       }
       
+      // 特別驗證雙因素驗證「信任此裝置」天數：0-90（0 = 停用）
+      if (setting_key === 'two_factor_trust_days') {
+        if (num < 0 || num > 90) {
+          return res.redirect('/settings?error=' + encodeURIComponent('信任裝置天數必須在 0-90 天之間'));
+        }
+      }
+
       // 特別驗證警告時間：必須在 1-10 分鐘之間
       if (setting_key === 'idle_warning_minutes') {
         if (num < 1 || num > 10) {
@@ -239,6 +246,14 @@ router.post('/bulk-update', requireAuth, requireManageSettings, (req, res) => {
             }
           }
           
+          // 特別驗證雙因素驗證「信任此裝置」天數
+          if (key === 'two_factor_trust_days') {
+            if (num < 0 || num > 90) {
+              errors.push('信任裝置天數必須在 0-90 天之間');
+              continue;
+            }
+          }
+
           // 特別驗證警告時間
           if (key === 'idle_warning_minutes') {
             if (num < 1 || num > 10) {

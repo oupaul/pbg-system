@@ -105,6 +105,7 @@ const MIGRATIONS = [
   'migrate_data_retention',
   'migrate_two_factor',
   'migrate_referral_rewards_created_by',
+  'migrate_two_factor_trusted_devices',
 ];
 
 function run() {

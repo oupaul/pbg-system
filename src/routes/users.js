@@ -292,7 +292,7 @@ router.post('/:id', requireAuth, requireAdmin, async (req, res) => {
 // 重設雙因素驗證（使用者遺失手機又沒有復原碼時）：清除密鑰與復原碼，並通知該使用者
 router.post('/:id/reset-2fa', requireAuth, requireAdmin, (req, res) => {
   try {
-    const target = User.findById(req.params.id);
+    const target = User.findByIdAnyStatus(req.params.id);
     if (!target) return res.redirect('/users?error=' + encodeURIComponent('找不到使用者'));
     const TwoFactor = require('../models/TwoFactor');
     TwoFactor.clear(target.id);
@@ -314,7 +314,8 @@ router.post('/:id/reset-2fa', requireAuth, requireAdmin, (req, res) => {
 
 router.post('/:id/toggle-active', requireAuth, requireAdmin, async (req, res) => {
   const userId = parseInt(req.params.id);
-  const user = User.findById(userId);
+  // 要能找到已停用的帳號，否則停用後永遠無法從列表重新啟用
+  const user = User.findByIdAnyStatus(userId);
 
   if (!user) {
     return res.status(404).render('error', { title: '找不到使用者', message: '找不到使用者', error: {} });

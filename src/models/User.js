@@ -1,5 +1,6 @@
 const db = require('./db');
 const argon2 = require('argon2');
+const TrustedDevice = require('./TrustedDevice');
 
 const User = {
   // 依使用者名稱取得
@@ -7,7 +8,12 @@ const User = {
     return db.prepare(`SELECT * FROM users WHERE username = ? AND is_active = 1`).get(username);
   },
 
-  // 依ID取得（包含 salesperson_id）
+  // 依ID取得，不論帳號是否啟用（管理員要能找到已停用的帳號來重新啟用、重設雙因素驗證）
+  findByIdAnyStatus(id) {
+    return db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+  },
+
+  // 依ID取得（包含 salesperson_id；只找啟用中的帳號）
   findById(id) {
     try {
       return db.prepare(`
@@ -87,8 +93,9 @@ const User = {
     `).all(`-${minutes} minutes`);
   },
 
-  // 更新密碼（使用 update 方法，確保一致性）
-  async updatePassword(id, newPassword) {
+  // 更新密碼（使用 update 方法，確保一致性）。密碼變更後，該使用者所有「信任此裝置」一律失效；
+  // 登入時把舊雜湊升級成 argon2id 不是使用者改密碼，傳 keepTrustedDevices: true 保留
+  async updatePassword(id, newPassword, { keepTrustedDevices = false } = {}) {
     try {
       const passwordHash = await this.hashPassword(newPassword);
       const result = db.prepare(`
@@ -111,6 +118,7 @@ const User = {
       }
       
       console.log(`[User.updatePassword] 密碼更新成功，用戶 ID: ${id}, changes: ${result.changes}`);
+      if (result.changes > 0 && !keepTrustedDevices) TrustedDevice.revokeAll(id);
       return result.changes > 0;
     } catch (err) {
       console.error('[User.updatePassword] 更新錯誤:', err);
@@ -230,6 +238,7 @@ const User = {
       
       
       console.log(`[User.update] 更新成功，用戶 ID: ${id}, changes: ${result.changes}`);
+      if (data.is_active !== undefined && !Number(data.is_active)) TrustedDevice.revokeAll(id); // 帳號被停用
       return true; // 總是返回 true，因為我們已經驗證了更新成功
     } catch (err) {
       console.error('[User.update] 更新錯誤:', err);

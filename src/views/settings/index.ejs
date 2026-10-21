@@ -24,6 +24,8 @@
   const idleWarningSetting = localSettings.find(s => s.setting_key === 'idle_warning_minutes');
   const attachmentCleanupSetting = localSettings.find(s => s.setting_key === 'attachment_cleanup_retention_days');
   const activityReminderDaysSetting = localSettings.find(s => s.setting_key === 'activity_reminder_days');
+  const trustDaysSetting = localSettings.find(s => s.setting_key === 'two_factor_trust_days');
+  const trustDaysValue = trustDaysSetting ? trustDaysSetting.setting_value : '30';
 
   const notificationDaysValue = notificationDaysSetting ? notificationDaysSetting.setting_value : '6';
   const notificationEnabledValue = notificationEnabledSetting ? notificationEnabledSetting.setting_value : 'true';
@@ -258,6 +260,25 @@
   bodyHtml += '        <span class="input-group-text">天</span>';
   bodyHtml += '      </div>';
   bodyHtml += '      <div class="form-text">客戶已指派「客戶關係負責人」時，若超過此天數沒有新增任何活動紀錄（拜訪/電話/客訴/其他），就會在首頁儀表板的「客戶追蹤提醒」與導覽列通知中心產生提醒。</div>';
+  bodyHtml += '      <hr class="my-4">';
+  bodyHtml += '      <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> 儲存設定</button>';
+  bodyHtml += '    </form>';
+  bodyHtml += '  </div>';
+  bodyHtml += '</div>';
+
+  // 雙因素驗證「信任此裝置」設定卡片
+  bodyHtml += '<div class="card mt-4">';
+  bodyHtml += '  <div class="card-header bg-primary text-white">';
+  bodyHtml += '    <h5 class="mb-0"><i class="bi bi-shield-check"></i> 雙因素驗證：信任此裝置</h5>';
+  bodyHtml += '  </div>';
+  bodyHtml += '  <div class="card-body">';
+  bodyHtml += '    <form method="POST" action="/settings/bulk-update">';
+  bodyHtml += '      <label for="two_factor_trust_days" class="form-label"><strong>信任天數</strong></label>';
+  bodyHtml += '      <div class="input-group" style="max-width: 260px;">';
+  bodyHtml += '        <input type="number" class="form-control" id="two_factor_trust_days" name="two_factor_trust_days" value="' + escapeHtml(trustDaysValue) + '" min="0" max="90" required>';
+  bodyHtml += '        <span class="input-group-text">天</span>';
+  bodyHtml += '      </div>';
+  bodyHtml += '      <div class="form-text">已啟用雙因素驗證的使用者，登入時可勾選「信任這台裝置」，期間內在該裝置登入只需要密碼。<strong>0 表示停用此功能</strong>（每次登入都要輸入驗證碼，已建立的信任一律不再有效）；建議 30 天。改密碼、停用或重設雙因素驗證、帳號被停用時，該使用者的信任裝置會自動失效。</div>';
   bodyHtml += '      <hr class="my-4">';
   bodyHtml += '      <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> 儲存設定</button>';
   bodyHtml += '    </form>';
