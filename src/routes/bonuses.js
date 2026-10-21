@@ -6,6 +6,8 @@ const Salesperson = require('../models/Salesperson');
 const db = require('../models/db');
 const { getUserInfo } = require('../utils/authHelper');
 const safeRedirect = require('../utils/safeRedirect');
+const AuditLogService = require('../services/AuditLogService');
+const BonusStatementService = require('../services/BonusStatementService');
 const { requireEditPermission } = require('../middleware/auth');
 const { requireProjectScopeFromBody, requireProjectScopeFromRecord, userCanAccessProject, getVisibleSalespersonIds } = require('../utils/projectScope');
 
@@ -138,8 +140,14 @@ router.get('/', (req, res) => {
     typeColorMap = {};
   }
   
+  // 對帳單可選的業務（含已離職者，離職後仍可能有待發放獎金）：只列使用者範圍內的
+  const statementSalespeople = Salesperson.findAll(true)
+    .filter(sp => visibleIds === null || visibleIds.includes(sp.id))
+    .map(sp => ({ id: sp.id, name: sp.name }));
+
   res.render('bonuses/index', {
     title: '獎金管理',
+    statementSalespeople,
     years,
     selectedYear,
     stats,
@@ -151,6 +159,41 @@ router.get('/', (req, res) => {
     error: req.query.error || '',
     success: req.query.success || ''
   });
+});
+
+// 獎金對帳單 PDF：單一業務、某年度／季／月；業務只能產出自己範圍內的對帳單
+router.get('/statement', async (req, res) => {
+  const salespersonId = /^\d+$/.test(String(req.query.salesperson_id || '')) ? parseInt(req.query.salesperson_id, 10) : null;
+  const year = String(req.query.year || '');
+  const period = String(req.query.period || 'year');
+  const fail = (status, message) => res.status(status).render('error', { title: status === 403 ? '權限不足' : '請求錯誤', message, error: {} });
+
+  if (!salespersonId || !/^\d{4}$/.test(year) || !/^(year|q[1-4]|m([1-9]|1[0-2]))$/i.test(period)) {
+    return fail(400, '對帳單參數不正確，請重新選擇業務、年度與期間');
+  }
+  const visibleIds = getVisibleSalespersonIds(req.user); // null = 不限制
+  if (visibleIds !== null && !visibleIds.includes(salespersonId)) {
+    return fail(403, '您沒有權限產出這位業務的獎金對帳單');
+  }
+
+  try {
+    const result = await BonusStatementService.generate({ salespersonId, year, period, generatedBy: getUserInfo(req) });
+    if (!result) return fail(400, '找不到這位業務，或年度超出範圍');
+    // 表名用獨立的 bonus_statements：用 bonus_calculations 的話，record_id（業務 ID）會被專案時間軸誤認成某筆獎金
+    AuditLogService.log('generate_statement', 'bonus_statements', salespersonId, null, {
+      statement_id: result.statementId, period: result.period.code, counts: result.counts, totals: result.totals
+    }, getUserInfo(req));
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="bonus-statement.pdf"; filename*=UTF-8''${encodeURIComponent(result.fileName)}`,
+      'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff'
+    });
+    res.send(result.buffer);
+  } catch (err) {
+    console.error('產出獎金對帳單失敗:', err);
+    fail(500, '產出獎金對帳單失敗，請稍後再試');
+  }
 });
 
 // 新增獎金

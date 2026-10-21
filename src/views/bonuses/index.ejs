@@ -9,6 +9,9 @@
     <h1 class="h3"><i class="bi bi-currency-dollar"></i> 獎金管理</h1>
   </div>
   <div class="col-auto">
+    ${(statementSalespeople || []).length ? '<button type="button" class="btn btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#statementModal"><i class="bi bi-file-earmark-pdf"></i> 獎金對帳單</button>' : ''}
+  </div>
+  <div class="col-auto">
     <form class="d-flex" method="get">
       <select name="year" class="form-select" onchange="this.form.submit()">
         ${years.map(y => `<option value="${y}" ${y == selectedYear ? 'selected' : ''}>${y}</option>`).join('')}
@@ -151,6 +154,52 @@ ${success ? '<div class="alert alert-success alert-dismissible fade show" role="
   </div>
   <div class="card-footer text-muted">
     共 ${(bonuses || []).length} 筆獎金記錄
+  </div>
+</div>
+
+<!-- 獎金對帳單 -->
+<div class="modal fade" id="statementModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content" method="get" action="/bonuses/statement" target="_blank">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-file-earmark-pdf"></i> 產出獎金對帳單</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">業務人員</label>
+          <select name="salesperson_id" class="form-select" required>
+            ${(statementSalespeople || []).map(sp => `<option value="${sp.id}">${escapeHtml(sp.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="row g-3">
+          <div class="col-6">
+            <label class="form-label">年度</label>
+            <select name="year" class="form-select">
+              ${years.map(y => `<option value="${y}" ${y == selectedYear ? 'selected' : ''}>${y}</option>`).join('')}
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label">期間</label>
+            <select name="period" class="form-select">
+              <option value="year">全年</option>
+              <option value="q1">第 1 季（1～3 月）</option>
+              <option value="q2">第 2 季（4～6 月）</option>
+              <option value="q3">第 3 季（7～9 月）</option>
+              <option value="q4">第 4 季（10～12 月）</option>
+              ${[1,2,3,4,5,6,7,8,9,10,11,12].map(m => `<option value="m${m}">${m} 月</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="form-text mt-3">
+          「已發放」「充公」依發放日落在所選期間計入；「待發放」不受期間限制，列出截至產出日的全部待發放獎金。每次產出都會留下稽核紀錄。
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-dark"><i class="bi bi-download"></i> 產出 PDF</button>
+      </div>
+    </form>
   </div>
 </div>
 

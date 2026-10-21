@@ -52,7 +52,7 @@ const FIELD_LABELS = {
 
 const TABLE_LABELS = {
   projects: '專案', invoices: '發票', payments: '收款', bonus_calculations: '獎金',
-  salespeople: '業務', customers: '客戶'
+  salespeople: '業務', customers: '客戶', bonus_statements: '獎金對帳單'
 };
 
 // 修改記錄列表
@@ -312,7 +312,7 @@ router.get('/', (req, res) => {
     tableNames: ['projects', 'invoices', 'payments', 'bonus_calculations', 'salespeople', 'customers'],
     tableLabels: TABLE_LABELS,
     actions: ['create', 'update', 'delete'],
-    actionLabels: { create: '新增', update: '更新', delete: '刪除' }
+    actionLabels: { create: '新增', update: '更新', delete: '刪除', generate_statement: '產出對帳單' }
   });
 });
 

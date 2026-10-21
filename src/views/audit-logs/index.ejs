@@ -95,12 +95,14 @@
                     <span class="badge bg-warning text-dark">更新</span>
                   ` : log.action === 'delete' ? `
                     <span class="badge bg-danger">刪除</span>
+                  ` : log.action === 'generate_statement' ? `
+                    <span class="badge bg-secondary">產出對帳單</span>
                   ` : ''}
                 </td>
                 <td><code>${typeof tableLabels !== 'undefined' && tableLabels[log.table_name] ? tableLabels[log.table_name] : log.table_name}</code></td>
                 <td>${log.record_id}</td>
                 <td>
-                  ${log.action === 'create' && log.new_value_parsed ? `
+                  ${(log.action === 'create' || log.action === 'generate_statement') && log.new_value_parsed ? `
                     <button class="btn btn-sm btn-outline-info" type="button" data-bs-toggle="collapse" data-bs-target="#new-${log.id}">
                       <i class="bi bi-eye"></i> 查看
                     </button>

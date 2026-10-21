@@ -1,8 +1,8 @@
 /**
  * PDF 匯出服務
  * 支援專案總表、獎金報表、帳齡分析等報表匯出為 PDF
- * 注意：預設字型不支援中文，若需正確顯示中文請將支援 CJK 的字型檔
- * (如 NotoSansTC-Regular.ttf) 置於專案 fonts/ 目錄
+ * 中文字型：專案內建 Noto Sans CJK TC 的繁體常用字子集（fonts/，見 fonts/README.md）；
+ * 若把完整字型 (NotoSansTC-Regular.ttf / NotoSansCJKtc-Regular.otf) 放進 fonts/ 會優先使用
  */
 const path = require('path');
 const fs = require('fs');
@@ -16,7 +16,9 @@ const GrossProfitAnalysisService = require('./GrossProfitAnalysisService');
 function getChineseFontPath() {
   const candidates = [
     path.join(__dirname, '..', '..', 'fonts', 'NotoSansTC-Regular.ttf'),
-    path.join(__dirname, '..', '..', 'fonts', 'NotoSansCJKtc-Regular.otf')
+    path.join(__dirname, '..', '..', 'fonts', 'NotoSansCJKtc-Regular.otf'),
+    // 內建的精簡字型（繁體常用字子集，見 fonts/README.md）；自行放置完整字型時會優先使用上面兩個
+    path.join(__dirname, '..', '..', 'fonts', 'NotoSansCJKtc-Subset-Regular.otf')
   ];
   return candidates.find(p => fs.existsSync(p)) || null;
 }
@@ -445,5 +447,8 @@ const PdfExportService = {
     });
   }
 };
+
+// 供其他 PDF 產生器（例如獎金對帳單）重用：字型與報表日期／金額格式
+PdfExportService.helpers = { getChineseFontPath, formatROCDate, formatCurrency };
 
 module.exports = PdfExportService;
