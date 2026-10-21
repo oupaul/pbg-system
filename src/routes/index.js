@@ -427,10 +427,11 @@ router.get('/', (req, res) => {
   // 合併兩個列表（當月的在前，過期的在後）
   const allInvoiceProjects = [...upcomingInvoiceProjects, ...overdueInvoiceProjects];
 
-  // 應收帳款帳齡分析（admin/user 可見），始終包含全部發票（含獨立加總業務），以掌握完整應收狀況
+  // 應收帳款帳齡分析（有編輯權限者可見），始終包含全部發票（含獨立加總業務）、不受年度以外的篩選影響，以掌握完整應收狀況
   let receivablesAging = null;
   if (req.user && req.user.canEdit) {
-    receivablesAging = ReceivablesAgingService.getAgingReport(selectedYear, null);
+    // 範圍為「自己／指派」的編輯者只看得到所屬業務專案的應收帳款（visibleSalespersonIds 為 null 代表不限制）
+    receivablesAging = ReceivablesAgingService.getAgingReport(selectedYear, null, visibleSalespersonIds);
   }
 
   // 收款提醒：預計收款日即將到期或已逾期

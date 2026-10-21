@@ -46,7 +46,9 @@
     "check:expected-invoice": "node check_expected_invoice_field.js",
     "check:password-hash": "node scripts/check_password_hash.js",
     "upgrade:passwords": "node scripts/upgrade_passwords.js",
-    "test": "jest"
+    "test": "jest",
+    "test:unit": "jest --selectProjects unit",
+    "test:integration": "jest --selectProjects integration"
   },
   "keywords": [
     "invoice",
@@ -77,9 +79,24 @@
     "nodemon": "^3.1.7"
   },
   "jest": {
-    "testEnvironment": "node",
-    "testMatch": [
-      "**/tests/**/*.test.js"
+    "projects": [
+      {
+        "displayName": "unit",
+        "testEnvironment": "node",
+        "testMatch": [
+          "<rootDir>/tests/*.test.js"
+        ]
+      },
+      {
+        "displayName": "integration",
+        "testEnvironment": "node",
+        "testMatch": [
+          "<rootDir>/tests/integration/**/*.test.js"
+        ],
+        "globalSetup": "<rootDir>/tests/integration/setup/globalSetup.js",
+        "globalTeardown": "<rootDir>/tests/integration/setup/globalTeardown.js",
+        "testTimeout": 30000
+      }
     ]
   }
 }

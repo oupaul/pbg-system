@@ -9,6 +9,7 @@ const { getUserInfo } = require('../utils/authHelper');
 
 const { guardedSingleUpload, XLSX_EXTENSIONS } = require('../utils/uploadValidation');
 const { mountImportFlow } = require('../utils/importFlow');
+const { requireFullProjectScope } = require('../utils/projectScope');
 const { requireImport } = require('../middleware/auth');
 const summaries = require('../utils/importSummaries');
 
@@ -141,6 +142,9 @@ module.exports = function(upload) {
     summarize: summaries.summarizeProjects,
     finish: (req, raw) => { req.session.importResult = summaries.shapeProjects(raw); }
   });
+
+  // 以下匯出都是全公司範圍的報表，只開放專案檢視範圍為「全部」的角色（見 utils/projectScope.js）
+  router.use('/export', requireFullProjectScope);
 
   // 匯出專案總表
   router.get('/export/projects/:year', async (req, res) => {

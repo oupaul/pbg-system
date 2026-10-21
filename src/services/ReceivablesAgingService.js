@@ -10,14 +10,22 @@ const ReceivablesAgingService = {
    * 取得應收帳款帳齡分析
    * @param {number|null} year - 專案簽約年度篩選，null 為全部
    * @param {number[]|null} excludeSalespersonIds - 排除的業務 ID 列表（exclude_separate 時使用）
+   * @param {number[]|null} onlySalespersonIds - 只計入這些業務的專案（使用者專案檢視範圍；null 為不限制，空陣列代表都看不到）
    * @returns {Object} { buckets, total, details }
    */
-  getAgingReport(year = null, excludeSalespersonIds = null) {
+  getAgingReport(year = null, excludeSalespersonIds = null, onlySalespersonIds = null) {
     const today = new Date().toISOString().slice(0, 10);
     const excludeCond = excludeSalespersonIds && excludeSalespersonIds.length > 0
       ? ` AND p.salesperson_id NOT IN (${excludeSalespersonIds.map(() => '?').join(',')})`
       : '';
-    const excludeParams = excludeSalespersonIds && excludeSalespersonIds.length > 0 ? excludeSalespersonIds : [];
+    let excludeParams = excludeSalespersonIds && excludeSalespersonIds.length > 0 ? excludeSalespersonIds : [];
+    let excludeCondAll = excludeCond;
+    if (Array.isArray(onlySalespersonIds)) {
+      excludeCondAll += onlySalespersonIds.length > 0
+        ? ` AND p.salesperson_id IN (${onlySalespersonIds.map(() => '?').join(',')})`
+        : ' AND 1 = 0';
+      excludeParams = [...excludeParams, ...onlySalespersonIds];
+    }
 
     // 取得有效發票（僅 status = 有效）
     let invoices;
@@ -27,7 +35,7 @@ const ReceivablesAgingService = {
         FROM invoices i
         JOIN projects p ON i.project_id = p.id
         LEFT JOIN salespeople sp ON p.salesperson_id = sp.id
-        WHERE (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) AND p.contract_year = ? ${excludeCond}
+        WHERE (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) AND p.contract_year = ? ${excludeCondAll}
         ORDER BY i.expected_payment_date, i.invoice_date
       `).all(year, ...excludeParams);
     } else {
@@ -36,7 +44,7 @@ const ReceivablesAgingService = {
         FROM invoices i
         JOIN projects p ON i.project_id = p.id
         LEFT JOIN salespeople sp ON p.salesperson_id = sp.id
-        WHERE (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) ${excludeCond}
+        WHERE (i.status IS NULL OR i.status = '有效') AND (i.deleted_at IS NULL) ${excludeCondAll}
         ORDER BY i.expected_payment_date, i.invoice_date
       `).all(...excludeParams);
     }

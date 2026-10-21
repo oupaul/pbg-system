@@ -1,12 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
+const { getVisibleSalespersonIds } = require('../utils/projectScope');
 
 // 近期收款查詢
 router.get('/', (req, res) => {
   const days = parseInt(req.query.days) || 30; // 預設 30 天
   const validDays = [7, 30, 60, 90, 120, 360];
   const selectedDays = validDays.includes(days) ? days : 30;
+
+  // 依專案檢視範圍限制：範圍為「自己／指派」的使用者只看得到所屬業務的專案收款（null＝不限制）
+  const visibleIds = getVisibleSalespersonIds(req.user);
+  const scopeSql = visibleIds === null ? ''
+    : (visibleIds.length ? ` AND pr.salesperson_id IN (${visibleIds.map(() => '?').join(',')})` : ' AND 1 = 0');
+  const scopeParams = visibleIds === null ? [] : visibleIds;
 
   // 查詢近期收款
   const payments = db.prepare(`
@@ -34,9 +41,10 @@ router.get('/', (req, res) => {
     LEFT JOIN invoices i ON p.invoice_id = i.id
     LEFT JOIN project_types pt ON pr.project_type = pt.type_name
     WHERE p.payment_date IS NOT NULL
-      AND date(p.payment_date) >= date('now', '-' || ? || ' days')
+      AND p.deleted_at IS NULL
+      AND date(p.payment_date) >= date('now', '-' || ? || ' days')${scopeSql}
     ORDER BY p.payment_date DESC, pr.project_code ASC
-  `).all(selectedDays);
+  `).all(selectedDays, ...scopeParams);
 
   // 計算統計（考慮匯費差異）
   const totalAmount = payments.reduce((sum, p) => {

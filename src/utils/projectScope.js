@@ -63,7 +63,17 @@ function getVisibleSalespersonIds(user) {
   return [];
 }
 
+// 全公司範圍的匯出/報表：只有專案檢視範圍為「全部」的角色可用（範圍為自己／指派／無的角色，
+// 這類匯出會把其他業務的專案、發票、收款、獎金一併帶出去）
+function requireFullProjectScope(req, res, next) {
+  if (getVisibleSalespersonIds(req.user) === null) return next();
+  const message = '此匯出包含全公司的資料，僅限專案檢視範圍為「全部」的角色使用';
+  if (req.accepts('html')) return res.status(403).render('error', { title: '權限不足', message, error: {} });
+  return res.status(403).json({ error: '權限不足', message });
+}
+
 module.exports = {
+  requireFullProjectScope,
   getVisibleSalespersonIds,
   userCanAccessProject,
   requireProjectScopeFromBody,

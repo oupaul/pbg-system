@@ -69,8 +69,9 @@ Node.js + Express + SQLite（`better-sqlite3`）的發票／業績獎金／CRM �
 - 儀表板「本月概況」（`src/services/DashboardSummaryService.js`、`src/views/partials/dashboard-monthly.ejs`）：本月 vs 上月的開票／收款／新簽專案、逾期未收、進行中銷售機會（狀態不是 `is_won`/`is_lost` 的機會，加權金額 = 預估金額 × 成交機率），以及近 12 個月開票/收款長條圖（`src/utils/dashboardChart.js` 於伺服器端產生 SVG，不依賴前端圖表函式庫）。範圍規則與儀表板其他區塊相同（業務員只看自己、排除「獨立加總」類型）；逾期卡片與銷售機會卡片只對有對應權限的角色顯示。收款金額算法與 `Payment.calculateActualReceived` 一致（只有差異類型為「匯費」才把差異算進去）
 - 逾期收款自動提醒（`src/services/OverdueReminderService.js`，設定在「系統設定」頁、`migrate_overdue_reminder` 建立設定，**預設停用**）：程序內排程（`app.js` 啟動時 `start()`，每 5 分鐘檢查；不需額外 systemd timer）。到設定時間且當天沒跑過就執行：每週一（錯過會在滿 7 天後補發）或週一至週五每天；先寫入 `overdue_reminder_last_run_date` 再發送以避免重複。資料來源是 `ReceivablesAgingService.getPaymentReminder`（預計收款日已過／N 天內到期且未收齊），彙整成**一則**訊息：負責業務綁定的使用者只收到自己的發票，`overdue_reminder_notify_user_ids` 指定的財務/主管收到全公司彙總（依業務分組）。透過 `NotificationService.notify` 發送（類型 `payment_overdue_digest` 在 `EXTERNAL_CHANNEL_TYPES` 內，所以有填 Email/LINE ID 且管道已啟用者會外送）。設定頁有「發送測試給我自己」按鈕，不影響排程。沒有逾期或即將到期的發票時不發送
 - 匯入前預覽（`src/utils/importFlow.js`、`importStaging.js`、`importSummaries.js`、`views/import-export/preview.ejs`）：專案總表、成本明細、客戶/廠商、活動紀錄四種 Excel 匯入都是「上傳 → 試跑預覽 → 確認才寫入」。試跑是把整批匯入包在交易裡、最後 `ROLLBACK`（`ExcelImportService` 的 `{ dryRun: true }`），所以去重判斷與逐列驗證和正式匯入完全相同，預覽數字等於實際結果；匯入路徑上不可以加資料庫以外的副作用（寄信、寫檔、外部呼叫），否則試跑會真的觸發。上傳檔暫存於 `uploads/import-staging/<token>.xlsx`（600 權限、僅建立者本人與同類型可取用、30 分鐘失效、確認時 `claim` 只能取一次避免重複匯入）。確認匯入時會先用 `VACUUM INTO` 保存資料庫快照（`utils/dbSnapshot.js`，`data/invoice_bonus.db.pre-import-<時間>`，600 權限，保留最近 5 份；快照失敗就中止匯入、暫存檔保留可重試）；要還原時停服務，把快照複製回 `data/invoice_bonus.db`、刪除 `-wal`/`-shm`，再啟動（會連同快照之後的所有修改一起退回，只當緊急手段）。新增匯入類型請用 `mountImportFlow`，不要自己寫直接寫入的上傳端點；匯入服務新增的資料一定要在單一交易內完成。專案匯入的 `results.salespeople/customers` 是「處理列數」，真正新增的筆數看回傳的 `created`
+- 專案檢視範圍（`getVisibleSalespersonIds`）要套用到**所有**會列出專案相關資料的地方，不只專案列表：近期收款、儀表板應收帳齡（`getAgingReport` 的 `onlySalespersonIds`）都曾漏掉而洩漏他人資料；全公司範圍的匯出報表（`/import-export/export/*`）一律要求範圍為「全部」（`requireFullProjectScope`）。整合測試的 `03_projectScope` 會檢查這些頁面，新增列出資料的頁面請一併加進去
 - 附件線上預覽（專案頁）：以檔案內容（魔術位元組）判斷類型，不信任副檔名/MIME；SVG/HTML 一律不預覽。圖片/PDF/文字/CSV 由伺服器供應；Word（.docx）、Excel（.xlsx）由瀏覽器端解析（mammoth 為 `public/vendor/mammoth/` 內的 vendored 檔案，ExcelJS 由 `/vendor/exceljs/exceljs.min.js` 提供），伺服器只驗證 OOXML ZIP 結構（防 zip bomb：條目數／解壓總量上限）並以 `application/octet-stream` 回傳原始位元組（`/projects/:id/attachments/:attachmentId/office`）。Word 預覽經白名單消毒（`public/js/attachment-preview.js`），Excel 一律用 `textContent`；舊版 .doc/.xls 不支援預覽，只能下載
-- 自動測試：`npm test`（jest，`tests/`）目前涵蓋跳脫/重導/CSRF Origin 檢查/帳號鎖定/備份檔名白名單/NAS 設定驗證等純函式；尚無需要資料庫的整合測試
+- 自動測試：`npm test` 跑兩組（jest projects）。`unit`（`tests/*.test.js`）是不碰資料庫的純函式測試；`integration`（`tests/integration/`）是**權限整合測試**：`globalSetup` 把 `src/migrations/scripts/public` 複製到系統暫存目錄、在那裡建全新資料庫、灌入種子資料（12 種角色/使用者 × 業務 A、B 各一套專案與財務資料）並啟動真正的伺服器，測試再用 HTTP 打它，**不會碰到真實的 `data/` 與 `uploads/`**。涵蓋：未登入掃描（每條路由除明確列出的公開路由外都必須被擋下，用注入在「複製版」app.js 的 `/__test/routes` 取得路由清單）、角色 × 端點權限矩陣、變更類路由的「寫入面」凍結（老闆／業務員實際能打到的 POST 必須剛好等於清單）、專案範圍 IDOR（含列表、匯出、儀表板不洩漏他人資料）、CSRF Origin、登入鎖定與 session 失效、角色提權防護、附件與匯入的上傳驗證、匯入預覽/確認/快照流程。需要 better-sqlite3 能在目前的 Node 載入（`.nvmrc` 為 22；Node 版本不符時整組整合測試自動略過並印警告，不會失敗）。`npm run test:unit` / `npm run test:integration` 可分開跑。**新增路由或權限規則時請同步更新**：新的公開路由要加進 `01_routeAuth` 的 `PUBLIC`，新的權限端點加進 `02_permissionMatrix` 的 `ENDPOINTS`；老闆／業務員的「寫入面」清單變動前先確認真的該開放。這些測試用「刻意弄壞再確認會失敗」驗證過（拿掉 requireAuth、範圍檢查、CSRF、快照等）
 
 ## 一個刻意沒修的風險：`deploy.sh` 裡的 ad-hoc `ALTER TABLE`
 
@@ -104,6 +105,7 @@ Repo 目前**沒有任何 Dockerfile 或 compose.yaml**，部署完全走 system
 
 - `npm run dev` — nodemon 開發模式
 - `npm start` — 正式啟動（純 `node`，不會自動 reload）
-- `npm test` — jest
+- `npm test` — jest（單元＋權限整合測試；整合測試需 Node 22，見上方「自動測試」）
+- `npm run test:integration` — 只跑權限整合測試
 - `npm run migrate:run` — 執行 migrations/runner.js（見上方「高風險操作」，需先確認）
 - `scripts/health-check.sh <PORT>` — 打 `GET /login` 驗證服務是否正常回應，`update.sh` 會自動呼叫，也可隨時手動執行
