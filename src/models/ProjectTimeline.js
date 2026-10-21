@@ -14,8 +14,9 @@ function allowedKinds(user) {
   return KINDS.filter(k => k !== 'bonus' || (user && user.canEdit));
 }
 
+// 記錄內容裡的 project_id 可能是字串（表單送來的 "3"）也可能是數字，一律轉成整數再比較
 function jsonProjectId(column) {
-  return `(CASE WHEN json_valid(${column}) THEN json_extract(${column}, '$.project_id') END)`;
+  return `(CASE WHEN json_valid(${column}) THEN CAST(json_extract(${column}, '$.project_id') AS INTEGER) END)`;
 }
 
 function fetchLogRows(projectId, tables) {
@@ -26,12 +27,16 @@ function fetchLogRows(projectId, tables) {
     params.push(projectId);
   }
   for (const table of CHILD_TABLES.filter(t => tables.includes(t))) {
+    // record_id 對得上還不夠：資料被永久刪除後 SQLite 會重用 id，舊記錄就會誤算到新資料頭上。兩道防護：
+    //   1. 記錄內容若帶有 project_id，必須等於這個專案
+    //   2. 記錄的時間不能早於這筆資料的建立時間（早於的是前一個用這個 id 的資料留下的）
     conditions.push(`(l.table_name = '${table}' AND (
-      l.record_id IN (SELECT id FROM ${table} WHERE project_id = ?)
+      (l.record_id IN (SELECT id FROM ${table} WHERE project_id = ? AND (created_at IS NULL OR created_at <= l.created_at))
+        AND COALESCE(${jsonProjectId('l.new_value')}, ${jsonProjectId('l.old_value')}, ?) = ?)
       OR ${jsonProjectId('l.new_value')} = ?
       OR ${jsonProjectId('l.old_value')} = ?
     ))`);
-    params.push(projectId, projectId, projectId);
+    params.push(projectId, projectId, projectId, projectId, projectId);
   }
   if (conditions.length === 0) return [];
   return db.prepare(`

@@ -1,4 +1,5 @@
 const db = require('./db');
+const { toMoney } = require('../utils/money');
 const AuditLogService = require('../services/AuditLogService');
 
 const Bonus = {
@@ -49,9 +50,9 @@ const Bonus = {
       data.project_id,
       data.salesperson_id,
       data.bonus_type,
-      data.base_amount || 0,
+      toMoney(data.base_amount),
       data.bonus_percentage || 0,
-      data.bonus_amount || 0,
+      toMoney(data.bonus_amount),
       data.payment_date || null,
       data.status || '待發放',
       data.forfeiture_reason || null
@@ -82,9 +83,10 @@ const Bonus = {
     const newData = {};
     for (const field of allowedFields) {
       if (data[field] !== undefined) {
+        const value = (field === 'base_amount' || field === 'bonus_amount') ? toMoney(data[field]) : data[field];
         fields.push(`${field} = ?`);
-        values.push(data[field]);
-        newData[field] = data[field];
+        values.push(value);
+        newData[field] = value;
       }
     }
 

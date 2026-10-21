@@ -1,4 +1,5 @@
 const express = require('express');
+const { toMoney } = require('../utils/money');
 const router = express.Router();
 const ReferralReward = require('../models/ReferralReward');
 const { getUserInfo } = require('../utils/authHelper');
@@ -33,7 +34,7 @@ router.post('/', requireCrmEditPermission, (req, res) => {
       project_id: req.body.project_id || null,
       recipient_type: req.body.recipient_type,
       recipient_user_id: req.body.recipient_user_id || null,
-      reward_amount: parseFloat(req.body.reward_amount) || 0,
+      reward_amount: toMoney(req.body.reward_amount),
       status: req.body.status || '待發放',
       notes: req.body.notes || null,
       userInfo: getUserInfo(req)
@@ -65,7 +66,7 @@ router.post('/:id', requireCrmEditPermission, (req, res) => {
       project_id: req.body.project_id || null,
       recipient_type: req.body.recipient_type,
       recipient_user_id: req.body.recipient_user_id || null,
-      reward_amount: parseFloat(req.body.reward_amount) || 0,
+      reward_amount: toMoney(req.body.reward_amount),
       status: req.body.status || '待發放',
       forfeiture_reason: req.body.forfeiture_reason || null,
       notes: req.body.notes || null,

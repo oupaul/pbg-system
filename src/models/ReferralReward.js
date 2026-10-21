@@ -1,6 +1,7 @@
 const db = require('./db');
 const AuditLogService = require('../services/AuditLogService');
 const { getVisibleSalespersonIds } = require('../utils/projectScope');
+const { toMoney } = require('../utils/money');
 
 // 轉介紹獎勵的可見範圍（依使用者的專案檢視範圍）。獎勵金額屬於財務資料，不能讓範圍外的人看到：
 //   - 專案檢視範圍為「全部」：不限制
@@ -101,7 +102,7 @@ const ReferralReward = {
     const projectId = data.project_id ? parseInt(data.project_id) : null;
     const recipientType = data.recipient_type === 'staff' ? 'staff' : 'customer';
     const recipientUserId = recipientType === 'staff' && data.recipient_user_id ? parseInt(data.recipient_user_id) : null;
-    const rewardAmount = data.reward_amount !== undefined && data.reward_amount !== null ? parseFloat(data.reward_amount) || 0 : 0;
+    const rewardAmount = toMoney(data.reward_amount);
     const status = data.status || '待發放';
     const forfeitureReason = data.forfeiture_reason || null;
     const notes = data.notes || null;
@@ -152,7 +153,7 @@ const ReferralReward = {
         if (field === 'referred_customer_id' || field === 'project_id' || field === 'recipient_user_id') {
           value = (value === '' || value === null) ? null : parseInt(value);
         } else if (field === 'reward_amount') {
-          value = parseFloat(value) || 0;
+          value = toMoney(value);
         } else if (value === '') {
           value = null;
         }

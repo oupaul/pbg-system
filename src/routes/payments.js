@@ -1,4 +1,5 @@
 const express = require('express');
+const { toMoney } = require('../utils/money');
 const router = express.Router();
 const Payment = require('../models/Payment');
 const { getUserInfo } = require('../utils/authHelper');
@@ -16,8 +17,8 @@ router.post('/', requireEditPermission, requireProjectScopeFromBody, (req, res) 
       project_id: req.body.project_id,
       invoice_id: req.body.invoice_id || null,
       payment_date: req.body.payment_date,
-      bank_deposit_amount: parseFloat(req.body.bank_deposit_amount) || 0,
-      payment_difference: parseFloat(req.body.payment_difference) || 0,
+      bank_deposit_amount: toMoney(req.body.bank_deposit_amount),
+      payment_difference: toMoney(req.body.payment_difference),
       difference_type: req.body.difference_type || null,
       notes: req.body.notes,
       userInfo: getUserInfo(req)
@@ -46,8 +47,8 @@ router.post('/:id', requireEditPermission, paymentScope, (req, res) => {
     Payment.update(req.params.id, {
       invoice_id: req.body.invoice_id || null,
       payment_date: req.body.payment_date,
-      bank_deposit_amount: parseFloat(req.body.bank_deposit_amount) || 0,
-      payment_difference: parseFloat(req.body.payment_difference) || 0,
+      bank_deposit_amount: toMoney(req.body.bank_deposit_amount),
+      payment_difference: toMoney(req.body.payment_difference),
       difference_type: req.body.difference_type || null,
       notes: req.body.notes || null,
       userInfo: getUserInfo(req)

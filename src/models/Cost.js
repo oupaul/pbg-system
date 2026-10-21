@@ -1,4 +1,5 @@
 const db = require('./db');
+const { toMoney } = require('../utils/money');
 const AuditLogService = require('../services/AuditLogService');
 
 // 驗證「成本類型/費用類別/付款辦法/付款條件/下單狀態」這幾個可自訂選項欄位：
@@ -65,8 +66,8 @@ const Cost = {
     const costDate = data.cost_date || null;
     const costType = data.cost_type || null;
     const vendorId = data.vendor_id ? parseInt(data.vendor_id) : null;
-    const estimatedAmount = data.estimated_amount !== undefined && data.estimated_amount !== null ? parseFloat(data.estimated_amount) || 0 : 0;
-    const actualAmount = data.actual_amount !== undefined && data.actual_amount !== null ? parseFloat(data.actual_amount) || 0 : 0;
+    const estimatedAmount = toMoney(data.estimated_amount);
+    const actualAmount = toMoney(data.actual_amount);
     const notes = data.notes || null;
     const itemCode = data.item_code || null;
     const itemName = data.item_name.trim();
@@ -136,7 +137,7 @@ const Cost = {
       if (data[field] !== undefined) {
         fields.push(`${field} = ?`);
         if (field === 'estimated_amount' || field === 'actual_amount') {
-          const v = parseFloat(data[field]) || 0;
+          const v = toMoney(data[field]);
           values.push(v);
           newData[field] = v;
         } else if (field === 'vendor_id') {

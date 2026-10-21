@@ -1,4 +1,5 @@
 const express = require('express');
+const { toMoney } = require('../utils/money');
 const router = express.Router();
 const db = require('../models/db');
 const Pipeline = require('../models/Pipeline');
@@ -529,8 +530,8 @@ router.post('/:id/convert', requireEditPermission, (req, res) => {
       project_type: req.body.project_type.trim(),
       salesperson_id: req.body.salesperson_id || pipeline.salesperson_id || null,
       project_name: req.body.project_name ? req.body.project_name.trim() : pipeline.opportunity_name,
-      price_with_tax: parseFloat(req.body.price_with_tax) || pipeline.estimated_amount || 0,
-      price_without_tax: parseFloat(req.body.price_without_tax) || 0,
+      price_with_tax: toMoney(req.body.price_with_tax) || pipeline.estimated_amount || 0,
+      price_without_tax: toMoney(req.body.price_without_tax),
       notes: req.body.notes || pipeline.notes,
       userInfo: getUserInfo(req)
     });

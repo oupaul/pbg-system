@@ -1,4 +1,5 @@
 const express = require('express');
+const { toMoney } = require('../utils/money');
 const router = express.Router();
 const Bonus = require('../models/Bonus');
 const Project = require('../models/Project');
@@ -203,9 +204,9 @@ router.post('/', requireEditPermission, requireProjectScopeFromBody, (req, res) 
       project_id: req.body.project_id,
       salesperson_id: req.body.salesperson_id,
       bonus_type: req.body.bonus_type,
-      base_amount: parseFloat(req.body.base_amount) || 0,
+      base_amount: toMoney(req.body.base_amount),
       bonus_percentage: parseFloat(req.body.bonus_percentage) || 0,
-      bonus_amount: parseFloat(req.body.bonus_amount) || 0,
+      bonus_amount: toMoney(req.body.bonus_amount),
       payment_date: req.body.payment_date || null,
       status: req.body.status || '待發放',
       forfeiture_reason: req.body.forfeiture_reason,
@@ -311,9 +312,9 @@ router.post('/:id', requireEditPermission, bonusScope, (req, res) => {
     }
 
     Bonus.update(req.params.id, {
-      base_amount: parseFloat(req.body.base_amount) || 0,
+      base_amount: toMoney(req.body.base_amount),
       bonus_percentage: parseFloat(req.body.bonus_percentage) || 0,
-      bonus_amount: parseFloat(req.body.bonus_amount) || 0,
+      bonus_amount: toMoney(req.body.bonus_amount),
       payment_date: req.body.payment_date || null,
       status: req.body.status || '待發放',
       forfeiture_reason: req.body.forfeiture_reason || null

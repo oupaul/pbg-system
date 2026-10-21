@@ -1,4 +1,5 @@
 const db = require('./db');
+const { toMoney } = require('../utils/money');
 const AuditLogService = require('../services/AuditLogService');
 const Project = require('./Project');
 
@@ -103,7 +104,7 @@ const Pipeline = {
       data.owner_user_id ? parseInt(data.owner_user_id) : null,
       data.opportunity_name.trim(),
       normalizeProjectTypes(data.project_type),
-      data.estimated_amount !== undefined && data.estimated_amount !== null ? parseFloat(data.estimated_amount) : 0,
+      toMoney(data.estimated_amount),
       data.win_probability !== undefined && data.win_probability !== null && data.win_probability !== ''
         ? parseInt(data.win_probability) : null,
       data.expected_close_year_month || null,
@@ -139,7 +140,7 @@ const Pipeline = {
     if (data.owner_user_id !== undefined) setField('owner_user_id', data.owner_user_id ? parseInt(data.owner_user_id) : null);
     if (data.opportunity_name !== undefined) setField('opportunity_name', data.opportunity_name.trim());
     if (data.project_type !== undefined) setField('project_type', normalizeProjectTypes(data.project_type));
-    if (data.estimated_amount !== undefined) setField('estimated_amount', parseFloat(data.estimated_amount) || 0);
+    if (data.estimated_amount !== undefined) setField('estimated_amount', toMoney(data.estimated_amount));
     if (data.win_probability !== undefined) {
       setField('win_probability', data.win_probability !== '' && data.win_probability !== null ? parseInt(data.win_probability) : null);
     }

@@ -1,4 +1,5 @@
 const db = require('./db');
+const { toMoney, roundMoneyFields } = require('../utils/money');
 const AuditLogService = require('../services/AuditLogService');
 const { PROJECT_VIEW_SCOPE, ROLES } = require('../constants');
 const SearchService = require('../services/SearchService');
@@ -113,20 +114,20 @@ const Project = {
     }
 
     if (filters.uninvoiced === true || filters.uninvoiced === 'true') {
-      conditions += ` AND (price_with_tax > COALESCE(total_invoiced, 0)) AND project_type NOT IN ('非營利專案', '廣告交換')`;
+      conditions += ` AND (ROUND(price_with_tax - COALESCE(total_invoiced, 0), 2) > 0) AND project_type NOT IN ('非營利專案', '廣告交換')`;
     }
     if (filters.unpaid === true || filters.unpaid === 'true') {
-      conditions += ` AND (total_invoiced > 0) AND (total_invoiced - COALESCE(total_received, 0) - COALESCE(sales_discount, 0) > 0) AND project_type NOT IN ('非營利專案', '廣告交換')`;
+      conditions += ` AND (total_invoiced > 0) AND (ROUND(total_invoiced - COALESCE(total_received, 0) - COALESCE(sales_discount, 0), 2) > 0) AND project_type NOT IN ('非營利專案', '廣告交換')`;
     }
     if (filters.overdue_unpaid === true || filters.overdue_unpaid === 'true') {
-      conditions += ` AND (total_invoiced > 0) AND (total_invoiced - COALESCE(total_received, 0) - COALESCE(sales_discount, 0) > 0) AND project_type NOT IN ('非營利專案', '廣告交換')`;
+      conditions += ` AND (total_invoiced > 0) AND (ROUND(total_invoiced - COALESCE(total_received, 0) - COALESCE(sales_discount, 0), 2) > 0) AND project_type NOT IN ('非營利專案', '廣告交換')`;
       conditions += ` AND id IN (SELECT DISTINCT project_id FROM invoices WHERE expected_payment_date IS NOT NULL AND TRIM(expected_payment_date) <> '' AND date(expected_payment_date) < date('now', 'localtime'))`;
     }
     // 已完成：發票金額涵蓋合約總價（已全部開立），且收款已扣抵折讓後不再有未收餘額（已全數收款）。
     // price_with_tax > 0 是為了排除本來就沒有計價金額的專案（否則會因為 0 >= 0 誤判為已完成）
     if (filters.completed === true || filters.completed === 'true') {
-      conditions += ` AND price_with_tax > 0 AND COALESCE(total_invoiced, 0) >= price_with_tax`;
-      conditions += ` AND (COALESCE(total_invoiced, 0) - COALESCE(total_received, 0) - COALESCE(sales_discount, 0)) <= 0`;
+      conditions += ` AND price_with_tax > 0 AND ROUND(COALESCE(total_invoiced, 0) - price_with_tax, 2) >= 0`;
+      conditions += ` AND ROUND(COALESCE(total_invoiced, 0) - COALESCE(total_received, 0) - COALESCE(sales_discount, 0), 2) <= 0`;
       conditions += ` AND project_type NOT IN ('非營利專案', '廣告交換')`;
     }
     if (filters.expected_invoice_year_month) {
@@ -182,6 +183,7 @@ const Project = {
 
   // v_project_summary 視圖不含 sales_mode，列表查完後另行補上
   _attachSalesMode(rows) {
+    rows.forEach(roundMoneyFields);
     try {
       const map = {};
       db.prepare('SELECT id, sales_mode FROM projects').all().forEach(r => { map[r.id] = r.sales_mode; });
@@ -193,7 +195,7 @@ const Project = {
   // 依ID取得單一專案
   // 新增 user 參數用於權限檢查
   findById(id, user = null) {
-    const project = db.prepare(`SELECT * FROM v_project_summary WHERE id = ?`).get(id);
+    const project = roundMoneyFields(db.prepare(`SELECT * FROM v_project_summary WHERE id = ?`).get(id));
     
     // 如果專案不存在，直接返回 null
     if (!project) {
@@ -316,8 +318,8 @@ const Project = {
     const salespersonId = data.salesperson_id !== undefined && data.salesperson_id !== null ? parseInt(data.salesperson_id) : null;
     const customerId = data.customer_id !== undefined && data.customer_id !== null ? parseInt(data.customer_id) : null;
     const projectName = data.project_name || null;
-    const priceWithTax = data.price_with_tax !== undefined && data.price_with_tax !== null ? parseFloat(data.price_with_tax) : 0;
-    const priceWithoutTax = data.price_without_tax !== undefined && data.price_without_tax !== null ? parseFloat(data.price_without_tax) : 0;
+    const priceWithTax = toMoney(data.price_with_tax);
+    const priceWithoutTax = toMoney(data.price_without_tax);
     const salesDiscount = data.sales_discount !== undefined && data.sales_discount !== null ? parseFloat(data.sales_discount) : 0;
     const isNewCustomer = data.is_new_customer ? 1 : 0;
     const expectedInvoiceYearMonth = data.expected_invoice_year_month || null;
@@ -449,7 +451,9 @@ const Project = {
         } else if (field === 'contract_year' || field === 'contract_month') {
           value = value ? parseInt(value) : null;
         } else if (field === 'price_with_tax' || field === 'price_without_tax') {
-          value = value ? parseFloat(value) : 0;
+          value = toMoney(value);
+        } else if (field === 'sales_discount') {
+          value = toMoney(value);
         } else if (field === 'is_new_customer') {
           value = value ? 1 : 0;
         }

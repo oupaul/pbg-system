@@ -61,9 +61,10 @@ describeIntegration('專案時間軸：內容', () => {
 
   test('沒有實際變動的儲存不會出現在時間軸', async () => {
     const id1 = invoiceId('TL00000001');
-    const before = titles((await timeline(admin, P)).text).filter(x => x.startsWith('修改發票')).length;
+    // 只數這個測試自己的發票：其他測試檔同時在共用資料庫刪發票，id 在同一秒內被重用時，時間戳分不出新舊
+    const before = titles((await timeline(admin, P)).text).filter(x => x.startsWith('修改發票 TL')).length;
     await admin.post(`/invoices/${id1}`, { form: { invoice_number: 'TL00000001', invoice_date: '2026-10-09', amount_with_tax: '3000' } }); // 與目前內容完全相同
-    const after = titles((await timeline(admin, P)).text).filter(x => x.startsWith('修改發票')).length;
+    const after = titles((await timeline(admin, P)).text).filter(x => x.startsWith('修改發票 TL')).length;
     expect(after).toBe(before);
   });
 
@@ -147,5 +148,33 @@ describeIntegration('專案時間軸：分頁', () => {
     const created = seen.filter(x => /^新增發票 PG/.test(x));
     expect(created).toHaveLength(36);
     expect(new Set(created).size).toBe(36);
+  });
+});
+
+describeIntegration('專案時間軸：id 重用', () => {
+  const Database = require('better-sqlite3');
+  const withDb = (fn) => {
+    const db = new Database(require('path').join(process.env.PBG_TEST_TMP, 'data', 'invoice_bonus.db'));
+    db.pragma('busy_timeout = 5000');
+    try { return fn(db); } finally { db.close(); }
+  };
+
+  test('資料被永久刪除後 id 被重用，別的專案的舊記錄不會算到新資料頭上', async () => {
+    const admin = await as('admin');
+    const P = ids.C.project;
+    await admin.post('/invoices/', { form: { project_id: String(P), invoice_number: 'REUSE00001', invoice_date: '2026-10-07', amount_with_tax: '100' } });
+    const invId = withDb(db => db.prepare("SELECT id FROM invoices WHERE invoice_number = 'REUSE00001'").get().id);
+    // 模擬「別的專案、同一個 id 的發票」留下的舊記錄（該發票後來被永久刪除）
+    const other = JSON.stringify({ id: invId, project_id: ids.D.project, invoice_number: 'GHOST00001', amount_with_tax: 1 });
+    withDb(db => db.prepare("INSERT INTO system_logs (action, table_name, record_id, new_value, user_info) VALUES ('create', 'invoices', ?, ?, 'ghost')").run(invId, other));
+    // 沒有 project_id 的舊式記錄仍用 record_id 歸屬（維持相容）
+    withDb(db => db.prepare("INSERT INTO system_logs (action, table_name, record_id, new_value, user_info) VALUES ('update', 'invoices', ?, ?, 'legacy')").run(invId, JSON.stringify({ invoice_number: 'LEGACY00001' })));
+    // 沒有 project_id 的舊記錄，但寫入時間早於這筆資料建立：是前一個用這個 id 的資料留下的
+    withDb(db => db.prepare("INSERT INTO system_logs (action, table_name, record_id, new_value, user_info, created_at) VALUES ('update', 'invoices', ?, ?, 'ghost', '2000-01-01 00:00:00')").run(invId, JSON.stringify({ invoice_number: 'GHOST00002' })));
+    const t = titles((await timeline(admin, P)).text);
+    expect(t).not.toContain('新增發票 GHOST00001');
+    expect(t).not.toContain('修改發票 GHOST00002');
+    expect(t).toContain('新增發票 REUSE00001');
+    expect(t).toContain('修改發票 LEGACY00001'); // 時間在建立之後的舊式記錄照常歸屬
   });
 });

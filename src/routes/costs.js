@@ -1,4 +1,5 @@
 const express = require('express');
+const { toMoney } = require('../utils/money');
 const router = express.Router();
 const Cost = require('../models/Cost');
 const { getUserInfo } = require('../utils/authHelper');
@@ -16,8 +17,8 @@ router.post('/', requireEditPermission, requireProjectScopeFromBody, (req, res) 
       cost_date: req.body.cost_date,
       cost_type: req.body.cost_type || null,
       vendor_id: req.body.vendor_id || null,
-      estimated_amount: parseFloat(req.body.estimated_amount) || 0,
-      actual_amount: parseFloat(req.body.actual_amount) || 0,
+      estimated_amount: toMoney(req.body.estimated_amount),
+      actual_amount: toMoney(req.body.actual_amount),
       notes: req.body.notes || null,
       item_code: req.body.item_code || null,
       item_name: req.body.item_name || '',
@@ -51,8 +52,8 @@ router.post('/:id', requireEditPermission, costScope, (req, res) => {
       cost_date: req.body.cost_date,
       cost_type: req.body.cost_type || null,
       vendor_id: req.body.vendor_id || null,
-      estimated_amount: parseFloat(req.body.estimated_amount) || 0,
-      actual_amount: parseFloat(req.body.actual_amount) || 0,
+      estimated_amount: toMoney(req.body.estimated_amount),
+      actual_amount: toMoney(req.body.actual_amount),
       notes: req.body.notes || null,
       item_code: req.body.item_code || null,
       item_name: req.body.item_name || '',

@@ -1,4 +1,5 @@
 const express = require('express');
+const { round2, sumMoney, toMoney } = require('../utils/money');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs');
@@ -299,14 +300,15 @@ router.get('/', (req, res) => {
         // 發票年度模式：統計只加總當年度發票金額
         salespersonStats.totalInvoiced += project.year_invoiced || 0;
         salespersonStats.totalReceived += project.year_received || 0;
-        salespersonStats.totalUnpaid += Math.max(0, project.year_unpaid || 0);
+        salespersonStats.totalUnpaid += Math.max(0, round2(project.year_unpaid || 0));
       } else {
         salespersonStats.totalInvoiced += project.total_invoiced || 0;
         salespersonStats.totalUninvoiced += project.uninvoiced_amount ?? ((project.price_with_tax || 0) - (project.total_invoiced || 0));
         salespersonStats.totalReceived += project.total_received || 0;
-        salespersonStats.totalUnpaid += Math.max(0, (project.total_invoiced || 0) - (project.total_received || 0) - (project.sales_discount || 0));
+        salespersonStats.totalUnpaid += Math.max(0, round2((project.total_invoiced || 0) - (project.total_received || 0) - (project.sales_discount || 0)));
       }
     });
+    for (const k of Object.keys(salespersonStats)) salespersonStats[k] = round2(salespersonStats[k]);
   }
 
   res.render('projects/index', {
@@ -398,7 +400,7 @@ router.get('/invoice-detail', (req, res) => {
 
   res.json({
     invoices,
-    totals: { count: invoices.length, totalAmount, totalAllowance, totalNet, totalPaid, totalUnpaid: totalNet - totalPaid }
+    totals: { count: invoices.length, totalAmount: round2(totalAmount), totalAllowance: round2(totalAllowance), totalNet: round2(totalNet), totalPaid: round2(totalPaid), totalUnpaid: round2(totalNet - totalPaid) }
   });
 });
 
@@ -511,9 +513,9 @@ router.post('/', requireEditPermission, (req, res) => {
       salesperson_id: req.body.salesperson_id || null,
       customer_id: customerId || null,
       project_name: req.body.project_name.trim(),
-      price_with_tax: parseFloat(req.body.price_with_tax) || 0,
-      price_without_tax: parseFloat(req.body.price_without_tax) || 0,
-      sales_discount: parseFloat(req.body.sales_discount) || 0,
+      price_with_tax: toMoney(req.body.price_with_tax),
+      price_without_tax: toMoney(req.body.price_without_tax),
+      sales_discount: toMoney(req.body.sales_discount),
       is_new_customer: req.body.is_new_customer === '1',
       notes: req.body.notes ? req.body.notes.trim() : null,
       report_group_id: req.body.report_group_id || null,
@@ -769,8 +771,8 @@ router.get('/:id', (req, res) => {
     const invPayments = paymentsForStatus.filter(p => p.invoice_id === inv.id);
     const expectedDate = inv.expected_payment_date || null;
     const invAmount = (inv.amount_with_tax || 0) - (inv.allowance_amount || 0);
-    const paid = invPayments.reduce((s, p) => s + Payment.calculateActualReceived(p), 0);
-    const isFullyPaid = invAmount <= 0 || paid >= invAmount;
+    const paid = sumMoney(invPayments, p => Payment.calculateActualReceived(p));
+    const isFullyPaid = invAmount <= 0 || round2(paid - invAmount) >= 0;
     let paymentStatus = { text: '-', class: 'text-muted' };
 
     if (invPayments.length > 0 && !isFullyPaid) {
@@ -843,12 +845,12 @@ router.get('/:id', (req, res) => {
     const invAmount = inv.recognized_amount != null
       ? inv.recognized_amount
       : (inv.amount_with_tax || 0) - (inv.allowance_amount || 0);
-    const paid = inv.total_received != null
+    const paid = round2(inv.total_received != null
       ? inv.total_received
-      : paymentsForStatus.filter(p => p.invoice_id === inv.id).reduce((s, p) => s + Payment.calculateActualReceived(p), 0);
-    const unpaid = inv.unpaid_amount != null
+      : sumMoney(paymentsForStatus.filter(p => p.invoice_id === inv.id), p => Payment.calculateActualReceived(p)));
+    const unpaid = round2(inv.unpaid_amount != null
       ? inv.unpaid_amount
-      : Math.max(0, invAmount - paid);
+      : Math.max(0, invAmount - paid));
     const isValid = !inv.status || inv.status === '有效';
     return { invoice_id: inv.id, invoice_number: inv.invoice_number, amount: invAmount, paid, unpaid, isValid };
   });
@@ -856,11 +858,11 @@ router.get('/:id', (req, res) => {
   // 計算彙總（僅計有效發票）
   const totalInvoiced = Invoice.getTotalByProject(project.id);
   // 計算實際收款金額（考慮匯費差異，僅計未刪除收款）
-  const totalReceived = paymentsForStatus.reduce((sum, p) => sum + Payment.calculateActualReceived(p), 0);
-  const totalBonus = bonuses.reduce((sum, b) => sum + (b.bonus_amount || 0), 0);
+  const totalReceived = sumMoney(paymentsForStatus, p => Payment.calculateActualReceived(p));
+  const totalBonus = sumMoney(bonuses, b => b.bonus_amount);
   const totalCost = Cost.getTotalByProject(project.id);
   const estimatedCost = Cost.getEstimatedTotalByProject(project.id);
-  const grossProfit = (project.price_without_tax || 0) - totalCost;
+  const grossProfit = round2((project.price_without_tax || 0) - totalCost);
   
   // 建立類型顏色映射
   let typeColorMap = {};
@@ -989,9 +991,9 @@ router.post('/:id', requireEditPermission, (req, res) => {
       salesperson_id: req.body.salesperson_id && req.body.salesperson_id !== '' ? parseInt(req.body.salesperson_id) : null,
       customer_id: customerId, // 使用處理過的 customerId（可能包含新建的客戶）
       project_name: req.body.project_name || null,
-      price_with_tax: req.body.price_with_tax ? parseFloat(req.body.price_with_tax) : 0,
-      price_without_tax: req.body.price_without_tax ? parseFloat(req.body.price_without_tax) : 0,
-      sales_discount: req.body.sales_discount ? parseFloat(req.body.sales_discount) : 0,
+      price_with_tax: toMoney(req.body.price_with_tax),
+      price_without_tax: toMoney(req.body.price_without_tax),
+      sales_discount: toMoney(req.body.sales_discount),
       is_new_customer: req.body.is_new_customer === '1' ? 1 : 0,
       notes: req.body.notes || null,
       report_group_id: req.body.report_group_id && req.body.report_group_id !== '' ? parseInt(req.body.report_group_id) : null,

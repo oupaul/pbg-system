@@ -4,6 +4,7 @@
  */
 const db = require('../models/db');
 const Payment = require('../models/Payment');
+const { round2, sumMoney } = require('../utils/money');
 
 const ReceivablesAgingService = {
   /**
@@ -68,12 +69,12 @@ const ReceivablesAgingService = {
         SELECT * FROM payments WHERE invoice_id = ? AND (deleted_at IS NULL)
       `).all(inv.id);
 
-      const paid = payments.reduce((sum, p) => sum + Payment.calculateActualReceived(p), 0);
-      const unpaid = Math.max(0, amount - paid);
+      const paid = sumMoney(payments, p => Payment.calculateActualReceived(p));
+      const unpaid = Math.max(0, round2(amount - paid));
 
       if (unpaid <= 0) continue;
 
-      totalUnpaid += unpaid;
+      totalUnpaid = round2(totalUnpaid + unpaid);
 
       const agingDate = inv.expected_payment_date || inv.invoice_date;
       const item = {
@@ -166,8 +167,8 @@ const ReceivablesAgingService = {
     for (const inv of invoices) {
       const amount = (inv.amount_with_tax || 0) - (inv.allowance_amount || 0);
       const payments = db.prepare('SELECT * FROM payments WHERE invoice_id = ? AND (deleted_at IS NULL)').all(inv.id);
-      const paid = payments.reduce((sum, p) => sum + Payment.calculateActualReceived(p), 0);
-      const unpaid = Math.max(0, amount - paid);
+      const paid = sumMoney(payments, p => Payment.calculateActualReceived(p));
+      const unpaid = Math.max(0, round2(amount - paid));
       if (unpaid <= 0) continue;
 
       const due = inv.expected_payment_date;

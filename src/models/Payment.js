@@ -1,5 +1,7 @@
 const db = require('./db');
 const AuditLogService = require('../services/AuditLogService');
+const { round2, toMoney, sumMoney } = require('../utils/money');
+
 
 const Payment = {
   // 取得專案的所有收款（預設不含軟刪除；傳入 { includeDeleted: true } 則含已刪除）
@@ -26,8 +28,8 @@ const Payment = {
     const projectId = data.project_id !== undefined && data.project_id !== null ? parseInt(data.project_id) : null;
     const invoiceId = data.invoice_id !== undefined && data.invoice_id !== null ? parseInt(data.invoice_id) : null;
     const paymentDate = data.payment_date || null;
-    const bankDepositAmount = data.bank_deposit_amount !== undefined && data.bank_deposit_amount !== null ? parseFloat(data.bank_deposit_amount) : 0;
-    const paymentDifference = data.payment_difference !== undefined && data.payment_difference !== null ? parseFloat(data.payment_difference) : 0;
+    const bankDepositAmount = toMoney(data.bank_deposit_amount);
+    const paymentDifference = toMoney(data.payment_difference);
     const differenceType = data.difference_type || null;
     const notes = data.notes || null;
     
@@ -71,9 +73,10 @@ const Payment = {
     
     allowedFields.forEach(field => {
       if (data[field] !== undefined) {
+        const value = (field === 'bank_deposit_amount' || field === 'payment_difference') ? toMoney(data[field]) : data[field];
         fields.push(`${field} = ?`);
-        values.push(data[field]);
-        newData[field] = data[field];
+        values.push(value);
+        newData[field] = value;
       } else {
         newData[field] = oldRecord[field];
       }
@@ -126,21 +129,19 @@ const Payment = {
     const difference = payment.payment_difference || 0;
     // 如果差異類型是「匯費」，則實際收款 = 銀行匯入金額 + 差異金額
     if (payment.difference_type === '匯費') {
-      return bankAmount + difference;
+      return round2(bankAmount + difference);
     }
     // 否則只計算銀行匯入金額
-    return bankAmount;
+    return round2(bankAmount);
   },
 
   // 取得專案收款總額
   getTotalByProject(projectId) {
     const payments = this.findByProject(projectId);
-    const totalReceived = payments.reduce((sum, p) => {
-      return sum + this.calculateActualReceived(p);
-    }, 0);
+    const totalReceived = sumMoney(payments, p => this.calculateActualReceived(p));
     return {
       total_received: totalReceived,
-      total_difference: payments.reduce((sum, p) => sum + (p.payment_difference || 0), 0)
+      total_difference: sumMoney(payments, p => p.payment_difference)
     };
   }
 };

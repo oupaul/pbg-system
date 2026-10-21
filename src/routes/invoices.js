@@ -1,4 +1,5 @@
 const express = require('express');
+const { toMoney } = require('../utils/money');
 const router = express.Router();
 const Invoice = require('../models/Invoice');
 const Project = require('../models/Project');
@@ -17,7 +18,7 @@ router.post('/', requireEditPermission, requireProjectScopeFromBody, (req, res) 
       project_id: req.body.project_id,
       invoice_date: req.body.invoice_date,
       invoice_number: req.body.invoice_number,
-      amount_with_tax: parseFloat(req.body.amount_with_tax) || 0,
+      amount_with_tax: toMoney(req.body.amount_with_tax),
       expected_payment_date: req.body.expected_payment_date || null,
       userInfo: getUserInfo(req)
     });
@@ -45,7 +46,7 @@ router.post('/:id', requireEditPermission, invoiceScope, (req, res) => {
     Invoice.update(req.params.id, {
       invoice_date: req.body.invoice_date,
       invoice_number: req.body.invoice_number,
-      amount_with_tax: parseFloat(req.body.amount_with_tax) || 0,
+      amount_with_tax: toMoney(req.body.amount_with_tax),
       expected_payment_date: (req.body.expected_payment_date && String(req.body.expected_payment_date).trim()) || null,
       userInfo: getUserInfo(req)
     });

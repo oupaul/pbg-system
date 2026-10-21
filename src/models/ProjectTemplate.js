@@ -1,4 +1,5 @@
 const db = require('./db');
+const { toMoney } = require('../utils/money');
 
 const ProjectTemplate = {
   findAll() {
@@ -30,11 +31,11 @@ const ProjectTemplate = {
       data.salesperson_id || null,
       data.customer_id || null,
       data.project_name || null,
-      data.price_with_tax != null ? parseFloat(data.price_with_tax) : 0,
-      data.price_without_tax != null ? parseFloat(data.price_without_tax) : 0,
+      toMoney(data.price_with_tax),
+      toMoney(data.price_without_tax),
       data.is_new_customer ? 1 : 0,
       data.expected_invoice_year_month || null,
-      data.sales_discount != null ? parseFloat(data.sales_discount) : 0,
+      toMoney(data.sales_discount),
       data.notes || null
     );
     return result.lastInsertRowid;
@@ -58,11 +59,11 @@ const ProjectTemplate = {
       data.salesperson_id !== undefined ? (data.salesperson_id || null) : old.salesperson_id,
       data.customer_id !== undefined ? (data.customer_id || null) : old.customer_id,
       data.project_name !== undefined ? data.project_name : old.project_name,
-      data.price_with_tax !== undefined ? parseFloat(data.price_with_tax) : old.price_with_tax,
-      data.price_without_tax !== undefined ? parseFloat(data.price_without_tax) : old.price_without_tax,
+      data.price_with_tax !== undefined ? toMoney(data.price_with_tax) : old.price_with_tax,
+      data.price_without_tax !== undefined ? toMoney(data.price_without_tax) : old.price_without_tax,
       data.is_new_customer !== undefined ? (data.is_new_customer ? 1 : 0) : old.is_new_customer,
       data.expected_invoice_year_month !== undefined ? data.expected_invoice_year_month : old.expected_invoice_year_month,
-      data.sales_discount !== undefined ? parseFloat(data.sales_discount) : old.sales_discount,
+      data.sales_discount !== undefined ? toMoney(data.sales_discount) : old.sales_discount,
       data.notes !== undefined ? data.notes : old.notes,
       id
     );

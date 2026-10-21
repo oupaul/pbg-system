@@ -1,4 +1,5 @@
 const express = require('express');
+const { toMoney } = require('../utils/money');
 const router = express.Router();
 const ProjectTemplate = require('../models/ProjectTemplate');
 const Salesperson = require('../models/Salesperson');
@@ -56,11 +57,11 @@ router.post('/', requireEditPermission, (req, res) => {
       salesperson_id: req.body.salesperson_id ? parseInt(req.body.salesperson_id) : null,
       customer_id: req.body.customer_id ? parseInt(req.body.customer_id) : null,
       project_name: req.body.project_name ? req.body.project_name.trim() : null,
-      price_with_tax: req.body.price_with_tax != null ? parseFloat(req.body.price_with_tax) : 0,
-      price_without_tax: req.body.price_without_tax != null ? parseFloat(req.body.price_without_tax) : 0,
+      price_with_tax: toMoney(req.body.price_with_tax),
+      price_without_tax: toMoney(req.body.price_without_tax),
       is_new_customer: req.body.is_new_customer === '1',
       expected_invoice_year_month: req.body.expected_invoice_year_month || null,
-      sales_discount: req.body.sales_discount != null ? parseFloat(req.body.sales_discount) : 0,
+      sales_discount: toMoney(req.body.sales_discount),
       notes: req.body.notes ? req.body.notes.trim() : null
     });
     res.redirect('/project-templates?success=' + encodeURIComponent('範本已建立'));
@@ -107,11 +108,11 @@ router.post('/:id', requireEditPermission, (req, res) => {
       salesperson_id: req.body.salesperson_id ? parseInt(req.body.salesperson_id) : null,
       customer_id: req.body.customer_id ? parseInt(req.body.customer_id) : null,
       project_name: req.body.project_name ? req.body.project_name.trim() : null,
-      price_with_tax: req.body.price_with_tax != null ? parseFloat(req.body.price_with_tax) : 0,
-      price_without_tax: req.body.price_without_tax != null ? parseFloat(req.body.price_without_tax) : 0,
+      price_with_tax: toMoney(req.body.price_with_tax),
+      price_without_tax: toMoney(req.body.price_without_tax),
       is_new_customer: req.body.is_new_customer === '1',
       expected_invoice_year_month: req.body.expected_invoice_year_month || null,
-      sales_discount: req.body.sales_discount != null ? parseFloat(req.body.sales_discount) : 0,
+      sales_discount: toMoney(req.body.sales_discount),
       notes: req.body.notes ? req.body.notes.trim() : null
     });
     res.redirect('/project-templates?success=' + encodeURIComponent('範本已更新'));

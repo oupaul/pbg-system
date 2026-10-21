@@ -1,4 +1,5 @@
 const db = require('./db');
+const { toMoney, round2, roundMoneyFields } = require('../utils/money');
 const AuditLogService = require('../services/AuditLogService');
 
 // 有效發票條件：用於 total_invoiced 等計算
@@ -93,7 +94,7 @@ const Invoice = {
     const projectId = data.project_id !== undefined && data.project_id !== null ? parseInt(data.project_id) : null;
     const invoiceDate = data.invoice_date || null;
     const invoiceNumber = data.invoice_number ? String(data.invoice_number).trim() || null : null;
-    const amountWithTax = data.amount_with_tax !== undefined && data.amount_with_tax !== null ? parseFloat(data.amount_with_tax) : 0;
+    const amountWithTax = toMoney(data.amount_with_tax);
     const expectedPaymentDate = data.expected_payment_date || null;
     const status = data.status || '有效';
     const originalInvoiceId = data.original_invoice_id || null;
@@ -106,7 +107,7 @@ const Invoice = {
       const project = db.prepare('SELECT price_with_tax FROM projects WHERE id = ?').get(projectId);
       if (project) {
         const currentTotal = this.getTotalByProject(projectId);
-        if (currentTotal + amountWithTax > project.price_with_tax + 0.01) {
+        if (round2(currentTotal + amountWithTax - project.price_with_tax) > 0.01) {
           const over = Math.round(currentTotal + amountWithTax - project.price_with_tax);
           throw new Error(
             `發票金額超出合約！` +
@@ -182,8 +183,9 @@ const Invoice = {
     
     if (data.amount_with_tax !== undefined) {
       fields.push('amount_with_tax = ?');
-      values.push(data.amount_with_tax);
-      newData.amount_with_tax = data.amount_with_tax;
+      const amt = toMoney(data.amount_with_tax);
+      values.push(amt);
+      newData.amount_with_tax = amt;
     } else {
       newData.amount_with_tax = oldRecord.amount_with_tax;
     }
@@ -232,7 +234,7 @@ const Invoice = {
       newData.original_invoice_id = oldRecord.original_invoice_id;
     }
     if (data.allowance_amount !== undefined) {
-      const val = data.allowance_amount === null || data.allowance_amount === '' ? null : parseFloat(data.allowance_amount);
+      const val = data.allowance_amount === null || data.allowance_amount === '' ? null : toMoney(data.allowance_amount);
       fields.push('allowance_amount = ?');
       values.push(val);
       newData.allowance_amount = val;
@@ -290,7 +292,7 @@ const Invoice = {
       SELECT COALESCE(SUM(amount_with_tax - COALESCE(allowance_amount, 0)), 0) as total
       FROM invoices WHERE project_id = ? AND ${VALID_STATUS_CONDITION} AND (deleted_at IS NULL)
     `).get(projectId);
-    return result ? result.total : 0;
+    return result ? round2(result.total) : 0;
   },
 
   // 取得專案有效發票列表（用於收款對應等，不含已刪除）
@@ -323,7 +325,7 @@ const Invoice = {
         SELECT * FROM v_invoice_summary
         WHERE project_id = ? ${deletedCond}
         ORDER BY deleted_at IS NOT NULL, invoice_date
-      `).all(projectId);
+      `).all(projectId).map(roundMoneyFields);
     } catch (err) {
       console.warn('[Invoice] findByProjectWithPayments 失敗，回退至 findByProject:', err.message);
       return this.findByProject(projectId, opts);
@@ -389,7 +391,7 @@ const Invoice = {
         invoice_date: newInvoiceData.invoice_date || null,
         invoice_number: newInvoiceData.invoice_number || null,
         amount_with_tax: newInvoiceData.amount_with_tax !== undefined
-          ? parseFloat(newInvoiceData.amount_with_tax)
+          ? toMoney(newInvoiceData.amount_with_tax)
           : original.amount_with_tax,
         expected_payment_date: newInvoiceData.expected_payment_date || original.expected_payment_date || null,
         original_invoice_id: originalId,
@@ -448,9 +450,9 @@ const Invoice = {
     if (old.status === '作廢' || old.status === '整筆折讓') {
       throw new Error(`發票已是「${old.status}」狀態，無法設定部分折讓`);
     }
-    const amount = parseFloat(allowance_amount);
+    const amount = toMoney(allowance_amount, NaN);
     if (isNaN(amount) || amount < 0) throw new Error('折讓金額必須為不小於 0 的數字');
-    const origAmount = parseFloat(old.amount_with_tax) || 0;
+    const origAmount = toMoney(old.amount_with_tax);
     if (amount > origAmount) throw new Error('折讓金額不可大於發票金額');
     this.update(id, {
       allowance_amount: amount,

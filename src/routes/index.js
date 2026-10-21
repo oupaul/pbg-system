@@ -7,6 +7,7 @@ const ActivityReminderService = require('../services/ActivityReminderService');
 const Role = require('../models/Role');
 const cache = require('../services/CacheService');
 const { getVisibleSalespersonIds } = require('../utils/projectScope');
+const { round2, sumMoney } = require('../utils/money');
 const DashboardSummaryService = require('../services/DashboardSummaryService');
 const { formatDelta, renderTrendSvg, INVOICED_COLOR, RECEIVED_COLOR } = require('../utils/dashboardChart');
 
@@ -307,9 +308,7 @@ router.get('/', (req, res) => {
       WHERE p.contract_year = ? AND (pm.deleted_at IS NULL) ${excludeCond}${spCondP}
     `).all(selectedYear, ...excludeCondParams, ...spParam);
 
-    const totalReceived = payments.reduce((sum, p) => {
-      return sum + Payment.calculateActualReceived(p);
-    }, 0);
+    const totalReceived = sumMoney(payments, p => Payment.calculateActualReceived(p));
 
     const salesDiscountResult = db.prepare(`
       SELECT COALESCE(SUM(p.sales_discount), 0) as total_sales_discount
@@ -319,7 +318,7 @@ router.get('/', (req, res) => {
 
     paymentStats = {
       total_received: totalReceived,
-      total_sales_discount: salesDiscountResult ? (salesDiscountResult.total_sales_discount || 0) : 0
+      total_sales_discount: salesDiscountResult ? round2(salesDiscountResult.total_sales_discount || 0) : 0
     };
   } else {
     const payments = needsProjectJoin
@@ -331,9 +330,7 @@ router.get('/', (req, res) => {
         `).all(...excludeCondParams, ...spParam)
       : db.prepare('SELECT bank_deposit_amount, payment_difference, difference_type FROM payments WHERE deleted_at IS NULL').all();
 
-    const totalReceived = payments.reduce((sum, p) => {
-      return sum + Payment.calculateActualReceived(p);
-    }, 0);
+    const totalReceived = sumMoney(payments, p => Payment.calculateActualReceived(p));
 
     const salesDiscountResult = needsProjectJoin
       ? db.prepare(`SELECT COALESCE(SUM(p.sales_discount), 0) as total_sales_discount FROM projects p WHERE 1=1 ${excludeCond}${spCondP}`).get(...excludeCondParams, ...spParam)
@@ -341,7 +338,7 @@ router.get('/', (req, res) => {
 
     paymentStats = {
       total_received: totalReceived,
-      total_sales_discount: salesDiscountResult ? (salesDiscountResult.total_sales_discount || 0) : 0
+      total_sales_discount: salesDiscountResult ? round2(salesDiscountResult.total_sales_discount || 0) : 0
     };
   }
   
@@ -351,7 +348,7 @@ router.get('/', (req, res) => {
   };
   
   // 計算已開立發票未收款總額 = 已開立發票總額 - 已收款總額 - 銷貨折讓總額
-  const totalUnpaidInvoiced = (invoiceStats.total_invoiced || 0) - (paymentStats.total_received || 0) - (paymentStats.total_sales_discount || 0);
+  const totalUnpaidInvoiced = round2((invoiceStats.total_invoiced || 0) - (paymentStats.total_received || 0) - (paymentStats.total_sales_discount || 0));
   
   // 檢查即將到期的預計開票專案（從系統設定讀取通知天數）
   const now = new Date();
@@ -486,7 +483,7 @@ router.get('/', (req, res) => {
         FROM payments pm JOIN projects p ON pm.project_id = p.id
         WHERE p.project_type = ? AND (pm.deleted_at IS NULL) AND ${yearCondP}${spCondP}
       `).all(...params, ...spParam);
-      const totalReceived = typePayments.reduce((s, p) => s + Payment.calculateActualReceived(p), 0);
+      const totalReceived = sumMoney(typePayments, p => Payment.calculateActualReceived(p));
       const typeSalesDiscount = db.prepare(`
         SELECT COALESCE(SUM(sales_discount), 0) as total_sales_discount
         FROM projects WHERE project_type = ? AND ${yearCond}${spCondPlain}
