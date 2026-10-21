@@ -100,6 +100,7 @@ const MIGRATIONS = [
   'migrate_system_logs_indexes',
   'migrate_role_admin_flags',
   'migrate_overdue_reminder',
+  'migrate_role_can_import',
 ];
 
 function run() {

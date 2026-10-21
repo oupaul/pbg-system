@@ -1,0 +1,69 @@
+<%- include('../layout', { title: title, body: `
+<div class="row mb-3">
+  <div class="col">
+    <h1 class="h3"><i class="bi bi-eye"></i> ${escapeHtml(label)}匯入預覽</h1>
+    <p class="text-muted mb-0">檔案：<strong>${escapeHtml(fileName)}</strong>　<span class="small">（預覽只是試跑，<strong>還沒有寫入任何資料</strong>；確認後才會真正匯入）</span></p>
+  </div>
+</div>
+
+${typeof snapshotError !== 'undefined' && snapshotError ? `
+  <div class="alert alert-danger"><i class="bi bi-x-octagon"></i> 無法建立匯入前的資料庫快照（可能是磁碟空間不足），為了安全<strong>沒有進行匯入</strong>。請處理後再按一次「確認匯入」，或聯絡系統管理員。</div>
+` : ''}
+
+${fatal ? `
+  <div class="alert alert-danger"><i class="bi bi-x-octagon"></i> 無法匯入：${escapeHtml(fatal)}</div>
+` : ''}
+
+<div class="card mb-4">
+  <div class="card-header">將會發生的變更</div>
+  <div class="card-body">
+    <div class="row g-3">
+      ${stats.map(s => `
+        <div class="col-6 col-md-3">
+          <div class="border rounded p-3 h-100">
+            <div class="small text-muted">${escapeHtml(s.label)}</div>
+            <div class="fs-4 fw-semibold ${s.danger && s.value > 0 ? 'text-danger' : (s.main ? '' : 'text-secondary')}">${Number(s.value) || 0} <span class="fs-6 fw-normal text-muted">筆</span></div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    ${notes.length ? `<div class="small text-muted mt-3">${notes.map(n => '<i class="bi bi-info-circle"></i> ' + escapeHtml(n)).join('<br>')}</div>` : ''}
+  </div>
+</div>
+
+${errorCount > 0 ? `
+  <div class="card mb-4 border-danger">
+    <div class="card-header text-danger d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-exclamation-triangle"></i> 有 ${errorCount} 個錯誤，這些列會被略過${errorCount > 100 ? '（以下只列前 100 筆，完整清單請下載）' : ''}</span>
+      <a href="${issuesUrl}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-download"></i> 下載錯誤清單</a>
+    </div>
+    <ul class="list-group list-group-flush small">
+      ${errors.slice(0, 100).map(m => '<li class="list-group-item">' + escapeHtml(m) + '</li>').join('')}
+    </ul>
+  </div>
+` : ''}
+
+${warnings.length > 0 ? `
+  <div class="card mb-4 border-warning">
+    <div class="card-header"><i class="bi bi-info-circle"></i> ${warnings.length} 則提醒（不影響匯入）</div>
+    <ul class="list-group list-group-flush small">
+      ${warnings.slice(0, 50).map(m => '<li class="list-group-item">' + escapeHtml(m) + '</li>').join('')}
+      ${warnings.length > 50 ? '<li class="list-group-item text-muted">… 還有 ' + (warnings.length - 50) + ' 則，完整清單請下載</li>' : ''}
+    </ul>
+  </div>
+` : ''}
+
+<div class="d-flex gap-2 flex-wrap align-items-center">
+  ${importable ? `
+    <form method="POST" action="${confirmUrl}" onsubmit="this.querySelector('button').disabled = true;">
+      <button type="submit" class="btn btn-dark"><i class="bi bi-check2-circle"></i> 確認匯入${errorCount > 0 ? '（略過錯誤列）' : ''}</button>
+    </form>
+  ` : `
+    <span class="text-muted">${fatal ? '' : '沒有可新增的資料，不需要匯入。'}</span>
+  `}
+  <form method="POST" action="${cancelUrl}">
+    <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-x-circle"></i> ${importable ? '取消' : '返回'}</button>
+  </form>
+</div>
+<p class="small text-muted mt-3 mb-0">按下「確認匯入」後，系統會先自動保存一份資料庫快照（保留最近 5 份），匯入發生嚴重問題時可請系統管理員用它還原。預覽結果是依目前資料庫內容試跑出來的；若在預覽後有人修改了資料，實際匯入結果可能略有差異（以匯入完成後顯示的結果為準）。預覽在 30 分鐘後失效。</p>
+` }) %>

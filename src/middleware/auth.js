@@ -176,6 +176,8 @@ const requireManageRoles = requireRoleFlag('can_manage_roles', '此功能僅限�
 const requireManageSettings = requireRoleFlag('can_manage_settings', '此功能僅限具備「系統設定」權限的角色使用');
 // 備份還原（can_backup_restore）
 const requireBackupRestore = requireRoleFlag('can_backup_restore', '此功能僅限具備「備份還原」權限的角色使用');
+// 專案總表／成本明細的批次匯入（can_import；另需通過 /import-export 的 can_edit 檢查）
+const requireImport = requireRoleFlag('can_import', '此功能僅限具備「批次匯入」權限的角色使用');
 
 // 密碼雜湊的指紋（存在 session 裡）：使用者改密碼或管理員重設密碼後指紋會變，
 // 其他已登入的 session 下一次請求就會失效，不會讓舊登入狀態在改密碼後繼續有效。
@@ -272,6 +274,7 @@ const setUserPermissions = (req, res, next) => {
     req.user.canManageRoles = isBuiltInAdmin || !!(role && role.can_manage_roles);
     req.user.canManageSettings = isBuiltInAdmin || !!(role && role.can_manage_settings);
     req.user.canBackupRestore = isBuiltInAdmin || !!(role && role.can_backup_restore);
+    req.user.canImport = isBuiltInAdmin || !!(role && role.can_import);
     req.user.isReadOnly = !req.user.canEdit;
     req.user.isSalesperson = req.user.role === ROLES.SALESPERSON;
     req.user.isBoss = req.user.role === ROLES.BOSS;
@@ -297,6 +300,7 @@ const setUserPermissions = (req, res, next) => {
     res.locals.canManageRoles = req.user.canManageRoles;
     res.locals.canManageSettings = req.user.canManageSettings;
     res.locals.canBackupRestore = req.user.canBackupRestore;
+    res.locals.canImport = req.user.canImport;
     res.locals.isReadOnly = req.user.isReadOnly;
 
     if (req.user.canAccessDeletionApprovals) {
@@ -353,6 +357,7 @@ module.exports = {
   requireManageRoles,
   requireManageSettings,
   requireBackupRestore,
+  requireImport,
   requireRoleFlag,
   setUserPermissions
 };

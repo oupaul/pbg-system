@@ -1,6 +1,5 @@
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
 const multer = require('multer');
 const router = express.Router();
 const Customer = require('../models/Customer');
@@ -20,6 +19,8 @@ const { getUserInfo } = require('../utils/authHelper');
 const { requireCrmEditPermission, requireAdmin } = require('../middleware/auth');
 const NotificationService = require('../services/NotificationService');
 const { guardedSingleUpload, XLSX_EXTENSIONS } = require('../utils/uploadValidation');
+const { mountImportFlow } = require('../utils/importFlow');
+const importSummaries = require('../utils/importSummaries');
 const ExcelExportService = require('../services/ExcelExportService');
 const ExcelImportService = require('../services/ExcelImportService');
 
@@ -265,45 +266,18 @@ router.get('/import/template', requireAdmin, async (req, res) => {
   }
 });
 
-// 客戶/廠商批次匯入（管理者專用）：直接建立，不經過新增客戶的審核流程
-router.post('/import', requireAdmin, ...customerXlsxGuard, async (req, res) => {
-  let filePath = null;
-  try {
-    if (!req.file) {
-      return res.redirect('/customers?error=' + encodeURIComponent('請選擇檔案'));
-    }
-    filePath = req.file.path;
-
-    const result = await ExcelImportService.importCustomers(filePath);
-
-    if (fs.existsSync(filePath)) {
-      try { fs.unlinkSync(filePath); } catch (unlinkErr) { console.error('刪除暫存檔失敗:', unlinkErr); }
-    }
-
-    const limitedResult = {
-      success: result.success !== false,
-      createdCount: result.createdCount || 0,
-      skippedCount: result.skippedCount || 0,
-      errorCount: result.errorCount || 0,
-      errors: (result.errors || []).slice(0, 50).map(err => {
-        const msg = (typeof err === 'object' && err !== null) ? (err.message || String(err)) : String(err);
-        return msg.length > 200 ? msg.substring(0, 200) + '...' : msg;
-      })
-    };
-
-    let resultStr = encodeURIComponent(JSON.stringify(limitedResult));
-    if (resultStr.length > 2000) {
-      resultStr = encodeURIComponent(JSON.stringify({ ...limitedResult, errors: limitedResult.errors.slice(0, 10) }));
-    }
-    req.session.importResult = limitedResult;
-    res.redirect('/customers');
-  } catch (err) {
-    console.error('客戶批次匯入錯誤:', err);
-    if (filePath && fs.existsSync(filePath)) {
-      try { fs.unlinkSync(filePath); } catch (unlinkErr) { console.error('刪除暫存檔失敗:', unlinkErr); }
-    }
-    res.redirect('/customers?error=' + encodeURIComponent(err.message || '匯入過程中發生未知錯誤'));
-  }
+// 客戶/廠商批次匯入（管理者專用）：直接建立，不經過新增客戶的審核流程；上傳後先試跑預覽，確認才寫入
+mountImportFlow(router, {
+  kind: 'customers',
+  label: '客戶/廠商',
+  urlBase: '/customers/import',
+  routePath: '/import',
+  backUrl: '/customers',
+  guards: [requireAdmin],
+  upload: customerXlsxGuard,
+  run: (filePath, req, opts) => ExcelImportService.importCustomers(filePath, opts),
+  summarize: importSummaries.summarizeCustomers,
+  finish: (req, raw) => { req.session.importResult = importSummaries.shapeCustomers(raw); }
 });
 
 // 活動紀錄批次匯入範本下載（管理者專用）
@@ -323,53 +297,18 @@ router.get('/import-activities/template', requireAdmin, async (req, res) => {
   }
 });
 
-// 活動紀錄批次匯入（管理者專用）
-router.post('/import-activities', requireAdmin, ...customerXlsxGuard, async (req, res) => {
-  let filePath = null;
-  try {
-    if (!req.file) {
-      return res.redirect('/customers?error=' + encodeURIComponent('請選擇檔案'));
-    }
-    filePath = req.file.path;
-
-    const result = await ExcelImportService.importActivities(filePath, getUserInfo(req));
-
-    if (fs.existsSync(filePath)) {
-      try { fs.unlinkSync(filePath); } catch (unlinkErr) { console.error('刪除暫存檔失敗:', unlinkErr); }
-    }
-
-    const clip = (v) => {
-      const msg = (typeof v === 'object' && v !== null) ? (v.message || String(v)) : String(v);
-      return msg.length > 200 ? msg.substring(0, 200) + '...' : msg;
-    };
-    const limitedResult = {
-      kind: 'activities',
-      success: result.success !== false,
-      createdCount: result.createdCount || 0,
-      duplicateCount: result.duplicateCount || 0,
-      linkedCount: result.linkedCount || 0,
-      skippedCount: result.failedCount || 0,
-      errorCount: result.errorCount || 0,
-      errors: (result.errors || []).slice(0, 50).map(clip),
-      warnings: (result.warnings || []).slice(0, 30).map(clip),
-      createdTypes: (result.createdTypes || []).slice(0, 30)
-    };
-
-    let resultStr = encodeURIComponent(JSON.stringify(limitedResult));
-    if (resultStr.length > 2000) {
-      resultStr = encodeURIComponent(JSON.stringify({
-        ...limitedResult, errors: limitedResult.errors.slice(0, 8), warnings: limitedResult.warnings.slice(0, 5), createdTypes: limitedResult.createdTypes.slice(0, 10)
-      }));
-    }
-    req.session.importResult = limitedResult;
-    res.redirect('/customers');
-  } catch (err) {
-    console.error('活動紀錄批次匯入錯誤:', err);
-    if (filePath && fs.existsSync(filePath)) {
-      try { fs.unlinkSync(filePath); } catch (unlinkErr) { console.error('刪除暫存檔失敗:', unlinkErr); }
-    }
-    res.redirect('/customers?error=' + encodeURIComponent(err.message || '匯入過程中發生未知錯誤'));
-  }
+// 活動紀錄批次匯入（管理者專用）：上傳後先試跑預覽，確認才寫入
+mountImportFlow(router, {
+  kind: 'activities',
+  label: '活動紀錄',
+  urlBase: '/customers/import-activities',
+  routePath: '/import-activities',
+  backUrl: '/customers',
+  guards: [requireAdmin],
+  upload: customerXlsxGuard,
+  run: (filePath, req, opts) => ExcelImportService.importActivities(filePath, getUserInfo(req), opts),
+  summarize: importSummaries.summarizeActivities,
+  finish: (req, raw) => { req.session.importResult = importSummaries.shapeActivities(raw); }
 });
 
 // 快速新增客戶/廠商（API，返回 JSON）

@@ -173,7 +173,9 @@ class ExcelImportService {
   }
 
   // 匯入Excel檔案
-  async importExcel(filePath, userInfo = null) {
+  // options.dryRun：整批照常處理（含去重判斷與各列驗證），最後 ROLLBACK 而不是 COMMIT，用於匯入前預覽，不會留下任何資料
+  async importExcel(filePath, userInfo = null, options = {}) {
+    const dryRun = !!options.dryRun;
     this.importLog = [];
     this.errors = [];
     this.resetDedupe();
@@ -206,6 +208,10 @@ class ExcelImportService {
         }
       });
       txDb.exec('BEGIN IMMEDIATE');
+      // results.salespeople／results.customers 統計的是「處理過幾列」（含既有資料的比對），不是真正新增的筆數；
+      // 這裡另外以交易前後的資料表筆數差計算「實際新增」的業務人員／客戶，供匯入預覽顯示正確數字
+      const countRows = (table) => { try { return txDb.prepare(`SELECT COUNT(*) AS c FROM ${table}`).get().c; } catch (e) { return 0; } };
+      const before = { salespeople: countRows('salespeople'), customers: countRows('customers') };
 
       workbook.eachSheet((worksheet, sheetId) => {
         const sheetName = worksheet.name;
@@ -461,7 +467,8 @@ class ExcelImportService {
         }
       }
 
-      txDb.exec('COMMIT');
+      const created = { salespeople: countRows('salespeople') - before.salespeople, customers: countRows('customers') - before.customers };
+      txDb.exec(dryRun ? 'ROLLBACK' : 'COMMIT');
 
       results.duplicates = this.duplicateCount;
       this.log(`匯入完成${this.duplicateCount ? `（略過 ${this.duplicateCount} 筆已存在的重複資料）` : ''}`);
@@ -469,8 +476,10 @@ class ExcelImportService {
       // 即使有錯誤，也返回結果（部分成功）
       const hasErrors = this.errors.length > 0;
       return {
+        dryRun,
         success: !hasErrors || results.projects > 0, // 如果有成功匯入專案，視為部分成功
         results,
+        created,
         log: this.importLog,
         errors: this.errors,
         errorCount: this.errors.length,
@@ -1354,7 +1363,8 @@ class ExcelImportService {
   }
 
   // 客戶/廠商批次匯入（管理者專用）：直接呼叫 Customer.create()，不經過新增客戶的審核流程
-  async importCustomers(filePath) {
+  async importCustomers(filePath, options = {}) {
+    const dryRun = !!options.dryRun;
     this.importLog = [];
     this.errors = [];
     this.log(`開始匯入客戶/廠商: ${filePath}`);
@@ -1378,6 +1388,11 @@ class ExcelImportService {
       }
 
       const totalRows = worksheet.rowCount;
+      if (totalRows > 20000) throw new Error(`工作表有 ${totalRows} 列，超過單一匯入上限 20000 列，請拆分檔案後再匯入`);
+      // 整批包成單一交易（從這裡到 COMMIT/ROLLBACK 全是同步程式）：未預期的例外整批回復；
+      // 單列錯誤仍由各列自己的 try/catch 處理並繼續。dryRun 時最後 ROLLBACK，用於匯入前預覽
+      db.exec('BEGIN IMMEDIATE');
+      try {
       for (let rowNumber = 2; rowNumber <= totalRows; rowNumber++) {
         const excelRow = worksheet.getRow(rowNumber);
         const row = [];
@@ -1430,9 +1445,15 @@ class ExcelImportService {
           this.error(`第 ${rowNumber} 列（客戶編號：${customerCode || '未填'}）：${rowErr.message}`);
         }
       }
+      db.exec(dryRun ? 'ROLLBACK' : 'COMMIT');
+      } catch (txErr) {
+        try { db.exec('ROLLBACK'); } catch (e) { /* 沒有進行中的交易 */ }
+        throw txErr;
+      }
 
       this.log(`匯入完成：成功 ${createdCount} 筆，失敗 ${skippedCount} 筆`);
       return {
+        dryRun,
         success: this.errors.length === 0 || createdCount > 0,
         createdCount, skippedCount,
         errors: this.errors, errorCount: this.errors.length,
@@ -1567,14 +1588,15 @@ class ExcelImportService {
     return { createdCount, failedCount };
   }
 
-  async importCosts(filePath, userInfo) {
+  async importCosts(filePath, userInfo, options = {}) {
+    const dryRun = !!options.dryRun;
     this.importLog = [];
     this.errors = [];
     this.resetDedupe();
     this.log(`開始匯入成本明細: ${filePath}`);
 
     const buildResult = (success, createdCount = 0, failedCount = 0) => ({
-      success, createdCount, duplicateCount: this.duplicateCount, failedCount,
+      dryRun, success, createdCount, duplicateCount: this.duplicateCount, failedCount,
       errors: this.errors, errorCount: this.errors.length
     });
 
@@ -1594,7 +1616,7 @@ class ExcelImportService {
       let createdCount, failedCount;
       try {
         ({ createdCount, failedCount } = this.processCostWorksheet(worksheet, userInfo));
-        costDb.exec('COMMIT');
+        costDb.exec(dryRun ? 'ROLLBACK' : 'COMMIT');
       } catch (txErr) {
         try { costDb.exec('ROLLBACK'); } catch (e) { /* 忽略 */ }
         throw txErr;
@@ -1610,7 +1632,8 @@ class ExcelImportService {
 
   // 客戶活動紀錄批次匯入（管理者專用）：
   // 依客戶編號（或公司名稱）對應客戶；缺少的活動類型自動新增；同客戶＋同日期＋同類型＋同內容已存在則略過
-  async importActivities(filePath, userInfo) {
+  async importActivities(filePath, userInfo, options = {}) {
+    const dryRun = !!options.dryRun;
     this.importLog = [];
     this.errors = [];
     this.log(`開始匯入活動紀錄: ${filePath}`);
@@ -1641,6 +1664,10 @@ class ExcelImportService {
         return { success: false, createdCount, duplicateCount, failedCount, errors: this.errors, errorCount: this.errors.length, warnings, createdTypes };
       }
 
+      if (worksheet.rowCount > 20000) throw new Error(`工作表有 ${worksheet.rowCount} 列，超過單一匯入上限 20000 列，請拆分檔案後再匯入`);
+      // 整批包成單一交易（同步處理）；dryRun 時最後 ROLLBACK（含自動新增的活動類型也一併回復）
+      db.exec('BEGIN IMMEDIATE');
+      try {
       for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
         const excelRow = worksheet.getRow(rowNumber);
         const code = safeExtractText(excelRow.getCell(COLS.CODE + 1).value);
@@ -1736,8 +1763,15 @@ class ExcelImportService {
         }
       }
 
+      db.exec(dryRun ? 'ROLLBACK' : 'COMMIT');
+      } catch (txErr) {
+        try { db.exec('ROLLBACK'); } catch (e) { /* 沒有進行中的交易 */ }
+        throw txErr;
+      }
+
       this.log(`活動紀錄匯入完成：成功 ${createdCount}、補上關聯 ${linkedCount}、略過重複 ${duplicateCount}、失敗 ${failedCount}`);
       return {
+        dryRun,
         success: failedCount === 0 || createdCount > 0 || duplicateCount > 0 || linkedCount > 0,
         createdCount, linkedCount, duplicateCount, failedCount,
         errors: this.errors, errorCount: this.errors.length,

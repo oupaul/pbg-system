@@ -33,6 +33,7 @@ ${result ? `
       </ul>
       `}
       ${result.warning ? `<p class="mb-0 mt-2 text-warning"><strong>${escapeHtml(result.warning)}</strong></p>` : ''}
+      ${result.snapshot ? `<p class="mb-0 mt-2 small text-muted"><i class="bi bi-shield-check"></i> 已於匯入前保存資料庫快照：${escapeHtml(result.snapshot)}（保留最近 5 份）</p>` : ''}
       ${result.errorCount > 0 ? `
         <details class="mt-2">
           <summary class="text-danger cursor-pointer">查看錯誤詳情 (${result.errorCount} 個錯誤)</summary>
@@ -57,6 +58,7 @@ ${result ? `
 ` : ''}
 
 <div class="row g-4">
+${locals.canImport ? `
   <div class="col-md-6">
     <div class="card h-100">
       <div class="card-header bg-primary text-white">
@@ -72,11 +74,11 @@ ${result ? `
         <form action="/import-export/import" method="POST" enctype="multipart/form-data">
           <div class="mb-3">
             <label class="form-label">選擇檔案</label>
-            <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required>
-            <div class="form-text">支援 .xlsx, .xls 格式</div>
+            <input type="file" name="file" class="form-control" accept=".xlsx" required>
+            <div class="form-text">支援 .xlsx 格式；上傳後會先顯示預覽，確認無誤才會真正寫入</div>
           </div>
           <button type="submit" class="btn btn-primary w-100">
-            <i class="bi bi-cloud-upload"></i> 開始匯入
+            <i class="bi bi-eye"></i> 上傳並預覽
           </button>
         </form>
       </div>
@@ -88,6 +90,14 @@ ${result ? `
     </div>
   </div>
   
+` : `
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header bg-secondary text-white"><i class="bi bi-upload"></i> 匯入Excel</div>
+      <div class="card-body"><p class="text-muted mb-0"><i class="bi bi-lock"></i> 您的角色沒有「批次匯入」權限，無法匯入資料。如需匯入請聯絡系統管理員。</p></div>
+    </div>
+  </div>
+`}
   <div class="col-md-6">
     <div class="card h-100">
       <div class="card-header bg-success text-white">
@@ -193,6 +203,7 @@ ${result ? `
   </div>
 </div>
 
+${locals.canImport ? `
 <div class="card mt-4">
   <div class="card-header bg-warning">
     <i class="bi bi-cash-coin"></i> 成本明細批次匯入
@@ -206,13 +217,15 @@ ${result ? `
       <form action="/import-export/import-costs" method="POST" enctype="multipart/form-data" class="d-flex gap-2 align-items-end">
         <div>
           <label class="form-label small mb-1">選擇檔案</label>
-          <input type="file" name="file" class="form-control form-control-sm" accept=".xlsx,.xls" required>
+          <input type="file" name="file" class="form-control form-control-sm" accept=".xlsx" required>
         </div>
-        <button type="submit" class="btn btn-warning btn-sm"><i class="bi bi-cloud-upload"></i> 匯入成本明細</button>
+        <button type="submit" class="btn btn-warning btn-sm"><i class="bi bi-eye"></i> 上傳並預覽</button>
       </form>
     </div>
   </div>
 </div>
+
+` : ''}
 
 <div class="card mt-4">
   <div class="card-header">
