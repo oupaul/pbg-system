@@ -82,17 +82,19 @@ router.post('/:id/delete', requireEditPermission, invoiceScope, (req, res) => {
 
 // 還原發票
 router.post('/:id/restore', requireEditPermission, invoiceScope, (req, res) => {
+  let projectId = null;
   try {
     const invoice = Invoice.findById(req.params.id);
     if (!invoice) {
       return res.redirect('/projects?error=' + encodeURIComponent('找不到發票'));
     }
-    const projectId = invoice.project_id;
+    projectId = invoice.project_id;
     Invoice.restore(req.params.id, getUserInfo(req));
     res.redirect(`/projects/${projectId}?show_deleted=1&success=` + encodeURIComponent('發票已還原'));
   } catch (err) {
     console.error(err);
-    res.redirect('back');
+    // 還原失敗（例如發票號碼已被另一張有效發票使用）要把原因顯示出來
+    res.redirect(projectId ? `/projects/${projectId}?show_deleted=1&error=` + encodeURIComponent(err.message) : '/projects?error=' + encodeURIComponent(err.message));
   }
 });
 

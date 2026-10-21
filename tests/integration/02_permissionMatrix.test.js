@@ -28,7 +28,7 @@ const settingsPages = ['/settings/', '/project-types/', '/bonus-types/', '/bonus
   '/search-settings/', '/customer-levels/', '/customer-statuses/', '/pipeline-statuses/', '/approval-chains/', '/cost-types/',
   '/cost-categories/', '/payment-methods/', '/payment-terms/', '/order-statuses/', '/report-groups/', '/pipeline-amount-options/'];
 const settingsWrites = ['/settings/update', '/settings/bulk-update', '/settings/test-email', '/settings/overdue-reminder/test',
-  '/settings/favicon/delete', '/project-types/create', '/project-types/update/999999', '/project-types/delete/999999',
+  '/settings/favicon/delete', '/settings/retention/run', '/project-types/create', '/project-types/update/999999', '/project-types/delete/999999',
   '/bonus-types/create', '/bonus-tiers/create', '/activity-types/create', '/sales-modes/create', '/customer-levels/create',
   '/customer-statuses/create', '/pipeline-statuses/create', '/approval-chains/create', '/cost-types/create', '/cost-categories/create',
   '/payment-methods/create', '/payment-terms/create', '/order-statuses/create', '/report-groups/create', '/pipeline-amount-options/create'];

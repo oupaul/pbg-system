@@ -6,6 +6,7 @@ const { requireAuth, requireManageSettings } = require('../middleware/auth');
 const { getUserInfo } = require('../utils/authHelper');
 const AuditLogService = require('../services/AuditLogService');
 const EmailService = require('../services/EmailService');
+const DataRetentionService = require('../services/DataRetentionService');
 
 // 輔助函數：獲取系統設定
 function getSystemSetting(key, defaultValue = null) {
@@ -89,6 +90,7 @@ router.get('/', requireAuth, requireManageSettings, (req, res) => {
       settings: settings,
       settingsObj: settingsObj,
       allUsers: User.findActive(),
+      retentionStats: (() => { try { return DataRetentionService.getStats(); } catch (e) { return []; } })(),
       customFavicon: !!require('./branding').getCustomFavicon(),
       success: req.query.success || '',
       error: req.query.error || ''
@@ -260,6 +262,13 @@ router.post('/bulk-update', requireAuth, requireManageSettings, (req, res) => {
               continue;
             }
           }
+
+          // 資料保留天數：0（不清理）或不小於各項目的最小天數（避免一時手滑把近期資料也清掉）
+          const retentionTarget = DataRetentionService.TARGETS.find(t => t.key === key);
+          if (retentionTarget && !DataRetentionService.validateDays(num, retentionTarget.minDays)) {
+            errors.push(`${retentionTarget.label}保留天數必須是 0（不清理）或 ${retentionTarget.minDays}～3650 天`);
+            continue;
+          }
         } else if (setting.setting_type === 'boolean') {
           validatedValue = value === 'true' || value === '1' || value === 'on';
         } else if (key === 'overdue_reminder_frequency' && !['weekly', 'daily'].includes(value)) {
@@ -268,7 +277,7 @@ router.post('/bulk-update', requireAuth, requireManageSettings, (req, res) => {
         } else if (key === 'overdue_reminder_time' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(value))) {
           errors.push('逾期收款提醒發送時間格式必須是 HH:MM');
           continue;
-        } else if (key === 'overdue_reminder_last_run_date') {
+        } else if (key === 'overdue_reminder_last_run_date' || key === 'retention_last_run_date') {
           // 系統內部使用的欄位，不接受從表單修改
           continue;
         } else if (key === 'date_calendar_system' && !['roc', 'gregorian'].includes(value)) {
@@ -309,6 +318,19 @@ router.post('/test-email', requireAuth, requireManageSettings, async (req, res) 
     rejectUnauthorized: req.body.smtp_reject_unauthorized
   });
   res.json(result);
+});
+
+// 資料保留：依目前設定立即清理一次（超過保留天數的修改記錄/登入紀錄/已讀通知會永久刪除）
+router.post('/retention/run', requireAuth, requireManageSettings, (req, res) => {
+  try {
+    const result = DataRetentionService.run({ actor: (req.user && req.user.name) || '管理員' });
+    const labels = Object.fromEntries(DataRetentionService.TARGETS.map(t => [t.table, t.label]));
+    const detail = Object.entries(result.deleted).map(([table, n]) => `${labels[table] || table} ${n} 筆`).join('、');
+    res.redirect('/settings?success=' + encodeURIComponent(result.total > 0 ? `已清理：${detail}` : '目前沒有超過保留天數的資料需要清理（或尚未設定保留天數）'));
+  } catch (err) {
+    console.error('資料保留清理失敗:', err);
+    res.redirect('/settings?error=' + encodeURIComponent('清理失敗：' + err.message));
+  }
 });
 
 // 逾期收款提醒：發送一則測試訊息給目前登入的使用者（不影響正式排程、不發給其他人）

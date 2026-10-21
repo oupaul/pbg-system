@@ -353,6 +353,36 @@
   bodyHtml += '  </div>';
   bodyHtml += '</div>';
 
+  // 資料保留與自動清理卡片
+  const retentionRows = typeof retentionStats !== 'undefined' ? retentionStats : [];
+  if (retentionRows.length > 0) {
+  bodyHtml += '<div class="card mt-4">';
+  bodyHtml += '  <div class="card-header bg-secondary text-white">';
+  bodyHtml += '    <h5 class="mb-0"><i class="bi bi-database-gear"></i> 資料保留與自動清理</h5>';
+  bodyHtml += '  </div>';
+  bodyHtml += '  <div class="card-body">';
+  bodyHtml += '    <p class="text-muted small">這些資料會隨使用不斷累積，讓資料庫與備份越來越大。可設定保留天數，超過的資料每天凌晨自動<strong>永久刪除</strong>；<strong>0 = 不清理</strong>（預設）。修改記錄是稽核證據、登入紀錄是資安紀錄，請依公司規定決定保留多久；刪除前建議確認備份正常。</p>';
+  bodyHtml += '    <form method="POST" action="/settings/bulk-update">';
+  bodyHtml += '      <div class="table-responsive"><table class="table table-sm align-middle mb-3">';
+  bodyHtml += '        <thead><tr><th>資料</th><th style="width:220px">保留天數</th><th class="text-end">目前筆數</th><th>最舊一筆</th><th class="text-end">依目前設定將清理</th></tr></thead><tbody>';
+  bodyHtml += retentionRows.map(r => '<tr>'
+    + '<td>' + escapeHtml(r.label) + (r.table === 'notifications' ? '<div class="small text-muted">未讀通知不會被清理</div>' : '') + '</td>'
+    + '<td><div class="input-group input-group-sm"><input type="number" class="form-control" name="' + escapeHtml(r.key) + '" value="' + r.days + '" min="0" max="3650"><span class="input-group-text">天</span></div><div class="form-text">0 或 ' + r.minDays + '～3650</div></td>'
+    + '<td class="text-end">' + Number(r.total).toLocaleString() + '</td>'
+    + '<td>' + (r.oldest ? escapeHtml(String(r.oldest).slice(0, 10)) : '-') + '</td>'
+    + '<td class="text-end ' + (r.deletable > 0 ? 'text-danger' : 'text-muted') + '">' + Number(r.deletable).toLocaleString() + '</td>'
+    + '</tr>').join('');
+  bodyHtml += '      </tbody></table></div>';
+  bodyHtml += '      <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> 儲存設定</button>';
+  bodyHtml += '    </form>';
+  bodyHtml += '    <form method="POST" action="/settings/retention/run" class="mt-3" onsubmit="return confirm(\'確定要立即永久刪除超過保留天數的資料嗎？此操作無法復原。\');">';
+  bodyHtml += '      <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i> 立即依目前設定清理一次</button>';
+  bodyHtml += '      <span class="text-muted small ms-2">請先儲存設定；系統也會每天凌晨 3:30 之後自動清理一次。</span>';
+  bodyHtml += '    </form>';
+  bodyHtml += '  </div>';
+  bodyHtml += '</div>';
+  }
+
   // Email 通知設定卡片
   bodyHtml += '<div class="card mt-4">';
   bodyHtml += '  <div class="card-header bg-primary text-white">';

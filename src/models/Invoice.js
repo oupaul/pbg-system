@@ -62,15 +62,44 @@ const Invoice = {
     return db.prepare(`SELECT * FROM invoices WHERE invoice_number = ? AND project_id = ?`).get(invoiceNumber, projectId);
   },
 
+  // 發票號碼的唯一性：同一個發票號碼同時只能有一張「有效」的發票（忽略大小寫與前後空白）。
+  // 已作廢的發票不佔用號碼（作廢重開可沿用同一號碼）；已刪除（軟刪除）的也不佔用。
+  // 資料庫另有同條件的部分唯一索引（migrate_invoice_number_unique）作為最後防線，這裡先檢查才能給友善的錯誤訊息。
+  findActiveByNumber(invoiceNumber, excludeId = null) {
+    const number = invoiceNumber === null || invoiceNumber === undefined ? '' : String(invoiceNumber).trim();
+    if (!number) return null;
+    return db.prepare(`
+      SELECT i.id, i.project_id, i.invoice_date, p.project_code, p.project_name
+      FROM invoices i
+      LEFT JOIN projects p ON p.id = i.project_id
+      WHERE i.invoice_number = ? COLLATE NOCASE
+        AND i.deleted_at IS NULL
+        AND COALESCE(i.status, '有效') <> '作廢'
+        AND i.id <> ?
+      LIMIT 1
+    `).get(number, excludeId === null || excludeId === undefined ? -1 : excludeId);
+  },
+
+  assertNumberAvailable(invoiceNumber, excludeId = null) {
+    const existing = this.findActiveByNumber(invoiceNumber, excludeId);
+    if (existing) {
+      const where = existing.project_code ? `專案 ${existing.project_code}${existing.project_name ? '（' + existing.project_name + '）' : ''}` : `專案 #${existing.project_id}`;
+      throw new Error(`發票號碼「${String(invoiceNumber).trim()}」已被${where}的另一張有效發票使用，同一個號碼不能重複開立。若原發票已作廢，請先將它設為作廢。`);
+    }
+  },
+
   // 新增發票
   create(data) {
     const projectId = data.project_id !== undefined && data.project_id !== null ? parseInt(data.project_id) : null;
     const invoiceDate = data.invoice_date || null;
-    const invoiceNumber = data.invoice_number || null;
+    const invoiceNumber = data.invoice_number ? String(data.invoice_number).trim() || null : null;
     const amountWithTax = data.amount_with_tax !== undefined && data.amount_with_tax !== null ? parseFloat(data.amount_with_tax) : 0;
     const expectedPaymentDate = data.expected_payment_date || null;
     const status = data.status || '有效';
     const originalInvoiceId = data.original_invoice_id || null;
+
+    // 發票號碼不可重複（作廢重開時原發票已先作廢，所以可以沿用同一號碼）
+    if (invoiceNumber && status !== '作廢') this.assertNumberAvailable(invoiceNumber);
 
     // 超額開票防護（僅在非作廢重開的一般新增時驗證）
     if (projectId && !data._skipOverInvoiceCheck) {
@@ -137,6 +166,13 @@ const Invoice = {
     }
     
     if (data.invoice_number !== undefined) {
+      const normalizedNumber = data.invoice_number ? String(data.invoice_number).trim() || null : null;
+      const effectiveStatus = data.status !== undefined ? data.status : oldRecord.status;
+      if (normalizedNumber && effectiveStatus !== '作廢' && !oldRecord.deleted_at
+          && String(oldRecord.invoice_number || '').trim().toLowerCase() !== normalizedNumber.toLowerCase()) {
+        this.assertNumberAvailable(normalizedNumber, id);
+      }
+      data = { ...data, invoice_number: normalizedNumber };
       fields.push('invoice_number = ?');
       values.push(data.invoice_number);
       newData.invoice_number = data.invoice_number;
@@ -241,6 +277,8 @@ const Invoice = {
   restore(id, userInfo = null) {
     const record = this.findById(id);
     if (!record || !record.deleted_at) return false;
+    // 還原後會重新佔用發票號碼：若號碼已被另一張有效發票使用就不能還原
+    if (record.invoice_number && (record.status || '有效') !== '作廢') this.assertNumberAvailable(record.invoice_number, id);
     db.prepare('UPDATE invoices SET deleted_at = NULL, updated_at = datetime(\'now\', \'localtime\') WHERE id = ?').run(id);
     AuditLogService.logUpdate('invoices', id, record, { deleted_at: null }, userInfo);
     return true;

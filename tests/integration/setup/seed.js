@@ -91,6 +91,11 @@ async function main() {
     ids[tag] = { customer: cid, project: pid, invoice: iid, payment: payid, bonus: bid, attachment: aid, cost: costId };
   }
 
+  // ---- 資料完整性測試用的專案（金額充足、沒有發票，不會被「超額開票」檢查擋住）----
+  ids.C = { project: Number(project.run('P-C', '專案C', spA, ids.A.customer).lastInsertRowid) };
+  ids.D = { project: Number(project.run('P-D', '專案D', spA, ids.A.customer).lastInsertRowid) };
+  db.prepare('UPDATE projects SET price_with_tax = 10000000, price_without_tax = 9523810 WHERE id IN (?, ?)').run(ids.C.project, ids.D.project);
+
   // ---- 客戶關係負責人（轉介紹獎勵的可見範圍會用到）：客戶 A 歸 u_salesA，客戶 B 歸 u_salesB ----
   db.prepare('UPDATE customers SET owner_salesperson_id = ? WHERE id = ?').run(users.u_salesA, ids.A.customer);
   db.prepare('UPDATE customers SET owner_salesperson_id = ? WHERE id = ?').run(users.u_salesB, ids.B.customer);

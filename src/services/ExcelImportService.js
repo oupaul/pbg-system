@@ -1128,7 +1128,13 @@ class ExcelImportService {
             const invCount = invoiceNumber
               ? db.prepare('SELECT COUNT(*) c FROM invoices WHERE project_id = ? AND invoice_number = ? AND deleted_at IS NULL').get(currentProjectId, invoiceNumber).c
               : db.prepare('SELECT COUNT(*) c FROM invoices WHERE project_id = ? AND invoice_number IS NULL AND invoice_date = ? AND amount_with_tax = ? AND deleted_at IS NULL').get(currentProjectId, invoiceDate, invoiceAmount).c;
-            if (this.isDuplicateRow(invKey, invCount)) {
+            // 有發票號碼時，同一專案已有相同號碼的有效發票（例如檔案內重複列出同一張發票）一律視為重複；
+            // 號碼被「其他專案」的有效發票使用時，由 Invoice.create 拋出錯誤，該列記為失敗
+            const sameNumberExisting = invoiceNumber ? Invoice.findActiveByNumber(invoiceNumber) : null;
+            const duplicateByKey = this.isDuplicateRow(invKey, invCount); // 命中時會自行累計重複筆數
+            const duplicateBySameNumber = !duplicateByKey && !!sameNumberExisting && String(sameNumberExisting.project_id) === String(currentProjectId);
+            if (duplicateBySameNumber) this.duplicateCount++;
+            if (duplicateByKey || duplicateBySameNumber) {
               this.log(`第 ${i + 1} 行：發票${invoiceNumber ? ` ${invoiceNumber}` : ''}已存在，略過`);
             } else {
               Invoice.create({

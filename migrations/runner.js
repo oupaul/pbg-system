@@ -101,6 +101,8 @@ const MIGRATIONS = [
   'migrate_role_admin_flags',
   'migrate_overdue_reminder',
   'migrate_role_can_import',
+  'migrate_invoice_number_unique',
+  'migrate_data_retention',
 ];
 
 function run() {

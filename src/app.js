@@ -418,6 +418,7 @@ function gracefulShutdown(signal) {
   }, 10000);
   forceTimer.unref();
   try { require('./services/OverdueReminderService').stop(); } catch (e) { /* 忽略 */ }
+  try { require('./services/DataRetentionService').stop(); } catch (e) { /* 忽略 */ }
   server.close(() => {
     try { require('./models/db').close(); } catch (e) { /* 忽略 */ }
     console.log('[關閉] 已正常關閉');
@@ -437,6 +438,8 @@ const server = app.listen(...listenArgs, () => {
   console.log(`   環境: ${process.env.NODE_ENV || 'development'}\n`);
   // 逾期收款自動提醒排程（預設停用，由系統設定啟用）
   try { require('./services/OverdueReminderService').start(); } catch (e) { console.error('[啟動] 逾期收款提醒排程啟動失敗:', e.message); }
+  // 資料保留自動清理排程（預設全部不清理，由系統設定啟用）
+  try { require('./services/DataRetentionService').start(); } catch (e) { console.error('[啟動] 資料保留排程啟動失敗:', e.message); }
 });
 
 // 處理端口衝突錯誤
