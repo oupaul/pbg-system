@@ -117,7 +117,7 @@ list_services() {
                 fi
             done
             # 若 ExecStart 含 app.js 且未在列表中，加入
-            if [ $found -eq 0 ] && grep -q "app.js" "$service_file" 2>/dev/null; then
+            if [ $found -eq 0 ] && grep -q "app\.js" "$service_file" 2>/dev/null; then
                 services+=("$service_name")
                 local status=$(systemctl is-active "$service_name" 2>/dev/null || echo "unknown")
                 local enabled=$(systemctl is-enabled "$service_name" 2>/dev/null || echo "unknown")
@@ -581,11 +581,17 @@ if [ -n "$DB_SOURCE" ] && [ -f "$DB_SOURCE" ]; then
             
             # 檢查並清理佔用端口的進程（從配置文件讀取端口，或使用預設值 3000）
             PORT=$(grep -E "^PORT=" "${DEPLOY_CONFIG_FILE}" 2>/dev/null | cut -d'=' -f2 | tr -d '"' || echo "3000")
-            PORT_PID=$(sudo lsof -ti:${PORT} 2>/dev/null || echo "")
+            # 只看「監聽」該 port 的程序（連線到該 port 的用戶端，例如 SSH 通道，不是佔用者），
+            # 且指令必須是本專案的 app.js 才終止，避免誤殺無關程序
+            PORT_PID=$(sudo lsof -ti TCP:${PORT} -sTCP:LISTEN 2>/dev/null || echo "")
             if [ -n "$PORT_PID" ]; then
-                warning "檢測到端口 ${PORT} 仍被佔用 (PID: $PORT_PID)，正在終止..."
-                sudo kill -9 "$PORT_PID" 2>/dev/null || warning "無法終止進程，可能需要手動處理"
-                sleep 2
+                if ps -o args= -p "$PORT_PID" 2>/dev/null | grep -q "app\.js"; then
+                    warning "檢測到端口 ${PORT} 仍被佔用 (PID: $PORT_PID)，正在終止..."
+                    sudo kill -9 "$PORT_PID" 2>/dev/null || warning "無法終止進程，可能需要手動處理"
+                    sleep 2
+                else
+                    warning "端口 ${PORT} 被非本專案的程序佔用 (PID: $PORT_PID)，不會自動終止，請手動確認"
+                fi
             fi
             
             # 再次確認服務狀態
@@ -600,11 +606,15 @@ if [ -n "$DB_SOURCE" ] && [ -f "$DB_SOURCE" ]; then
             log "服務未運行，直接還原..."
             # 即使服務未運行，也檢查端口是否被佔用（可能有殘留進程）
             PORT=$(grep -E "^PORT=" "${DEPLOY_CONFIG_FILE}" 2>/dev/null | cut -d'=' -f2 | tr -d '"' || echo "3000")
-            PORT_PID=$(sudo lsof -ti:${PORT} 2>/dev/null || echo "")
+            PORT_PID=$(sudo lsof -ti TCP:${PORT} -sTCP:LISTEN 2>/dev/null || echo "")
             if [ -n "$PORT_PID" ]; then
-                warning "檢測到端口 ${PORT} 被佔用 (PID: $PORT_PID)，正在清理..."
-                sudo kill -9 "$PORT_PID" 2>/dev/null || true
-                sleep 1
+                if ps -o args= -p "$PORT_PID" 2>/dev/null | grep -q "app\.js"; then
+                    warning "檢測到端口 ${PORT} 被佔用 (PID: $PORT_PID)，正在清理..."
+                    sudo kill -9 "$PORT_PID" 2>/dev/null || true
+                    sleep 1
+                else
+                    warning "端口 ${PORT} 被非本專案的程序佔用 (PID: $PORT_PID)，不會自動終止，請手動確認"
+                fi
             fi
         fi
     else
@@ -1033,6 +1043,16 @@ else
     warning "sqlite3 不可用，跳過資料庫結構檢查"
 fi
 
+# 還原後把 data/、uploads/ 的擁有者改回服務帳號：
+# restore.sh 以 root 執行，解出來的資料庫與附件都是 root 擁有；服務若以專用的非 root 帳號執行，
+# 沒有修正的話無法寫入資料庫與附件（SERVICE_USER 由 deploy.config.sh 提供）
+if [ -n "${SERVICE_USER:-}" ] && [ "${SERVICE_RUN_AS:-dedicated}" != "root" ] && id "$SERVICE_USER" >/dev/null 2>&1; then
+    chown -R "${SERVICE_USER}:${SERVICE_USER}" "${PROJECT_DIR}/data" "${PROJECT_DIR}/uploads" 2>/dev/null \
+        && chmod 700 "${PROJECT_DIR}/data" "${PROJECT_DIR}/uploads" 2>/dev/null \
+        && log "✓ 已將 data/、uploads/ 的擁有者設為服務帳號 ${SERVICE_USER}" \
+        || warning "無法設定 data/、uploads/ 的擁有者，服務可能無法寫入，請手動執行：sudo chown -R ${SERVICE_USER}:${SERVICE_USER} ${PROJECT_DIR}/data ${PROJECT_DIR}/uploads"
+fi
+
 # 處理服務重啟（⚠️ better-sqlite3 需要重啟服務才能重新連接資料庫）
 log "處理服務狀態..."
 if [ -n "$SERVICE_NAME" ] && systemctl list-unit-files | grep -q "^${SERVICE_NAME}.service"; then
@@ -1043,11 +1063,15 @@ if [ -n "$SERVICE_NAME" ] && systemctl list-unit-files | grep -q "^${SERVICE_NAM
         
         # 啟動服務前，再次確認端口未被佔用
         PORT=$(grep -E "^PORT=" "${DEPLOY_CONFIG_FILE}" 2>/dev/null | cut -d'=' -f2 | tr -d '"' || echo "3000")
-        PORT_PID=$(sudo lsof -ti:${PORT} 2>/dev/null || echo "")
+        PORT_PID=$(sudo lsof -ti TCP:${PORT} -sTCP:LISTEN 2>/dev/null || echo "")
         if [ -n "$PORT_PID" ]; then
-            warning "檢測到端口 ${PORT} 被佔用 (PID: $PORT_PID)，正在清理..."
-            sudo kill -9 "$PORT_PID" 2>/dev/null || true
-            sleep 2
+            if ps -o args= -p "$PORT_PID" 2>/dev/null | grep -q "app\.js"; then
+                warning "檢測到端口 ${PORT} 被佔用 (PID: $PORT_PID)，正在清理..."
+                sudo kill -9 "$PORT_PID" 2>/dev/null || true
+                sleep 2
+            else
+                warning "端口 ${PORT} 被非本專案的程序佔用 (PID: $PORT_PID)，不會自動終止，請手動確認"
+            fi
         fi
         
         # 啟動服務（在交互模式下，服務已經被停止了）

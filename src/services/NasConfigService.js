@@ -34,6 +34,35 @@ class NasConfigService {
   }
 
   /**
+   * 驗證 NAS 設定欄位，回傳正規化後的連接埠；不合法時丟出錯誤。
+   * 這些欄位會直接組進 ssh/rsync/scp 的參數：只接受安全字元，且不可以 "-" 開頭（避免被當成選項，
+   * 例如 -oProxyCommand=... 可執行任意指令）。儲存設定與測試連線（含以 root 執行的特權輔助程式）共用這份驗證。
+   */
+  static validateConfig(config) {
+    if (!config || typeof config !== 'object') throw new Error('NAS 設定格式不正確');
+    if (!config.host || !config.path) {
+      throw new Error('NAS 主機和路徑為必填項');
+    }
+    if (!/^[A-Za-z0-9][A-Za-z0-9.\-]*$/.test(String(config.host))) {
+      throw new Error('NAS 主機格式不正確（只能包含英數字、點與連字號）');
+    }
+    if (config.username && !/^[A-Za-z0-9_][A-Za-z0-9._-]*$/.test(String(config.username))) {
+      throw new Error('NAS 使用者名稱格式不正確');
+    }
+    if (!/^\/[A-Za-z0-9._/@+-]*$/.test(String(config.path)) || String(config.path).split('/').includes('..')) {
+      throw new Error('NAS 路徑必須是以 / 開頭的絕對路徑，且不可包含 .. 或特殊字元');
+    }
+    const port = config.port === undefined || config.port === '' ? 22 : parseInt(config.port, 10);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      throw new Error('NAS 連接埠必須是 1–65535 的整數');
+    }
+    if (config.protocol && !['rsync', 'scp'].includes(config.protocol)) {
+      throw new Error('NAS 傳輸協定只能是 rsync 或 scp');
+    }
+    return port;
+  }
+
+  /**
    * 保存 NAS 設定
    */
   static saveConfig(config) {
@@ -46,29 +75,7 @@ class NasConfigService {
         fs.mkdirSync(configDir, { recursive: true });
       }
       
-      // 驗證設定
-      if (!config.host || !config.path) {
-        throw new Error('NAS 主機和路徑為必填項');
-      }
-
-      // 這些欄位會直接組進 ssh/rsync/scp 的參數：只接受安全字元，且不可以 "-" 開頭（避免被當成選項，
-      // 例如 -oProxyCommand=... 可執行任意指令）
-      if (!/^[A-Za-z0-9][A-Za-z0-9.\-]*$/.test(String(config.host))) {
-        throw new Error('NAS 主機格式不正確（只能包含英數字、點與連字號）');
-      }
-      if (config.username && !/^[A-Za-z0-9_][A-Za-z0-9._-]*$/.test(String(config.username))) {
-        throw new Error('NAS 使用者名稱格式不正確');
-      }
-      if (!/^\/[A-Za-z0-9._/@+-]*$/.test(String(config.path)) || String(config.path).split('/').includes('..')) {
-        throw new Error('NAS 路徑必須是以 / 開頭的絕對路徑，且不可包含 .. 或特殊字元');
-      }
-      const port = config.port === undefined || config.port === '' ? 22 : parseInt(config.port, 10);
-      if (!Number.isInteger(port) || port < 1 || port > 65535) {
-        throw new Error('NAS 連接埠必須是 1–65535 的整數');
-      }
-      if (config.protocol && !['rsync', 'scp'].includes(config.protocol)) {
-        throw new Error('NAS 傳輸協定只能是 rsync 或 scp');
-      }
+      const port = NasConfigService.validateConfig(config);
       
       // 保存設定（不保存密碼到檔案，使用環境變數或加密）
       const configToSave = {
@@ -96,6 +103,35 @@ class NasConfigService {
    */
   static async testConnection(config) {
     const { spawn } = require('child_process');
+
+    // 先驗證欄位（測試連線的設定來自表單、尚未儲存，過去沒有驗證就直接組進 ssh 參數）
+    try {
+      NasConfigService.validateConfig(config);
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+
+    // 服務以非 root 帳號執行時，實際的 NAS 同步是由 root（備份腳本/定時備份）使用 root 的 SSH 金鑰執行，
+    // 測試也要用同一組金鑰才有意義：透過特權輔助程式以 root 執行
+    const PrivilegedClient = require('./PrivilegedClient');
+    if (PrivilegedClient.needsHelper(isInstalled())) {
+      return new Promise((resolve) => {
+        const [cmd, cmdArgs] = PrivilegedClient.helperCommand(INSTALL_DIR, 'nas-test');
+        const child = spawn(cmd, cmdArgs, { stdio: ['pipe', 'pipe', 'pipe'], env: { PATH: process.env.PATH } });
+        let out = '';
+        let err = '';
+        child.stdout.on('data', d => { out += d.toString(); });
+        child.stderr.on('data', d => { err += d.toString(); });
+        child.on('error', e => resolve({ success: false, message: '無法啟動測試程序: ' + e.message }));
+        child.on('close', () => {
+          try { resolve(JSON.parse(out.trim().split('\n').pop())); }
+          catch { resolve({ success: false, message: '測試失敗：' + (err.trim().split('\n').pop() || '無回應') }); }
+        });
+        child.stdin.end(JSON.stringify({
+          host: config.host, port: config.port, username: config.username, path: config.path, protocol: config.protocol
+        }));
+      });
+    }
     
     return new Promise((resolve) => {
       try {

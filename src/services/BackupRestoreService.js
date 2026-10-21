@@ -5,12 +5,9 @@ const path = require('path');
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
-// 備份檔名白名單：只接受純檔名（不含路徑字元），避免用 ../ 指到備份目錄外的任意檔案
-const BACKUP_FILE_NAME_PATTERN = /^(backup_|uninstall_backup_)[A-Za-z0-9._-]+\.tar\.gz$/;
-function isValidBackupFileName(name) {
-  return typeof name === 'string' && BACKUP_FILE_NAME_PATTERN.test(name) && !name.includes('..');
-}
+const { isValidBackupFileName, detectBackupDir: detectBackupDirShared } = require('../utils/backupPaths');
 const progressService = require('./BackupProgressService');
+const PrivilegedClient = require('./PrivilegedClient');
 
 const PROJECT_DIR = process.cwd();
 
@@ -37,52 +34,8 @@ function detectInstallDir() {
   return null;
 }
 
-// 動態偵測備份目錄
-function detectBackupDir(installDir) {
-  if (!installDir) {
-    // 如果沒有安裝目錄，使用專案目錄下的 backups
-    return path.join(PROJECT_DIR, 'backups');
-  }
-  
-  // 優先使用 deploy.config.sh 的 BACKUP_DIR：備份/還原/更新腳本都以它為準，
-  // 網頁端也必須讀同一個目錄（deploy.sh 預設的備份目錄名稱是 invoice-bonus-backups，
-  // 不是「<安裝目錄名稱>-backups」；只靠目錄名稱猜測會在兩者並存時選錯、找不到備份）
-  try {
-    const configPath = path.join(installDir, 'deploy.config.sh');
-    if (fs.existsSync(configPath)) {
-      const match = fs.readFileSync(configPath, 'utf8').match(/^BACKUP_DIR="?([^"\n]+)"?\s*$/m);
-      if (match && match[1] && path.isAbsolute(match[1])) {
-        return match[1];
-      }
-    }
-  } catch (e) { /* 讀不到設定檔就用下面的猜測邏輯 */ }
-
-  // 根據安裝目錄名稱生成備份目錄名稱
-  const installDirName = path.basename(installDir);
-  const backupDir = `/opt/${installDirName}-backups`;
-  
-  // 如果備份目錄存在，就使用它
-  if (fs.existsSync(backupDir)) {
-    return backupDir;
-  }
-  
-  // 否則檢查其他可能的備份目錄
-  const possibleBackupDirs = [
-    `/opt/${installDirName}-backups`,
-    '/opt/project-system-backups',
-    '/opt/invoice-bonus-backups',
-    '/opt/fund-weekly-backups'
-  ];
-  
-  for (const dir of possibleBackupDirs) {
-    if (fs.existsSync(dir)) {
-      return dir;
-    }
-  }
-  
-  // 如果都不存在，返回預設的備份目錄路徑（可能需要創建）
-  return backupDir;
-}
+// 動態偵測備份目錄（規則與特權輔助程式共用，見 utils/backupPaths.js）
+const detectBackupDir = (installDir) => detectBackupDirShared(installDir, PROJECT_DIR);
 
 const INSTALL_DIR = detectInstallDir();
 const BACKUP_DIR = detectBackupDir(INSTALL_DIR);
@@ -146,7 +99,15 @@ class BackupRestoreService {
       
       // 在安裝環境使用 sudo -E 保留環境變數，否則直接執行 bash
       let child;
-      if (isInstalled()) {
+      if (PrivilegedClient.needsHelper(isInstalled())) {
+        // 服務以非 root 帳號執行：透過特權輔助程式執行備份（輔助程式自行設定 NON_INTERACTIVE 與最小環境）
+        const [cmd, cmdArgs] = PrivilegedClient.helperCommand(INSTALL_DIR, 'backup');
+        child = spawn(cmd, cmdArgs, {
+          cwd: INSTALL_DIR,
+          env: { PATH: process.env.PATH },
+          stdio: ['ignore', 'pipe', 'pipe']
+        });
+      } else if (isInstalled()) {
         // 使用 sudo -E 保留環境變數（包括 NON_INTERACTIVE）
         child = spawn('sudo', ['-E', 'bash', scriptPath], {
           cwd: path.dirname(scriptPath),
@@ -441,25 +402,40 @@ class BackupRestoreService {
    */
   static async restoreDetached({ scriptPath, backupPath, backupFileName, cwd, opId }) {
     const { execFileSync, execFile } = require('child_process');
-    const unit = `pbg-restore-${Date.now()}`;
-    const logFile = `/tmp/pbg-restore-${opId}.log`;
-    fs.closeSync(fs.openSync(logFile, 'a', 0o600));
+    let unit;
+    let logFile;
 
-    const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
-    const runnerArgs = [
-      '--unit', unit, '--collect', '--no-block', '--quiet',
-      '--setenv=NON_INTERACTIVE=1', `--setenv=BACKUP_FILE=${backupPath || backupFileName}`,
-      '-p', `StandardOutput=append:${logFile}`, '-p', `StandardError=append:${logFile}`,
-      `--working-directory=${cwd}`,
-      '/bin/bash', scriptPath, backupPath
-    ];
-    console.log('[還原] 使用 systemd-run 獨立執行還原:', unit, '日誌:', logFile);
-    try {
-      if (isRoot) execFileSync('systemd-run', runnerArgs, { stdio: 'pipe' });
-      else execFileSync('sudo', ['-n', 'systemd-run', ...runnerArgs], { stdio: 'pipe' });
-    } catch (e) {
-      const detail = (e.stderr ? e.stderr.toString() : e.message).trim();
-      throw new Error('無法啟動獨立的還原程序（systemd-run）: ' + detail);
+    if (PrivilegedClient.needsHelper(true)) {
+      // 服務以非 root 帳號執行：由特權輔助程式驗證備份檔名並啟動獨立的 systemd 暫時性 unit，
+      // 日誌檔由 root 建立（0644），這裡只讀取
+      const [cmd, cmdArgs] = PrivilegedClient.helperCommand(INSTALL_DIR || cwd, 'restore', [backupFileName, opId]);
+      console.log('[還原] 透過特權輔助程式啟動獨立還原');
+      try {
+        const out = execFileSync(cmd, cmdArgs, { stdio: ['ignore', 'pipe', 'pipe'], env: { PATH: process.env.PATH } }).toString().trim();
+        ({ unit, logFile } = JSON.parse(out.split('\n').pop()));
+      } catch (e) {
+        const detail = (e.stderr ? e.stderr.toString() : e.message).trim();
+        throw new Error('無法啟動獨立的還原程序（特權輔助程式）: ' + detail);
+      }
+    } else {
+      unit = `pbg-restore-${Date.now()}`;
+      logFile = `/tmp/pbg-restore-${opId}.log`;
+      fs.closeSync(fs.openSync(logFile, 'a', 0o600));
+      const runnerArgs = [
+        '--unit', unit, '--collect', '--no-block', '--quiet',
+        '--setenv=NON_INTERACTIVE=1', `--setenv=BACKUP_FILE=${backupPath || backupFileName}`,
+        '-p', `StandardOutput=append:${logFile}`, '-p', `StandardError=append:${logFile}`,
+        `--working-directory=${cwd}`,
+        '/bin/bash', scriptPath, backupPath
+      ];
+      console.log('[還原] 使用 systemd-run 獨立執行還原:', unit, '日誌:', logFile);
+      try {
+        if (PrivilegedClient.isRoot()) execFileSync('systemd-run', runnerArgs, { stdio: 'pipe' });
+        else execFileSync('sudo', ['-n', 'systemd-run', ...runnerArgs], { stdio: 'pipe' });
+      } catch (e) {
+        const detail = (e.stderr ? e.stderr.toString() : e.message).trim();
+        throw new Error('無法啟動獨立的還原程序（systemd-run）: ' + detail);
+      }
     }
 
     progressService.setProgress(opId, {
@@ -922,7 +898,11 @@ class BackupRestoreService {
       }
 
       // 安裝環境需要 root 權限刪除
-      if (isInstalled()) {
+      if (PrivilegedClient.needsHelper(isInstalled())) {
+        // 非 root 的服務帳號：由特權輔助程式驗證檔名並刪除（備份目錄不開放服務帳號寫入）
+        const [cmd, cmdArgs] = PrivilegedClient.helperCommand(INSTALL_DIR, 'delete-backup', [backupFileName]);
+        await execFileAsync(cmd, cmdArgs, { env: { PATH: process.env.PATH } });
+      } else if (isInstalled()) {
         // 不經過 shell：檔名已通過白名單驗證，仍以參數陣列傳遞避免任何注入
         await execFileAsync('sudo', ['rm', '-f', '--', backupPath]);
       } else {

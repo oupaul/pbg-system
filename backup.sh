@@ -140,7 +140,13 @@ if [ "$USE_INSTALL_BACKUP_DIR" -eq 1 ]; then
     # 確保備份目錄存在（需要 root 權限）
     if [ "$EUID" -eq 0 ]; then
         mkdir -p "$BACKUP_DIR"
-        chmod 700 "$BACKUP_DIR" || true
+        if [ -n "${SERVICE_USER:-}" ] && [ "${SERVICE_RUN_AS:-dedicated}" != "root" ] && id "$SERVICE_USER" >/dev/null 2>&1; then
+            # 服務以專用的非 root 帳號執行：服務帳號所屬群組只能讀取（列表/下載），不可寫入
+            chgrp "$SERVICE_USER" "$BACKUP_DIR" || true
+            chmod 750 "$BACKUP_DIR" || true
+        else
+            chmod 700 "$BACKUP_DIR" || true
+        fi
     else
         # 如果不是 root，嘗試創建（可能失敗，但會在下一個 mkdir 中處理）
         mkdir -p "$BACKUP_DIR" 2>/dev/null || true
@@ -326,6 +332,11 @@ cd "$BACKUP_DIR"
 tar -czf "${BACKUP_NAME}.tar.gz" "$BACKUP_NAME" || error "備份壓縮失敗"
 rm -rf "$BACKUP_NAME" || warning "無法刪除臨時備份目錄"
 chmod 600 "${BACKUP_NAME}.tar.gz" 2>/dev/null || true
+# 服務以專用的非 root 帳號執行時，網頁端需要能讀取（下載）備份檔：給服務帳號所屬群組唯讀權限
+# （備份目錄本身不開放服務帳號寫入，刪除備份由特權輔助程式 scripts/pbg-privileged.js 處理）
+if [ -n "${SERVICE_USER:-}" ] && [ "${SERVICE_RUN_AS:-dedicated}" != "root" ] && id "$SERVICE_USER" >/dev/null 2>&1; then
+    chgrp "$SERVICE_USER" "${BACKUP_NAME}.tar.gz" 2>/dev/null && chmod 640 "${BACKUP_NAME}.tar.gz" 2>/dev/null || true
+fi
 BACKUP_SIZE=$(du -h "${BACKUP_NAME}.tar.gz" | cut -f1)
 log "備份壓縮完成，大小: $BACKUP_SIZE"
 

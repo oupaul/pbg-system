@@ -433,6 +433,9 @@ if systemctl list-unit-files | grep -q "^${SERVICE_NAME}.service"; then
     
     log "移除服務文件..."
     sudo rm -f "/etc/systemd/system/${SERVICE_NAME}.service" 2>/dev/null || true
+    # 移除 deploy.sh 為專用服務帳號安裝的 sudoers 規則（服務帳號本身不刪除，避免誤刪仍被其他東西使用的帳號；
+    # 確定不需要時可手動執行 sudo userdel <帳號>，帳號名稱見 deploy.config.sh 的 SERVICE_USER）
+    sudo rm -f "/etc/sudoers.d/$(printf '%s' "${SERVICE_NAME}" | tr -c 'A-Za-z0-9_-' '_')" 2>/dev/null || true
     
     # 同時移除相關的 timer 服務（如果有）
     if systemctl list-unit-files | grep -q "^${SERVICE_NAME}-backup.timer"; then
@@ -464,19 +467,23 @@ if [ -n "$APP_PIDS" ]; then
     sleep 1
 fi
 
-# 檢查並清理端口 3000
+# 檢查並清理端口 3000：只看「監聽」該 port 的程序，且指令必須是本安裝目錄的 app.js 才終止
+# （避免誤殺同一台主機上其他使用 3000 埠的服務，或只是連線到該 port 的用戶端，例如 SSH 通道）
 log "檢查端口 3000 佔用情況..."
-PORT_PID=$(sudo lsof -ti:3000 2>/dev/null || echo "")
+PORT_PID=$(sudo lsof -ti TCP:3000 -sTCP:LISTEN 2>/dev/null || echo "")
 if [ -n "$PORT_PID" ]; then
-    warning "檢測到端口 3000 仍被佔用 (PID: $PORT_PID)，正在終止..."
-    sudo kill -9 "$PORT_PID" 2>/dev/null || true
-    sleep 1
-    # 再次檢查
-    PORT_PID=$(sudo lsof -ti:3000 2>/dev/null || echo "")
-    if [ -n "$PORT_PID" ]; then
-        warning "端口 3000 仍被佔用，可能需要手動處理"
+    if ps -o args= -p "$PORT_PID" 2>/dev/null | grep -qF "${PROJECT_DIR}/src/app.js"; then
+        warning "檢測到端口 3000 仍被本專案的程序佔用 (PID: $PORT_PID)，正在終止..."
+        sudo kill -9 "$PORT_PID" 2>/dev/null || true
+        sleep 1
+        PORT_PID=$(sudo lsof -ti TCP:3000 -sTCP:LISTEN 2>/dev/null || echo "")
+        if [ -n "$PORT_PID" ]; then
+            warning "端口 3000 仍被佔用，可能需要手動處理"
+        else
+            log "端口 3000 已釋放"
+        fi
     else
-        log "端口 3000 已釋放"
+        warning "端口 3000 被非本專案的程序佔用 (PID: $PORT_PID)，不會自動終止，請手動確認"
     fi
 else
     log "端口 3000 未被佔用"

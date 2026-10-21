@@ -47,9 +47,17 @@ Node.js + Express + SQLite（`better-sqlite3`）的發票／業績獎金／CRM �
 ## `deploy.sh` 已修的風險
 
 - migration 失敗（`node migrations/runner.js` 非 0）現在會停止部署、不啟動服務，而不是印警告後繼續（`runner.js` 本身已經是「失敗的 migration 不標記完成、下次重跑會自動重試」，所以停下來是安全的，不會卡住進度）
-- 停服務時的 `kill -9`（含首次安裝那個分支）現在會先確認佔用該 port 的程序指令包含 `app.js` 才殺，且都改用 `${PORT}` 而非寫死 3000；驗證失敗會停止部署並印出 PID／指令，不會誤殺無關程序
+- 停服務時的 `kill -9`（含首次安裝那個分支，以及 `restore.sh`、`uninstall.sh`）現在只看「監聽」該 port 的程序（`lsof -sTCP:LISTEN`，連到該 port 的用戶端如 SSH 通道不算），並先確認指令包含 `app.js`（`uninstall.sh` 要求是本安裝目錄的 `src/app.js`）才殺，且都改用 `${PORT}` 而非寫死 3000；驗證失敗會停止部署並印出 PID／指令，不會誤殺無關程序
 - 依賴以 `package-lock.json` 鎖定（已提交，不再 gitignore），部署使用 `npm ci` 讓每家公司的主機得到完全相同的版本；有鎖定檔時**不會**在主機上自動 `npm audit fix`（會讓各主機版本漂移）——漏洞請在開發環境執行 `npm audit fix`、測試後提交更新的鎖定檔，需要在主機強制執行時設定 `RUN_AUDIT_FIX=1`；沒有鎖定檔時維持舊行為（`npm install` + 自動 audit fix，`SKIP_AUDIT_FIX=1` 可略過）。`package.json` 有 `engines`（Node >=20 <25）與 `.nvmrc`（22）；Node 26 與 better-sqlite3 的 ABI 不相容
 - 部署前的資料庫備份與 `migrations/runner.js` 執行前的快照（`data/invoice_bonus.db.pre-migrate-*`，保留最近 3 份，`SKIP_MIGRATION_SNAPSHOT=1` 可略過）都改用 SQLite 線上備份（`.backup`／`VACUUM INTO`），並檢查 `PRAGMA integrity_check`；備份失敗就中止，不再在沒有備份時變更資料庫。`runner.js` 遇到第一個失敗的 migration 就停止，不再繼續執行後面可能依賴它的 migration
+
+## 服務執行帳號（非 root）與特權輔助程式
+
+- `deploy.sh`（含 `update.sh` 呼叫的部署）預設讓服務以**專用的系統帳號**執行（帳號名稱預設等於服務名稱，記錄在 `deploy.config.sh` 的 `SERVICE_USER`），不再是 root：萬一應用程式被入侵，影響範圍只有資料庫與附件，不會直接取得整台主機。條件不足時（安裝目錄不在 `/opt`、沒有 `visudo`/`useradd`、`/etc/sudoers` 沒啟用 `sudoers.d`）自動退回 root 並印出原因。緊急退回：`sudo SERVICE_RUN_AS=root bash deploy.sh`（會記錄到 `deploy.config.sh`，之後的更新維持 root；改回專用帳號用 `SERVICE_RUN_AS=dedicated`）。舊安裝第一次更新時會自動升級（重寫 unit、建立帳號、修正擁有者）
+- 檔案權限：安裝目錄與全部程式碼 `root:root` 且 group/其他人不可寫（服務帳號不能改自己的程式碼，也不能竄改要以 root 執行的腳本）；`data/`、`uploads/`、`nas_config.json` 歸服務帳號（700/600）；備份目錄 `root:<服務帳號群組>` 750，備份檔 640（網頁可列出/下載，但**不可寫入或植入備份檔**）。`restore.sh` 還原後會把 `data/`、`uploads/` 擁有者改回服務帳號；`backup.sh` 會維持備份目錄/檔案的群組權限。新增「應用程式需要寫入」的路徑時，要在 `deploy.sh` 的 `apply_service_permissions` 與 `restore.sh` 一併處理擁有者
+- systemd 防護：`UMask=0077`、`PrivateDevices`、`ProtectSystem=full`、`ProtectHome=read-only`、`ProtectKernel*`、`ProtectControlGroups`、`RestrictRealtime`、`LockPersonality`。**刻意沒有** `NoNewPrivileges`（服務要用 sudo 呼叫輔助程式）、`PrivateTmp`（還原程序的日誌寫在 `/tmp`，要與服務共用）、`ProtectSystem=strict`（備份腳本要寫備份目錄）
+- 需要 root 的動作（備份、還原、刪除備份、測試 NAS 連線）一律走 `scripts/pbg-privileged.js`：`sudo -n <node> <安裝目錄>/scripts/pbg-privileged.js <動作> <參數>`，網頁端用 `src/services/PrivilegedClient.js` 呼叫。sudoers（`/etc/sudoers.d/<服務名稱>`，由 `deploy.sh` 以 `visudo -cf` 驗證後安裝）**只允許這一條指令**。輔助程式把呼叫者視為不可信：參數全部白名單驗證（備份檔名、操作 ID 格式）、不經 shell、不繼承環境變數、日誌檔以 `O_EXCL|O_NOFOLLOW` 由 root 建立，且**執行前先檢查安裝目錄內會被 root 載入/執行的檔案都是 root 擁有、不可被 group/其他人寫入、不是符號連結**（否則拒絕）。輔助程式與它載入的模組**不可以載入資料庫**（以 root 開資料庫會產生 root 擁有的 `-wal`/`-shm`）。新增特權動作時：在 `parseInvocation` 加白名單、更新 `tests/privilegedHelper.test.js`、不要放寬 sudoers 規則
+- 這些流程在 DEV01 實測過：舊安裝升級、首次安裝（另開一個獨立實例）、緊急退回 root 再切回、網頁端備份/下載/刪除/還原/NAS 測試（在與正式服務相同的 systemd 沙盒設定下以服務帳號身分執行）、定時備份的檔案權限
 
 ## 備份與還原
 

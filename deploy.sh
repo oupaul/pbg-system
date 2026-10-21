@@ -110,10 +110,14 @@ input_config() {
     fi
 }
 
+# 執行時以環境變數指定的 SERVICE_RUN_AS（例如緊急退回 root）要優先於設定檔裡記錄的值
+SERVICE_RUN_AS_OVERRIDE="${SERVICE_RUN_AS:-}"
+
 # 輸入配置，或從既有設定檔讀取
 if [ -f "${PROJECT_DIR}/deploy.config.sh" ]; then
     source "${PROJECT_DIR}/deploy.config.sh"
     info "已從 deploy.config.sh 讀取現有配置（服務：${SERVICE_NAME}，目錄：${INSTALL_DIR}）"
+    [ -n "$SERVICE_RUN_AS_OVERRIDE" ] && SERVICE_RUN_AS="$SERVICE_RUN_AS_OVERRIDE"
 else
     input_config
 fi
@@ -140,6 +144,114 @@ warning() {
 
 info() {
     echo -e "${BLUE}[資訊]${NC} $1"
+}
+
+# ========================================
+# 服務執行帳號（預設：專用的非 root 帳號）
+# ========================================
+# SERVICE_RUN_AS=dedicated（預設）：服務以專用的系統帳號執行，只能寫入 data/、uploads/；程式碼由 root 擁有、
+#   服務帳號不可修改。需要 root 的動作（備份、還原、刪除備份、測試 NAS 連線）由 sudoers 只允許的
+#   scripts/pbg-privileged.js 處理（參數嚴格驗證）。萬一應用程式被入侵，影響範圍僅限於資料庫與附件，
+#   不會直接取得整台主機的 root 權限。
+# SERVICE_RUN_AS=root：維持舊行為（緊急退回用；可在執行 deploy.sh/update.sh 時以環境變數指定，會記錄到 deploy.config.sh）
+SERVICE_RUN_AS="${SERVICE_RUN_AS:-dedicated}"
+if [ -z "${SERVICE_USER:-}" ]; then
+    SERVICE_USER=$(printf '%s' "$SERVICE_NAME" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9_-' '-' | cut -c1-32)
+fi
+case "$SERVICE_USER" in
+    [a-z_]*) ;;
+    *) SERVICE_USER="svc-${SERVICE_USER}"; SERVICE_USER=$(printf '%s' "$SERVICE_USER" | cut -c1-32) ;;
+esac
+EFFECTIVE_RUN_USER="root"
+
+# 判斷能否使用專用帳號；不行就退回 root 並說明原因（不中止部署）
+decide_run_user() {
+    EFFECTIVE_RUN_USER="root"
+    if [ "$SERVICE_RUN_AS" = "root" ]; then
+        warning "已指定以 root 執行服務（SERVICE_RUN_AS=root）。建議改用專用帳號：移除該設定後重新執行 deploy.sh/update.sh"
+        return 0
+    fi
+    if [ "$PROJECT_DIR" != "$INSTALL_DIR" ]; then
+        warning "目前不是在安裝目錄（${INSTALL_DIR}）內執行，維持以 root 執行服務"
+        return 0
+    fi
+    case "$PROJECT_DIR" in
+        /opt/*) ;;
+        *) warning "安裝目錄不在 /opt 之下（${PROJECT_DIR}），為避免變更非預期目錄的擁有者，維持以 root 執行服務"; return 0 ;;
+    esac
+    if ! command -v visudo >/dev/null 2>&1 || ! command -v useradd >/dev/null 2>&1; then
+        warning "找不到 visudo 或 useradd，無法設定專用帳號，維持以 root 執行服務"
+        return 0
+    fi
+    if ! grep -rqsE '^[#@]includedir[[:space:]]+/etc/sudoers\.d' /etc/sudoers; then
+        warning "/etc/sudoers 未啟用 /etc/sudoers.d，無法安全地授權特權輔助程式，維持以 root 執行服務"
+        return 0
+    fi
+    EFFECTIVE_RUN_USER="$SERVICE_USER"
+}
+
+# 建立服務帳號、設定檔案擁有者與權限、安裝 sudoers（必須在服務停止後、啟動前執行）
+apply_service_permissions() {
+    local sudoers_file="/etc/sudoers.d/$(printf '%s' "$SERVICE_NAME" | tr -c 'A-Za-z0-9_-' '_')"
+
+    if [ "$EFFECTIVE_RUN_USER" = "root" ]; then
+        # 以 root 執行：不需要 sudoers 規則，移除先前可能留下的
+        if [ -f "$sudoers_file" ]; then
+            rm -f "$sudoers_file" && log "已移除不再需要的 sudoers 規則: $sudoers_file"
+        fi
+        return 0
+    fi
+
+    log "設定服務帳號與檔案權限（服務以 ${SERVICE_USER} 執行）..."
+
+    if ! id "$SERVICE_USER" >/dev/null 2>&1; then
+        useradd --system --user-group --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin "$SERVICE_USER" \
+            || error "無法建立服務帳號 ${SERVICE_USER}"
+        log "✓ 已建立服務帳號 ${SERVICE_USER}"
+    fi
+
+    # 程式碼：root 擁有、其他人不可寫（服務帳號無法修改自己的程式碼，也無法竄改要以 root 執行的腳本）
+    chown -R root:root "$PROJECT_DIR"
+    chmod -R go-w "$PROJECT_DIR"
+    chmod 755 "$PROJECT_DIR"
+
+    # 資料與附件：服務帳號專用
+    mkdir -p "${PROJECT_DIR}/data" "${PROJECT_DIR}/uploads"
+    chown -R "${SERVICE_USER}:${SERVICE_USER}" "${PROJECT_DIR}/data" "${PROJECT_DIR}/uploads"
+    chmod 700 "${PROJECT_DIR}/data" "${PROJECT_DIR}/uploads"
+
+    # NAS 設定檔由網頁儲存，需預先建立並歸服務帳號（安裝目錄本身不開放服務帳號寫入）
+    if [ ! -f "${PROJECT_DIR}/nas_config.json" ]; then
+        echo '{"enabled": false}' > "${PROJECT_DIR}/nas_config.json"
+    fi
+    chown "${SERVICE_USER}:${SERVICE_USER}" "${PROJECT_DIR}/nas_config.json"
+    chmod 600 "${PROJECT_DIR}/nas_config.json"
+
+    # 備份目錄：root 擁有；服務帳號所屬群組可讀取（網頁下載備份），但不可寫入（避免被拿來植入備份檔）
+    mkdir -p "$BACKUP_DIR"
+    chown root:"$SERVICE_USER" "$BACKUP_DIR"
+    chmod 750 "$BACKUP_DIR"
+    find "$BACKUP_DIR" -maxdepth 1 -type f -name '*.tar.gz' -exec chgrp "$SERVICE_USER" {} + -exec chmod 640 {} + 2>/dev/null || true
+
+    # sudoers：只允許服務帳號以 root 執行特權輔助程式（參數由輔助程式驗證），先用 visudo 驗證語法再安裝
+    local node_real tmp
+    node_real=$(readlink -f "$NODE_PATH" 2>/dev/null || echo "$NODE_PATH")
+    tmp=$(mktemp)
+    {
+        echo "# 由 deploy.sh 產生（${SERVICE_NAME}），請勿手動修改；重新執行 deploy.sh/update.sh 會覆寫"
+        echo "${SERVICE_USER} ALL=(root) NOPASSWD: ${node_real} ${PROJECT_DIR}/scripts/pbg-privileged.js *"
+        if [ "$node_real" != "$NODE_PATH" ]; then
+            echo "${SERVICE_USER} ALL=(root) NOPASSWD: ${NODE_PATH} ${PROJECT_DIR}/scripts/pbg-privileged.js *"
+        fi
+    } > "$tmp"
+    if visudo -cf "$tmp" >/dev/null 2>&1; then
+        install -m 0440 -o root -g root "$tmp" "$sudoers_file"
+        rm -f "$tmp"
+        log "✓ 已安裝 sudoers 規則: $sudoers_file"
+    else
+        rm -f "$tmp"
+        error "產生的 sudoers 規則語法驗證失敗，已中止（未變更 sudoers）。可暫時以 SERVICE_RUN_AS=root 執行部署"
+    fi
 }
 
 # 開始部署
@@ -465,15 +577,14 @@ fi
 
 # 步驟 5: 檢查並更新 systemd 服務配置
 log "步驟 5/6: 檢查 systemd 服務配置..."
-CURRENT_USER=${SUDO_USER:-$USER}
-if [ -z "$CURRENT_USER" ]; then
-    CURRENT_USER=$(whoami)
-fi
-
 NODE_PATH=$(which node)
 if [ -z "$NODE_PATH" ]; then
     error "找不到 Node.js 執行檔"
 fi
+
+# 決定服務的執行帳號（專用的非 root 帳號，或因條件不足/明確指定而使用 root）
+decide_run_user
+RUN_AS_MARKER="# pbg-run-as: ${EFFECTIVE_RUN_USER} v1"
 
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
@@ -488,6 +599,11 @@ else
         NEED_UPDATE=true
         log "檢測到專案目錄變更，需要更新服務文件"
     fi
+    # 執行帳號或防護設定改變（含舊安裝以 root 執行、升級為專用帳號）
+    if ! grep -qxF "$RUN_AS_MARKER" "$SERVICE_FILE" 2>/dev/null; then
+        NEED_UPDATE=true
+        log "服務執行帳號/防護設定需要更新（改為以 ${EFFECTIVE_RUN_USER} 執行）"
+    fi
 fi
 
 if [ "$NEED_UPDATE" = true ]; then
@@ -498,7 +614,24 @@ if [ "$NEED_UPDATE" = true ]; then
         EXISTING_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | sha256sum | cut -d' ' -f1)
         log "已產生新的 SESSION_SECRET"
     fi
+
+    # 專用帳號時加上基本的 systemd 防護。刻意不啟用 NoNewPrivileges：服務需要透過 sudo 呼叫特權輔助程式；
+    # 也不啟用 PrivateTmp（還原程序的日誌寫在 /tmp，要與服務共用）、ProtectSystem=strict（備份腳本需要寫入備份目錄）
+    SERVICE_HARDENING=""
+    if [ "$EFFECTIVE_RUN_USER" != "root" ]; then
+        SERVICE_HARDENING="UMask=0077
+PrivateDevices=true
+ProtectSystem=full
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+LockPersonality=true"
+    fi
+
     sudo tee "$SERVICE_FILE" > /dev/null <<EOF
+${RUN_AS_MARKER}
 [Unit]
 Description=專案開立發票業績認列獎金計算總表系統
 Documentation=https://github.com/your-repo/invoice-bonus-system
@@ -507,8 +640,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=${CURRENT_USER}
-Group=${CURRENT_USER}
+User=${EFFECTIVE_RUN_USER}
+Group=${EFFECTIVE_RUN_USER}
 WorkingDirectory=${PROJECT_DIR}
 Environment=NODE_ENV=production
 Environment=PORT=${PORT}
@@ -521,6 +654,7 @@ StartLimitInterval=0
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=${SERVICE_NAME}
+${SERVICE_HARDENING}
 
 [Install]
 WantedBy=multi-user.target
@@ -584,6 +718,9 @@ FOOTER_TEXT="${FOOTER_TEXT}"
 # 服務設定
 PORT=${PORT}
 SERVICE_NAME="${SERVICE_NAME}"
+# 服務執行帳號：dedicated（專用非 root 帳號，預設）或 root；備份/還原腳本依此調整檔案權限
+SERVICE_RUN_AS="${SERVICE_RUN_AS}"
+SERVICE_USER="${SERVICE_USER}"
 
 # 目錄設定
 INSTALL_DIR_NAME="${INSTALL_DIR_NAME}"
@@ -598,6 +735,9 @@ chmod 755 "$DEPLOY_CONFIG_FILE" 2>/dev/null || true
 # 確保備份相關腳本可執行（供後續 setup-backup-timer 與 systemd 排程使用）
 chmod +x "${PROJECT_DIR}/backup.sh" 2>/dev/null || true
 chmod +x "${PROJECT_DIR}/setup-backup-timer.sh" 2>/dev/null || true
+
+# 套用服務帳號與檔案權限（migration 等步驟都是以 root 執行，資料庫與快照可能是 root 擁有，必須在啟動前修正）
+apply_service_permissions
 
 # 步驟 6: 啟動服務
 log "步驟 6/6: 啟動服務..."
