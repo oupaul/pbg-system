@@ -475,7 +475,7 @@ router.get('/:id', (req, res) => {
     : [];
 
   // 轉介紹紀錄（此客戶身為介紹人的紀錄）
-  const referralRewards = ReferralReward.findByCustomer(customer.id);
+  const referralRewards = ReferralReward.findByCustomer(customer.id, req.user);
 
   res.render('customers/show', {
     title: customer.company_name,

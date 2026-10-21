@@ -91,6 +91,24 @@ async function main() {
     ids[tag] = { customer: cid, project: pid, invoice: iid, payment: payid, bonus: bid, attachment: aid, cost: costId };
   }
 
+  // ---- 客戶關係負責人（轉介紹獎勵的可見範圍會用到）：客戶 A 歸 u_salesA，客戶 B 歸 u_salesB ----
+  db.prepare('UPDATE customers SET owner_salesperson_id = ? WHERE id = ?').run(users.u_salesA, ids.A.customer);
+  db.prepare('UPDATE customers SET owner_salesperson_id = ? WHERE id = ?').run(users.u_salesB, ids.B.customer);
+
+  // ---- 轉介紹獎勵（金額各不相同，測試用金額辨識是哪一筆）----
+  const reward = db.prepare(`
+    INSERT INTO referral_rewards (referring_customer_id, project_id, recipient_type, recipient_user_id, reward_amount, status, notes)
+    VALUES (?, ?, ?, ?, ?, '待發放', ?)
+  `);
+  ids.rewards = {
+    aProject: Number(reward.run(ids.A.customer, ids.A.project, 'customer', null, 1111, 'A 專案').lastInsertRowid),
+    bProject: Number(reward.run(ids.B.customer, ids.B.project, 'customer', null, 2222, 'B 專案').lastInsertRowid),
+    bCustomerLevel: Number(reward.run(ids.B.customer, null, 'customer', null, 3333, 'B 客戶層級（無專案）').lastInsertRowid),
+    aCustomerLevel: Number(reward.run(ids.A.customer, null, 'customer', null, 4444, 'A 客戶層級（無專案）').lastInsertRowid),
+    // 關聯業務 B 的專案，但領取人是 u_salesA：領取人本人應該看得到
+    staffForSalesA: Number(reward.run(ids.B.customer, ids.B.project, 'staff', users.u_salesA, 5555, '領取人是 u_salesA').lastInsertRowid)
+  };
+
   require('fs').writeFileSync(path.join(root, 'seed-ids.json'), JSON.stringify(ids));
   db.close();
   console.log('seed ok');
