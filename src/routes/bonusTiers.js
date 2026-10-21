@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireManageSettings } = require('../middleware/auth');
 
 function getActiveProjectTypeNames() {
   try {
@@ -11,7 +11,7 @@ function getActiveProjectTypeNames() {
   }
 }
 
-router.get('/', requireAuth, requireAdmin, (req, res) => {
+router.get('/', requireAuth, requireManageSettings, (req, res) => {
   try {
     const tiers = db.prepare(`SELECT * FROM bonus_tiers ORDER BY project_type ASC, tier_name ASC`).all();
     res.render('bonusTiers/index', {
@@ -33,7 +33,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
   }
 });
 
-router.post('/create', requireAuth, requireAdmin, (req, res) => {
+router.post('/create', requireAuth, requireManageSettings, (req, res) => {
   const { project_type, tier_name, percentage, cost_deduction_rate, description } = req.body;
 
   if (!project_type || !project_type.trim() || !tier_name || !tier_name.trim()) {
@@ -67,7 +67,7 @@ router.post('/create', requireAuth, requireAdmin, (req, res) => {
   }
 });
 
-router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/update/:id', requireAuth, requireManageSettings, (req, res) => {
   const { id } = req.params;
   const { project_type, tier_name, percentage, cost_deduction_rate, description, is_active } = req.body;
 
@@ -112,7 +112,7 @@ router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
   }
 });
 
-router.post('/delete/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/delete/:id', requireAuth, requireManageSettings, (req, res) => {
   const { id } = req.params;
 
   const tier = db.prepare('SELECT id FROM bonus_tiers WHERE id = ?').get(id);

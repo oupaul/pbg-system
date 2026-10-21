@@ -21,6 +21,7 @@ const { detectPreviewKind, readTextPreview, detectOfficeKind } = require('../uti
 const projectScope = requireProjectScopeFromParam('id');
 const AuditLogService = require('../services/AuditLogService');
 const cache = require('../services/CacheService');
+const { guardedSingleUpload, ATTACHMENT_EXTENSIONS } = require('../utils/uploadValidation');
 
 // 專案附件上傳：儲存至 uploads/attachments，檔名唯一
 const attachmentsDir = path.join(__dirname, '..', '..', 'uploads', 'attachments');
@@ -38,6 +39,13 @@ const uploadAttachment = multer({
     }
   }),
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
+
+// 附件：副檔名白名單 + 內容檔頭必須與副檔名相符（偽裝副檔名、html/svg/腳本/可執行檔都會被擋下）
+const attachmentUploadGuard = guardedSingleUpload({
+  multer: uploadAttachment,
+  allowed: ATTACHMENT_EXTENSIONS,
+  onReject: (req, res, message) => res.redirect(`/projects/${req.params.id}?error=` + encodeURIComponent(message))
 });
 
 /** 修正上傳檔名編碼：瀏覽器常以 UTF-8 傳送中文，若被解為 Latin-1 會變亂碼 */
@@ -690,7 +698,7 @@ router.post('/:id/attachments/:attachmentId/restore', requireEditPermission, req
 });
 
 // 專案附件上傳（需編輯權限）
-router.post('/:id/attachments', requireEditPermission, requireNumericParam('id'), projectScope, uploadAttachment.single('file'), (req, res) => {
+router.post('/:id/attachments', requireEditPermission, requireNumericParam('id'), projectScope, ...attachmentUploadGuard, (req, res) => {
   if (!req.file) return res.redirect(`/projects/${req.params.id}?error=` + encodeURIComponent('請選擇檔案'));
   try {
     const displayName = fixFilenameEncoding(req.file.originalname || req.file.filename);

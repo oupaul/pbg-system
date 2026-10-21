@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireManageSettings } = require('../middleware/auth');
 
 function findActive() {
   return db.prepare(`SELECT * FROM pipeline_statuses WHERE is_active = 1 ORDER BY display_order ASC`).all();
@@ -19,7 +19,7 @@ function countInUse(statusName) {
   return row?.count || 0;
 }
 
-router.get('/', requireAuth, requireAdmin, (req, res) => {
+router.get('/', requireAuth, requireManageSettings, (req, res) => {
   const statuses = db.prepare(`SELECT * FROM pipeline_statuses ORDER BY display_order ASC`).all();
   res.render('pipelineStatuses/index', {
     title: '銷售機會狀態管理',
@@ -29,7 +29,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
   });
 });
 
-router.post('/create', requireAuth, requireAdmin, (req, res) => {
+router.post('/create', requireAuth, requireManageSettings, (req, res) => {
   const statusName = (req.body.status_name || '').trim();
   if (!statusName) {
     return res.redirect('/pipeline-statuses?error=' + encodeURIComponent('狀態名稱不能為空'));
@@ -59,7 +59,7 @@ router.post('/create', requireAuth, requireAdmin, (req, res) => {
   }
 });
 
-router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/update/:id', requireAuth, requireManageSettings, (req, res) => {
   const { id } = req.params;
   const existing = db.prepare('SELECT * FROM pipeline_statuses WHERE id = ?').get(id);
   if (!existing) {
@@ -113,7 +113,7 @@ router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
   }
 });
 
-router.post('/delete/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/delete/:id', requireAuth, requireManageSettings, (req, res) => {
   const existing = db.prepare('SELECT * FROM pipeline_statuses WHERE id = ?').get(req.params.id);
   if (!existing) {
     return res.redirect('/pipeline-statuses?error=' + encodeURIComponent('狀態不存在'));

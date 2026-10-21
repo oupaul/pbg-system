@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const db = require('../models/db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireManageSettings } = require('../middleware/auth');
 const { getUserInfo } = require('../utils/authHelper');
 const AuditLogService = require('../services/AuditLogService');
 
@@ -75,7 +75,7 @@ publicRouter.get(['/favicon.ico', '/branding/favicon'], (req, res) => {
 const settingsRouter = express.Router();
 const faviconUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FAVICON_BYTES, files: 1 } }).single('favicon');
 
-settingsRouter.post('/', requireAuth, requireAdmin, (req, res) => {
+settingsRouter.post('/', requireAuth, requireManageSettings, (req, res) => {
   faviconUpload(req, res, (uploadErr) => {
     const back = (key, msg) => res.redirect(`/settings?${key}=` + encodeURIComponent(msg));
     if (uploadErr) {
@@ -103,7 +103,7 @@ settingsRouter.post('/', requireAuth, requireAdmin, (req, res) => {
   });
 });
 
-settingsRouter.post('/delete', requireAuth, requireAdmin, (req, res) => {
+settingsRouter.post('/delete', requireAuth, requireManageSettings, (req, res) => {
   try {
     const oldName = readSetting('favicon_file');
     removeCustomFiles();

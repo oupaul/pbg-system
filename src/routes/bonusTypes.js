@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireManageSettings } = require('../middleware/auth');
 
 // 新增獎金表單用：啟用中的獎金類型，依顯示順序排序
 function findActive() {
@@ -13,7 +13,7 @@ function findActive() {
 }
 
 // 獎金類型管理（僅管理員）
-router.get('/', requireAuth, requireAdmin, (req, res) => {
+router.get('/', requireAuth, requireManageSettings, (req, res) => {
   const types = db.prepare(`
     SELECT * FROM bonus_types ORDER BY display_order ASC, type_name ASC
   `).all();
@@ -27,7 +27,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
 });
 
 // 新增獎金類型（僅管理員）
-router.post('/create', requireAuth, requireAdmin, (req, res) => {
+router.post('/create', requireAuth, requireManageSettings, (req, res) => {
   const typeName = (req.body.type_name || '').trim();
   if (!typeName) {
     return res.redirect('/bonus-types?error=' + encodeURIComponent('類型名稱不能為空'));
@@ -55,7 +55,7 @@ router.post('/create', requireAuth, requireAdmin, (req, res) => {
 });
 
 // 更新獎金類型（僅管理員）
-router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/update/:id', requireAuth, requireManageSettings, (req, res) => {
   const { id } = req.params;
   const existing = db.prepare('SELECT * FROM bonus_types WHERE id = ?').get(id);
   if (!existing) {
@@ -102,7 +102,7 @@ router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
 });
 
 // 刪除獎金類型（僅管理員）
-router.post('/delete/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/delete/:id', requireAuth, requireManageSettings, (req, res) => {
   const existing = db.prepare('SELECT * FROM bonus_types WHERE id = ?').get(req.params.id);
   if (!existing) {
     return res.redirect('/bonus-types?error=' + encodeURIComponent('類型不存在'));

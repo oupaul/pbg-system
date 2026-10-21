@@ -1,11 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const Role = require('../models/Role');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireManageRoles } = require('../middleware/auth');
 
-// 所有路由都需要管理員權限
+// 所有路由都需要「角色管理」權限（can_manage_roles）
 router.use(requireAuth);
-router.use(requireAdmin);
+router.use(requireManageRoles);
+
+// 「使用者管理」旗標等於可以建立/改密碼任何帳號，只有自己已具備該權限的人才能授予
+function canGrantUserManagement(req) {
+  return !!(req.user && (req.user.isAdmin || req.user.role === 'admin'));
+}
 
 // 角色列表
 router.get('/', (req, res) => {
@@ -100,7 +105,7 @@ router.post('/', async (req, res) => {
       can_delete: req.body.can_delete === 'on' ? 1 : 0,
       can_edit_crm: req.body.can_edit_crm === 'on' ? 1 : 0,
       can_approve_customer: req.body.can_approve_customer === 'on' ? 1 : 0,
-      can_manage_users: req.body.can_manage_users === 'on' ? 1 : 0,
+      can_manage_users: canGrantUserManagement(req) && req.body.can_manage_users === 'on' ? 1 : 0,
       can_manage_roles: req.body.can_manage_roles === 'on' ? 1 : 0,
       can_manage_settings: req.body.can_manage_settings === 'on' ? 1 : 0,
       can_backup_restore: req.body.can_backup_restore === 'on' ? 1 : 0,
@@ -176,7 +181,10 @@ async function handleRoleUpdate(req, res) {
       can_delete: req.body.can_delete === 'on' ? 1 : 0,
       can_edit_crm: req.body.can_edit_crm === 'on' ? 1 : 0,
       can_approve_customer: req.body.can_approve_customer === 'on' ? 1 : 0,
-      can_manage_users: req.body.can_manage_users === 'on' ? 1 : 0,
+      // 沒有「使用者管理」權限的角色管理者，不能新增或移除任何角色的「使用者管理」旗標（維持原值），避免自行提權
+      can_manage_users: canGrantUserManagement(req)
+        ? (req.body.can_manage_users === 'on' ? 1 : 0)
+        : (existingRole.can_manage_users ? 1 : 0),
       can_manage_roles: req.body.can_manage_roles === 'on' ? 1 : 0,
       can_manage_settings: req.body.can_manage_settings === 'on' ? 1 : 0,
       can_backup_restore: req.body.can_backup_restore === 'on' ? 1 : 0,

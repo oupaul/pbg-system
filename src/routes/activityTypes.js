@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireManageSettings } = require('../middleware/auth');
 
 function findActive() {
   return db.prepare(`SELECT * FROM activity_types WHERE is_active = 1 ORDER BY display_order ASC, type_name ASC`).all();
@@ -19,7 +19,7 @@ function countInUse(typeName) {
   return row?.count || 0;
 }
 
-router.get('/', requireAuth, requireAdmin, (req, res) => {
+router.get('/', requireAuth, requireManageSettings, (req, res) => {
   try {
     const types = db.prepare(`SELECT * FROM activity_types ORDER BY display_order ASC, type_name ASC`).all();
     res.render('activityTypes/index', {
@@ -39,7 +39,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
   }
 });
 
-router.post('/create', requireAuth, requireAdmin, (req, res) => {
+router.post('/create', requireAuth, requireManageSettings, (req, res) => {
   const { type_name, badge_color, display_order } = req.body;
 
   if (!type_name || !type_name.trim()) {
@@ -69,7 +69,7 @@ router.post('/create', requireAuth, requireAdmin, (req, res) => {
   }
 });
 
-router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/update/:id', requireAuth, requireManageSettings, (req, res) => {
   const { id } = req.params;
   const { type_name, badge_color, display_order, is_active } = req.body;
 
@@ -118,7 +118,7 @@ router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
   }
 });
 
-router.post('/delete/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/delete/:id', requireAuth, requireManageSettings, (req, res) => {
   const { id } = req.params;
 
   const type = db.prepare('SELECT type_name FROM activity_types WHERE id = ?').get(id);

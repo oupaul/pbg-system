@@ -176,50 +176,20 @@ router.post('/', requireEditPermission, requireProjectScopeFromBody, (req, res) 
   }
 });
 
-// 更新獎金狀態
-router.post('/:id', requireEditPermission, bonusScope, (req, res) => {
-  try {
-    const bonus = Bonus.findById(req.params.id);
-    if (!bonus) {
-      return res.status(404).render('error', { 
-        title: '找不到獎金記錄',
-        message: '找不到獎金記錄', 
-        error: {} 
-      });
-    }
-
-    Bonus.update(req.params.id, {
-      base_amount: parseFloat(req.body.base_amount) || 0,
-      bonus_percentage: parseFloat(req.body.bonus_percentage) || 0,
-      bonus_amount: parseFloat(req.body.bonus_amount) || 0,
-      payment_date: req.body.payment_date || null,
-      status: req.body.status || '待發放',
-      forfeiture_reason: req.body.forfeiture_reason || null
-    });
-
-    const redirectTo = safeRedirect(req.body.redirect, `/projects/${bonus.project_id}`);
-    res.redirect(redirectTo);
-  } catch (err) {
-    console.error(err);
-    const bonus = Bonus.findById(req.params.id);
-    if (bonus) {
-      const redirectTo = safeRedirect(req.body.redirect, `/projects/${bonus.project_id}`);
-      res.redirect(redirectTo + '?error=' + encodeURIComponent(err.message));
-    } else {
-      res.redirect('/projects?error=' + encodeURIComponent(err.message));
-    }
-  }
-});
-
+// 注意：/batch-update、/batch-delete 必須定義在 /:id 之前，否則會被 /:id 當成 id 吃掉而回 404
 // 批次更新獎金狀態
 router.post('/batch-update', requireEditPermission, (req, res) => {
   try {
-    const ids = req.body.ids;
+    // 表單只勾一筆時 ids 會是字串而不是陣列，統一轉成陣列
+    const ids = [].concat(req.body.ids || []).filter(Boolean);
     const status = req.body.status;
     const paymentDate = req.body.payment_date;
 
-    if (!ids || !Array.isArray(ids)) {
+    if (ids.length === 0) {
       return res.status(400).json({ error: '請選擇要更新的獎金' });
+    }
+    if (!['待發放', '已發放', '充公'].includes(status)) {
+      return res.status(400).json({ error: '無效的獎金狀態' });
     }
 
     // 先全部檢查範圍再更新，任何一筆不在範圍內就整批拒絕
@@ -233,10 +203,10 @@ router.post('/batch-update', requireEditPermission, (req, res) => {
       Bonus.update(id, { status, payment_date: paymentDate });
     }
 
-    res.redirect('/bonuses?year=' + req.body.year);
+    res.redirect('/bonuses?year=' + encodeURIComponent(req.body.year || ''));
   } catch (err) {
     console.error(err);
-    res.redirect('back');
+    res.redirect('/bonuses?error=' + encodeURIComponent('批次更新失敗'));
   }
 });
 
@@ -282,6 +252,41 @@ router.post('/batch-delete', requireEditPermission, (req, res) => {
   } catch (err) {
     console.error('批次刪除錯誤:', err);
     res.redirect('/bonuses?error=' + encodeURIComponent('批次刪除失敗：' + err.message));
+  }
+});
+
+// 更新獎金狀態
+router.post('/:id', requireEditPermission, bonusScope, (req, res) => {
+  try {
+    const bonus = Bonus.findById(req.params.id);
+    if (!bonus) {
+      return res.status(404).render('error', { 
+        title: '找不到獎金記錄',
+        message: '找不到獎金記錄', 
+        error: {} 
+      });
+    }
+
+    Bonus.update(req.params.id, {
+      base_amount: parseFloat(req.body.base_amount) || 0,
+      bonus_percentage: parseFloat(req.body.bonus_percentage) || 0,
+      bonus_amount: parseFloat(req.body.bonus_amount) || 0,
+      payment_date: req.body.payment_date || null,
+      status: req.body.status || '待發放',
+      forfeiture_reason: req.body.forfeiture_reason || null
+    });
+
+    const redirectTo = safeRedirect(req.body.redirect, `/projects/${bonus.project_id}`);
+    res.redirect(redirectTo);
+  } catch (err) {
+    console.error(err);
+    const bonus = Bonus.findById(req.params.id);
+    if (bonus) {
+      const redirectTo = safeRedirect(req.body.redirect, `/projects/${bonus.project_id}`);
+      res.redirect(redirectTo + '?error=' + encodeURIComponent(err.message));
+    } else {
+      res.redirect('/projects?error=' + encodeURIComponent(err.message));
+    }
   }
 });
 

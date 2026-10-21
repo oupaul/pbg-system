@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
 const User = require('../models/User');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireManageSettings } = require('../middleware/auth');
 const { getUserInfo } = require('../utils/authHelper');
 const AuditLogService = require('../services/AuditLogService');
 const EmailService = require('../services/EmailService');
@@ -61,7 +61,7 @@ function updateSystemSetting(key, value, type = 'string') {
 }
 
 // 系統設定頁面（僅管理員）
-router.get('/', requireAuth, requireAdmin, (req, res) => {
+router.get('/', requireAuth, requireManageSettings, (req, res) => {
   try {
     // 獲取所有設定
     const settings = db.prepare('SELECT * FROM system_settings ORDER BY setting_key').all();
@@ -107,7 +107,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
 });
 
 // 更新系統設定（僅管理員）
-router.post('/update', requireAuth, requireAdmin, (req, res) => {
+router.post('/update', requireAuth, requireManageSettings, (req, res) => {
   const { setting_key, setting_value, setting_type } = req.body;
   
   if (!setting_key) {
@@ -191,7 +191,7 @@ router.post('/update', requireAuth, requireAdmin, (req, res) => {
 const PRESERVE_IF_EMPTY_KEYS = new Set(['smtp_password', 'line_channel_access_token', 'line_channel_secret']);
 
 // 批量更新設定（僅管理員）
-router.post('/bulk-update', requireAuth, requireAdmin, (req, res) => {
+router.post('/bulk-update', requireAuth, requireManageSettings, (req, res) => {
   try {
     const updates = req.body;
     let updateCount = 0;
@@ -289,7 +289,7 @@ router.post('/bulk-update', requireAuth, requireAdmin, (req, res) => {
 });
 
 // 測試發送 Email（僅管理員）：用表單目前的值（不一定已存檔）實際寄一封測試信，回傳結果供畫面顯示
-router.post('/test-email', requireAuth, requireAdmin, async (req, res) => {
+router.post('/test-email', requireAuth, requireManageSettings, async (req, res) => {
   const result = await EmailService.sendTestMail(req.body.to, {
     host: req.body.smtp_host,
     port: req.body.smtp_port,

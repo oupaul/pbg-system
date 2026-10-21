@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const SearchService = require('../services/SearchService');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireManageSettings } = require('../middleware/auth');
 
-router.get('/', requireAuth, requireAdmin, (req, res) => {
+router.get('/', requireAuth, requireManageSettings, (req, res) => {
   const tables = SearchService.describe();
   const newCount = tables.reduce((sum, t) => sum + t.columns.filter(c => c.isNew).length, 0);
   res.render('searchSettings/index', {
@@ -16,7 +16,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
 });
 
 // 儲存：表單送出每個可設定項目（all）與被勾選的項目（on），格式為「資料表|欄位」，整表為「資料表|*」
-router.post('/', requireAuth, requireAdmin, (req, res) => {
+router.post('/', requireAuth, requireManageSettings, (req, res) => {
   try {
     const toArray = v => (Array.isArray(v) ? v : (v ? [v] : []));
     const all = toArray(req.body.all);

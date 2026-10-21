@@ -3,14 +3,14 @@ const router = express.Router();
 const db = require('../models/db');
 const ApprovalChain = require('../models/ApprovalChain');
 const Role = require('../models/Role');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireManageSettings } = require('../middleware/auth');
 
 const APPROVAL_TYPES = {
   customer_creation: '新客戶/廠商審核',
   deletion: '刪除審核'
 };
 
-router.get('/', requireAuth, requireAdmin, (req, res) => {
+router.get('/', requireAuth, requireManageSettings, (req, res) => {
   const chains = {};
   Object.keys(APPROVAL_TYPES).forEach(type => {
     chains[type] = ApprovalChain.getAllSteps(type);
@@ -26,7 +26,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
   });
 });
 
-router.post('/create', requireAuth, requireAdmin, (req, res) => {
+router.post('/create', requireAuth, requireManageSettings, (req, res) => {
   const { approval_type, role_key, step_name } = req.body;
 
   if (!APPROVAL_TYPES[approval_type]) {
@@ -62,7 +62,7 @@ function countStuckAtStep(approvalType, stepOrder) {
   return row?.count || 0;
 }
 
-router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/update/:id', requireAuth, requireManageSettings, (req, res) => {
   const { id } = req.params;
   const { role_key, step_name, is_active } = req.body;
 
@@ -98,7 +98,7 @@ router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
 });
 
 // 上移/下移：跟相鄰的關卡互換 step_order
-router.post('/reorder/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/reorder/:id', requireAuth, requireManageSettings, (req, res) => {
   const { id } = req.params;
   const direction = req.body.direction === 'up' ? 'up' : 'down';
 
@@ -138,7 +138,7 @@ router.post('/reorder/:id', requireAuth, requireAdmin, (req, res) => {
   }
 });
 
-router.post('/delete/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/delete/:id', requireAuth, requireManageSettings, (req, res) => {
   const existing = db.prepare('SELECT * FROM approval_chain_steps WHERE id = ?').get(req.params.id);
   if (!existing) {
     return res.redirect('/approval-chains?error=' + encodeURIComponent('關卡不存在'));

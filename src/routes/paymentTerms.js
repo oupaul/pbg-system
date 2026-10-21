@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireManageSettings } = require('../middleware/auth');
 
 function findActive() {
   return db.prepare(`SELECT * FROM payment_terms WHERE is_active = 1 ORDER BY display_order ASC, term_name ASC`).all();
@@ -19,7 +19,7 @@ function countInUse(termName) {
   return row?.count || 0;
 }
 
-router.get('/', requireAuth, requireAdmin, (req, res) => {
+router.get('/', requireAuth, requireManageSettings, (req, res) => {
   try {
     const terms = db.prepare(`SELECT * FROM payment_terms ORDER BY display_order ASC, term_name ASC`).all();
     res.render('paymentTerms/index', {
@@ -39,7 +39,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
   }
 });
 
-router.post('/create', requireAuth, requireAdmin, (req, res) => {
+router.post('/create', requireAuth, requireManageSettings, (req, res) => {
   const { term_name, badge_color, display_order } = req.body;
 
   if (!term_name || !term_name.trim()) {
@@ -69,7 +69,7 @@ router.post('/create', requireAuth, requireAdmin, (req, res) => {
   }
 });
 
-router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/update/:id', requireAuth, requireManageSettings, (req, res) => {
   const { id } = req.params;
   const { term_name, badge_color, display_order, is_active } = req.body;
 
@@ -116,7 +116,7 @@ router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
   }
 });
 
-router.post('/delete/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/delete/:id', requireAuth, requireManageSettings, (req, res) => {
   const { id } = req.params;
 
   const term = db.prepare('SELECT term_name FROM payment_terms WHERE id = ?').get(id);

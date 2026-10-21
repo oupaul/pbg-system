@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireManageSettings } = require('../middleware/auth');
 
 // 銷售機會表單用：啟用中的金額選項，依顯示順序排序
 function findActive() {
@@ -13,7 +13,7 @@ function findActive() {
 }
 
 // 金額選項管理（僅管理員）
-router.get('/', requireAuth, requireAdmin, (req, res) => {
+router.get('/', requireAuth, requireManageSettings, (req, res) => {
   const options = db.prepare(`
     SELECT * FROM pipeline_amount_options ORDER BY display_order ASC, amount ASC
   `).all();
@@ -27,7 +27,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
 });
 
 // 新增金額選項（僅管理員）
-router.post('/create', requireAuth, requireAdmin, (req, res) => {
+router.post('/create', requireAuth, requireManageSettings, (req, res) => {
   const amount = parseInt(req.body.amount, 10);
   if (!amount || amount <= 0) {
     return res.redirect('/pipeline-amount-options?error=' + encodeURIComponent('請輸入大於 0 的金額'));
@@ -55,7 +55,7 @@ router.post('/create', requireAuth, requireAdmin, (req, res) => {
 });
 
 // 更新金額選項（僅管理員）
-router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/update/:id', requireAuth, requireManageSettings, (req, res) => {
   const { id } = req.params;
   const existing = db.prepare('SELECT * FROM pipeline_amount_options WHERE id = ?').get(id);
   if (!existing) {
@@ -94,7 +94,7 @@ router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
 
 // 刪除金額選項（僅管理員）
 // pipelines.estimated_amount 是自由數值欄位、不參照本表，刪除選項不影響既有銷售機會
-router.post('/delete/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/delete/:id', requireAuth, requireManageSettings, (req, res) => {
   const existing = db.prepare('SELECT id FROM pipeline_amount_options WHERE id = ?').get(req.params.id);
   if (!existing) {
     return res.redirect('/pipeline-amount-options?error=' + encodeURIComponent('選項不存在'));

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireManageSettings } = require('../middleware/auth');
 
 // 客戶詳情/列表表單用：啟用中的客戶等級，依顯示順序排序
 function findActive() {
@@ -28,7 +28,7 @@ function countInUse(levelName) {
 }
 
 // 客戶等級管理（僅管理員）
-router.get('/', requireAuth, requireAdmin, (req, res) => {
+router.get('/', requireAuth, requireManageSettings, (req, res) => {
   const levels = db.prepare(`
     SELECT * FROM customer_levels ORDER BY display_order ASC, level_name ASC
   `).all();
@@ -42,7 +42,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
 });
 
 // 新增客戶等級（僅管理員）
-router.post('/create', requireAuth, requireAdmin, (req, res) => {
+router.post('/create', requireAuth, requireManageSettings, (req, res) => {
   const levelName = (req.body.level_name || '').trim();
   if (!levelName) {
     return res.redirect('/customer-levels?error=' + encodeURIComponent('等級名稱不能為空'));
@@ -71,7 +71,7 @@ router.post('/create', requireAuth, requireAdmin, (req, res) => {
 });
 
 // 更新客戶等級（僅管理員）
-router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/update/:id', requireAuth, requireManageSettings, (req, res) => {
   const { id } = req.params;
   const existing = db.prepare('SELECT * FROM customer_levels WHERE id = ?').get(id);
   if (!existing) {
@@ -119,7 +119,7 @@ router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
 });
 
 // 刪除客戶等級（僅管理員）
-router.post('/delete/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/delete/:id', requireAuth, requireManageSettings, (req, res) => {
   const existing = db.prepare('SELECT * FROM customer_levels WHERE id = ?').get(req.params.id);
   if (!existing) {
     return res.redirect('/customer-levels?error=' + encodeURIComponent('等級不存在'));

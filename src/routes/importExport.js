@@ -8,7 +8,17 @@ const Project = require('../models/Project');
 const db = require('../models/db');
 const { getUserInfo } = require('../utils/authHelper');
 
+const { guardedSingleUpload, XLSX_EXTENSIONS } = require('../utils/uploadValidation');
+
 module.exports = function(upload) {
+  // Excel 匯入：只接受內容確實是 .xlsx 的檔案（檢查副檔名、檔頭與 zip 結構）
+  const xlsxUploadGuard = guardedSingleUpload({
+    multer: upload,
+    allowed: XLSX_EXTENSIONS,
+    xlsxStructure: true,
+    onReject: (req, res, message) => res.redirect('/import-export?error=' + encodeURIComponent(message))
+  });
+
   const router = express.Router();
 
   // 發票/成本明細匯出依「發票日期/成本日期」年度篩選，年度清單取自實際有資料的年份（所有 render 都需要，統一放 locals）
@@ -103,7 +113,7 @@ module.exports = function(upload) {
   });
 
   // 成本明細批次匯入
-  router.post('/import-costs', upload.single('file'), async (req, res) => {
+  router.post('/import-costs', ...xlsxUploadGuard, async (req, res) => {
     let filePath = null;
     const cleanup = () => {
       if (filePath && fs.existsSync(filePath)) {
@@ -144,7 +154,7 @@ module.exports = function(upload) {
   });
 
   // 匯入Excel
-  router.post('/import', upload.single('file'), async (req, res) => {
+  router.post('/import', ...xlsxUploadGuard, async (req, res) => {
     let filePath = null;
     try {
       if (!req.file) {

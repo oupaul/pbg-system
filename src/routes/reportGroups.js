@@ -5,9 +5,9 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireManageSettings } = require('../middleware/auth');
 
-router.get('/', requireAuth, requireAdmin, (req, res) => {
+router.get('/', requireAuth, requireManageSettings, (req, res) => {
   try {
     const groups = db.prepare(`
       SELECT * FROM report_groups
@@ -31,7 +31,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
   }
 });
 
-router.post('/create', requireAuth, requireAdmin, (req, res) => {
+router.post('/create', requireAuth, requireManageSettings, (req, res) => {
   const name = (req.body.name || '').trim();
   if (!name) {
     return res.redirect('/report-groups?error=' + encodeURIComponent('群組名稱不能為空'));
@@ -59,7 +59,7 @@ router.post('/create', requireAuth, requireAdmin, (req, res) => {
   }
 });
 
-router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/update/:id', requireAuth, requireManageSettings, (req, res) => {
   const id = req.params.id;
   const name = (req.body.name || '').trim();
   if (!name) {
@@ -93,7 +93,7 @@ router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
   }
 });
 
-router.post('/delete/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/delete/:id', requireAuth, requireManageSettings, (req, res) => {
   const id = req.params.id;
   const group = db.prepare('SELECT id, name FROM report_groups WHERE id = ?').get(id);
   if (!group) {

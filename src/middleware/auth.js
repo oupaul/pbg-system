@@ -146,35 +146,36 @@ const requireImportExport = (req, res, next) => {
   return res.status(403).json({ error: '權限不足', message: '此功能僅限系統管理員與專案管理員使用' });
 };
 
-// Uses roles table (can_manage_users) so custom admin-like roles work correctly.
-const requireAdmin = (req, res, next) => {
-  if (!req.user) {
-    // JSON vs HTML response
-    if (req.accepts('html')) {
-      return res.status(403).render('error', {
-        title: '權限不足',
-        message: '此功能僅限管理員使用',
-        error: {}
-      });
+// 依角色旗標放行（roles 表），自訂角色也能正確運作。
+// 內建 admin 角色永遠放行，避免角色設定被改壞時整個系統沒有人能再進入管理頁面。
+function requireRoleFlag(flag, message) {
+  return (req, res, next) => {
+    if (!req.user) {
+      if (req.accepts('html')) {
+        return res.status(403).render('error', { title: '權限不足', message, error: {} });
+      }
+      return res.status(401).json({ error: '未登入' });
     }
-    return res.status(401).json({ error: '未登入' });
-  }
 
-  const role = getRolePermissions(req.user.role);
-  if (role && role.can_manage_users) return next();
+    const role = getRolePermissions(req.user.role);
+    if (role && role[flag]) return next();
+    if (req.user.role === ROLES.ADMIN) return next();
 
-  // Fallback: built-in admin role always has access
-  if (req.user.role === ROLES.ADMIN) return next();
+    if (req.accepts('html')) {
+      return res.status(403).render('error', { title: '權限不足', message, error: {} });
+    }
+    return res.status(403).json({ error: '權限不足', message });
+  };
+}
 
-  if (req.accepts('html')) {
-    return res.status(403).render('error', {
-      title: '權限不足',
-      message: '此功能僅限管理員使用',
-      error: {}
-    });
-  }
-  return res.status(403).json({ error: '權限不足', message: '此功能僅限管理員使用' });
-};
+// 使用者管理、修改記錄、登入紀錄、系統健康、廣播通知、客戶匯入匯出等（can_manage_users）
+const requireAdmin = requireRoleFlag('can_manage_users', '此功能僅限管理員使用');
+// 角色管理（can_manage_roles）
+const requireManageRoles = requireRoleFlag('can_manage_roles', '此功能僅限具備「角色管理」權限的角色使用');
+// 系統設定與各種選項／類型／狀態／簽核關卡管理（can_manage_settings）
+const requireManageSettings = requireRoleFlag('can_manage_settings', '此功能僅限具備「系統設定」權限的角色使用');
+// 備份還原（can_backup_restore）
+const requireBackupRestore = requireRoleFlag('can_backup_restore', '此功能僅限具備「備份還原」權限的角色使用');
 
 // 密碼雜湊的指紋（存在 session 裡）：使用者改密碼或管理員重設密碼後指紋會變，
 // 其他已登入的 session 下一次請求就會失效，不會讓舊登入狀態在改密碼後繼續有效。
@@ -266,6 +267,11 @@ const setUserPermissions = (req, res, next) => {
     req.user.canAccessCustomerApprovals = req.user.canApproveCustomer || isApprovalChainRole('customer_creation', req.user.role);
     req.user.canAccessDeletionApprovals = req.user.canDelete || isApprovalChainRole('deletion', req.user.role);
     req.user.isAdmin = role ? !!role.can_manage_users : req.user.role === ROLES.ADMIN;
+    // 內建 admin 角色永遠具備（與 requireRoleFlag 一致）
+    const isBuiltInAdmin = req.user.role === ROLES.ADMIN;
+    req.user.canManageRoles = isBuiltInAdmin || !!(role && role.can_manage_roles);
+    req.user.canManageSettings = isBuiltInAdmin || !!(role && role.can_manage_settings);
+    req.user.canBackupRestore = isBuiltInAdmin || !!(role && role.can_backup_restore);
     req.user.isReadOnly = !req.user.canEdit;
     req.user.isSalesperson = req.user.role === ROLES.SALESPERSON;
     req.user.isBoss = req.user.role === ROLES.BOSS;
@@ -288,6 +294,9 @@ const setUserPermissions = (req, res, next) => {
     res.locals.canAccessCustomerApprovals = req.user.canAccessCustomerApprovals;
     res.locals.canAccessDeletionApprovals = req.user.canAccessDeletionApprovals;
     res.locals.isAdmin = req.user.isAdmin;
+    res.locals.canManageRoles = req.user.canManageRoles;
+    res.locals.canManageSettings = req.user.canManageSettings;
+    res.locals.canBackupRestore = req.user.canBackupRestore;
     res.locals.isReadOnly = req.user.isReadOnly;
 
     if (req.user.canAccessDeletionApprovals) {
@@ -341,5 +350,9 @@ module.exports = {
   requireCustomerApprovalPermission,
   requireImportExport,
   requireAdmin,
+  requireManageRoles,
+  requireManageSettings,
+  requireBackupRestore,
+  requireRoleFlag,
   setUserPermissions
 };

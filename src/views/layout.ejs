@@ -97,7 +97,7 @@
           </li>
           <% } %>
 
-          <% if (typeof canEdit !== 'undefined' && canEdit) { %>
+          <% if ((typeof canEdit !== 'undefined' && canEdit) || locals.isAdmin || locals.canManageSettings || locals.canManageRoles || locals.canBackupRestore) { %>
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle <%= navGroupActive(['/salespeople', '/users', '/project-templates', '/import-export', '/audit-logs', '/project-types', '/pipeline-amount-options', '/bonus-types', '/bonus-tiers', '/customer-levels', '/customer-statuses', '/activity-types', '/sales-modes', '/search-settings', '/pipeline-statuses', '/approval-chains', '/cost-types', '/cost-categories', '/payment-methods', '/payment-terms', '/order-statuses', '/report-groups', '/roles', '/settings', '/backup-restore', '/health', '/login-history', '/notifications/broadcast']) %>" href="#" id="systemGroupDropdown" role="button" data-bs-toggle="dropdown">
               <i class="bi bi-gear-wide-connected"></i> 系統設定
@@ -109,33 +109,33 @@
               <li><a class="dropdown-item <%= navActive('/audit-logs') %>" href="/audit-logs"><i class="bi bi-clock-history"></i> 修改記錄</a></li>
               <% } %>
               <li><a class="dropdown-item <%= navActive('/salespeople') %>" href="/salespeople"><i class="bi bi-people"></i> 業務管理</a></li>
-              <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+              <% if (locals.isAdmin || locals.canManageSettings || locals.canManageRoles || locals.canBackupRestore) { %>
               <li><hr class="dropdown-divider"></li>
-              <li><a class="dropdown-item <%= navActive('/project-types') %>" href="/project-types"><i class="bi bi-tags"></i> 類型管理</a></li>
-              <li><a class="dropdown-item <%= navActive('/pipeline-amount-options') %>" href="/pipeline-amount-options"><i class="bi bi-cash-stack"></i> 金額選項管理</a></li>
-              <li><a class="dropdown-item <%= navActive('/bonus-types') %>" href="/bonus-types"><i class="bi bi-award"></i> 獎金類型管理</a></li>
-              <li><a class="dropdown-item <%= navActive('/bonus-tiers') %>" href="/bonus-tiers"><i class="bi bi-percent"></i> 獎金級距設定</a></li>
-              <li><a class="dropdown-item <%= navActive('/activity-types') %>" href="/activity-types"><i class="bi bi-clock-history"></i> 活動類型管理</a></li>
-              <li><a class="dropdown-item <%= navActive('/sales-modes') %>" href="/sales-modes"><i class="bi bi-shop"></i> 銷售模式管理</a></li>
-              <li><a class="dropdown-item <%= navActive('/search-settings') %>" href="/search-settings"><i class="bi bi-search"></i> 搜尋範圍設定</a></li>
-              <li><a class="dropdown-item <%= navActive('/customer-levels') %>" href="/customer-levels"><i class="bi bi-star"></i> 客戶等級管理</a></li>
-              <li><a class="dropdown-item <%= navActive('/customer-statuses') %>" href="/customer-statuses"><i class="bi bi-signpost-split"></i> 客戶狀態管理</a></li>
-              <li><a class="dropdown-item <%= navActive('/pipeline-statuses') %>" href="/pipeline-statuses"><i class="bi bi-bullseye"></i> 銷售機會狀態管理</a></li>
-              <li><a class="dropdown-item <%= navActive('/approval-chains') %>" href="/approval-chains"><i class="bi bi-diagram-3"></i> 簽核關卡設定</a></li>
-              <li><a class="dropdown-item <%= navActive('/cost-types') %>" href="/cost-types"><i class="bi bi-tags"></i> 成本類型管理</a></li>
-              <li><a class="dropdown-item <%= navActive('/cost-categories') %>" href="/cost-categories"><i class="bi bi-tags"></i> 費用類別管理</a></li>
-              <li><a class="dropdown-item <%= navActive('/payment-methods') %>" href="/payment-methods"><i class="bi bi-credit-card"></i> 付款辦法管理</a></li>
-              <li><a class="dropdown-item <%= navActive('/payment-terms') %>" href="/payment-terms"><i class="bi bi-calendar-check"></i> 付款條件管理</a></li>
-              <li><a class="dropdown-item <%= navActive('/order-statuses') %>" href="/order-statuses"><i class="bi bi-clipboard-check"></i> 下單狀態管理</a></li>
-              <li><a class="dropdown-item <%= navActive('/report-groups') %>" href="/report-groups"><i class="bi bi-collection"></i> 報表群組</a></li>
-              <li><a class="dropdown-item <%= navActive('/users') %>" href="/users"><i class="bi bi-person-gear"></i> 使用者管理</a></li>
-              <li><a class="dropdown-item <%= navActive('/roles') %>" href="/roles"><i class="bi bi-shield-check"></i> 角色管理</a></li>
-              <li><a class="dropdown-item <%= navActive('/settings') %>" href="/settings"><i class="bi bi-gear"></i> 系統設定</a></li>
-              <li><a class="dropdown-item <%= navActive('/backup-restore') %>" href="/backup-restore"><i class="bi bi-archive"></i> 備份還原</a></li>
-              <li><a class="dropdown-item <%= navActive('/health') %>" href="/health"><i class="bi bi-heart-pulse"></i> 系統健康</a></li>
-              <li><a class="dropdown-item <%= navActive('/login-history') %>" href="/login-history"><i class="bi bi-box-arrow-in-right"></i> 登入紀錄</a></li>
+              <% if (locals.canManageSettings) { %><li><a class="dropdown-item <%= navActive('/project-types') %>" href="/project-types"><i class="bi bi-tags"></i> 類型管理</a></li><% } %>
+              <% if (locals.canManageSettings) { %><li><a class="dropdown-item <%= navActive('/pipeline-amount-options') %>" href="/pipeline-amount-options"><i class="bi bi-cash-stack"></i> 金額選項管理</a></li><% } %>
+              <% if (locals.canManageSettings) { %><li><a class="dropdown-item <%= navActive('/bonus-types') %>" href="/bonus-types"><i class="bi bi-award"></i> 獎金類型管理</a></li><% } %>
+              <% if (locals.canManageSettings) { %><li><a class="dropdown-item <%= navActive('/bonus-tiers') %>" href="/bonus-tiers"><i class="bi bi-percent"></i> 獎金級距設定</a></li><% } %>
+              <% if (locals.canManageSettings) { %><li><a class="dropdown-item <%= navActive('/activity-types') %>" href="/activity-types"><i class="bi bi-clock-history"></i> 活動類型管理</a></li><% } %>
+              <% if (locals.canManageSettings) { %><li><a class="dropdown-item <%= navActive('/sales-modes') %>" href="/sales-modes"><i class="bi bi-shop"></i> 銷售模式管理</a></li><% } %>
+              <% if (locals.canManageSettings) { %><li><a class="dropdown-item <%= navActive('/search-settings') %>" href="/search-settings"><i class="bi bi-search"></i> 搜尋範圍設定</a></li><% } %>
+              <% if (locals.canManageSettings) { %><li><a class="dropdown-item <%= navActive('/customer-levels') %>" href="/customer-levels"><i class="bi bi-star"></i> 客戶等級管理</a></li><% } %>
+              <% if (locals.canManageSettings) { %><li><a class="dropdown-item <%= navActive('/customer-statuses') %>" href="/customer-statuses"><i class="bi bi-signpost-split"></i> 客戶狀態管理</a></li><% } %>
+              <% if (locals.canManageSettings) { %><li><a class="dropdown-item <%= navActive('/pipeline-statuses') %>" href="/pipeline-statuses"><i class="bi bi-bullseye"></i> 銷售機會狀態管理</a></li><% } %>
+              <% if (locals.canManageSettings) { %><li><a class="dropdown-item <%= navActive('/approval-chains') %>" href="/approval-chains"><i class="bi bi-diagram-3"></i> 簽核關卡設定</a></li><% } %>
+              <% if (locals.canManageSettings) { %><li><a class="dropdown-item <%= navActive('/cost-types') %>" href="/cost-types"><i class="bi bi-tags"></i> 成本類型管理</a></li><% } %>
+              <% if (locals.canManageSettings) { %><li><a class="dropdown-item <%= navActive('/cost-categories') %>" href="/cost-categories"><i class="bi bi-tags"></i> 費用類別管理</a></li><% } %>
+              <% if (locals.canManageSettings) { %><li><a class="dropdown-item <%= navActive('/payment-methods') %>" href="/payment-methods"><i class="bi bi-credit-card"></i> 付款辦法管理</a></li><% } %>
+              <% if (locals.canManageSettings) { %><li><a class="dropdown-item <%= navActive('/payment-terms') %>" href="/payment-terms"><i class="bi bi-calendar-check"></i> 付款條件管理</a></li><% } %>
+              <% if (locals.canManageSettings) { %><li><a class="dropdown-item <%= navActive('/order-statuses') %>" href="/order-statuses"><i class="bi bi-clipboard-check"></i> 下單狀態管理</a></li><% } %>
+              <% if (locals.canManageSettings) { %><li><a class="dropdown-item <%= navActive('/report-groups') %>" href="/report-groups"><i class="bi bi-collection"></i> 報表群組</a></li><% } %>
+              <% if (locals.isAdmin) { %><li><a class="dropdown-item <%= navActive('/users') %>" href="/users"><i class="bi bi-person-gear"></i> 使用者管理</a></li><% } %>
+              <% if (locals.canManageRoles) { %><li><a class="dropdown-item <%= navActive('/roles') %>" href="/roles"><i class="bi bi-shield-check"></i> 角色管理</a></li><% } %>
+              <% if (locals.canManageSettings) { %><li><a class="dropdown-item <%= navActive('/settings') %>" href="/settings"><i class="bi bi-gear"></i> 系統設定</a></li><% } %>
+              <% if (locals.canBackupRestore) { %><li><a class="dropdown-item <%= navActive('/backup-restore') %>" href="/backup-restore"><i class="bi bi-archive"></i> 備份還原</a></li><% } %>
+              <% if (locals.isAdmin) { %><li><a class="dropdown-item <%= navActive('/health') %>" href="/health"><i class="bi bi-heart-pulse"></i> 系統健康</a></li><% } %>
+              <% if (locals.isAdmin) { %><li><a class="dropdown-item <%= navActive('/login-history') %>" href="/login-history"><i class="bi bi-box-arrow-in-right"></i> 登入紀錄</a></li><% } %>
               <li><hr class="dropdown-divider"></li>
-              <li><a class="dropdown-item <%= navActive('/notifications/broadcast') %>" href="/notifications/broadcast"><i class="bi bi-megaphone"></i> 廣播通知</a></li>
+              <% if (locals.isAdmin) { %><li><a class="dropdown-item <%= navActive('/notifications/broadcast') %>" href="/notifications/broadcast"><i class="bi bi-megaphone"></i> 廣播通知</a></li><% } %>
               <% } %>
             </ul>
           </li>

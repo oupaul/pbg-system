@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireManageSettings } = require('../middleware/auth');
 
 // 取得所有專案類型（僅管理員）
-router.get('/', requireAuth, requireAdmin, (req, res) => {
+router.get('/', requireAuth, requireManageSettings, (req, res) => {
   try {
     const types = db.prepare(`
       SELECT * FROM project_types 
@@ -29,7 +29,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
 });
 
 // 新增專案類型（僅管理員）
-router.post('/create', requireAuth, requireAdmin, (req, res) => {
+router.post('/create', requireAuth, requireManageSettings, (req, res) => {
   const { type_name, badge_color, display_order, alert_margin_threshold, show_in_dashboard, show_separate_dashboard } = req.body;
   
   if (!type_name || !type_name.trim()) {
@@ -81,7 +81,7 @@ router.post('/create', requireAuth, requireAdmin, (req, res) => {
 
 // 快速新增專案類型（僅管理員；供新增專案表單「快速新增」使用，只取類型名稱，
 // 其餘顏色/排序/毛利警示等細節維持預設值，之後可到「類型管理」頁面補齊）
-router.post('/quick-add', requireAuth, requireAdmin, (req, res) => {
+router.post('/quick-add', requireAuth, requireManageSettings, (req, res) => {
   try {
     const typeName = (req.body.type_name || '').trim();
     if (!typeName) {
@@ -109,7 +109,7 @@ router.post('/quick-add', requireAuth, requireAdmin, (req, res) => {
 });
 
 // 更新專案類型（僅管理員）
-router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/update/:id', requireAuth, requireManageSettings, (req, res) => {
   const { id } = req.params;
   const { type_name, badge_color, display_order, is_active, alert_margin_threshold, show_in_dashboard, show_separate_dashboard } = req.body;
   
@@ -180,7 +180,7 @@ router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
 });
 
 // 刪除專案類型（僅管理員）
-router.post('/delete/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/delete/:id', requireAuth, requireManageSettings, (req, res) => {
   const { id } = req.params;
   
   // 檢查類型是否存在

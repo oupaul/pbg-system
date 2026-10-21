@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireManageSettings } = require('../middleware/auth');
 
 // 客戶詳情/列表表單用：啟用中的客戶往來狀態，依顯示順序排序
 function findActive() {
@@ -28,7 +28,7 @@ function countInUse(statusName) {
 }
 
 // 客戶狀態管理（僅管理員）
-router.get('/', requireAuth, requireAdmin, (req, res) => {
+router.get('/', requireAuth, requireManageSettings, (req, res) => {
   const statuses = db.prepare(`
     SELECT * FROM customer_statuses ORDER BY display_order ASC, status_name ASC
   `).all();
@@ -42,7 +42,7 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
 });
 
 // 新增客戶狀態（僅管理員）
-router.post('/create', requireAuth, requireAdmin, (req, res) => {
+router.post('/create', requireAuth, requireManageSettings, (req, res) => {
   const statusName = (req.body.status_name || '').trim();
   if (!statusName) {
     return res.redirect('/customer-statuses?error=' + encodeURIComponent('狀態名稱不能為空'));
@@ -71,7 +71,7 @@ router.post('/create', requireAuth, requireAdmin, (req, res) => {
 });
 
 // 更新客戶狀態（僅管理員）
-router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/update/:id', requireAuth, requireManageSettings, (req, res) => {
   const { id } = req.params;
   const existing = db.prepare('SELECT * FROM customer_statuses WHERE id = ?').get(id);
   if (!existing) {
@@ -119,7 +119,7 @@ router.post('/update/:id', requireAuth, requireAdmin, (req, res) => {
 });
 
 // 刪除客戶狀態（僅管理員）
-router.post('/delete/:id', requireAuth, requireAdmin, (req, res) => {
+router.post('/delete/:id', requireAuth, requireManageSettings, (req, res) => {
   const existing = db.prepare('SELECT * FROM customer_statuses WHERE id = ?').get(req.params.id);
   if (!existing) {
     return res.redirect('/customer-statuses?error=' + encodeURIComponent('狀態不存在'));

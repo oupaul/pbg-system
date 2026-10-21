@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const fs = require('fs');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireBackupRestore } = require('../middleware/auth');
 
 // 嘗試載入 BackupRestoreService，如果失敗則記錄錯誤
 let BackupRestoreService;
@@ -27,7 +27,7 @@ try {
 router.use(requireAuth);
 
 // 所有備份還原功能都需要管理員權限
-router.use(requireAdmin);
+router.use(requireBackupRestore);
 
 // 備份還原管理頁面
 router.get('/', (req, res, next) => {

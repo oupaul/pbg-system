@@ -64,6 +64,8 @@ Node.js + Express + SQLite（`better-sqlite3`）的發票／業績獎金／CRM �
 - `SIGTERM`/`SIGINT` 會先停止接收請求再關閉資料庫（最多等 10 秒）；`GET /healthz` 不需登入、不建 session，會實際讀一次資料庫
 - `src/models/db.js`：`busy_timeout=5000`、`synchronous=NORMAL`；資料庫忙碌/鎖定/IO 錯誤/損毀不再被 `get()`/`all()` 當成「查無資料」吞掉（schema 差異類錯誤仍維持原本的容錯）；錯誤日誌不記錄 SQL 參數
 - Excel 專案匯入與成本明細匯入包在單一交易裡，單一工作表上限 20000 列
+- 角色旗標已實際強制：`can_manage_users`（`requireAdmin`：使用者、修改記錄、登入紀錄、系統健康、廣播通知、客戶匯入匯出）、`can_manage_roles`（`requireManageRoles`：角色管理）、`can_manage_settings`（`requireManageSettings`：系統設定與各類選項／類型／狀態／簽核關卡管理、分頁圖示）、`can_backup_restore`（`requireBackupRestore`：備份還原），皆由 `requireRoleFlag` 產生，內建 `admin` 角色永遠放行（防止角色被改壞後無人能進管理頁）。沒有 `can_manage_users` 的角色管理者不能授予或移除「使用者管理」旗標（避免自行提權）。`migrate_role_admin_flags` 會把既有 `can_manage_users=1` 角色的其餘三個旗標補成 1，讓升級前後行為一致；新增管理頁面時請選對應的 middleware，不要一律用 `requireAdmin`
+- 上傳驗證（`src/utils/uploadValidation.js`）：附件採副檔名白名單且檔頭必須與副檔名相符（html/svg/js/exe/sh 與含巨集的 .xlsm/.docm 都不在白名單），Excel 匯入只接受結構正常的 .xlsx（含 zip bomb 檢查）；新增上傳端點請用 `guardedSingleUpload`，不要直接 `upload.single()`。路由順序注意：`/batch-*` 這類固定路徑必須定義在 `/:id` 之前
 - 附件線上預覽（專案頁）：以檔案內容（魔術位元組）判斷類型，不信任副檔名/MIME；SVG/HTML 一律不預覽。圖片/PDF/文字/CSV 由伺服器供應；Word（.docx）、Excel（.xlsx）由瀏覽器端解析（mammoth 為 `public/vendor/mammoth/` 內的 vendored 檔案，ExcelJS 由 `/vendor/exceljs/exceljs.min.js` 提供），伺服器只驗證 OOXML ZIP 結構（防 zip bomb：條目數／解壓總量上限）並以 `application/octet-stream` 回傳原始位元組（`/projects/:id/attachments/:attachmentId/office`）。Word 預覽經白名單消毒（`public/js/attachment-preview.js`），Excel 一律用 `textContent`；舊版 .doc/.xls 不支援預覽，只能下載
 - 自動測試：`npm test`（jest，`tests/`）目前涵蓋跳脫/重導/CSRF Origin 檢查/帳號鎖定/備份檔名白名單/NAS 設定驗證等純函式；尚無需要資料庫的整合測試
 

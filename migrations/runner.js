@@ -98,6 +98,7 @@ const MIGRATIONS = [
   'migrate_search_settings',
   'migrate_must_change_password',
   'migrate_system_logs_indexes',
+  'migrate_role_admin_flags',
 ];
 
 function run() {

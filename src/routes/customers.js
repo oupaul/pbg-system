@@ -19,6 +19,7 @@ const db = require('../models/db');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireCrmEditPermission, requireAdmin } = require('../middleware/auth');
 const NotificationService = require('../services/NotificationService');
+const { guardedSingleUpload, XLSX_EXTENSIONS } = require('../utils/uploadValidation');
 const ExcelExportService = require('../services/ExcelExportService');
 const ExcelImportService = require('../services/ExcelImportService');
 
@@ -26,6 +27,14 @@ const ExcelImportService = require('../services/ExcelImportService');
 const customerImportUpload = multer({
   dest: path.join(__dirname, '..', '..', 'uploads'),
   limits: { fileSize: 10 * 1024 * 1024 }
+});
+
+// 只接受內容確實是 .xlsx 的檔案（檢查副檔名、檔頭與 zip 結構）
+const customerXlsxGuard = guardedSingleUpload({
+  multer: customerImportUpload,
+  allowed: XLSX_EXTENSIONS,
+  xlsxStructure: true,
+  onReject: (req, res, message) => res.redirect('/customers?error=' + encodeURIComponent(message))
 });
 
 // 新增客戶/廠商是否需要送審：能核准他人申請的角色（roles.can_approve_customer）
@@ -257,7 +266,7 @@ router.get('/import/template', requireAdmin, async (req, res) => {
 });
 
 // 客戶/廠商批次匯入（管理者專用）：直接建立，不經過新增客戶的審核流程
-router.post('/import', requireAdmin, customerImportUpload.single('file'), async (req, res) => {
+router.post('/import', requireAdmin, ...customerXlsxGuard, async (req, res) => {
   let filePath = null;
   try {
     if (!req.file) {
@@ -315,7 +324,7 @@ router.get('/import-activities/template', requireAdmin, async (req, res) => {
 });
 
 // 活動紀錄批次匯入（管理者專用）
-router.post('/import-activities', requireAdmin, customerImportUpload.single('file'), async (req, res) => {
+router.post('/import-activities', requireAdmin, ...customerXlsxGuard, async (req, res) => {
   let filePath = null;
   try {
     if (!req.file) {
