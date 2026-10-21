@@ -178,6 +178,9 @@ ${typeof showNotification !== 'undefined' && showNotification && (typeof upcomin
   </div>
 </div>
 
+<!-- 本月概況 -->
+${typeof monthlySummary !== 'undefined' && monthlySummary ? include('partials/dashboard-monthly', { summary: monthlySummary, currencySymbol: typeof currencySymbol !== 'undefined' ? currencySymbol : '$' }) : ''}
+
 <!-- 調試資訊區塊（僅管理員可見） -->
 ${typeof showNotification !== 'undefined' && locals.user && locals.isAdmin ? `
 <div class="alert alert-info alert-dismissible fade show mb-3" role="alert">

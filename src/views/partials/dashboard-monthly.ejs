@@ -1,0 +1,78 @@
+<%
+  // 儀表板「本月概況」：本月 vs 上月的開票／收款／新簽專案、逾期未收、進行中銷售機會，以及近 12 個月趨勢。
+  // 所有動態值一律用自動跳脫的輸出標籤；趨勢圖 SVG 由伺服器端 dashboardChart 以純數字產生，才用不跳脫的輸出標籤。
+  const cs = (typeof currencySymbol !== 'undefined' && currencySymbol) ? currencySymbol : '$';
+  const money = (n) => cs + Math.round(Number(n) || 0).toLocaleString('en-US');
+  const deltaClass = (d) => d.dir === 'up' ? 'text-success' : d.dir === 'down' ? 'text-danger' : 'text-secondary';
+  const deltaIcon = (d) => d.dir === 'up' ? 'bi-arrow-up-short' : d.dir === 'down' ? 'bi-arrow-down-short' : 'bi-dash';
+%>
+<div class="dashboard-monthly mb-4">
+  <div class="d-flex justify-content-between align-items-baseline mb-2">
+    <h2 class="h6 mb-0 text-secondary">本月概況（<%= summary.currentYm %>）</h2>
+    <small class="text-secondary">不受下方年度篩選影響</small>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-lg">
+      <div class="card h-100 dm-card"><div class="card-body">
+        <div class="dm-label">本月開票</div>
+        <div class="dm-value"><%= money(summary.invoiced.current) %></div>
+        <div class="dm-sub <%= deltaClass(summary.deltas.invoiced) %>"><i class="bi <%= deltaIcon(summary.deltas.invoiced) %>"></i><%= summary.deltas.invoiced.text %></div>
+      </div></div>
+    </div>
+    <div class="col-6 col-lg">
+      <div class="card h-100 dm-card"><div class="card-body">
+        <div class="dm-label">本月收款</div>
+        <div class="dm-value"><%= money(summary.received.current) %></div>
+        <div class="dm-sub <%= deltaClass(summary.deltas.received) %>"><i class="bi <%= deltaIcon(summary.deltas.received) %>"></i><%= summary.deltas.received.text %></div>
+      </div></div>
+    </div>
+    <div class="col-6 col-lg">
+      <div class="card h-100 dm-card"><div class="card-body">
+        <div class="dm-label">本月新簽專案</div>
+        <div class="dm-value"><%= summary.signed.current.count %> <span class="dm-unit">件</span></div>
+        <div class="dm-sub text-secondary">含稅 <%= money(summary.signed.current.amount) %></div>
+      </div></div>
+    </div>
+    <% if (summary.overdue) { %>
+    <div class="col-6 col-lg">
+      <div class="card h-100 dm-card"><div class="card-body">
+        <div class="dm-label">逾期未收</div>
+        <div class="dm-value <%= summary.overdue.amount > 0 ? 'text-danger' : '' %>"><%= money(summary.overdue.amount) %></div>
+        <div class="dm-sub text-secondary"><%= summary.overdue.count %> 張發票已過預計收款日</div>
+      </div></div>
+    </div>
+    <% } %>
+    <% if (summary.pipelines) { %>
+    <div class="col-6 col-lg">
+      <div class="card h-100 dm-card"><div class="card-body">
+        <div class="dm-label">進行中銷售機會</div>
+        <div class="dm-value"><%= summary.pipelines.count %> <span class="dm-unit">件</span></div>
+        <div class="dm-sub text-secondary">加權 <%= money(summary.pipelines.weighted) %>・本月預計成交 <%= summary.pipelines.closing_this_month %> 件</div>
+        <a href="/pipelines" class="stretched-link" aria-label="前往銷售機會"></a>
+      </div></div>
+    </div>
+    <% } %>
+  </div>
+
+  <div class="card dm-card">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="dm-label mb-0">近 12 個月開票與收款</div>
+        <div class="small text-secondary">
+          <span class="dm-legend" style="background:<%= summary.colors.invoiced %>"></span>開票
+          <span class="dm-legend ms-3" style="background:<%= summary.colors.received %>"></span>收款
+        </div>
+      </div>
+      <%- summary.trendSvg %>
+    </div>
+  </div>
+</div>
+<style>
+  .dashboard-monthly .dm-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; box-shadow: none; }
+  .dashboard-monthly .dm-label { font-size: .8rem; color: #64748B; margin-bottom: .25rem; }
+  .dashboard-monthly .dm-value { font-size: 1.5rem; font-weight: 600; color: #1E293B; line-height: 1.2; word-break: break-all; }
+  .dashboard-monthly .dm-unit { font-size: .9rem; font-weight: 400; color: #64748B; }
+  .dashboard-monthly .dm-sub { font-size: .8rem; margin-top: .25rem; }
+  .dashboard-monthly .dm-legend { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+</style>

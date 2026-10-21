@@ -7,6 +7,8 @@ const ActivityReminderService = require('../services/ActivityReminderService');
 const Role = require('../models/Role');
 const cache = require('../services/CacheService');
 const { getVisibleSalespersonIds } = require('../utils/projectScope');
+const DashboardSummaryService = require('../services/DashboardSummaryService');
+const { formatDelta, renderTrendSvg, INVOICED_COLOR, RECEIVED_COLOR } = require('../utils/dashboardChart');
 
 // 取得使用者角色的儀表板檢視模式
 function getDashboardViewMode(user) {
@@ -507,9 +509,36 @@ router.get('/', (req, res) => {
     }
   }
   
+  // 本月概況（本月 vs 上月、近 12 個月趨勢、進行中銷售機會）；範圍規則與上方各區塊一致
+  let monthlySummary = null;
+  try {
+    let pipelineScope; // undefined = 不顯示銷售機會卡片
+    if (req.user && (req.user.canEditCrm || req.user.canEdit)) {
+      if (visibleSalespersonIds === null) pipelineScope = {};
+      else if (req.user.project_view_scope === 'own') pipelineScope = { ownerUserId: req.user.id, salespersonId: req.user.salesperson_id || null };
+    }
+    monthlySummary = DashboardSummaryService.getMonthlySummary({ salespersonId, excludeTypeNames, pipelineScope });
+    monthlySummary.deltas = {
+      invoiced: formatDelta(monthlySummary.invoiced.current, monthlySummary.invoiced.previous),
+      received: formatDelta(monthlySummary.received.current, monthlySummary.received.previous)
+    };
+    // 收款提醒只對「具編輯權限或 own 範圍」的使用者計算過，其他角色不顯示逾期卡片（否則會誤顯示 0）
+    const reminderComputed = !!(req.user && (req.user.canEdit || req.user.project_view_scope === 'own'));
+    monthlySummary.overdue = reminderComputed && paymentReminder && paymentReminder.overdue
+      ? { count: paymentReminder.overdue.length, amount: paymentReminder.overdue.reduce((sum, item) => sum + (item.unpaid || 0), 0) }
+      : null;
+    monthlySummary.colors = { invoiced: INVOICED_COLOR, received: RECEIVED_COLOR };
+    monthlySummary.trendSvg = renderTrendSvg(monthlySummary.trend, monthlySummary.currentYm);
+  } catch (err) {
+    // 概況只是輔助資訊，算失敗不應讓整個儀表板打不開
+    console.error('[儀表板] 本月概況計算失敗:', err.message);
+    monthlySummary = null;
+  }
+
   res.render('index', {
     title: '首頁',
     showWelcome: false,
+    monthlySummary,
     years,
     selectedYear: selectedYear ? selectedYear : 'all',
     stats,
