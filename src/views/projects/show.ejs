@@ -374,6 +374,9 @@ function resetExpectedInvoice() {
     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-bonuses" type="button" role="tab"><i class="bi bi-award"></i> 獎金明細</button>
   </li>
   ` : ''}
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-timeline" type="button" role="tab"><i class="bi bi-clock-history"></i> 時間軸</button>
+  </li>
 </ul>
 
 <div class="tab-content">
@@ -734,11 +737,65 @@ ${locals.canEdit ? `
 </div>
 ` : ''}
 
+<!-- 專案時間軸：第一次切到此分頁時才載入 -->
+<div class="tab-content">
+<div class="tab-pane fade" id="pane-timeline" role="tabpanel">
+  <div class="card">
+    <div class="card-header"><i class="bi bi-clock-history"></i> 專案時間軸</div>
+    <div class="card-body" id="timelineRoot" data-url="/projects/${project.id}/timeline">
+      <div class="text-muted">載入中…</div>
+    </div>
+  </div>
+</div>
+</div>
+
 <style>
+  .pbg-timeline { list-style: none; margin: 0 0 0 14px; padding: 0; border-left: 2px solid #E2E8F0; }
+  .pbg-timeline > li { position: relative; padding: 0 0 18px 28px; }
+  .pbg-timeline .tl-dot { position: absolute; left: -15px; top: 0; width: 28px; height: 28px; border-radius: 50%; background: #fff; border: 2px solid #E2E8F0; display: flex; align-items: center; justify-content: center; color: #64748B; font-size: .85rem; }
+  .pbg-timeline .tl-dot.tone-remove { color: #dc3545; border-color: #f1c0c5; }
+  .pbg-timeline .tl-title { font-weight: 600; color: #1E293B; }
+  .pbg-timeline .tl-meta { font-size: .8rem; color: #64748B; }
+  .pbg-timeline .tl-details { margin: 4px 0 0; padding: 0; list-style: none; font-size: .85rem; color: #475569; }
+  .pbg-timeline .tl-from { text-decoration: line-through; color: #94A3B8; }
+  .timeline-filters .btn { --bs-btn-padding-y: .15rem; --bs-btn-font-size: .8rem; }
   table.js-sortable thead th[data-sortkey] { cursor: pointer; user-select: none; white-space: nowrap; }
   table.js-sortable thead th[data-sortkey]:hover { background-color: rgba(0,0,0,.04); }
   table.js-sortable thead th .sort-ind { font-size: .7em; opacity: .55; margin-left: 3px; }
 </style>
+<script>
+// 專案時間軸：第一次顯示分頁時載入；篩選與「載入更多」都用同一支端點（回傳 HTML 片段，內容已由伺服器跳脫）
+(function () {
+  var root = document.getElementById('timelineRoot');
+  if (!root) return;
+  var base = root.getAttribute('data-url');
+  var loaded = false;
+  function load(kind) {
+    root.innerHTML = '<div class="text-muted">載入中…</div>';
+    fetch(base + (kind ? '?kind=' + encodeURIComponent(kind) : ''), { credentials: 'same-origin' })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (html) { root.innerHTML = html; })
+      .catch(function () { root.innerHTML = '<div class="text-danger">時間軸載入失敗，請重新整理頁面再試。</div>'; });
+  }
+  root.addEventListener('click', function (e) {
+    var chip = e.target.closest('[data-timeline-kind]');
+    if (chip) { load(chip.getAttribute('data-timeline-kind')); return; }
+    var more = e.target.closest('[data-timeline-cursor]');
+    if (more) {
+      var holder = more.closest('.timeline-more');
+      var kind = more.getAttribute('data-timeline-current-kind') || '';
+      more.disabled = true;
+      var url = base + '?cursor=' + encodeURIComponent(more.getAttribute('data-timeline-cursor')) + (kind ? '&kind=' + encodeURIComponent(kind) : '');
+      fetch(url, { credentials: 'same-origin' })
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+        .then(function (html) { var body = root.querySelector('#timelineBody'); holder.remove(); body.insertAdjacentHTML('beforeend', html); })
+        .catch(function () { more.disabled = false; more.textContent = '載入失敗，點此重試'; });
+    }
+  });
+  var tabBtn = document.querySelector('[data-bs-target="#pane-timeline"]');
+  if (tabBtn) tabBtn.addEventListener('shown.bs.tab', function () { if (!loaded) { loaded = true; load(''); } });
+})();
+</script>
 <script>
 (function () {
   var collator = new Intl.Collator('zh-Hant');

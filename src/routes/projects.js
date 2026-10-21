@@ -723,6 +723,19 @@ router.post('/:id/attachments', requireEditPermission, requireNumericParam('id')
 });
 
 // 專案詳情
+// 專案時間軸（HTML 片段，供專案頁的「時間軸」分頁載入）：依專案檢視範圍檢查，獎金事件只有可編輯的角色看得到
+const ProjectTimeline = require('../models/ProjectTimeline');
+const { KINDS: TIMELINE_KINDS, KIND_LABELS: TIMELINE_KIND_LABELS } = require('../utils/projectTimeline');
+router.get('/:id/timeline', requireNumericParam('id'), projectScope, (req, res) => {
+  const kind = TIMELINE_KINDS.includes(req.query.kind) ? req.query.kind : null;
+  const cursor = typeof req.query.cursor === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\|(l\d{10}|s[a-z_]+\d{10})$/.test(req.query.cursor) ? req.query.cursor : null;
+  const result = ProjectTimeline.list(parseInt(req.params.id, 10), {
+    user: req.user, kind, cursor, symbol: res.locals.currencySymbol || '$'
+  });
+  res.set('Cache-Control', 'private, no-store');
+  res.render('projects/timeline', { ...result, kind, append: !!cursor, kindLabels: TIMELINE_KIND_LABELS });
+});
+
 router.get('/:id', (req, res) => {
   // 傳遞用戶資訊以進行權限檢查
   const project = Project.findById(req.params.id, req.user);

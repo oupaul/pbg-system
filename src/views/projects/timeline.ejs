@@ -1,0 +1,42 @@
+<%
+  // 專案時間軸的 HTML 片段（不含 layout）：初次載入含篩選按鈕；「載入更多」只回傳事件清單與下一個按鈕。
+  // 所有動態文字一律用自動跳脫的輸出標籤。
+  const kindParam = kind || '';
+%>
+<% if (!append) { %>
+<div class="timeline-filters mb-3 d-flex flex-wrap gap-1">
+  <button type="button" class="btn btn-sm <%= kindParam === '' ? 'btn-dark' : 'btn-outline-secondary' %>" data-timeline-kind="">全部</button>
+  <% kinds.forEach(function (k) { %>
+    <button type="button" class="btn btn-sm <%= kindParam === k ? 'btn-dark' : 'btn-outline-secondary' %>" data-timeline-kind="<%= k %>"><%= kindLabels[k] %></button>
+  <% }) %>
+</div>
+<div id="timelineBody">
+<% } %>
+<% if (events.length === 0 && !append) { %>
+  <div class="text-muted py-3"><i class="bi bi-info-circle"></i> 這個專案目前沒有可顯示的歷史紀錄。</div>
+<% } else { %>
+  <ul class="pbg-timeline">
+    <% events.forEach(function (e) { %>
+      <li>
+        <span class="tl-dot tone-<%= e.tone %>"><i class="bi <%= e.icon %>"></i></span>
+        <div class="tl-title"><%= e.title %></div>
+        <div class="tl-meta"><%= e.ts %>　<%= e.actor ? e.actor : (e.synthetic ? '（系統記錄功能啟用前的資料）' : '系統') %></div>
+        <% if (e.details && e.details.length) { %>
+          <ul class="tl-details">
+            <% e.details.forEach(function (d) { %>
+              <li><%= d.label %>：<% if (d.from !== null) { %><span class="tl-from"><%= d.from %></span> → <% } %><span><%= d.to %></span></li>
+            <% }) %>
+          </ul>
+        <% } %>
+      </li>
+    <% }) %>
+  </ul>
+<% } %>
+<% if (nextCursor) { %>
+  <div class="timeline-more text-center">
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-timeline-cursor="<%= nextCursor %>" data-timeline-current-kind="<%= kindParam %>">載入更多</button>
+  </div>
+<% } %>
+<% if (!append) { %>
+</div>
+<% } %>
