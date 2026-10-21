@@ -385,7 +385,9 @@ function resetExpectedInvoice() {
 <div class="card mb-4 overflow-visible">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
     <span><i class="bi bi-receipt"></i> 發票明細</span>
-    <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      ${locals.canEdit ? '<form id="invBatchForm" method="POST" class="d-none"><input type="hidden" name="project_id" value="' + project.id + '"></form>' : ''}
+      ${locals.canEdit ? '<button type="submit" form="invBatchForm" formaction="/invoices/batch-restore" class="btn btn-sm btn-outline-success d-none" id="invBatchRestore" data-batch-label="還原"><i class="bi bi-arrow-counterclockwise"></i> 還原選取 (<span>0</span>)</button><button type="submit" form="invBatchForm" formaction="/invoices/batch-delete" class="btn btn-sm btn-outline-danger d-none" id="invBatchDelete" data-batch-confirm="確定刪除選取的發票？（刪除後可於「顯示已刪除」還原）"><i class="bi bi-trash"></i> 刪除選取 (<span>0</span>)</button>' : ''}
       ${typeof showDeleted !== 'undefined' ? (showDeleted ? '<a href="/projects/' + project.id + '" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye-slash"></i> 隱藏已刪除</a>' : '<a href="/projects/' + project.id + '?show_deleted=1" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye"></i> 顯示已刪除</a>') : ''}
       ${locals.canEdit ? '<button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#invoiceModal"><i class="bi bi-plus-lg"></i> 新增發票</button>' : ''}
     </div>
@@ -395,6 +397,7 @@ function resetExpectedInvoice() {
       <table class="table table-hover mb-0 js-sortable">
         <thead class="table-light">
           <tr>
+            ${locals.canEdit ? '<th style="width:36px"><input type="checkbox" class="form-check-input" data-batch-all="inv" title="全選／取消全選"></th>' : ''}
             <th data-sortkey="text">狀態</th>
             <th data-sortkey="date">發票日期</th>
             <th data-sortkey="text">發票號碼</th>
@@ -418,6 +421,7 @@ function resetExpectedInvoice() {
               : (locals.canEdit && isValid ? '<button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editInvoiceModal' + inv.id + '"><i class="bi bi-pencil"></i></button>' : '') + (locals.canEdit && isValid ? '<div class="btn-group dropdown" data-bs-boundary="viewport" data-bs-popper-config="{\"strategy\":\"fixed\"}"><button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">更多</button><ul class="dropdown-menu dropdown-menu-invoice dropdown-menu-end"><li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#voidModal' + inv.id + '"><i class="bi bi-x-circle me-1"></i>作廢</a></li><li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#voidReissueModal' + inv.id + '"><i class="bi bi-arrow-repeat me-1"></i>作廢重開</a></li><li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#partialAllowanceModal' + inv.id + '"><i class="bi bi-percent me-1"></i>部分折讓</a></li><li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#allowanceModal' + inv.id + '"><i class="bi bi-dash-circle me-1"></i>整筆折讓</a></li></ul></div>' : '') + (locals.canEdit ? '<form action="/invoices/' + inv.id + '/delete" method="POST" style="display:inline" onsubmit="return confirm(\'確定刪除？\')"><button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>' : '');
             return `
             <tr class="${rowClass}" id="inv${inv.id}"${isDeleted ? ' data-deleted="1"' : ''}>
+              ${locals.canEdit ? '<td><input type="checkbox" class="form-check-input" data-batch-row="inv" form="invBatchForm" name="ids" value="' + inv.id + '" data-deleted="' + (isDeleted ? 1 : 0) + '"></td>' : ''}
               <td>${statusBadge}${deletedBadge}${replacementLink}</td>
               <td>${inv.invoice_date || '-'}</td>
               <td><code>${h(inv.invoice_number || '-')}</code></td>
@@ -438,7 +442,7 @@ function resetExpectedInvoice() {
               })()}</td>
               <td class="text-end">${actionCell}</td>
             </tr>
-          `}).join('') : '<tr><td colspan="7" class="text-center text-muted py-3">尚無發票</td></tr>'}
+          `}).join('') : '<tr><td colspan="' + (locals.canEdit ? 8 : 7) + '" class="text-center text-muted py-3">尚無發票</td></tr>'}
         </tbody>
       </table>
     </div>
@@ -589,13 +593,18 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
     <span><i class="bi bi-cash"></i> 收款明細</span>
-    ${locals.canEdit ? '<button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#paymentModal"><i class="bi bi-plus-lg"></i> 新增收款</button>' : ''}
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      ${locals.canEdit ? '<form id="payBatchForm" method="POST" class="d-none"><input type="hidden" name="project_id" value="' + project.id + '"></form>' : ''}
+      ${locals.canEdit ? '<button type="submit" form="payBatchForm" formaction="/payments/batch-restore" class="btn btn-sm btn-outline-success d-none" id="payBatchRestore" data-batch-label="還原"><i class="bi bi-arrow-counterclockwise"></i> 還原選取 (<span>0</span>)</button><button type="submit" form="payBatchForm" formaction="/payments/batch-delete" class="btn btn-sm btn-outline-danger d-none" id="payBatchDelete" data-batch-confirm="確定刪除選取的收款？（刪除後可於「顯示已刪除」還原）"><i class="bi bi-trash"></i> 刪除選取 (<span>0</span>)</button>' : ''}
+      ${locals.canEdit ? '<button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#paymentModal"><i class="bi bi-plus-lg"></i> 新增收款</button>' : ''}
+    </div>
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
       <table class="table table-hover mb-0 js-sortable">
         <thead class="table-light">
           <tr>
+            ${locals.canEdit ? '<th style="width:36px"><input type="checkbox" class="form-check-input" data-batch-all="pay" title="全選／取消全選"></th>' : ''}
             <th data-sortkey="text">狀態</th>
             <th data-sortkey="date">收款日期</th>
             <th data-sortkey="text">對應發票</th>
@@ -613,6 +622,7 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
               : (locals.canEdit ? '<button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editPaymentModal' + pay.id + '"><i class="bi bi-pencil"></i></button>' : '') + (locals.canEdit ? '<form action="/payments/' + pay.id + '/delete" method="POST" style="display:inline" onsubmit="return confirm(\'確定刪除？\')"><button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>' : '');
             return `
             <tr class="${isDeleted ? 'table-secondary' : ''}"${isDeleted ? ' data-deleted="1"' : ''}>
+              ${locals.canEdit ? '<td><input type="checkbox" class="form-check-input" data-batch-row="pay" form="payBatchForm" name="ids" value="' + pay.id + '" data-deleted="' + (isDeleted ? 1 : 0) + '"></td>' : ''}
               <td>${isDeleted ? '<span class="badge bg-secondary">已刪除</span>' : '-'}</td>
               <td>${pay.payment_date || '-'}</td>
               <td><code>${h(pay.invoice_number || '-')}</code></td>
@@ -621,7 +631,7 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
               <td><small>${h(pay.notes || '')}</small></td>
               <td class="text-end">${actionCell}</td>
             </tr>
-          `}).join('') : '<tr><td colspan="7" class="text-center text-muted py-3">尚無收款記錄</td></tr>'}
+          `}).join('') : '<tr><td colspan="' + (locals.canEdit ? 8 : 7) + '" class="text-center text-muted py-3">尚無收款記錄</td></tr>'}
         </tbody>
       </table>
     </div>
@@ -794,6 +804,44 @@ ${locals.canEdit ? `
   });
   var tabBtn = document.querySelector('[data-bs-target="#pane-timeline"]');
   if (tabBtn) tabBtn.addEventListener('shown.bs.tab', function () { if (!loaded) { loaded = true; load(''); } });
+})();
+</script>
+<script>
+// 發票／收款的批次勾選：勾選後顯示「刪除選取／還原選取」，數量依勾選內容更新；刪除前要確認
+(function () {
+  ['inv', 'pay'].forEach(function (key) {
+    var rows = Array.prototype.slice.call(document.querySelectorAll('[data-batch-row="' + key + '"]'));
+    var all = document.querySelector('[data-batch-all="' + key + '"]');
+    var delBtn = document.getElementById(key + 'BatchDelete');
+    var resBtn = document.getElementById(key + 'BatchRestore');
+    if (!rows.length || !all || !delBtn || !resBtn) return;
+    function refresh() {
+      var checked = rows.filter(function (c) { return c.checked; });
+      var nDel = checked.filter(function (c) { return c.getAttribute('data-deleted') !== '1'; }).length;
+      var nRes = checked.length - nDel;
+      delBtn.querySelector('span').textContent = nDel;
+      resBtn.querySelector('span').textContent = nRes;
+      delBtn.classList.toggle('d-none', nDel === 0);
+      resBtn.classList.toggle('d-none', nRes === 0);
+      all.checked = checked.length > 0 && checked.length === rows.length;
+      all.indeterminate = checked.length > 0 && checked.length < rows.length;
+    }
+    rows.forEach(function (c) { c.addEventListener('change', refresh); });
+    all.addEventListener('change', function () { rows.forEach(function (c) { c.checked = all.checked; }); refresh(); });
+    delBtn.addEventListener('click', function (e) {
+      if (!confirm(delBtn.getAttribute('data-batch-confirm'))) e.preventDefault();
+    });
+    refresh();
+  });
+  // 批次操作完成後導回原來的分頁（網址的 #pane-xxx）
+  // Bootstrap 在頁面後段才載入，等整頁載入完成再切換
+  window.addEventListener('load', function () {
+    var h = location.hash;
+    if (h && h.indexOf('#pane-') === 0) {
+      var tabBtn = document.querySelector('button[data-bs-toggle="tab"][data-bs-target="' + h + '"]');
+      if (tabBtn && window.bootstrap) window.bootstrap.Tab.getOrCreateInstance(tabBtn).show();
+    }
+  });
 })();
 </script>
 <script>

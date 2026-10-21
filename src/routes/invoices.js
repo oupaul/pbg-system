@@ -7,6 +7,7 @@ const { getUserInfo } = require('../utils/authHelper');
 const cache = require('../services/CacheService');
 const { requireEditPermission } = require('../middleware/auth');
 const { requireProjectScopeFromBody, requireProjectScopeFromRecord } = require('../utils/projectScope');
+const { runBatch } = require('../utils/batchOps');
 
 // 操作的專案必須在使用者的專案範圍內
 const invoiceScope = requireProjectScopeFromRecord(id => Invoice.findById(id));
@@ -29,6 +30,23 @@ router.post('/', requireEditPermission, requireProjectScopeFromBody, (req, res) 
     console.error(err);
     res.redirect(`/projects/${req.body.project_id}?error=` + encodeURIComponent(err.message));
   }
+});
+
+// 批次刪除／還原發票（同一專案、全有或全無；須定義在 /:id 之前）
+router.post('/batch-delete', requireEditPermission, (req, res) => {
+  const userInfo = getUserInfo(req);
+  runBatch({
+    req, res, find: (id) => Invoice.findById(id), unit: '張發票', verb: '刪除', tab: 'pane-invoices',
+    apply: (inv) => { if (inv.deleted_at) return false; return Invoice.delete(inv.id, userInfo); }
+  });
+});
+router.post('/batch-restore', requireEditPermission, (req, res) => {
+  const userInfo = getUserInfo(req);
+  runBatch({
+    req, res, find: (id) => Invoice.findById(id), unit: '張發票', verb: '還原', tab: 'pane-invoices', showDeleted: true,
+    // 還原會重新佔用發票號碼，號碼已被其他有效發票使用時 Invoice.restore 會丟錯，整批復原
+    apply: (inv) => { if (!inv.deleted_at) return false; return Invoice.restore(inv.id, userInfo); }
+  });
 });
 
 // 更新發票

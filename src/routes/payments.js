@@ -6,6 +6,7 @@ const { getUserInfo } = require('../utils/authHelper');
 const cache = require('../services/CacheService');
 const { requireEditPermission } = require('../middleware/auth');
 const { requireProjectScopeFromBody, requireProjectScopeFromRecord } = require('../utils/projectScope');
+const { runBatch } = require('../utils/batchOps');
 
 // 寫入收款需要編輯權限，且操作的專案必須在使用者的專案範圍內
 const paymentScope = requireProjectScopeFromRecord(id => Payment.findById(id));
@@ -30,6 +31,22 @@ router.post('/', requireEditPermission, requireProjectScopeFromBody, (req, res) 
     console.error(err);
     res.redirect(`/projects/${req.body.project_id}?error=` + encodeURIComponent(err.message));
   }
+});
+
+// 批次刪除／還原收款（同一專案、全有或全無；須定義在 /:id 之前）
+router.post('/batch-delete', requireEditPermission, (req, res) => {
+  const userInfo = getUserInfo(req);
+  runBatch({
+    req, res, find: (id) => Payment.findById(id), unit: '筆收款', verb: '刪除', tab: 'pane-payments',
+    apply: (pay) => { if (pay.deleted_at) return false; return Payment.delete(pay.id, userInfo); }
+  });
+});
+router.post('/batch-restore', requireEditPermission, (req, res) => {
+  const userInfo = getUserInfo(req);
+  runBatch({
+    req, res, find: (id) => Payment.findById(id), unit: '筆收款', verb: '還原', tab: 'pane-payments', showDeleted: true,
+    apply: (pay) => { if (!pay.deleted_at) return false; return Payment.restore(pay.id, userInfo); }
+  });
 });
 
 // 更新收款
