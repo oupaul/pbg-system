@@ -46,11 +46,12 @@ const ReferralReward = {
       SELECT r.*,
         referred.company_name AS referred_customer_name,
         p.project_code, p.project_name, p.salesperson_id AS project_salesperson_id,
-        u.name AS recipient_user_name
+        u.name AS recipient_user_name, cu.name AS created_by_name
       FROM referral_rewards r
       LEFT JOIN customers referred ON referred.id = r.referred_customer_id
       LEFT JOIN projects p ON p.id = r.project_id
       LEFT JOIN users u ON u.id = r.recipient_user_id
+      LEFT JOIN users cu ON cu.id = r.created_by_user_id
       WHERE r.referring_customer_id = ?${scope.sql}
       ORDER BY r.created_at DESC
     `).all(customerId, ...scope.params);
@@ -72,12 +73,13 @@ const ReferralReward = {
         referring.company_name AS referring_customer_name,
         referred.company_name AS referred_customer_name,
         p.project_code, p.project_name, p.salesperson_id AS project_salesperson_id,
-        u.name AS recipient_user_name
+        u.name AS recipient_user_name, cu.name AS created_by_name
       FROM referral_rewards r
       JOIN customers referring ON referring.id = r.referring_customer_id
       LEFT JOIN customers referred ON referred.id = r.referred_customer_id
       LEFT JOIN projects p ON p.id = r.project_id
       LEFT JOIN users u ON u.id = r.recipient_user_id
+      LEFT JOIN users cu ON cu.id = r.created_by_user_id
       WHERE 1=1${statusCond}${scope.sql}
       ORDER BY r.created_at DESC
     `).all(...statusParams, ...scope.params);
@@ -106,13 +108,15 @@ const ReferralReward = {
     const status = data.status || '待發放';
     const forfeitureReason = data.forfeiture_reason || null;
     const notes = data.notes || null;
+    // 建立者由伺服器端依登入者帶入（不信任表單送來的值）
+    const createdByUserId = Number.isInteger(data.createdByUserId) ? data.createdByUserId : null;
 
     const stmt = db.prepare(`
       INSERT INTO referral_rewards (
         referring_customer_id, referred_customer_id, project_id,
         recipient_type, recipient_user_id, reward_amount,
-        status, forfeiture_reason, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        status, forfeiture_reason, notes, created_by_user_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -124,7 +128,8 @@ const ReferralReward = {
       rewardAmount,
       status,
       forfeitureReason,
-      notes
+      notes,
+      createdByUserId
     );
 
     const id = result.lastInsertRowid;

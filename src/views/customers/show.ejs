@@ -196,6 +196,7 @@ ${success ? `
             <th>受益對象</th>
             <th class="text-end">獎勵金額</th>
             <th>狀態</th>
+            <th>建立者</th>
             <th></th>
           </tr>
         </thead>
@@ -216,13 +217,14 @@ ${success ? `
               <td>${recipientLabel}</td>
               <td class="text-end">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(r.reward_amount || 0).toLocaleString()}</td>
               <td><span class="badge bg-${statusBadge}">${escapeHtml(r.status)}</span></td>
+              <td>${r.created_by_name ? escapeHtml(r.created_by_name) : '<span class="text-muted">-</span>'}<div class="small text-muted">${escapeHtml((r.created_at || '').slice(0, 10))}</div></td>
               <td class="text-end">
                 ${locals.canEditCrm ? '<button type="button" class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editReferralModal' + r.id + '"><i class="bi bi-pencil"></i></button>' : ''}
                 ${deleteControl}
               </td>
             </tr>
           `;
-          }).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">尚無轉介紹紀錄</td></tr>'}
+          }).join('') || '<tr><td colspan="7" class="text-center text-muted py-3">尚無轉介紹紀錄</td></tr>'}
         </tbody>
       </table>
     </div>

@@ -37,6 +37,7 @@ router.post('/', requireCrmEditPermission, (req, res) => {
       reward_amount: toMoney(req.body.reward_amount),
       status: req.body.status || '待發放',
       notes: req.body.notes || null,
+      createdByUserId: req.user && Number.isInteger(req.user.id) ? req.user.id : null,
       userInfo: getUserInfo(req)
     });
 

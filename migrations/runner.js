@@ -104,6 +104,7 @@ const MIGRATIONS = [
   'migrate_invoice_number_unique',
   'migrate_data_retention',
   'migrate_two_factor',
+  'migrate_referral_rewards_created_by',
 ];
 
 function run() {
