@@ -20,7 +20,8 @@ const EXTERNAL_CHANNEL_TYPES = new Set([
   'customer_approval_pending', 'customer_approval_approved', 'customer_approval_rejected',
   'deletion_request_pending', 'deletion_request_approved', 'deletion_request_rejected',
   'pipeline_created', 'pipeline_updated', 'pipeline_status_changed', 'pipeline_converted',
-  'activity_created'
+  'activity_created',
+  'payment_overdue_digest'
 ]);
 
 // 依使用者填寫的 email/line_user_id 發送外部通知；失敗只記錄 log，不影響站內通知本身
@@ -58,6 +59,7 @@ const NOTIFICATION_ICONS = {
   pipeline_status_changed: { icon: 'bi-arrow-repeat', color: 'text-warning' },
   pipeline_converted: { icon: 'bi-folder-symlink', color: 'text-success' },
   activity_created: { icon: 'bi-journal-text', color: 'text-info' },
+  payment_overdue_digest: { icon: 'bi-cash-coin', color: 'text-danger' },
   broadcast_message: { icon: 'bi-megaphone', color: 'text-primary' }
 };
 

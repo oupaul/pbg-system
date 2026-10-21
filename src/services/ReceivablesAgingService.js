@@ -144,7 +144,7 @@ const ReceivablesAgingService = {
     if (salespersonId != null) allParams.push(salespersonId);
 
     const invoices = db.prepare(`
-      SELECT i.*, p.project_code, p.project_name, p.id as project_id, sp.name as salesperson_name
+      SELECT i.*, p.project_code, p.project_name, p.id as project_id, p.salesperson_id as salesperson_id, sp.name as salesperson_name
       FROM invoices i
       JOIN projects p ON i.project_id = p.id
       LEFT JOIN salespeople sp ON p.salesperson_id = sp.id
@@ -170,6 +170,7 @@ const ReceivablesAgingService = {
         salesperson_name: inv.salesperson_name || '-',
         invoice_id: inv.id,
         invoice_number: inv.invoice_number,
+        salesperson_id: inv.salesperson_id,
         unpaid,
         expected_payment_date: due
       };

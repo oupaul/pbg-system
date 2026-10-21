@@ -50,7 +50,7 @@
               </div>
               <small class="text-muted text-nowrap ms-2">${n.created_at}</small>
             </div>
-            ${n.message ? `<div class="text-muted small mt-1">${escapeHtml(n.message)}</div>` : ''}
+            ${n.message ? `<div class="text-muted small mt-1" style="white-space: pre-line;">${escapeHtml(n.message)}</div>` : ''}
             <div class="mt-2 d-flex gap-2">
               ${n.link ? `<a href="/notifications/${n.id}/open" class="btn btn-sm btn-outline-primary">查看詳情</a>` : ''}
               ${!n.is_read ? `

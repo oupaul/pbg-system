@@ -99,6 +99,7 @@ const MIGRATIONS = [
   'migrate_must_change_password',
   'migrate_system_logs_indexes',
   'migrate_role_admin_flags',
+  'migrate_overdue_reminder',
 ];
 
 function run() {

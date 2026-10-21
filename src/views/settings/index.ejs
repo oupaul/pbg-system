@@ -71,6 +71,16 @@
     : []);
   const localAllUsers = typeof allUsers !== 'undefined' ? allUsers : [];
 
+  // 逾期收款自動提醒
+  const getLocalSetting = (key, fallback) => { const row = localSettings.find(x => x.setting_key === key); return row && row.setting_value !== null ? row.setting_value : fallback; };
+  const overdueEnabled = getLocalSetting('overdue_reminder_enabled', 'false') === 'true';
+  const overdueFrequency = getLocalSetting('overdue_reminder_frequency', 'weekly');
+  const overdueTime = getLocalSetting('overdue_reminder_time', '09:00');
+  const overdueIncludeUpcoming = getLocalSetting('overdue_reminder_include_upcoming', 'true') === 'true';
+  const overdueLastRun = getLocalSetting('overdue_reminder_last_run_date', '');
+  const overdueRecipientIds = getLocalSetting('overdue_reminder_notify_user_ids', '').split(',').map(x => x.trim()).filter(Boolean);
+  const overdueReady = localSettings.some(x => x.setting_key === 'overdue_reminder_enabled');
+
   const isNotificationEnabled = notificationEnabledValue === 'true';
   const notificationDaysDesc = notificationDaysSetting ? notificationDaysSetting.description : '當月剩餘天數少於或等於此值時開始顯示通知';
   const notificationEnabledDesc = notificationEnabledSetting ? notificationEnabledSetting.description : '是否啟用開票提醒通知功能';
@@ -470,6 +480,66 @@
   bodyHtml += '  </div>';
   bodyHtml += '</div>';
 
+  // 逾期收款自動提醒卡片
+  if (overdueReady) {
+  bodyHtml += '<div class="card mt-4">';
+  bodyHtml += '  <div class="card-header bg-danger text-white">';
+  bodyHtml += '    <h5 class="mb-0"><i class="bi bi-cash-coin"></i> 逾期收款自動提醒</h5>';
+  bodyHtml += '  </div>';
+  bodyHtml += '  <div class="card-body">';
+  bodyHtml += '    <p class="text-muted small">依發票的「預計收款日」找出尚未收齊的款項，定時彙整成<strong>一則</strong>訊息發給負責業務（只看自己的發票）與下方指定的彙總收件人（看全公司）。一定會有站內通知；使用者有填 Email／LINE ID 且上方對應通知已啟用時，也會一併寄出。預設停用。</p>';
+  bodyHtml += '    <form method="POST" action="/settings/bulk-update" id="overdueReminderForm">';
+  bodyHtml += '      <div class="row g-3">';
+  bodyHtml += '        <div class="col-md-6">';
+  bodyHtml += '          <label class="form-label"><strong>功能狀態</strong></label>';
+  bodyHtml += '          <div class="form-check form-switch">';
+  bodyHtml += '            <input class="form-check-input" type="checkbox" id="overdue_reminder_enabled" name="overdue_reminder_enabled" value="true" ' + (overdueEnabled ? 'checked' : '') + '>';
+  bodyHtml += '            <label class="form-check-label" for="overdue_reminder_enabled">' + (overdueEnabled ? '已啟用' : '已停用') + '</label>';
+  bodyHtml += '          </div>';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="col-md-6">';
+  bodyHtml += '          <label class="form-label"><strong>同時列出即將到期的發票</strong></label>';
+  bodyHtml += '          <div class="form-check form-switch">';
+  bodyHtml += '            <input class="form-check-input" type="checkbox" id="overdue_reminder_include_upcoming" name="overdue_reminder_include_upcoming" value="true" ' + (overdueIncludeUpcoming ? 'checked' : '') + '>';
+  bodyHtml += '            <label class="form-check-label" for="overdue_reminder_include_upcoming">' + (overdueIncludeUpcoming ? '已啟用' : '已停用') + '</label>';
+  bodyHtml += '          </div>';
+  bodyHtml += '          <div class="form-text">天數沿用儀表板的「收款提醒天數」設定</div>';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="col-md-6">';
+  bodyHtml += '          <label for="overdue_reminder_frequency" class="form-label"><strong>發送頻率</strong></label>';
+  bodyHtml += '          <select class="form-select" id="overdue_reminder_frequency" name="overdue_reminder_frequency">';
+  bodyHtml += '            <option value="weekly" ' + (overdueFrequency !== 'daily' ? 'selected' : '') + '>每週一</option>';
+  bodyHtml += '            <option value="daily" ' + (overdueFrequency === 'daily' ? 'selected' : '') + '>每個工作日（週一至週五）</option>';
+  bodyHtml += '          </select>';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="col-md-6">';
+  bodyHtml += '          <label for="overdue_reminder_time" class="form-label"><strong>發送時間</strong></label>';
+  bodyHtml += '          <input type="time" class="form-control" id="overdue_reminder_time" name="overdue_reminder_time" value="' + escapeHtml(overdueTime) + '" required>';
+  bodyHtml += '          <div class="form-text">伺服器本地時間；到了這個時間且當天還沒發送過就會發送一次。沒有任何逾期或即將到期的發票時不會發送。</div>';
+  bodyHtml += '        </div>';
+  bodyHtml += '        <div class="col-12">';
+  bodyHtml += '          <label class="form-label"><strong>彙總收件人（財務／主管）</strong></label>';
+  bodyHtml += '          <input type="hidden" name="overdue_reminder_notify_user_ids" value="">';
+  bodyHtml += '          <select name="overdue_reminder_notify_user_ids" id="overdue_reminder_notify_user_ids" class="form-select select2-dropdown" multiple>';
+  bodyHtml += '            ' + localAllUsers.map(u => '<option value="' + u.id + '" ' + (overdueRecipientIds.includes(String(u.id)) ? 'selected' : '') + '>' + escapeHtml(u.name) + '</option>').join('');
+  bodyHtml += '          </select>';
+  bodyHtml += '          <div class="form-text">這些人會收到全公司彙總（依業務分組）；負責業務若有綁定使用者帳號，另會收到只有自己發票的提醒。可不選。</div>';
+  bodyHtml += '        </div>';
+  bodyHtml += '      </div>';
+  bodyHtml += '      <hr class="my-4">';
+  bodyHtml += '      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">';
+  bodyHtml += '        <div class="text-muted small">' + (overdueLastRun ? '上次自動發送：' + escapeHtml(overdueLastRun) : '尚未自動發送過') + '</div>';
+  bodyHtml += '        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> 儲存設定</button>';
+  bodyHtml += '      </div>';
+  bodyHtml += '    </form>';
+  bodyHtml += '    <form method="POST" action="/settings/overdue-reminder/test" class="mt-3">';
+  bodyHtml += '      <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-send"></i> 發送測試給我自己</button>';
+  bodyHtml += '      <span class="text-muted small ms-2">用目前的發票資料產生一則彙總，只發給你自己（站內通知；你有填 Email／LINE 且已啟用時也會寄出），不影響正式排程。</span>';
+  bodyHtml += '    </form>';
+  bodyHtml += '  </div>';
+  bodyHtml += '</div>';
+  }
+
   bodyHtml += '<div class="card mt-4">';
   bodyHtml += '  <div class="card-header bg-light">';
   bodyHtml += '    <h5 class="mb-0"><i class="bi bi-question-circle"></i> 設定說明</h5>';
@@ -571,6 +641,7 @@
   bodyHtml += '  }';
   bodyHtml += '  wireSwitchForm("emailSettingsForm", ["email_notification_enabled", "smtp_secure", "smtp_reject_unauthorized"], ["smtp_password"], ["email_notification_enabled"]);';
   bodyHtml += '  wireSwitchForm("lineSettingsForm", ["line_notification_enabled"], ["line_channel_access_token", "line_channel_secret"], ["line_notification_enabled"]);';
+  bodyHtml += '  wireSwitchForm("overdueReminderForm", ["overdue_reminder_enabled", "overdue_reminder_include_upcoming"], [], ["overdue_reminder_enabled", "overdue_reminder_include_upcoming"]);';
   bodyHtml += '';
   bodyHtml += '  const testEmailBtn = document.getElementById("testEmailBtn");';
   bodyHtml += '  if (testEmailBtn) {';

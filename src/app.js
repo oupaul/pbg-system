@@ -417,6 +417,7 @@ function gracefulShutdown(signal) {
     process.exit(1);
   }, 10000);
   forceTimer.unref();
+  try { require('./services/OverdueReminderService').stop(); } catch (e) { /* 忽略 */ }
   server.close(() => {
     try { require('./models/db').close(); } catch (e) { /* 忽略 */ }
     console.log('[關閉] 已正常關閉');
@@ -434,6 +435,8 @@ const server = app.listen(...listenArgs, () => {
   console.log(`\n🚀 專案開立發票業績認列獎金計算總表系統`);
   console.log(`   運行於 http://localhost:${PORT}`);
   console.log(`   環境: ${process.env.NODE_ENV || 'development'}\n`);
+  // 逾期收款自動提醒排程（預設停用，由系統設定啟用）
+  try { require('./services/OverdueReminderService').start(); } catch (e) { console.error('[啟動] 逾期收款提醒排程啟動失敗:', e.message); }
 });
 
 // 處理端口衝突錯誤

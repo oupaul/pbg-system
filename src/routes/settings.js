@@ -262,6 +262,15 @@ router.post('/bulk-update', requireAuth, requireManageSettings, (req, res) => {
           }
         } else if (setting.setting_type === 'boolean') {
           validatedValue = value === 'true' || value === '1' || value === 'on';
+        } else if (key === 'overdue_reminder_frequency' && !['weekly', 'daily'].includes(value)) {
+          errors.push('逾期收款提醒頻率必須是每週或每個工作日');
+          continue;
+        } else if (key === 'overdue_reminder_time' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(value))) {
+          errors.push('逾期收款提醒發送時間格式必須是 HH:MM');
+          continue;
+        } else if (key === 'overdue_reminder_last_run_date') {
+          // 系統內部使用的欄位，不接受從表單修改
+          continue;
         } else if (key === 'date_calendar_system' && !['roc', 'gregorian'].includes(value)) {
           errors.push('報表日期曆法必須是民國曆或西元曆');
           continue;
@@ -300,6 +309,20 @@ router.post('/test-email', requireAuth, requireManageSettings, async (req, res) 
     rejectUnauthorized: req.body.smtp_reject_unauthorized
   });
   res.json(result);
+});
+
+// 逾期收款提醒：發送一則測試訊息給目前登入的使用者（不影響正式排程、不發給其他人）
+router.post('/overdue-reminder/test', requireAuth, requireManageSettings, (req, res) => {
+  try {
+    const summary = require('../services/OverdueReminderService').run({ onlyUserId: req.user.id });
+    if (summary.empty) {
+      return res.redirect('/settings?success=' + encodeURIComponent('目前沒有任何逾期或即將到期的發票，所以沒有產生測試訊息'));
+    }
+    res.redirect('/settings?success=' + encodeURIComponent(`測試訊息已發送給您（逾期 ${summary.overdueCount} 張、即將到期 ${summary.upcomingCount} 張），請到通知中心查看`));
+  } catch (err) {
+    console.error('逾期收款提醒測試失敗:', err);
+    res.redirect('/settings?error=' + encodeURIComponent('測試發送失敗：' + err.message));
+  }
 });
 
 // 匯出輔助函數供其他模組使用
