@@ -289,6 +289,29 @@ router.post('/:id', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // 停用/啟用使用者（僅管理員）
+// 重設雙因素驗證（使用者遺失手機又沒有復原碼時）：清除密鑰與復原碼，並通知該使用者
+router.post('/:id/reset-2fa', requireAuth, requireAdmin, (req, res) => {
+  try {
+    const target = User.findById(req.params.id);
+    if (!target) return res.redirect('/users?error=' + encodeURIComponent('找不到使用者'));
+    const TwoFactor = require('../models/TwoFactor');
+    TwoFactor.clear(target.id);
+    TwoFactor.audit('2fa_reset_by_admin', target.id, getUserInfo(req), { target: target.username });
+    try {
+      require('../services/NotificationService').notify(target.id, {
+        type: 'two_factor_reset',
+        title: '您的雙因素驗證已被管理員重設',
+        message: `管理員（${req.user.name || req.user.username}）重設了您的雙因素驗證。若這不是您預期的操作，請立即聯絡管理員並修改密碼。`,
+        link: '/account/security'
+      });
+    } catch (e) { /* 通知失敗不影響重設 */ }
+    res.redirect('/users?success=' + encodeURIComponent(`已重設 ${target.name || target.username} 的雙因素驗證`));
+  } catch (err) {
+    console.error('重設雙因素驗證失敗:', err);
+    res.redirect('/users?error=' + encodeURIComponent('重設失敗：' + err.message));
+  }
+});
+
 router.post('/:id/toggle-active', requireAuth, requireAdmin, async (req, res) => {
   const userId = parseInt(req.params.id);
   const user = User.findById(userId);

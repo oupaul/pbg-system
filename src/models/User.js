@@ -125,7 +125,7 @@ const User = {
       return db.prepare(`
         SELECT 
           u.id, u.username, u.name, u.role, u.salesperson_id, u.is_active, 
-          u.created_at, u.last_login,
+          u.created_at, u.last_login, u.totp_enabled,
           s.name as salesperson_name
         FROM users u
         LEFT JOIN salespeople s ON u.salesperson_id = s.id

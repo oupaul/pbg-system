@@ -103,6 +103,7 @@ const MIGRATIONS = [
   'migrate_role_can_import',
   'migrate_invoice_number_unique',
   'migrate_data_retention',
+  'migrate_two_factor',
 ];
 
 function run() {

@@ -45,6 +45,7 @@ const upload = multer({
 
 // Session 設定
 const sessionSecret = process.env.SESSION_SECRET || require('crypto').randomBytes(32).toString('hex');
+process.env.SESSION_SECRET = sessionSecret; // 雙因素驗證密鑰的加密金鑰由它衍生（utils/secretBox.js）；未設定時為本次啟動的臨時值
 if (!process.env.SESSION_SECRET) {
   console.warn('[安全警告] SESSION_SECRET 未設定！本次使用臨時隨機金鑰，重啟後所有 session 將失效。正式部署請確認 deploy.sh 已設定此環境變數。');
 }
@@ -90,7 +91,7 @@ console.log('[啟動] ✓ EJS模板引擎設定完成');
 
 // 載入認證中間件
 console.log('[啟動] 載入認證中間件...');
-const { requireAuth, requireImportExport, setUserPermissions, enforcePasswordChange } = require('./middleware/auth');
+const { requireAuth, requireImportExport, setUserPermissions, enforcePasswordChange, enforceTwoFactorSetup } = require('./middleware/auth');
 console.log('[啟動] ✓ 認證中間件載入完成');
 
 // 載入部署配置
@@ -181,6 +182,9 @@ app.use(setUserPermissions);
 
 // 強制變更預設密碼（必須在設定 req.user 之後，且在所有路由之前）
 app.use(enforcePasswordChange);
+
+// 角色要求強制雙因素驗證但尚未設定的使用者，只能到設定頁（必須在 enforcePasswordChange 之後）
+app.use(enforceTwoFactorSetup);
 
 // 載入路由
 console.log('[啟動] 開始載入路由模組...');
@@ -283,6 +287,7 @@ try {
   app.use('/webhooks/line', lineWebhookRoutes);
 
   // 保護所有其他路由（需要登入）
+  app.use('/account', requireAuth, require('./routes/account'));
   app.use('/projects', requireAuth, projectRoutes);
   app.use('/project-templates', requireAuth, projectTemplateRoutes);
   app.use('/invoices', requireAuth, invoiceRoutes);

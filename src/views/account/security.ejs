@@ -1,0 +1,56 @@
+<%- include('../layout', { title: title, body: `
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <h1 class="h3 mb-4"><i class="bi bi-shield-lock"></i> 帳號安全</h1>
+
+    ${error ? `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> ${escapeHtml(error)}</div>` : ''}
+    ${success ? `<div class="alert alert-success"><i class="bi bi-check-circle"></i> ${escapeHtml(success)}</div>` : ''}
+
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-phone"></i> 雙因素驗證（驗證器 App）</span>
+        ${status.enabled ? '<span class="badge bg-success">已啟用</span>' : '<span class="badge bg-secondary">未啟用</span>'}
+      </div>
+      <div class="card-body">
+        <p class="text-muted">登入時除了密碼，還要輸入手機驗證器 App（Google Authenticator、Microsoft Authenticator、1Password 等）顯示的 6 位數驗證碼。即使密碼外洩，沒有您的手機也無法登入。</p>
+        ${required ? '<div class="alert alert-info"><i class="bi bi-info-circle"></i> 您的角色要求必須啟用雙因素驗證。</div>' : ''}
+
+        ${!status.enabled ? `
+          <a href="/account/security/2fa/setup" class="btn btn-dark"><i class="bi bi-shield-plus"></i> 啟用雙因素驗證</a>
+        ` : `
+          <div class="mb-4 small text-muted">
+            啟用時間：${escapeHtml(status.enabledAt || '-')}　｜　剩餘復原碼：<strong>${status.recoveryCodesRemaining}</strong> 組
+            ${status.recoveryCodesRemaining <= 2 ? '<span class="text-danger ms-1">（快用完了，建議重新產生）</span>' : ''}
+          </div>
+
+          <h6>重新產生復原碼</h6>
+          <p class="small text-muted">舊的復原碼會全部失效。需要輸入目前密碼與驗證碼。</p>
+          <form method="POST" action="/account/security/2fa/recovery-codes" class="row g-2 mb-4" autocomplete="off">
+            <div class="col-md-5"><input type="password" name="password" class="form-control" placeholder="目前密碼" required autocomplete="current-password"></div>
+            <div class="col-md-4"><input type="text" name="code" class="form-control" placeholder="驗證碼" inputmode="numeric" required autocomplete="one-time-code"></div>
+            <div class="col-md-3"><button type="submit" class="btn btn-outline-dark w-100">重新產生</button></div>
+          </form>
+
+          ${required ? '' : `
+            <hr>
+            <h6 class="text-danger">停用雙因素驗證</h6>
+            <p class="small text-muted">停用後登入只需要密碼，安全性會降低。需要輸入目前密碼與驗證碼（或復原碼）。</p>
+            <form method="POST" action="/account/security/2fa/disable" class="row g-2" autocomplete="off" onsubmit="return confirm('確定要停用雙因素驗證嗎？');">
+              <div class="col-md-5"><input type="password" name="password" class="form-control" placeholder="目前密碼" required autocomplete="current-password"></div>
+              <div class="col-md-4"><input type="text" name="code" class="form-control" placeholder="驗證碼或復原碼" required autocomplete="one-time-code"></div>
+              <div class="col-md-3"><button type="submit" class="btn btn-outline-danger w-100">停用</button></div>
+            </form>
+          `}
+        `}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><i class="bi bi-key"></i> 密碼</div>
+      <div class="card-body">
+        <a href="/change-password" class="btn btn-outline-secondary btn-sm">修改密碼</a>
+      </div>
+    </div>
+  </div>
+</div>
+` }) %>

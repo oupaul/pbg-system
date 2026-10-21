@@ -49,6 +49,16 @@ const checkAuth = (req, res, next) => {
 // 強制變更預設密碼：帳號被標記 must_change_password（目前只有全新安裝時建立的預設
 // admin 帳號會是 1）時，除了修改密碼頁本身與登出以外，一律導向修改密碼頁——
 // 避免帳號留著固定的預設密碼卻忘記改掉。
+// 角色要求強制雙因素驗證、但使用者尚未啟用：除了設定頁與登出，其他一律導向設定頁。
+// 先改密碼（must_change_password）再設定雙因素驗證，避免兩個強制流程互相導來導去。
+const TWO_FACTOR_SETUP_ALLOWED_PREFIXES = ['/account/security', '/logout', '/change-password', '/healthz'];
+const enforceTwoFactorSetup = (req, res, next) => {
+  if (!req.user || !req.user.must_setup_2fa || req.user.must_change_password) return next();
+  if (TWO_FACTOR_SETUP_ALLOWED_PREFIXES.some(p => req.path === p || req.path.startsWith(p + '/'))) return next();
+  if (req.method === 'GET' && req.accepts('html')) return res.redirect('/account/security/2fa/setup');
+  return res.status(403).json({ error: '需要先設定雙因素驗證', message: '您的角色要求啟用雙因素驗證，請先到「帳號安全」完成設定' });
+};
+
 const enforcePasswordChange = (req, res, next) => {
   if (!req.user || !req.user.must_change_password) return next();
   if (req.path === '/change-password' || req.path === '/logout') return next();
@@ -202,7 +212,7 @@ function revalidateSession(req, res) {
   try {
     const db = require('../models/db');
     try {
-      row = db.prepare('SELECT id, username, name, role, salesperson_id, is_active, must_change_password, password_hash FROM users WHERE id = ?').get(sessionUser.id);
+      row = db.prepare('SELECT id, username, name, role, salesperson_id, is_active, must_change_password, password_hash, totp_enabled FROM users WHERE id = ?').get(sessionUser.id);
     } catch {
       // 舊資料庫尚未執行 must_change_password migration 時的退路：不能因此整個停用 session 驗證
       row = db.prepare('SELECT id, username, name, role, salesperson_id, is_active, password_hash FROM users WHERE id = ?').get(sessionUser.id);
@@ -246,6 +256,10 @@ function revalidateSession(req, res) {
   sessionUser.role = row.role;
   sessionUser.salesperson_id = row.salesperson_id || null;
   sessionUser.must_change_password = !!row.must_change_password;
+  // 雙因素驗證：角色要求強制啟用、但這個使用者還沒啟用 → 必須先完成設定才能使用系統（見 enforceTwoFactorSetup）
+  const roleRow = getRolePermissions(row.role);
+  sessionUser.totp_enabled = !!row.totp_enabled;
+  sessionUser.must_setup_2fa = !!(roleRow && roleRow.require_2fa) && !row.totp_enabled;
   req.user = sessionUser;
   return true;
 }
@@ -301,6 +315,7 @@ const setUserPermissions = (req, res, next) => {
     res.locals.canManageSettings = req.user.canManageSettings;
     res.locals.canBackupRestore = req.user.canBackupRestore;
     res.locals.canImport = req.user.canImport;
+    res.locals.mustSetup2fa = !!req.user.must_setup_2fa;
     res.locals.isReadOnly = req.user.isReadOnly;
 
     if (req.user.canAccessDeletionApprovals) {
@@ -348,6 +363,7 @@ module.exports = {
   requireAuth,
   checkAuth,
   enforcePasswordChange,
+  enforceTwoFactorSetup,
   requireEditPermission,
   requireCrmEditPermission,
   requireDeletePermission,

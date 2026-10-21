@@ -43,6 +43,7 @@ ${success ? `
               <th>角色</th>
               <th>關聯業務員</th>
               <th>狀態</th>
+              <th>雙因素</th>
               <th>建立時間</th>
               <th>最後登入</th>
               <th>操作</th>
@@ -73,6 +74,14 @@ ${success ? `
                   ` : `
                     <span class="badge bg-secondary">停用</span>
                   `}
+                </td>
+                <td>
+                  ${user.totp_enabled ? `
+                    <span class="badge bg-success">已啟用</span>
+                    <form method="POST" action="/users/${user.id}/reset-2fa" class="d-inline ms-1" onsubmit="return confirm('確定要重設此使用者的雙因素驗證嗎？\\n重設後對方的驗證器與復原碼都會失效，下次登入只需密碼（若角色強制雙因素驗證，登入後必須重新設定）。');">
+                      <button type="submit" class="btn btn-sm btn-outline-secondary py-0" title="使用者遺失手機且沒有復原碼時使用"><i class="bi bi-arrow-counterclockwise"></i> 重設</button>
+                    </form>
+                  ` : '<span class="text-muted small">未啟用</span>'}
                 </td>
                 <td>${user.created_at || '-'}</td>
                 <td>${user.last_login || '從未登入'}</td>

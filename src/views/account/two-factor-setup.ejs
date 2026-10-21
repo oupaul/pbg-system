@@ -1,0 +1,50 @@
+<%- include('../layout', { title: title, body: `
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <h1 class="h3 mb-3"><i class="bi bi-shield-plus"></i> 啟用雙因素驗證</h1>
+
+    ${forced ? '<div class="alert alert-warning"><i class="bi bi-shield-exclamation"></i> 您的角色要求必須先啟用雙因素驗證，完成設定後才能使用系統的其他功能。</div>' : ''}
+    ${error ? `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> ${escapeHtml(error)}</div>` : ''}
+
+    <div class="card">
+      <div class="card-body">
+        <ol class="mb-4">
+          <li class="mb-2">在手機安裝驗證器 App（Google Authenticator、Microsoft Authenticator、1Password…）。</li>
+          <li class="mb-2">用 App 掃描下方 QR code；無法掃描時，改為手動輸入下方的密鑰（類型選「以時間為基礎」）。</li>
+          <li>輸入 App 顯示的 6 位數驗證碼，確認設定正確。</li>
+        </ol>
+
+        <div class="text-center mb-3">
+          <div id="qrBox" data-otpauth="${escapeHtml(otpauth)}" style="width: 220px; height: 220px; margin: 0 auto;"></div>
+          <noscript><p class="text-danger small">需要啟用 JavaScript 才能顯示 QR code，請改用手動輸入密鑰。</p></noscript>
+        </div>
+        <div class="text-center mb-4">
+          <div class="small text-muted">無法掃描？手動輸入密鑰：</div>
+          <code class="fs-5 user-select-all">${escapeHtml(secretGrouped)}</code>
+        </div>
+
+        <form method="POST" action="/account/security/2fa/enable" class="row g-2 justify-content-center" autocomplete="off">
+          <div class="col-sm-6">
+            <input type="text" name="code" class="form-control form-control-lg text-center" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="000000" required autofocus style="letter-spacing: .3em;">
+          </div>
+          <div class="col-sm-4"><button type="submit" class="btn btn-dark btn-lg w-100">確認並啟用</button></div>
+        </form>
+        <p class="small text-muted text-center mt-3 mb-0">這個密鑰只屬於您，請不要分享給任何人（包含系統管理員）。</p>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="/vendor/qrcode/qrcode.js"></script>
+<script>
+(function () {
+  var box = document.getElementById('qrBox');
+  if (!box || typeof qrcode !== 'function') return;
+  var qr = qrcode(0, 'M');
+  qr.addData(box.getAttribute('data-otpauth'));
+  qr.make();
+  box.innerHTML = qr.createSvgTag({ scalable: true, margin: 2 });
+  var svg = box.querySelector('svg');
+  if (svg) { svg.style.width = '100%'; svg.style.height = '100%'; }
+})();
+</script>
+` }) %>

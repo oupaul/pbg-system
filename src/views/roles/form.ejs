@@ -266,6 +266,21 @@
                   </label>
                 </div>
               </div>
+              <div class="col-md-6">
+                <div class="form-check form-switch mb-3">
+                  <input 
+                    class="form-check-input" 
+                    type="checkbox" 
+                    id="require_2fa" 
+                    name="require_2fa"
+                    ${role && role.require_2fa ? 'checked' : ''}
+                  >
+                  <label class="form-check-label" for="require_2fa">
+                    <strong>強制雙因素驗證</strong>
+                    <div class="text-muted small">此角色的使用者必須啟用雙因素驗證（手機驗證器 App）。尚未啟用者登入後會被導向設定頁，完成前無法使用其他功能；已啟用者不可自行停用。建議至少對系統管理員與財務相關角色開啟。</div>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
         </div>

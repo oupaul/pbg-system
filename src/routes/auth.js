@@ -5,8 +5,9 @@ const LoginHistory = require('../models/LoginHistory');
 const GeoIpService = require('../services/GeoIpService');
 const AuditLogService = require('../services/AuditLogService');
 const { getUserInfo } = require('../utils/authHelper');
-const { loginRateLimiter, resetOnSuccess, accountLockedMinutes, recordAccountFailure, clearAccountFailures } = require('../middleware/rateLimiter');
+const { loginRateLimiter, resetOnSuccess, accountLockedMinutes, recordAccountFailure, clearAccountFailures, twoFactorLockedMinutes, recordTwoFactorFailure, clearTwoFactorFailures } = require('../middleware/rateLimiter');
 const { passwordFingerprint } = require('../middleware/auth');
+const TwoFactor = require('../models/TwoFactor');
 
 // 帳號不存在時也做一次等量的雜湊運算，避免從回應時間差判斷帳號是否存在
 let dummyHashPromise = null;
@@ -108,18 +109,9 @@ router.post('/login', loginRateLimiter, async (req, res) => {
     return res.redirect(`/login?error=${encodeURIComponent('帳號已被停用')}&redirect=${encodeURIComponent(redirect)}`);
   }
 
-  // 登入成功 — 清除速率限制計數
+  // 密碼驗證通過 — 清除速率限制計數
   resetOnSuccess(req.ip || req.connection.remoteAddress || 'unknown');
   clearAccountFailures(username);
-
-  // 記錄登入紀錄（失敗不影響登入流程本身）
-  try {
-    const loginIp = req.ip || req.connection.remoteAddress || 'unknown';
-    const countryCode = await GeoIpService.lookupCountryCode(loginIp);
-    LoginHistory.record(user.id, loginIp, req.get('User-Agent'), countryCode);
-  } catch (err) {
-    console.error('[登入] 記錄登入紀錄失敗:', err);
-  }
 
   // 如果密碼是舊的 SHA256 格式，自動升級為 argon2id（要在建立 session 前完成，session 內的密碼指紋才會是最終版本）
   const isOldSHA256 = user.password_hash && user.password_hash.length === 64 && /^[a-f0-9]{64}$/i.test(user.password_hash);
@@ -133,6 +125,33 @@ router.post('/login', loginRateLimiter, async (req, res) => {
       console.error('[登入] 密碼升級失敗:', err);
       // 不影響登入流程，繼續執行
     }
+  }
+
+  // 已啟用雙因素驗證：密碼通過還不算登入成功，建立「等待第二步驗證」的暫時狀態（沒有 session.user，
+  // 所以任何需要登入的頁面都進不去），驗證碼通過後才完成登入
+  if (user.totp_enabled) {
+    return req.session.regenerate((regenErr) => {
+      if (regenErr) {
+        console.error('[登入] 重新產生 session 失敗:', regenErr);
+        return res.redirect(`/login?error=${encodeURIComponent('登入失敗，請稍後再試')}`);
+      }
+      req.session.pending2fa = { userId: user.id, redirect, expiresAt: Date.now() + PENDING_2FA_TTL_MS };
+      req.session.save(() => res.redirect('/login/2fa'));
+    });
+  }
+
+  return finishLogin(req, res, user, redirect);
+});
+
+// 登入的最後一步：記錄登入紀錄、換發新的 session 並寫入使用者資料
+async function finishLogin(req, res, user, redirect) {
+  // 記錄登入紀錄（失敗不影響登入流程本身）
+  try {
+    const loginIp = req.ip || req.connection.remoteAddress || 'unknown';
+    const countryCode = await GeoIpService.lookupCountryCode(loginIp);
+    LoginHistory.record(user.id, loginIp, req.get('User-Agent'), countryCode);
+  } catch (err) {
+    console.error('[登入] 記錄登入紀錄失敗:', err);
   }
 
   // 獲取完整的用戶資訊（包含 salesperson_id）與最新的密碼雜湊（用來產生 session 的密碼指紋）
@@ -163,6 +182,62 @@ router.post('/login', loginRateLimiter, async (req, res) => {
     // 確保 session 已寫入再導向（已驗證為站內相對路徑）
     req.session.save(() => res.redirect(redirect));
   });
+}
+
+// ---- 第二步：雙因素驗證碼 ----
+const PENDING_2FA_TTL_MS = 5 * 60 * 1000;
+
+function getPending2fa(req) {
+  const pending = req.session && req.session.pending2fa;
+  if (!pending || !pending.userId || pending.expiresAt < Date.now()) return null;
+  return pending;
+}
+
+router.get('/login/2fa', (req, res) => {
+  if (!getPending2fa(req)) {
+    return res.redirect(`/login?error=${encodeURIComponent('登入已逾時，請重新輸入帳號密碼')}`);
+  }
+  res.set('Cache-Control', 'no-store');
+  res.render('auth/two-factor', { title: '雙因素驗證', error: req.query.error || '' });
+});
+
+router.post('/login/2fa', loginRateLimiter, async (req, res) => {
+  const pending = getPending2fa(req);
+  const backToLogin = (message) => req.session.destroy(() => res.redirect(`/login?error=${encodeURIComponent(message)}`));
+  if (!pending) return backToLogin('登入已逾時，請重新輸入帳號密碼');
+
+  const db = require('../models/db');
+  const user = db.prepare('SELECT * FROM users WHERE id = ? AND is_active = 1').get(pending.userId);
+  if (!user || !user.totp_enabled) return backToLogin('登入已逾時，請重新輸入帳號密碼');
+
+  // 驗證碼的失敗次數另外計算（與密碼失敗分開），連續失敗會暫時鎖定，避免有人拿到密碼後暴力猜驗證碼
+  const lockKey = user.username;
+  const locked = twoFactorLockedMinutes(lockKey);
+  if (locked > 0) return backToLogin(`驗證失敗次數過多，此帳號已暫時鎖定，請 ${locked} 分鐘後再試`);
+
+  const input = String(req.body.code || '').trim();
+  let result = 'invalid';
+  let usedRecoveryCode = false;
+  if (TwoFactor.looksLikeRecoveryCode(input)) {
+    if (TwoFactor.useRecoveryCode(user.id, input) !== null) { result = 'ok'; usedRecoveryCode = true; }
+  } else {
+    result = TwoFactor.verifyCode(user.id, input);
+  }
+
+  if (result === 'unavailable') {
+    console.error(`[登入] 使用者 ${user.username} 的雙因素驗證密鑰無法解開（SESSION_SECRET 可能已更換），已拒絕登入，需由管理員重設`);
+    return backToLogin('雙因素驗證設定無法使用，請聯絡管理員重設');
+  }
+  if (result !== 'ok') {
+    recordTwoFactorFailure(lockKey);
+    return res.redirect(`/login/2fa?error=${encodeURIComponent('驗證碼錯誤，請重新輸入')}`);
+  }
+
+  clearTwoFactorFailures(lockKey);
+  if (usedRecoveryCode) {
+    TwoFactor.audit('2fa_recovery_code_used', user.id, user.name || user.username, { remaining: (TwoFactor.getStatus(user.id) || {}).recoveryCodesRemaining });
+  }
+  return finishLogin(req, res, user, pending.redirect);
 });
 
 // 登出

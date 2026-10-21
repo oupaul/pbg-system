@@ -38,7 +38,7 @@ const ENDPOINTS = [
   ...['/users/', '/users/new', '/audit-logs/', '/audit-logs/statistics', '/audit-logs/export', '/login-history/', '/health/',
     '/notifications/broadcast', '/customers/export', '/customers/export-activities', '/customers/import/template', '/customers/import-activities/template']
     .map(p => ['GET', p, null, adminOnly]),
-  ...['/users/', '/users/999999', '/users/999999/toggle-active', '/notifications/broadcast', '/customers/import', '/customers/import-activities']
+  ...['/users/', '/users/999999', '/users/999999/toggle-active', '/users/999999/reset-2fa', '/notifications/broadcast', '/customers/import', '/customers/import-activities']
     .map(p => ['POST', p, {}, adminOnly]),
 
   // ---- 角色管理（can_manage_roles）----
@@ -74,6 +74,7 @@ const ENDPOINTS = [
 
   // ---- 所有登入者都能看的一般頁面（確認沒有被過度限制）----
   ['GET', '/sales-performance/', null, ALL_SCOPE],
+  ['GET', '/account/security', null, ALL],
   ...['/', '/projects/', '/bonuses/', '/recent-payments/', '/gross-profit/', '/search/', '/customers/', '/pipelines/', '/notifications/']
     .map(p => ['GET', p, null, ALL])
 ];
@@ -106,7 +107,7 @@ describeIntegration('權限矩陣', () => {
 // ---- 「寫入面」凍結：唯讀與受限角色實際能執行的所有變更類路由，必須剛好等於下面的清單 ----
 // 新增任何一條變更資料的路由後，如果這兩個角色能打到它，這個測試會失敗，逼著開發者確認是否真的該開放。
 describeIntegration('寫入面（變更類路由）', () => {
-  const SKIP = new Set(['/login', '/logout', '/change-password', '/webhooks/line/']);
+  const SKIP = new Set(['/login', '/login/2fa', '/logout', '/change-password', '/webhooks/line/']); // 這幾個會破壞或改變目前的 session
 
   async function allowedMutations(username) {
     const c = await as(username);
@@ -121,6 +122,9 @@ describeIntegration('寫入面（變更類路由）', () => {
 
   test('老闆（唯讀）只能標記自己的通知為已讀', async () => {
     expect(await allowedMutations('u_boss')).toEqual([
+      'POST /account/security/2fa/disable',
+      'POST /account/security/2fa/enable',
+      'POST /account/security/2fa/recovery-codes',
       'POST /notifications/:id/read',
       'POST /notifications/mark-all-read'
     ]);
@@ -128,6 +132,9 @@ describeIntegration('寫入面（變更類路由）', () => {
 
   test('業務員只能操作 CRM（客戶、銷售機會、活動紀錄、轉介紹獎勵）與自己的通知', async () => {
     expect(await allowedMutations('u_salesA')).toEqual([
+      'POST /account/security/2fa/disable',
+      'POST /account/security/2fa/enable',
+      'POST /account/security/2fa/recovery-codes',
       'POST /customers/',
       'POST /customers/:id',
       'POST /customers/:id/activities',

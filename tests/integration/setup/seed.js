@@ -91,6 +91,32 @@ async function main() {
     ids[tag] = { customer: cid, project: pid, invoice: iid, payment: payid, bonus: bid, attachment: aid, cost: costId };
   }
 
+  // ---- 雙因素驗證測試用的使用者（密鑰一律是 RFC 測試密鑰，驗證碼由測試程式算出）----
+  const secretBox = require(path.join(root, 'src', 'utils', 'secretBox'));
+  const TOTP_SECRET = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+  const RECOVERY = ['AAAAA-BBBBB', 'CCCCC-DDDDD', 'EEEEE-FFFFF'];
+  const recoveryHashes = JSON.stringify(RECOVERY.map(c => secretBox.keyedHash(c.replace('-', ''))));
+  role('req2fa', { all: 1 });
+  db.prepare("UPDATE roles SET require_2fa = 1 WHERE role_key = 'req2fa'").run();
+  const enable2fa = (username, { encrypted } = {}) => {
+    db.prepare("UPDATE users SET totp_enabled = 1, totp_secret = ?, totp_last_step = 0, totp_enabled_at = datetime('now', 'localtime'), recovery_codes = ? WHERE username = ?")
+      .run(encrypted || secretBox.encrypt(TOTP_SECRET), recoveryHashes, username);
+  };
+  for (const name of ['u_2fa_login', 'u_2fa_lock', 'u_2fa_recovery', 'u_2fa_disable', 'u_2fa_regen', 'u_2fa_reset', 'u_2fa_unavail', 'u_2fa_iso']) {
+    addUser(name, 'edit_only');
+  }
+  addUser('u_req_a', 'req2fa');   // 角色強制、尚未啟用：登入後只能去設定頁
+  addUser('u_req_b', 'req2fa');   // 同上，用來走完整個啟用流程
+  addUser('u_req_c', 'req2fa');   // 角色強制且已啟用：不可停用
+  for (const name of ['u_2fa_login', 'u_2fa_lock', 'u_2fa_recovery', 'u_2fa_disable', 'u_2fa_regen', 'u_2fa_reset', 'u_2fa_iso', 'u_req_c']) enable2fa(name);
+  // 以另一把 SESSION_SECRET 加密的密鑰：模擬「還原到新主機後金鑰不同」，登入必須被拒絕（不是放行）
+  const savedSecret = process.env.SESSION_SECRET;
+  process.env.SESSION_SECRET = 'some-other-session-secret';
+  const foreignEncrypted = secretBox.encrypt(TOTP_SECRET);
+  process.env.SESSION_SECRET = savedSecret;
+  enable2fa('u_2fa_unavail', { encrypted: foreignEncrypted });
+  ids.twoFactor = { secret: TOTP_SECRET, recoveryCodes: RECOVERY };
+
   // ---- 資料完整性測試用的專案（金額充足、沒有發票，不會被「超額開票」檢查擋住）----
   ids.C = { project: Number(project.run('P-C', '專案C', spA, ids.A.customer).lastInsertRowid) };
   ids.D = { project: Number(project.run('P-D', '專案D', spA, ids.A.customer).lastInsertRowid) };

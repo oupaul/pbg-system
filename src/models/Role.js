@@ -51,14 +51,14 @@ const Role = {
         INSERT INTO roles (
           role_key, role_name, description,
           can_edit, can_delete, can_manage_users, can_manage_roles,
-          can_manage_settings, can_backup_restore, can_import,
+          can_manage_settings, can_backup_restore, can_import, require_2fa,
           can_view_all_projects, can_view_own_projects,
           can_edit_crm,
           can_approve_customer,
           project_view_scope,
           dashboard_view_mode,
           is_system_role, is_active, display_order
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         data.role_key,
         data.role_name,
@@ -70,6 +70,7 @@ const Role = {
         data.can_manage_settings || 0,
         data.can_backup_restore || 0,
         data.can_import || 0,
+        data.require_2fa || 0,
         data.can_view_all_projects !== undefined ? data.can_view_all_projects : 1,
         data.can_view_own_projects !== undefined ? data.can_view_own_projects : 1,
         data.can_edit_crm !== undefined ? data.can_edit_crm : 1,
@@ -154,6 +155,10 @@ const Role = {
       if (data.can_import !== undefined) {
         fields.push('can_import = ?');
         values.push(data.can_import);
+      }
+      if (data.require_2fa !== undefined) {
+        fields.push('require_2fa = ?');
+        values.push(data.require_2fa);
       }
       if (data.can_view_all_projects !== undefined) {
         fields.push('can_view_all_projects = ?');
@@ -307,6 +312,7 @@ const Role = {
       can_manage_settings: role.can_manage_settings === 1,
       can_backup_restore: role.can_backup_restore === 1,
       can_import: role.can_import === 1,
+      require_2fa: role.require_2fa === 1,
       can_view_all_projects: role.can_view_all_projects === 1,
       can_view_own_projects: role.can_view_own_projects === 1,
       can_edit_crm: role.can_edit_crm === 1,

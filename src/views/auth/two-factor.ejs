@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>雙因素驗證 - <%= typeof locals.pageTitleSuffix !== 'undefined' ? locals.pageTitleSuffix : '業績獎金系統' %></title>
+  <link rel="icon" href="<%= typeof faviconHref !== 'undefined' ? faviconHref : '/favicon.ico' %>">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/css/style.css" rel="stylesheet">
+</head>
+<body>
+  <div class="container-fluid">
+    <div class="row justify-content-center align-items-center" style="min-height: 100vh;">
+      <div class="col-md-4">
+        <div class="card shadow">
+          <div class="card-body p-5">
+            <div class="text-center mb-4">
+              <h2 class="mb-2"><i class="bi bi-shield-check"></i> 雙因素驗證</h2>
+              <p class="text-muted mb-0">請輸入驗證器 App 顯示的 6 位數驗證碼</p>
+            </div>
+
+            <% if (typeof error !== 'undefined' && error) { %>
+              <div class="alert alert-danger" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> <%= error %>
+              </div>
+            <% } %>
+
+            <form method="POST" action="/login/2fa" autocomplete="off">
+              <div class="mb-3">
+                <label for="code" class="form-label">驗證碼</label>
+                <input type="text" class="form-control form-control-lg text-center" id="code" name="code"
+                  inputmode="numeric" autocomplete="one-time-code" maxlength="20" placeholder="000000" required autofocus
+                  style="letter-spacing: .3em;">
+                <div class="form-text">手機遺失或無法使用驗證器時，可以改輸入一組<strong>復原碼</strong>（格式 XXXXX-XXXXX，每組只能用一次）。</div>
+              </div>
+              <button type="submit" class="btn btn-dark w-100"><i class="bi bi-box-arrow-in-right"></i> 驗證並登入</button>
+            </form>
+
+            <div class="text-center mt-3">
+              <a href="/login" class="small text-muted">返回登入頁</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
