@@ -303,12 +303,30 @@ if [ -f "${PROJECT_DIR}/package-lock.json" ]; then
 fi
 log "套件資訊備份完成"
 
+# SESSION_SECRET 指紋：雙因素驗證的密鑰是用 SESSION_SECRET 衍生的金鑰加密的，而這把密鑰（只存在 systemd unit，
+# 不在資料庫）不放進備份——備份檔可能被下載或同步到 NAS，不能把解密金鑰和密文放在一起。
+# 備份只記錄指紋（SHA-256 前 16 碼，無法反推密鑰），還原時 restore.sh 用它確認新主機是否使用同一把密鑰。
+# 與 restore.sh 內的同名函式必須一致（有測試比對）。
+sha256_text() {
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
+}
+session_secret_fingerprint() {
+    local unit="${PBG_SYSTEMD_DIR:-/etc/systemd/system}/${SERVICE_NAME:-}.service" secret
+    [ -n "${SERVICE_NAME:-}" ] && [ -f "$unit" ] || return 0
+    secret=$(grep "^Environment=SESSION_SECRET=" "$unit" 2>/dev/null | head -1 | cut -d'=' -f3-)
+    [ -n "$secret" ] || return 0
+    printf 'pbg-session-secret:%s' "$secret" | sha256_text | cut -c1-16
+}
+SECRET_FP=$(session_secret_fingerprint)
+
 # 創建備份資訊檔案
 log "建立備份資訊..."
 BACKUP_INFO="${BACKUP_PATH}/backup_info.txt"
 cat > "$BACKUP_INFO" << EOF
 備份時間: $(date +'%Y-%m-%d %H:%M:%S')
 備份名稱: $BACKUP_NAME
+SESSION_SECRET 指紋: ${SECRET_FP:-未知}
+（指紋只用來在還原時比對密鑰是否相同，無法反推出 SESSION_SECRET；備份本身不含該密鑰）
 系統資訊:
   - 作業系統: $(uname -a)
   - Node.js 版本: $(node -v 2>/dev/null || echo "未安裝")

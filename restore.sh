@@ -32,6 +32,112 @@ info() {
     echo -e "${BLUE}[資訊]${NC} $1"
 }
 
+# 異常結束（error 呼叫 exit）時也要清掉解壓出來的暫存目錄：裡面有完整的資料庫複本，不能留在 /tmp
+cleanup_restore_temp() {
+    case "${TEMP_DIR:-}" in
+        /tmp/invoice_bonus_restore_*) rm -rf -- "$TEMP_DIR" 2>/dev/null || true ;;
+    esac
+}
+trap cleanup_restore_temp EXIT
+
+# 安全副本只保留最近幾份（預設 5，可用 PBG_KEEP_SAFETY_COPIES 調整）：prune_keep_latest <絕對路徑目錄> <檔名前綴> [保留份數]
+# 依修改時間由新到舊排序；資料庫副本旁邊的 -wal／-shm 跟著主檔一起刪。與 deploy.sh 內的同名函式必須一致（有測試比對）。
+prune_keep_latest() {
+    local dir="$1" prefix="$2" keep="${3:-${PBG_KEEP_SAFETY_COPIES:-5}}" f
+    case "$dir" in /*) ;; *) return 0 ;; esac
+    [ -d "$dir" ] && [ -n "$prefix" ] || return 0
+    case "$keep" in ''|*[!0-9]*) keep=5 ;; esac
+    [ "$keep" -ge 1 ] || keep=1
+    ls -1dt "$dir"/"$prefix"* 2>/dev/null | grep -Ev -- '-(wal|shm)$' | tail -n +$((keep + 1)) | while IFS= read -r f; do
+        case "$f" in
+            "$dir"/"$prefix"*) rm -rf -- "$f" "${f}-wal" "${f}-shm" ;;
+        esac
+    done
+}
+
+# SHA-256（Linux 用 sha256sum，macOS 用 shasum）
+sha256_text() {
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
+}
+
+# 本機服務的 SESSION_SECRET 指紋（讀 systemd unit，只印指紋的前 16 碼，不印密鑰；讀不到就不印任何東西）。
+# 雙因素驗證的密鑰以 SESSION_SECRET 衍生的金鑰加密，備份不含這把金鑰，所以還原時要比對指紋確認是不是同一把。
+session_secret_fingerprint() {
+    local unit="${PBG_SYSTEMD_DIR:-/etc/systemd/system}/${SERVICE_NAME:-}.service" secret
+    [ -n "${SERVICE_NAME:-}" ] && [ -f "$unit" ] || return 0
+    secret=$(grep "^Environment=SESSION_SECRET=" "$unit" 2>/dev/null | head -1 | cut -d'=' -f3-)
+    [ -n "$secret" ] || return 0
+    printf 'pbg-session-secret:%s' "$secret" | sha256_text | cut -c1-16
+}
+
+# 檢查資料庫完整性，印出第一行結果（ok 才算正常）；沒有 sqlite3 時改用 node
+check_db_integrity() {
+    local db="$1"
+    if command -v sqlite3 >/dev/null 2>&1; then
+        sqlite3 -readonly "$db" "PRAGMA integrity_check;" 2>&1 | head -1
+    elif command -v node >/dev/null 2>&1 && [ -f "${PROJECT_DIR}/scripts/sqlite-integrity.js" ]; then
+        (cd "${PROJECT_DIR}" && node scripts/sqlite-integrity.js "$db" 2>&1 | head -1)
+    else
+        echo "無法檢查（找不到 sqlite3 或 node）"
+    fi
+}
+
+# 還原到一半才發現資料庫有問題：把還原前的資料庫（含 -wal／-shm）換回來，並把原本在跑的服務啟動回來。
+# rollback_database <還原前保留副本的時間戳> <原因>
+rollback_database() {
+    local ts="$1" reason="$2" ext
+    warning "${reason}，自動換回還原前的資料庫..."
+    rm -f "${PROJECT_DIR}/data/invoice_bonus.db" "${PROJECT_DIR}/data/invoice_bonus.db-wal" "${PROJECT_DIR}/data/invoice_bonus.db-shm"
+    for ext in "" "-wal" "-shm"; do
+        if [ -f "${PROJECT_DIR}/data/invoice_bonus.db.backup_${ts}${ext}" ]; then
+            mv "${PROJECT_DIR}/data/invoice_bonus.db.backup_${ts}${ext}" "${PROJECT_DIR}/data/invoice_bonus.db${ext}" || warning "無法換回 invoice_bonus.db${ext}，請手動處理：${PROJECT_DIR}/data/invoice_bonus.db.backup_${ts}${ext}"
+        fi
+    done
+    chmod 600 "${PROJECT_DIR}/data/invoice_bonus.db"* 2>/dev/null || true
+    if [ -n "${SERVICE_USER:-}" ] && [ "${SERVICE_RUN_AS:-dedicated}" != "root" ] && id "$SERVICE_USER" >/dev/null 2>&1; then
+        chown "${SERVICE_USER}:${SERVICE_USER}" "${PROJECT_DIR}/data/invoice_bonus.db"* 2>/dev/null || true
+    fi
+    if [ "${SERVICE_WAS_RUNNING:-0}" -eq 1 ] && [ -n "${SERVICE_NAME:-}" ]; then
+        sudo systemctl start "${SERVICE_NAME}" 2>/dev/null && log "✓ 服務已重新啟動（使用還原前的資料庫）" || warning "無法啟動服務，請手動執行：sudo systemctl start ${SERVICE_NAME}"
+    fi
+}
+
+# 還原完成後，依資料庫內有幾位使用者啟用雙因素驗證、以及 SESSION_SECRET 指紋是否一致，提示後續處理
+report_session_secret_status() {
+    local db="${PROJECT_DIR}/data/invoice_bonus.db" totp_users="0" current_fp
+    if command -v sqlite3 >/dev/null 2>&1 && [ -f "$db" ]; then
+        totp_users=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM users WHERE totp_enabled = 1;" 2>/dev/null || echo "0")
+    fi
+    case "$totp_users" in ''|*[!0-9]*) totp_users=0 ;; esac
+    current_fp=$(session_secret_fingerprint)
+    if [ -n "$BACKUP_SECRET_FP" ] && [ -n "$current_fp" ] && [ "$BACKUP_SECRET_FP" = "$current_fp" ]; then
+        info "✓ 本機 SESSION_SECRET 與製作這份備份的主機相同，雙因素驗證可正常使用"
+        return 0
+    fi
+    if [ "$totp_users" -eq 0 ]; then
+        if [ -n "$BACKUP_SECRET_FP" ] && [ -n "$current_fp" ]; then
+            info "本機 SESSION_SECRET 與製作這份備份的主機不同；備份中沒有使用者啟用雙因素驗證，不受影響"
+        fi
+        return 0
+    fi
+    echo ""
+    warning "══════════════════════════════════════════════════════════════"
+    if [ -n "$BACKUP_SECRET_FP" ] && [ -n "$current_fp" ]; then
+        warning "本機的 SESSION_SECRET 與製作這份備份的主機【不同】，但備份中有 ${totp_users} 位使用者啟用了雙因素驗證。"
+    else
+        warning "無法確認本機的 SESSION_SECRET 是否與製作這份備份的主機相同（備份沒有記錄指紋，或讀不到本機設定），"
+        warning "而備份中有 ${totp_users} 位使用者啟用了雙因素驗證。"
+    fi
+    warning "雙因素驗證的密鑰是用 SESSION_SECRET 衍生的金鑰加密的；金鑰不同時這些使用者會【無法登入】（系統會拒絕，不會放行），"
+    warning "「信任此裝置」也會一併失效。請擇一處理："
+    warning "  1. 把原主機的 SESSION_SECRET 設回本機：編輯 /etc/systemd/system/${SERVICE_NAME:-<服務名稱>}.service 的"
+    warning "     Environment=SESSION_SECRET=...，再 sudo systemctl daemon-reload && sudo systemctl restart ${SERVICE_NAME:-<服務名稱>}"
+    warning "  2. 重設這些使用者的雙因素驗證（使用者列表的「重設」按鈕；管理員也進不去時，在主機上執行："
+    warning "     sudo -u ${SERVICE_USER:-<服務帳號>} node ${PROJECT_DIR}/scripts/reset-2fa.js <使用者名稱>）"
+    warning "══════════════════════════════════════════════════════════════"
+    echo ""
+}
+
 # 專案目錄
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -464,9 +570,11 @@ fi
 log "完整備份目錄路徑: $RESTORE_FULL_DIR"
 
 log "備份內容："
+BACKUP_SECRET_FP=""
 if [ -f "$RESTORE_FULL_DIR/backup_info.txt" ]; then
     cat "$RESTORE_FULL_DIR/backup_info.txt"
     echo ""
+    BACKUP_SECRET_FP=$(grep -E '^SESSION_SECRET 指紋:' "$RESTORE_FULL_DIR/backup_info.txt" 2>/dev/null | head -1 | sed -E 's/^[^:]*:[[:space:]]*//' | grep -E '^[0-9a-f]{16}$' || true)
 elif [ -f "$RESTORE_FULL_DIR/uninstall_info.txt" ]; then
     cat "$RESTORE_FULL_DIR/uninstall_info.txt"
     echo ""
@@ -513,6 +621,19 @@ else
         log "  找到資料庫: $found_db"
     done
 fi
+
+# 在動到任何現有資料之前先確認備份可用：找不到資料庫、或資料庫通不過完整性檢查，一律中止（現有資料、服務都不受影響）
+if [ -z "$DB_SOURCE" ]; then
+    DB_SOURCE=$(find "$TEMP_DIR" -name "invoice_bonus.db" -type f 2>/dev/null | head -n 1)
+fi
+if [ -z "$DB_SOURCE" ] || [ ! -f "$DB_SOURCE" ]; then
+    error "備份檔中找不到資料庫（invoice_bonus.db），已中止還原，現有資料與服務都沒有被更動"
+fi
+PRECHECK_INTEGRITY=$(check_db_integrity "$DB_SOURCE")
+if [ "$PRECHECK_INTEGRITY" != "ok" ]; then
+    error "備份檔內的資料庫未通過完整性檢查（${PRECHECK_INTEGRITY}），已中止還原，現有資料與服務都沒有被更動。請改用其他備份檔"
+fi
+log "✓ 備份檔內的資料庫通過完整性檢查"
 
 if [ -n "$DB_SOURCE" ] && [ -f "$DB_SOURCE" ]; then
     # 驗證資料庫檔案大小
@@ -662,23 +783,24 @@ if [ -n "$DB_SOURCE" ] && [ -f "$DB_SOURCE" ]; then
     log "還原後資料庫檔案大小: $RESTORED_SIZE bytes"
     
     if [ "$RESTORED_SIZE" -ne "$SOURCE_SIZE" ]; then
-        error "資料庫檔案大小不一致 (原始: ${SOURCE_SIZE}, 還原後: ${RESTORED_SIZE})"
+        rollback_database "$SAFETY_TS" "還原後的資料庫檔案大小不一致 (原始: ${SOURCE_SIZE}, 還原後: ${RESTORED_SIZE})"
+        error "資料庫檔案大小不一致，還原已中止，已換回還原前的資料庫"
     fi
     
     if [ "$RESTORED_SIZE" -eq 0 ]; then
-        error "資料庫還原失敗: 檔案大小為 0"
+        rollback_database "$SAFETY_TS" "還原後的資料庫檔案大小為 0"
+        error "資料庫還原失敗: 檔案大小為 0，已換回還原前的資料庫"
     fi
     
     log "✓ 資料庫檔案複製成功"
 
-    # 完整性檢查：還原後的資料庫必須通過 PRAGMA integrity_check，否則保留還原前的資料庫並中止
-    if command -v sqlite3 >/dev/null 2>&1; then
-        RESTORE_INTEGRITY=$(sqlite3 -readonly "${PROJECT_DIR}/data/invoice_bonus.db" "PRAGMA integrity_check;" 2>&1 | head -1)
-        if [ "$RESTORE_INTEGRITY" != "ok" ]; then
-            error "還原的資料庫完整性檢查失敗（$RESTORE_INTEGRITY）。還原前的資料庫已保留為 ${PROJECT_DIR}/data/invoice_bonus.db.backup_${SAFETY_TS}，請改用其他備份或手動復原"
-        fi
-        log "✓ 還原的資料庫通過完整性檢查"
+    # 完整性檢查：還原後的資料庫必須通過 PRAGMA integrity_check，否則自動換回還原前的資料庫並中止
+    RESTORE_INTEGRITY=$(check_db_integrity "${PROJECT_DIR}/data/invoice_bonus.db")
+    if [ "$RESTORE_INTEGRITY" != "ok" ]; then
+        rollback_database "$SAFETY_TS" "還原後的資料庫完整性檢查失敗（${RESTORE_INTEGRITY}）"
+        error "還原已中止，已換回還原前的資料庫（服務已重新啟動）。請改用其他備份檔"
     fi
+    log "✓ 還原的資料庫通過完整性檢查"
     
     DB_SIZE=$(du -h "${PROJECT_DIR}/data/invoice_bonus.db" | cut -f1)
     log "資料庫還原完成，大小: $DB_SIZE"
@@ -1124,6 +1246,14 @@ else
     info "systemd 服務不存在，跳過服務操作"
     log "⚠️  提醒：手動啟動應用時，請重新啟動 Node.js 進程以載入還原的資料庫"
 fi
+
+# 雙因素驗證的金鑰（SESSION_SECRET）是否與製作備份的主機相同
+report_session_secret_status
+
+# 還原留下的安全副本只保留最近幾份，避免無限累積（含已刪除資料的舊資料庫副本）
+prune_keep_latest "${BACKUP_DIR}" "temp_backup_before_restore_"
+prune_keep_latest "${PROJECT_DIR}/data" "invoice_bonus.db.backup_"
+prune_keep_latest "${PROJECT_DIR}" "uploads.backup_" "${PBG_KEEP_UPLOAD_COPIES:-3}"
 
 echo ""
 echo "============================================"

@@ -270,6 +270,21 @@ else
     info "偵測到已安裝系統，將執行更新部署..."
 fi
 
+# 安全副本只保留最近幾份（預設 5，可用 PBG_KEEP_SAFETY_COPIES 調整）：prune_keep_latest <絕對路徑目錄> <檔名前綴> [保留份數]
+# 依修改時間由新到舊排序；資料庫副本旁邊的 -wal／-shm 跟著主檔一起刪。與 deploy.sh 內的同名函式必須一致（有測試比對）。
+prune_keep_latest() {
+    local dir="$1" prefix="$2" keep="${3:-${PBG_KEEP_SAFETY_COPIES:-5}}" f
+    case "$dir" in /*) ;; *) return 0 ;; esac
+    [ -d "$dir" ] && [ -n "$prefix" ] || return 0
+    case "$keep" in ''|*[!0-9]*) keep=5 ;; esac
+    [ "$keep" -ge 1 ] || keep=1
+    ls -1dt "$dir"/"$prefix"* 2>/dev/null | grep -Ev -- '-(wal|shm)$' | tail -n +$((keep + 1)) | while IFS= read -r f; do
+        case "$f" in
+            "$dir"/"$prefix"*) rm -rf -- "$f" "${f}-wal" "${f}-shm" ;;
+        esac
+    done
+}
+
 # 首次安裝時設定主機時區：系統所有時間（建立時間、修改記錄、作廢時間、備份排程）都跟著主機時區走，
 # 全新的 VM 映像檔通常是 UTC，畫面上的時間會和台灣差 8 小時。
 #   - 預設 Asia/Taipei；以環境變數 DEPLOY_TIMEZONE 指定其他時區，DEPLOY_TIMEZONE=skip 完全不處理
@@ -445,6 +460,8 @@ if [ -f "${PROJECT_DIR}/data/invoice_bonus.db" ]; then
            && [ "$(sqlite3 "$BACKUP_PATH" 'PRAGMA integrity_check;' 2>/dev/null | head -1)" = "ok" ]; then
             chmod 600 "$BACKUP_PATH" 2>/dev/null || true
             log "資料庫已備份（通過完整性檢查）: $BACKUP_PATH"
+            # 每次部署都留一份：只保留最近幾份，避免無限累積（含已刪除資料的舊資料庫副本）
+            prune_keep_latest "${PROJECT_DIR}/data" "invoice_bonus.db.backup-"
         else
             rm -f "$BACKUP_PATH" 2>/dev/null || true
             error "部署前的資料庫備份失敗或未通過完整性檢查，為避免在沒有可用備份的情況下變更資料庫，已中止部署"
@@ -654,8 +671,25 @@ if [ "$NEED_UPDATE" = true ]; then
     # 保留現有 SESSION_SECRET；首次安裝時產生隨機值
     EXISTING_SECRET=$(grep "^Environment=SESSION_SECRET=" "$SERVICE_FILE" 2>/dev/null | cut -d'=' -f3-)
     if [ -z "$EXISTING_SECRET" ]; then
-        EXISTING_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | sha256sum | cut -d' ' -f1)
-        log "已產生新的 SESSION_SECRET"
+        if [ -n "${DEPLOY_SESSION_SECRET:-}" ]; then
+            # 把備份還原到新主機時，沿用原主機的 SESSION_SECRET（雙因素驗證的密鑰靠它解密；備份不含這把密鑰）。
+            # 只接受英數字，因為它會直接寫進 systemd unit 的 Environment=；絕不印出內容
+            # 不能用 grep 逐行比對：含換行的值只要第一行合格就會通過，後面的內容會被當成 unit 的另一行；改成整串檢查
+            case "$DEPLOY_SESSION_SECRET" in
+                *[!A-Za-z0-9]*) SECRET_VALID=0 ;;
+                *) if [ "${#DEPLOY_SESSION_SECRET}" -ge 32 ] && [ "${#DEPLOY_SESSION_SECRET}" -le 128 ]; then SECRET_VALID=1; else SECRET_VALID=0; fi ;;
+            esac
+            if [ "$SECRET_VALID" -ne 1 ]; then
+                error "DEPLOY_SESSION_SECRET 格式不正確（需為 32–128 位英數字，例如原主機 systemd unit 內的 64 位十六進位字串）"
+            fi
+            EXISTING_SECRET="$DEPLOY_SESSION_SECRET"
+            log "已使用 DEPLOY_SESSION_SECRET 指定的 SESSION_SECRET（沿用原主機的密鑰）"
+        else
+            EXISTING_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | sha256sum | cut -d' ' -f1)
+            log "已產生新的 SESSION_SECRET（若要把備份還原到這台新主機，且備份中有使用者啟用雙因素驗證，請改用 DEPLOY_SESSION_SECRET 指定原主機的密鑰，見 CLAUDE.md「災難還原」）"
+        fi
+    elif [ -n "${DEPLOY_SESSION_SECRET:-}" ]; then
+        warning "本機已有 SESSION_SECRET，忽略 DEPLOY_SESSION_SECRET（只在首次安裝、尚無密鑰時生效）"
     fi
 
     # 專用帳號時加上基本的 systemd 防護。刻意不啟用 NoNewPrivileges：服務需要透過 sudo 呼叫特權輔助程式；

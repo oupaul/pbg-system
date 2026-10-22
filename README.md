@@ -76,7 +76,7 @@ bash <(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
 |---|---|---|
 | 執行環境 | `NODE_ENV=development`，會印出除錯訊息、SQL log | `NODE_ENV=production`，寫進 systemd unit |
 | 資料 | 本機 `data/invoice_bonus.db`，可隨時砍掉重建 | 客戶的真實資料，沒有 staging 環境 |
-| `SESSION_SECRET` | 未設定的話每次啟動都換一組（開發用途無妨，見 [`.env.example`](.env.example)） | 首次部署自動產生並固定寫入 systemd unit |
+| `SESSION_SECRET` | 未設定的話每次啟動都換一組（開發用途無妨，見 [`.env.example`](.env.example)） | 首次部署自動產生並固定寫入 systemd unit；**不在備份裡**，要把備份還原到新主機時，請用 `DEPLOY_SESSION_SECRET` 沿用原主機的值（見 CLAUDE.md「災難還原」） |
 | 啟動方式 | 手動 `npm run dev` | 透過 systemd 服務常駐、`Restart=always` |
 | 適合驗證什麼 | 功能邏輯、畫面、UI 互動 | 部署腳本本身、systemd 整合、實際 port/服務設定是否正確 |
 
