@@ -50,6 +50,7 @@ Node.js + Express + SQLite（`better-sqlite3`）的發票／業績獎金／CRM �
 - 停服務時的 `kill -9`（含首次安裝那個分支，以及 `restore.sh`、`uninstall.sh`）現在只看「監聽」該 port 的程序（`lsof -sTCP:LISTEN`，連到該 port 的用戶端如 SSH 通道不算），並先確認指令包含 `app.js`（`uninstall.sh` 要求是本安裝目錄的 `src/app.js`）才殺，且都改用 `${PORT}` 而非寫死 3000；驗證失敗會停止部署並印出 PID／指令，不會誤殺無關程序
 - 依賴以 `package-lock.json` 鎖定（已提交，不再 gitignore），部署使用 `npm ci` 讓每家公司的主機得到完全相同的版本；有鎖定檔時**不會**在主機上自動 `npm audit fix`（會讓各主機版本漂移）——漏洞請在開發環境執行 `npm audit fix`、測試後提交更新的鎖定檔，需要在主機強制執行時設定 `RUN_AUDIT_FIX=1`；沒有鎖定檔時維持舊行為（`npm install` + 自動 audit fix，`SKIP_AUDIT_FIX=1` 可略過）。`package.json` 有 `engines`（Node >=20 <25）與 `.nvmrc`（22）；Node 26 與 better-sqlite3 的 ABI 不相容
 - 部署前的資料庫備份與 `migrations/runner.js` 執行前的快照（`data/invoice_bonus.db.pre-migrate-*`，保留最近 3 份，`SKIP_MIGRATION_SNAPSHOT=1` 可略過）都改用 SQLite 線上備份（`.backup`／`VACUUM INTO`），並檢查 `PRAGMA integrity_check`；備份失敗就中止，不再在沒有備份時變更資料庫。`runner.js` 遇到第一個失敗的 migration 就停止，不再繼續執行後面可能依賴它的 migration
+- 首次安裝設定主機時區（`set_default_timezone`）：全新 VM 映像檔多半是 UTC，系統所有時間（見「時區與時間字串」）都跟著主機時區走。預設改成 `Asia/Taipei`，**只在主機目前是 UTC 時才改**（管理員刻意設成其他時區的不動）；`DEPLOY_TIMEZONE=<時區>` 指定其他時區、`DEPLOY_TIMEZONE=skip` 完全不處理；時區名稱驗證（只允許 Area/Location 字元且必須存在於 `/usr/share/zoneinfo`），失敗只警告不中斷；**更新部署（非首次安裝）完全不碰時區**。測試見 `tests/deployTimezone.test.js`（用假的 timedatectl）
 
 ## 服務執行帳號（非 root）與特權輔助程式
 

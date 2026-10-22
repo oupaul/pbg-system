@@ -270,6 +270,46 @@ else
     info "偵測到已安裝系統，將執行更新部署..."
 fi
 
+# 首次安裝時設定主機時區：系統所有時間（建立時間、修改記錄、作廢時間、備份排程）都跟著主機時區走，
+# 全新的 VM 映像檔通常是 UTC，畫面上的時間會和台灣差 8 小時。
+#   - 預設 Asia/Taipei；以環境變數 DEPLOY_TIMEZONE 指定其他時區，DEPLOY_TIMEZONE=skip 完全不處理
+#   - 只在主機目前是 UTC 時才改：管理員已經刻意設成其他時區的主機不會被動到
+#   - 失敗只警告，不中斷部署；更新部署（非首次安裝）完全不會碰時區
+set_default_timezone() {
+    local target="${DEPLOY_TIMEZONE:-Asia/Taipei}"
+    if [ "$target" = "skip" ]; then
+        info "DEPLOY_TIMEZONE=skip，略過時區設定"
+        return 0
+    fi
+    if ! command -v timedatectl &> /dev/null; then
+        warning "找不到 timedatectl，略過時區設定（請自行確認主機時區）"
+        return 0
+    fi
+    # 時區名稱只允許 Area/Location 這類字元，並且必須是系統認得的時區
+    if ! printf '%s' "$target" | grep -Eq '^[A-Za-z0-9_+/-]+$' || [ ! -f "/usr/share/zoneinfo/${target}" ]; then
+        warning "時區「${target}」不存在，略過時區設定"
+        return 0
+    fi
+    local current
+    current=$(timedatectl show --property=Timezone --value 2>/dev/null || true)
+    if [ "$current" = "$target" ]; then
+        log "✓ 主機時區已是 ${target}"
+        return 0
+    fi
+    case "$current" in
+        UTC|Etc/UTC|Etc/UCT|Etc/Universal|Etc/Zulu|"")
+            if timedatectl set-timezone "$target" 2>/dev/null; then
+                log "✓ 主機時區已由 ${current:-未設定} 改為 ${target}（可用 DEPLOY_TIMEZONE=skip 略過）"
+            else
+                warning "設定時區失敗，請手動執行：sudo timedatectl set-timezone ${target}"
+            fi
+            ;;
+        *)
+            info "主機時區為 ${current}，保留不變（要改成 ${target} 請手動執行：sudo timedatectl set-timezone ${target}）"
+            ;;
+    esac
+}
+
 echo ""
 log "開始部署流程..."
 
@@ -279,6 +319,9 @@ log "開始部署流程..."
 if [ "$IS_FIRST_INSTALL" = true ]; then
     log "=== 首次安裝流程 ==="
     
+    # 設定主機時區（預設台北；只在主機目前是 UTC 時才改）
+    set_default_timezone
+
     # 檢查並安裝 Node.js
     log "檢查 Node.js..."
     if ! command -v node &> /dev/null; then
