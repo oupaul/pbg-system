@@ -465,7 +465,7 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
           <p class="text-muted">發票號碼：<code>${h(inv.invoice_number || '-')}</code>，金額：${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(inv.amount_with_tax || 0).toLocaleString()}</p>
           <div class="mb-3">
             <label class="form-label">作廢日期</label>
-            <input type="date" name="voided_at" class="form-control" value="${new Date().toISOString().slice(0, 10)}">
+            <input type="date" name="voided_at" class="form-control" value="${localDate()}">
           </div>
           <div class="mb-3">
             <label class="form-label">作廢原因（選填）</label>
@@ -541,7 +541,7 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
           </div>
           <div class="mb-3">
             <label class="form-label">折讓日期</label>
-            <input type="date" name="voided_at" class="form-control" value="${new Date().toISOString().slice(0, 10)}">
+            <input type="date" name="voided_at" class="form-control" value="${localDate()}">
           </div>
           <div class="mb-3">
             <label class="form-label">折讓原因（選填）</label>
@@ -570,7 +570,7 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
           <p class="text-muted">發票號碼：<code>${h(inv.invoice_number || '-')}</code>，金額：${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(inv.amount_with_tax || 0).toLocaleString()} 將設為整筆折讓，不計入已開立總額。</p>
           <div class="mb-3">
             <label class="form-label">折讓日期</label>
-            <input type="date" name="voided_at" class="form-control" value="${new Date().toISOString().slice(0, 10)}">
+            <input type="date" name="voided_at" class="form-control" value="${localDate()}">
           </div>
           <div class="mb-3">
             <label class="form-label">折讓原因（選填）</label>

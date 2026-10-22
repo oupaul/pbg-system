@@ -135,7 +135,9 @@ document.addEventListener('DOMContentLoaded', function() {
   // 日期選擇器預設值
   document.querySelectorAll('input[type="date"]').forEach(function(input) {
     if (!input.value && !input.dataset.noDefault) {
-      input.value = new Date().toISOString().split('T')[0];
+      // 用瀏覽器本地日期（toISOString 是 UTC，台灣 00:00–08:00 會變成前一天）
+      var now = new Date();
+      input.value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
     }
   });
 

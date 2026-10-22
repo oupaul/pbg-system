@@ -5,6 +5,7 @@
 const db = require('../models/db');
 const Payment = require('../models/Payment');
 const { round2, sumMoney } = require('../utils/money');
+const { localDate } = require('../utils/localTime');
 
 const ReceivablesAgingService = {
   /**
@@ -15,7 +16,7 @@ const ReceivablesAgingService = {
    * @returns {Object} { buckets, total, details }
    */
   getAgingReport(year = null, excludeSalespersonIds = null, onlySalespersonIds = null) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDate();
     const excludeCond = excludeSalespersonIds && excludeSalespersonIds.length > 0
       ? ` AND p.salesperson_id NOT IN (${excludeSalespersonIds.map(() => '?').join(',')})`
       : '';
@@ -138,10 +139,10 @@ const ReceivablesAgingService = {
    * @returns {Object} { upcoming: [], overdue: [] }
    */
   getPaymentReminder(reminderDays = 7, excludeSalespersonIds = null, salespersonId = null) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDate();
     const todayDate = new Date(today);
     const futureDate = new Date(todayDate);
-    futureDate.setDate(futureDate.getDate() + reminderDays);
+    futureDate.setUTCDate(futureDate.getUTCDate() + reminderDays); // todayDate 是 UTC 午夜，用 UTC 加天數才不會受伺服器時區影響
     const futureStr = futureDate.toISOString().slice(0, 10);
 
     const excludeCond = excludeSalespersonIds && excludeSalespersonIds.length > 0

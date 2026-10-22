@@ -6,6 +6,7 @@
 //   details：修改事件列出「有變動的欄位」前後值；新增事件列出幾個關鍵欄位（from 為 null）
 
 // 各資料表的設定：kind、物件名稱、欄位中文名稱、如何辨識「是哪一筆」、新增時顯示哪些關鍵欄位
+const { UTC_STORED_FIELDS, displayTimeField } = require('./localTime');
 const TABLES = {
   projects: {
     kind: 'project', object: '專案資料',
@@ -91,6 +92,7 @@ function sameValue(a, b) {
 // 欄位值轉成顯示文字（金額加幣別符號、外鍵轉名稱、空值顯示為空白）
 function formatValue(field, value, ctx) {
   if (value === null || value === undefined || value === '') return '（空白）';
+  if (UTC_STORED_FIELDS.has(field)) return String(displayTimeField(field, value)); // 以 UTC 儲存的時間，顯示時轉本地
   if (MONEY_FIELDS.has(field)) return money(value, ctx.symbol);
   const lk = ctx.lookups || {};
   if (field === 'salesperson_id') return (lk.salespeople && lk.salespeople[value]) || `#${value}`;

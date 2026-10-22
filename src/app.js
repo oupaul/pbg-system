@@ -170,6 +170,7 @@ app.use((req, res, next) => {
   res.locals.jsAttr = require('./utils/escapeHtml').jsAttr;
   // 嵌入 <script>／HTML 屬性的 JSON 序列化（跳脫 < > & ' 與 U+2028/9）
   res.locals.jsonForScript = require('./utils/jsonForScript');
+  res.locals.localDate = require('./utils/localTime').localDate; // 伺服器本地日期（日期輸入預設值用；toISOString 是 UTC）
 
   // 目前路徑，供導覽列標示當前所在頁面使用
   res.locals.currentPath = req.path;

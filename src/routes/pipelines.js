@@ -17,6 +17,7 @@ const ExcelExportService = require('../services/ExcelExportService');
 const cache = require('../services/CacheService');
 const { WIN_PROBABILITY_STAGE_LABELS } = require('../constants');
 const NotificationService = require('../services/NotificationService');
+const { localDate } = require('../utils/localTime');
 
 function getActiveProjectTypes() {
   try {
@@ -217,7 +218,7 @@ router.get('/export', requireImportExport, async (req, res) => {
     const workbook = ExcelExportService.exportPipelines(Array.isArray(pipelines) ? pipelines : [], status);
     const buffer = await ExcelExportService.writeToBuffer(workbook);
     const nodeBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
-    const filename = `銷售機會${status ? '_' + status : ''}_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`;
+    const filename = `銷售機會${status ? '_' + status : ''}_${localDate().replace(/-/g, '')}.xlsx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
     res.setHeader('Content-Length', nodeBuffer.length);

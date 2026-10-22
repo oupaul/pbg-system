@@ -1,5 +1,6 @@
 const express = require('express');
 const { round2, sumMoney, toMoney } = require('../utils/money');
+const { localDate } = require('../utils/localTime');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs');
@@ -764,7 +765,7 @@ router.get('/:id', (req, res) => {
   // 計算每筆發票的收款狀態（與收款明細比對，僅用未刪除的收款）
   // 支援分次收款：僅在「已收齊」時顯示提前/準時/逾期到款；部分收款時依預計收款日顯示待收狀態
   const paymentsForStatus = Payment.findByProject(project.id); // 未刪除
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const today = localDate(); // YYYY-MM-DD（伺服器本地日期；toISOString 是 UTC，台灣 00:00–08:00 會算成前一天）
   const diffDays = (d1, d2) => Math.round((new Date(d1) - new Date(d2)) / (1000 * 60 * 60 * 24));
 
   const invoicesWithStatus = invoices.map(inv => {

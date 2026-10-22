@@ -23,6 +23,7 @@ const { mountImportFlow } = require('../utils/importFlow');
 const importSummaries = require('../utils/importSummaries');
 const ExcelExportService = require('../services/ExcelExportService');
 const ExcelImportService = require('../services/ExcelImportService');
+const { localDate } = require('../utils/localTime');
 
 // 客戶/廠商批次匯入專用的上傳中介層（管理者專用，沿用既有的 uploads/ 暫存目錄）
 const customerImportUpload = multer({
@@ -218,7 +219,7 @@ router.get('/export', requireAdmin, async (req, res) => {
     const workbook = ExcelExportService.exportCustomers(Array.isArray(customers) ? customers : []);
     const buffer = await ExcelExportService.writeToBuffer(workbook);
     const nodeBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
-    const filename = `客戶廠商資料_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`;
+    const filename = `客戶廠商資料_${localDate().replace(/-/g, '')}.xlsx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
     res.setHeader('Content-Length', nodeBuffer.length);
@@ -235,7 +236,7 @@ router.get('/export-activities', requireAdmin, async (req, res) => {
     const workbook = ExcelExportService.exportActivities();
     const buffer = await ExcelExportService.writeToBuffer(workbook);
     const nodeBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
-    const filename = `客戶活動紀錄_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`;
+    const filename = `客戶活動紀錄_${localDate().replace(/-/g, '')}.xlsx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
     res.setHeader('Content-Length', nodeBuffer.length);

@@ -93,7 +93,7 @@ describe('Excel 匯入檔驗證', () => {
     zip.file('big.bin', Buffer.alloc(160 * 1024 * 1024));
     const p = write('bomb.xlsx', await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }));
     expect(validateXlsxStructure(p).ok).toBe(false);
-  });
+  }, 30000); // 產生 160MB 測試檔，機器忙碌時超過預設 5 秒
 });
 
 describe('guardedSingleUpload', () => {

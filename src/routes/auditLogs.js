@@ -7,6 +7,7 @@ const Invoice = require('../models/Invoice');
 const dayjs = require('dayjs');
 
 const { requireAdmin } = require('../middleware/auth');
+const { displayTimeField } = require('../utils/localTime');
 
 const router = express.Router();
 
@@ -92,7 +93,7 @@ router.get('/', (req, res) => {
     const labels = FIELD_LABELS[tableName] || {};
     const result = {};
     for (const [key, value] of Object.entries(data)) {
-      result[labels[key] || key] = value;
+      result[labels[key] || key] = displayTimeField(key, value); // voided_at／deleted_at 以 UTC 儲存，顯示時轉本地時間
     }
     return result;
   };
@@ -142,7 +143,7 @@ router.get('/', (req, res) => {
       
       changedFields.forEach(field => {
         const displayKey = labels[field] || field;
-        let value = data[field];
+        let value = displayTimeField(field, data[field]); // 要和上面轉換後顯示的值一致，才找得到那一行加高亮
         if (field === 'project_id' && nameMap.project) {
           value = `${data.project_id} (${nameMap.project})`;
         } else if (field === 'id' && tableName === 'projects' && nameMap.project) {
