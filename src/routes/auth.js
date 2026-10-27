@@ -17,7 +17,7 @@ function burnPasswordCheck(password) {
   return dummyHashPromise.then(hash => User.verifyPassword(password, hash)).catch(() => false);
 }
 const LOGIN_FAIL_MESSAGE = '帳號或密碼錯誤';
-const PASSWORD_MIN_LENGTH = 10;
+const PasswordPolicy = require('../utils/passwordPolicy');
 
 // 只允許相對路徑重新導向，防止 open redirect
 function safeRedirect(redirect) {
@@ -278,7 +278,8 @@ router.get('/change-password', require('../middleware/auth').requireAuth, (req, 
     title: '修改密碼',
     error: req.query.error || '',
     success: req.query.success || '',
-    forced: !!req.session.user?.must_change_password
+    forced: !!req.session.user?.must_change_password,
+    passwordHint: PasswordPolicy.describe()
   });
 });
 
@@ -296,8 +297,9 @@ router.post('/change-password', require('../middleware/auth').requireAuth, async
     return res.redirect('/change-password?error=' + encodeURIComponent('新密碼與確認密碼不一致'));
   }
 
-  if (newPassword.length < PASSWORD_MIN_LENGTH) {
-    return res.redirect('/change-password?error=' + encodeURIComponent(`新密碼長度至少需要 ${PASSWORD_MIN_LENGTH} 個字元`));
+  const policy = PasswordPolicy.validate(newPassword, { username: req.session.user.username });
+  if (!policy.ok) {
+    return res.redirect('/change-password?error=' + encodeURIComponent(`新${policy.message}`));
   }
 
   // 取得當前用戶（使用原始查詢，不檢查 is_active）

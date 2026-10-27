@@ -106,6 +106,7 @@ async function main() {
     addUser(name, 'edit_only');
   }
   for (const name of Array.from({ length: 16 }, (_, i) => `u_td_${i + 1}`)) addUser(name, 'edit_only'); // 信任裝置測試用，各自獨立
+  for (const name of ['u_pw_1', 'u_pw_2', 'u_pw_3', 'u_pw_4']) addUser(name, 'edit_only'); // 密碼規則測試用，各自獨立
   addUser('u_req_a', 'req2fa');   // 角色強制、尚未啟用：登入後只能去設定頁
   addUser('u_req_b', 'req2fa');   // 同上，用來走完整個啟用流程
   addUser('u_req_c', 'req2fa');   // 角色強制且已啟用：不可停用

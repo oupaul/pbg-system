@@ -26,6 +26,8 @@
   const activityReminderDaysSetting = localSettings.find(s => s.setting_key === 'activity_reminder_days');
   const trustDaysSetting = localSettings.find(s => s.setting_key === 'two_factor_trust_days');
   const trustDaysValue = trustDaysSetting ? trustDaysSetting.setting_value : '30';
+  const passwordComplexitySetting = localSettings.find(s => s.setting_key === 'password_complexity_enabled');
+  const passwordComplexityOn = !!passwordComplexitySetting && String(passwordComplexitySetting.setting_value).toLowerCase() === 'true';
 
   const notificationDaysValue = notificationDaysSetting ? notificationDaysSetting.setting_value : '6';
   const notificationEnabledValue = notificationEnabledSetting ? notificationEnabledSetting.setting_value : 'true';
@@ -260,6 +262,26 @@
   bodyHtml += '        <span class="input-group-text">天</span>';
   bodyHtml += '      </div>';
   bodyHtml += '      <div class="form-text">客戶已指派「客戶關係負責人」時，若超過此天數沒有新增任何活動紀錄（拜訪/電話/客訴/其他），就會在首頁儀表板的「客戶追蹤提醒」與導覽列通知中心產生提醒。</div>';
+  bodyHtml += '      <hr class="my-4">';
+  bodyHtml += '      <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> 儲存設定</button>';
+  bodyHtml += '    </form>';
+  bodyHtml += '  </div>';
+  bodyHtml += '</div>';
+
+  // 密碼規則設定卡片：最短長度固定 6 個字元；複雜度由管理員選擇是否要求
+  bodyHtml += '<div class="card mt-4">';
+  bodyHtml += '  <div class="card-header bg-primary text-white">';
+  bodyHtml += '    <h5 class="mb-0"><i class="bi bi-key"></i> 密碼規則</h5>';
+  bodyHtml += '  </div>';
+  bodyHtml += '  <div class="card-body">';
+  bodyHtml += '    <form method="POST" action="/settings/bulk-update">';
+  bodyHtml += '      <p class="mb-3">最短長度：<strong>6 個字元</strong>（固定）</p>';
+  bodyHtml += '      <label for="password_complexity_enabled" class="form-label"><strong>密碼複雜度要求</strong></label>';
+  bodyHtml += '      <select class="form-select" id="password_complexity_enabled" name="password_complexity_enabled" style="max-width: 320px;">';
+  bodyHtml += '        <option value="false"' + (passwordComplexityOn ? '' : ' selected') + '>不要求（只檢查長度）</option>';
+  bodyHtml += '        <option value="true"' + (passwordComplexityOn ? ' selected' : '') + '>要求（建議）</option>';
+  bodyHtml += '      </select>';
+  bodyHtml += '      <div class="form-text">要求時，新密碼必須包含<strong>大寫字母、小寫字母、數字、符號中的至少 3 種</strong>，且不可包含使用者名稱。只在「設定密碼的當下」檢查：不影響既有密碼，也不會要求既有使用者重設。</div>';
   bodyHtml += '      <hr class="my-4">';
   bodyHtml += '      <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> 儲存設定</button>';
   bodyHtml += '    </form>';

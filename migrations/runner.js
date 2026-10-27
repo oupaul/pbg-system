@@ -106,6 +106,7 @@ const MIGRATIONS = [
   'migrate_two_factor',
   'migrate_referral_rewards_created_by',
   'migrate_two_factor_trusted_devices',
+  'migrate_password_policy',
 ];
 
 function run() {

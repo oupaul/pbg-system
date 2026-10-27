@@ -9,7 +9,7 @@ const db = require('../models/db');
 const { PROJECT_VIEW_SCOPE } = require('../constants');
 
 // 密碼最短長度（與 routes/auth.js 的修改密碼一致）
-const PASSWORD_MIN_LENGTH = 10;
+const PasswordPolicy = require('../utils/passwordPolicy');
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -102,6 +102,7 @@ router.get('/new', requireAuth, requireAdmin, (req, res) => {
     roles: getRoles(),
     assignedSalespersonIds: [],
     action: '/users',
+    passwordHint: PasswordPolicy.describe(),
     error: req.query.error || ''
   });
 });
@@ -118,8 +119,9 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
   if (!username || !password || !name) {
     return res.redirect('/users/new?error=' + encodeURIComponent('請填寫所有必填欄位'));
   }
-  if (password.length < PASSWORD_MIN_LENGTH) {
-    return res.redirect('/users/new?error=' + encodeURIComponent(`密碼長度至少需要 ${PASSWORD_MIN_LENGTH} 個字元`));
+  const passwordCheck = PasswordPolicy.validate(password, { username });
+  if (!passwordCheck.ok) {
+    return res.redirect('/users/new?error=' + encodeURIComponent(passwordCheck.message));
   }
   if (role === 'salesperson' && !salesperson_id) {
     return res.redirect('/users/new?error=' + encodeURIComponent('業務員角色必須關聯一位業務人員'));
@@ -190,6 +192,7 @@ router.get('/:id/edit', requireAuth, requireAdmin, (req, res) => {
     roles: getRoles(),
     assignedSalespersonIds: getAssignedSalespersonIds(user.id),
     action: `/users/${user.id}`,
+    passwordHint: PasswordPolicy.describe(),
     error: req.query.error || ''
   });
 });
@@ -212,9 +215,12 @@ router.post('/:id', requireAuth, requireAdmin, async (req, res) => {
     return res.redirect(`/users/${userId}/edit?error=` + encodeURIComponent('業務員角色必須關聯一位業務人員'));
   }
 
-  // 先驗證密碼長度，再建立新業務，避免驗證失敗時留下孤兒業務
-  if (password && password.length > 0 && password.length < PASSWORD_MIN_LENGTH) {
-    return res.redirect(`/users/${userId}/edit?error=` + encodeURIComponent(`密碼長度至少需要 ${PASSWORD_MIN_LENGTH} 個字元`));
+  // 先驗證密碼規則，再建立新業務，避免驗證失敗時留下孤兒業務
+  if (password && password.length > 0) {
+    const passwordCheck = PasswordPolicy.validate(password, { username: user.username });
+    if (!passwordCheck.ok) {
+      return res.redirect(`/users/${userId}/edit?error=` + encodeURIComponent(passwordCheck.message));
+    }
   }
 
   // 「建立新業務人員」：以此使用者姓名新建一位業務並綁定
@@ -242,9 +248,7 @@ router.post('/:id', requireAuth, requireAdmin, async (req, res) => {
     const oldUser = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
 
     if (password && password.length > 0) {
-      if (password.length < PASSWORD_MIN_LENGTH) {
-        return res.redirect(`/users/${userId}/edit?error=` + encodeURIComponent(`密碼長度至少需要 ${PASSWORD_MIN_LENGTH} 個字元`));
-      }
+      // 前面已驗證過密碼規則（在建立新業務之前），這裡直接更新
       await User.updatePassword(userId, password);
     }
 
