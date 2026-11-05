@@ -164,6 +164,86 @@ describeIntegration('批次刪除／還原收款', () => {
   });
 });
 
+describeIntegration('批次刪除成本（硬刪除）', () => {
+  let admin; let P; let Q; const c = {};
+  const costExists = (id) => !!withDb(db => db.prepare('SELECT 1 x FROM costs WHERE id = ?').get(id));
+  const costId = (name) => withDb(db => db.prepare('SELECT id FROM costs WHERE item_name = ?').get(name).id);
+  beforeAll(async () => {
+    admin = await as('admin');
+    P = makeProject('BATCH-COST');
+    Q = makeProject('BATCH-COST-2');
+    for (const [n, est, act] of [['BC-1', '100', '90'], ['BC-2', '200', '190'], ['BC-3', '300', '290'], ['BC-4', '400', '390']]) {
+      await admin.post('/costs/', { form: { project_id: String(P), cost_date: '2026-10-03', item_name: n, estimated_amount: est, actual_amount: act } });
+      c[n] = costId(n);
+    }
+    await admin.post('/costs/', { form: { project_id: String(Q), cost_date: '2026-10-03', item_name: 'BC-OTHER', estimated_amount: '999', actual_amount: '888' } });
+    c['BC-OTHER'] = costId('BC-OTHER');
+  });
+
+  test('批次刪除：選取的成本被刪除、其他成本與其他專案不動，每筆完整內容留在修改記錄', async () => {
+    const r = await post(admin, '/costs/batch-delete', { project_id: String(P), ids: [String(c['BC-1']), String(c['BC-2'])] });
+    expect(r.status).toBe(302);
+    expect(r.location).toContain(`/projects/${P}`);
+    expect(r.location).toContain('#pane-costs');
+    expect(decode(r.location)).toContain('已刪除 2 筆成本');
+    expect(costExists(c['BC-1'])).toBe(false);
+    expect(costExists(c['BC-2'])).toBe(false);
+    expect(costExists(c['BC-3'])).toBe(true);
+    expect(costExists(c['BC-OTHER'])).toBe(true);
+    expect(logCount('costs', 'delete', c['BC-1'])).toBe(1);
+    // 稽核紀錄保留被刪除成本的內容，之後才查得到刪了什麼
+    const old = withDb(db => db.prepare("SELECT old_value FROM system_logs WHERE table_name = 'costs' AND action = 'delete' AND record_id = ?").get(c['BC-1']).old_value);
+    expect(old).toContain('BC-1');
+    expect(old).toContain('100');
+  });
+
+  test('刪除後專案頁的預估成本與總成本只剩剩下的明細', async () => {
+    const html = (await admin.get(`/projects/${P}`)).text;
+    expect(html).toContain('BC-3');
+    expect(html).not.toContain('>BC-1<');
+    const side = (label) => { const m = new RegExp(`<span>${label}</span>\\s*<span[^>]*>[^0-9<]*([\\d,]+)</span>`).exec(html); return m && Number(m[1].replace(/,/g, '')); };
+    expect(side('預估成本')).toBe(700); // BC-3 + BC-4
+    expect(side('總成本')).toBe(680);
+  });
+
+  test('重複的 id 只算一次；夾帶其他專案的成本整批拒絕、什麼都不刪', async () => {
+    const dup = await post(admin, '/costs/batch-delete', { project_id: String(P), ids: [String(c['BC-3']), String(c['BC-3'])] });
+    expect(decode(dup.location)).toContain('已刪除 1 筆成本');
+    const mixed = await post(admin, '/costs/batch-delete', { project_id: String(P), ids: [String(c['BC-4']), String(c['BC-OTHER'])] });
+    expect(mixed.status).toBe(400);
+    expect(costExists(c['BC-4'])).toBe(true);
+    expect(costExists(c['BC-OTHER'])).toBe(true);
+  });
+
+  test('夾帶不存在的 id 整批拒絕；不合法的參數 400', async () => {
+    const r = await post(admin, '/costs/batch-delete', { project_id: String(P), ids: [String(c['BC-4']), '99999999'] });
+    expect(r.status).toBe(400);
+    expect(costExists(c['BC-4'])).toBe(true);
+    expect((await post(admin, '/costs/batch-delete', {})).status).toBe(400);
+    expect((await post(admin, '/costs/batch-delete', { ids: 'abc' })).status).toBe(400);
+    expect((await post(admin, '/costs/batch-delete', { ids: "1' OR '1'='1" })).status).toBe(400);
+    const tooMany = Array.from({ length: 201 }, (_, i) => String(i + 1));
+    expect((await post(admin, '/costs/batch-delete', { ids: tooMany })).status).toBe(400);
+    const none = await post(admin, '/costs/batch-delete', { project_id: String(P) });
+    expect(none.status).toBe(302);
+    expect(decode(none.location)).toContain('請先勾選');
+  });
+
+  test('唯讀角色與無權限者被擋下；範圍為「自己」的角色刪不到別人專案的成本', async () => {
+    for (const u of ['u_boss', 'u_salesA', 'u_none']) {
+      const cl = await as(u);
+      const r = await cl.post('/costs/batch-delete', { form: { ids: String(c['BC-4']) } });
+      expect([u, isDenied(r)]).toEqual([u, true]);
+    }
+    expect(costExists(c['BC-4'])).toBe(true);
+    const own = await as('u_ownedit'); // 綁業務 A；BATCH-COST 專案屬於業務 A，B 專案的成本才是範圍外
+    const other = ids.B.cost;
+    const denied = await post(own, '/costs/batch-delete', { project_id: String(ids.B.project), ids: String(other) });
+    expect(denied.status).toBe(403);
+    expect(costExists(other)).toBe(true);
+  });
+});
+
 describeIntegration('專案頁的批次勾選介面', () => {
   test('可編輯的角色看得到勾選框與批次按鈕，唯讀角色看不到', async () => {
     const adminPage = (await (await as('admin')).get(`/projects/${ids.A.project}`)).text;
@@ -171,9 +251,14 @@ describeIntegration('專案頁的批次勾選介面', () => {
     expect(adminPage).toContain('form="payBatchForm"');
     expect(adminPage).toContain('/invoices/batch-delete');
     expect(adminPage).toContain('/payments/batch-restore');
+    expect(adminPage).toContain('form="costBatchForm"');
+    expect(adminPage).toContain('/costs/batch-delete');
+    expect(adminPage).toContain('data-batch-confirm="確定永久刪除選取的 {n} 筆成本');
     const salesPage = (await (await as('u_salesA')).get(`/projects/${ids.A.project}`)).text;
     expect(salesPage).not.toContain('form="invBatchForm"');
     expect(salesPage).not.toContain('id="invBatchForm"');
     expect(salesPage).not.toContain('/invoices/batch-delete');
+    expect(salesPage).not.toContain('costBatchForm');
+    expect(salesPage).not.toContain('/costs/batch-delete');
   });
 });

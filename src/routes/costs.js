@@ -5,6 +5,7 @@ const Cost = require('../models/Cost');
 const { getUserInfo } = require('../utils/authHelper');
 const { requireEditPermission } = require('../middleware/auth');
 const { requireProjectScopeFromBody, requireProjectScopeFromRecord } = require('../utils/projectScope');
+const { runBatch } = require('../utils/batchOps');
 
 // 寫入成本需要編輯權限，且操作的專案必須在使用者的專案範圍內
 const costScope = requireProjectScopeFromRecord(id => Cost.findById(id));
@@ -34,6 +35,16 @@ router.post('/', requireEditPermission, requireProjectScopeFromBody, (req, res) 
     console.error(err);
     res.redirect(`/projects/${req.body.project_id}?error=` + encodeURIComponent(err.message));
   }
+});
+
+// 批次刪除成本（同一專案、全有或全無；須定義在 /:id 之前）。
+// 成本是硬刪除、沒有還原；每一筆的完整內容都留在修改記錄（logDelete）。
+router.post('/batch-delete', requireEditPermission, (req, res) => {
+  const userInfo = getUserInfo(req);
+  runBatch({
+    req, res, find: (id) => Cost.findById(id), unit: '筆成本', verb: '刪除', tab: 'pane-costs',
+    apply: (cost) => Cost.delete(cost.id, userInfo)
+  });
 });
 
 // 更新成本

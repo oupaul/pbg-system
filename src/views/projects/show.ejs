@@ -646,13 +646,18 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center">
     <span><i class="bi bi-cash-stack"></i> 成本明細</span>
-    ${locals.canEdit ? '<button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#costModal"><i class="bi bi-plus-lg"></i> 新增成本</button>' : ''}
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      ${locals.canEdit ? '<form id="costBatchForm" method="POST" class="d-none"><input type="hidden" name="project_id" value="' + project.id + '"></form>' : ''}
+      ${locals.canEdit ? '<button type="submit" form="costBatchForm" formaction="/costs/batch-delete" class="btn btn-sm btn-outline-danger d-none" id="costBatchDelete" data-batch-confirm="確定永久刪除選取的 {n} 筆成本？\n成本沒有「已刪除」可還原，刪除後只會留在修改記錄裡。"><i class="bi bi-trash"></i> 刪除選取 (<span>0</span>)</button>' : ''}
+      ${locals.canEdit ? '<button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#costModal"><i class="bi bi-plus-lg"></i> 新增成本</button>' : ''}
+    </div>
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
       <table class="table table-hover mb-0 js-sortable">
         <thead class="table-light">
           <tr>
+            ${locals.canEdit ? '<th style="width:36px"><input type="checkbox" class="form-check-input" data-batch-all="cost" title="全選／取消全選"></th>' : ''}
             <th data-sortkey="text">進項編號</th>
             <th data-sortkey="text">成本名稱</th>
             <th data-sortkey="date">成本日期</th>
@@ -671,6 +676,7 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
         <tbody>
           ${typeof costs !== 'undefined' && costs.length ? costs.map(cost => `
             <tr>
+              ${locals.canEdit ? '<td><input type="checkbox" class="form-check-input" data-batch-row="cost" form="costBatchForm" name="ids" value="' + cost.id + '" data-deleted="0"></td>' : ''}
               <td>${h(cost.item_code || '-')}</td>
               <td>${h(cost.item_name || '-')}</td>
               <td>${cost.cost_date || '-'}</td>
@@ -688,7 +694,7 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
                 ${locals.canEdit ? '<form action="/costs/' + cost.id + '/delete" method="POST" style="display:inline" onsubmit="return confirm(\'確定刪除？\')"><button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>' : ''}
               </td>
             </tr>
-          `).join('') : '<tr><td colspan="13" class="text-center text-muted py-3">尚無成本記錄</td></tr>'}
+          `).join('') : '<tr><td colspan="14" class="text-center text-muted py-3">尚無成本記錄</td></tr>'}
         </tbody>
       </table>
     </div>
@@ -809,27 +815,29 @@ ${locals.canEdit ? `
 <script>
 // 發票／收款的批次勾選：勾選後顯示「刪除選取／還原選取」，數量依勾選內容更新；刪除前要確認
 (function () {
-  ['inv', 'pay'].forEach(function (key) {
+  ['inv', 'pay', 'cost'].forEach(function (key) {
     var rows = Array.prototype.slice.call(document.querySelectorAll('[data-batch-row="' + key + '"]'));
     var all = document.querySelector('[data-batch-all="' + key + '"]');
     var delBtn = document.getElementById(key + 'BatchDelete');
     var resBtn = document.getElementById(key + 'BatchRestore');
-    if (!rows.length || !all || !delBtn || !resBtn) return;
+    if (!rows.length || !all || !delBtn) return; // 成本沒有還原按鈕（硬刪除）
     function refresh() {
       var checked = rows.filter(function (c) { return c.checked; });
       var nDel = checked.filter(function (c) { return c.getAttribute('data-deleted') !== '1'; }).length;
       var nRes = checked.length - nDel;
       delBtn.querySelector('span').textContent = nDel;
-      resBtn.querySelector('span').textContent = nRes;
       delBtn.classList.toggle('d-none', nDel === 0);
-      resBtn.classList.toggle('d-none', nRes === 0);
+      if (resBtn) {
+        resBtn.querySelector('span').textContent = nRes;
+        resBtn.classList.toggle('d-none', nRes === 0);
+      }
       all.checked = checked.length > 0 && checked.length === rows.length;
       all.indeterminate = checked.length > 0 && checked.length < rows.length;
     }
     rows.forEach(function (c) { c.addEventListener('change', refresh); });
     all.addEventListener('change', function () { rows.forEach(function (c) { c.checked = all.checked; }); refresh(); });
     delBtn.addEventListener('click', function (e) {
-      if (!confirm(delBtn.getAttribute('data-batch-confirm'))) e.preventDefault();
+      if (!confirm(delBtn.getAttribute('data-batch-confirm').replace('{n}', delBtn.querySelector('span').textContent))) e.preventDefault();
     });
     refresh();
   });
