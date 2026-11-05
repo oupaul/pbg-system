@@ -14,8 +14,9 @@ function findColorMap() {
   return map;
 }
 
+// 只算「有效」的成本：已刪除的成本不會顯示在任何畫面，不該擋住刪除／停用（它們保留原本的文字值，還原後要編輯時再改選）
 function countInUse(methodName) {
-  const row = db.prepare('SELECT COUNT(*) as count FROM costs WHERE payment_method = ?').get(methodName);
+  const row = db.prepare('SELECT COUNT(*) as count FROM costs WHERE payment_method = ? AND deleted_at IS NULL').get(methodName);
   return row?.count || 0;
 }
 
