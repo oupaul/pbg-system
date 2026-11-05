@@ -161,7 +161,7 @@ const xlsx = async (rows, sheetName = '成本明細') => {
   rows.forEach(r => ws.addRow(r));
   return Buffer.from(await wb.xlsx.writeBuffer());
 };
-const NEW_HEADER = ['專案編號', '類型', '客戶編號', '專案名稱', '成本名稱', '成本日期', '成本類型', '費用類別', '廠商', '付款辦法', '付款條件', '下單狀態', '預估金額', '實際金額', '備註'];
+const NEW_HEADER = ['專案編號', '類型', '客戶編號', '專案名稱', '成本名稱', '成本日期', '成本類型', '成本類別', '廠商', '付款辦法', '付款條件', '下單狀態', '預估金額', '實際金額', '備註'];
 const TAX_HEADER = [...NEW_HEADER, '稅別'];
 // 舊版匯出檔：第 16 欄是唯讀的「廠商名稱」、第 17 欄「專案狀態」，不是稅別
 const OLD_EXPORT_HEADER = [...NEW_HEADER, '廠商名稱', '專案狀態'];
@@ -201,6 +201,13 @@ describeIntegration('成本匯入：新格式（無進項編號）與舊格式',
     expect(r).toHaveLength(1);
     expect(r[0]).toMatchObject({ project_id: P, cost_date: '2026-10-06', estimated_amount: 2100, actual_amount: 2000, notes: '備註舊' });
     expect(r[0].item_code).toBeNull(); // 不再寫入
+  });
+
+  test('舊版標題「費用類別」的檔案仍可匯入（欄位依位置，標題改名成「成本類別」不影響舊檔）', async () => {
+    const legacyHeader = NEW_HEADER.map(h => (h === '成本類別' ? '費用類別' : h));
+    expect(legacyHeader).not.toEqual(NEW_HEADER);
+    await importFile(await xlsx([legacyHeader, [code, '', '', '', 'CI-LEGACYCAT', '2026-10-12', '', '', '', '', '', '', 210, 210, '']]));
+    expect(rowsOf('CI-LEGACYCAT')[0]).toMatchObject({ project_id: P, cost_date: '2026-10-12', estimated_amount: 210, actual_amount: 210 });
   });
 
   test('稅別欄：含稅／免稅／空白，並算好未稅金額；沒有這欄的檔案一律含稅', async () => {

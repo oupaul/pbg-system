@@ -671,7 +671,7 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
             <th data-sortkey="text">成本名稱</th>
             <th data-sortkey="date">成本日期</th>
             <th data-sortkey="text">成本類型</th>
-            <th data-sortkey="text">費用類別</th>
+            <th data-sortkey="text">成本類別</th>
             <th data-sortkey="text">廠商</th>
             <th data-sortkey="text">付款辦法</th>
             <th data-sortkey="text">付款條件</th>
@@ -1051,7 +1051,7 @@ ${locals.canViewBonus && locals.canEdit ? `
             </select>
           </div>
           <div class="mb-3">
-            <label class="form-label">費用類別</label>
+            <label class="form-label">成本類別</label>
             <select name="cost_category" class="form-select">
               <option value="">-- 不指定 --</option>
               ${typeof costCategories !== 'undefined' && costCategories ? costCategories.map(t => '<option value="' + h(t.category_name) + '">' + h(t.category_name) + '</option>').join('') : ''}
@@ -1151,7 +1151,7 @@ ${locals.canEdit ? `
           </select>
         </div>
         <div class="mb-3">
-          <label class="form-label">費用類別</label>
+          <label class="form-label">成本類別</label>
           <select name="cost_category" form="costBatchForm" class="form-select">
             <option value="">-- 不變更 --</option>
             ${typeof costCategories !== 'undefined' && costCategories ? costCategories.map(t => '<option value="' + h(t.category_name) + '">' + h(t.category_name) + '</option>').join('') : ''}
@@ -1222,7 +1222,7 @@ ${typeof costs !== 'undefined' && costs.length ? costs.filter(cost => !cost.dele
             </select>
           </div>
           <div class="mb-3">
-            <label class="form-label">費用類別</label>
+            <label class="form-label">成本類別</label>
             <select name="cost_category" class="form-select">
               <option value="">-- 不指定 --</option>
               ${typeof costCategories !== 'undefined' && costCategories ? costCategories.map(t => '<option value="' + h(t.category_name) + '" ' + (cost.cost_category === t.category_name ? 'selected' : '') + '>' + h(t.category_name) + '</option>').join('') : ''}

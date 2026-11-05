@@ -3,7 +3,7 @@ const { toMoney, round2 } = require('../utils/money');
 const { getTaxRate, toExTax, parseTaxIncluded } = require('../utils/tax');
 const AuditLogService = require('../services/AuditLogService');
 
-// 驗證「成本類型/費用類別/付款辦法/付款條件/下單狀態」這幾個可自訂選項欄位：
+// 驗證「成本類型/成本類別/付款辦法/付款條件/下單狀態」這幾個可自訂選項欄位：
 // 留空一律放行（皆為選填），有值時必須存在於對應管理表且為啟用狀態，
 // 否則丟出訊息引導使用者去後台管理頁新增/啟用（比照 Activity.js 的既有寫法）。
 function validateLookupValue(table, column, value, label, managePageLabel) {
@@ -55,7 +55,7 @@ const Cost = {
     }
 
     validateLookupValue('cost_types', 'type_name', data.cost_type, '成本類型', '成本類型管理');
-    validateLookupValue('cost_categories', 'category_name', data.cost_category, '費用類別', '費用類別管理');
+    validateLookupValue('cost_categories', 'category_name', data.cost_category, '成本類別', '成本類別管理');
     validateLookupValue('payment_methods', 'method_name', data.payment_method, '付款辦法', '付款辦法管理');
     validateLookupValue('payment_terms', 'term_name', data.payment_term, '付款條件', '付款條件管理');
     validateLookupValue('order_statuses', 'status_name', data.order_status, '下單狀態', '下單狀態管理');
@@ -125,7 +125,7 @@ const Cost = {
     }
 
     validateLookupValue('cost_types', 'type_name', data.cost_type, '成本類型', '成本類型管理');
-    validateLookupValue('cost_categories', 'category_name', data.cost_category, '費用類別', '費用類別管理');
+    validateLookupValue('cost_categories', 'category_name', data.cost_category, '成本類別', '成本類別管理');
     validateLookupValue('payment_methods', 'method_name', data.payment_method, '付款辦法', '付款辦法管理');
     validateLookupValue('payment_terms', 'term_name', data.payment_term, '付款條件', '付款條件管理');
     validateLookupValue('order_statuses', 'status_name', data.order_status, '下單狀態', '下單狀態管理');

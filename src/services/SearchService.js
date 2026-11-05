@@ -37,7 +37,7 @@ const COLUMN_LABELS = {
   address: '地址', industry: '產業別', opportunity_name: '商機名稱', content: '內容',
   void_reason: '作廢原因', forfeiture_reason: '充公原因', contract_term: '合約年限',
   sales_mode: '銷售模式', project_type: '專案類型', status: '狀態', cost_type: '成本類型',
-  cost_category: '費用類別', payment_method: '付款辦法', payment_term: '付款條件',
+  cost_category: '成本類別', payment_method: '付款辦法', payment_term: '付款條件',
   order_status: '下單狀態', bonus_type: '獎金類型', original_filename: '檔名', bank_name: '銀行',
   bank_account: '銀行帳號', customer_level: '客戶等級', request_type: '申請類型',
   quote_number: '報價單號', recipient_name: '收件人', recipient_address: '收件地址',

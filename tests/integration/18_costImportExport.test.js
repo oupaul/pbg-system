@@ -20,7 +20,7 @@ const download = async (client, url) => {
 };
 const sheetRows = (ws) => { const out = []; ws.eachRow(r => out.push(r.values.slice(1))); return out; };
 
-const NEW_HEADER = ['專案編號', '類型', '客戶編號', '專案名稱', '成本名稱', '成本日期', '成本類型', '費用類別', '廠商', '付款辦法', '付款條件', '下單狀態', '預估金額', '實際金額', '備註', '稅別'];
+const NEW_HEADER = ['專案編號', '類型', '客戶編號', '專案名稱', '成本名稱', '成本日期', '成本類型', '成本類別', '廠商', '付款辦法', '付款條件', '下單狀態', '預估金額', '實際金額', '備註', '稅別'];
 
 describeIntegration('成本匯出與毛利分析：不含已刪除的成本', () => {
   let admin; let P; const code = 'CEXP-1';

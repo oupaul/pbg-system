@@ -42,7 +42,7 @@ const TABLES = {
   costs: {
     kind: 'cost', object: '成本',
     labels: {
-      item_name: '成本名稱', item_code: '進項編號', cost_date: '成本日期', cost_type: '成本類型', cost_category: '費用類別',
+      item_name: '成本名稱', item_code: '進項編號', cost_date: '成本日期', cost_type: '成本類型', cost_category: '成本類別',
       vendor_id: '廠商', estimated_amount: '預估金額', actual_amount: '實際金額', payment_method: '付款辦法',
       payment_term: '付款條件', order_status: '下單狀態', notes: '備註', tax_included: '稅別'
     },

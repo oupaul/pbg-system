@@ -24,18 +24,18 @@ router.get('/', requireAuth, requireManageSettings, (req, res) => {
   try {
     const categories = db.prepare(`SELECT * FROM cost_categories ORDER BY display_order ASC, category_name ASC`).all();
     res.render('costCategories/index', {
-      title: '費用類別管理',
+      title: '成本類別管理',
       categories,
       success: req.query.success || '',
       error: req.query.error || ''
     });
   } catch (err) {
-    console.error('載入費用類別失敗:', err);
+    console.error('載入成本類別失敗:', err);
     res.render('costCategories/index', {
-      title: '費用類別管理',
+      title: '成本類別管理',
       categories: [],
       success: '',
-      error: '載入費用類別失敗：' + err.message
+      error: '載入成本類別失敗：' + err.message
     });
   }
 });
@@ -63,9 +63,9 @@ router.post('/create', requireAuth, requireManageSettings, (req, res) => {
       VALUES (?, ?, ?, 1, datetime('now', 'localtime'))
     `).run(trimmedName, color, order);
 
-    res.redirect('/cost-categories?success=' + encodeURIComponent('費用類別新增成功'));
+    res.redirect('/cost-categories?success=' + encodeURIComponent('成本類別新增成功'));
   } catch (err) {
-    console.error('新增費用類別失敗:', err);
+    console.error('新增成本類別失敗:', err);
     res.redirect('/cost-categories?error=' + encodeURIComponent('新增失敗：' + err.message));
   }
 });
@@ -110,9 +110,9 @@ router.post('/update/:id', requireAuth, requireManageSettings, (req, res) => {
       WHERE id = ?
     `).run(trimmedName, color, order, active, id);
 
-    res.redirect('/cost-categories?success=' + encodeURIComponent('費用類別更新成功'));
+    res.redirect('/cost-categories?success=' + encodeURIComponent('成本類別更新成功'));
   } catch (err) {
-    console.error('更新費用類別失敗:', err);
+    console.error('更新成本類別失敗:', err);
     res.redirect('/cost-categories?error=' + encodeURIComponent('更新失敗：' + err.message));
   }
 });
@@ -132,9 +132,9 @@ router.post('/delete/:id', requireAuth, requireManageSettings, (req, res) => {
 
   try {
     db.prepare('DELETE FROM cost_categories WHERE id = ?').run(id);
-    res.redirect('/cost-categories?success=' + encodeURIComponent('費用類別刪除成功'));
+    res.redirect('/cost-categories?success=' + encodeURIComponent('成本類別刪除成功'));
   } catch (err) {
-    console.error('刪除費用類別失敗:', err);
+    console.error('刪除成本類別失敗:', err);
     res.redirect('/cost-categories?error=' + encodeURIComponent('刪除失敗：' + err.message));
   }
 });

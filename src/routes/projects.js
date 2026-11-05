@@ -757,7 +757,7 @@ router.get('/:id', (req, res) => {
   const costs = Cost.findByProject(project.id, { includeDeleted: showDeleted });
   // 成本明細「廠商」下拉選單：客戶/廠商表裡 party_type 含「廠商」的資料
   const vendors = Customer.findAll({ party_type: '廠商' }, req.user);
-  // 成本明細各分類欄位的下拉選單來源（成本類型/費用類別/付款辦法/付款條件/下單狀態）
+  // 成本明細各分類欄位的下拉選單來源（成本類型/成本類別/付款辦法/付款條件/下單狀態）
   const costTypes = require('./costTypes').findActive();
   const costCategories = require('./costCategories').findActive();
   const paymentMethods = require('./paymentMethods').findActive();

@@ -11,7 +11,7 @@
 %>
 <%- include('../layout', { body: `
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h2><i class="bi bi-tags"></i> 費用類別管理</h2>
+  <h2><i class="bi bi-tags"></i> 成本類別管理</h2>
   <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTypeModal">
     <i class="bi bi-plus-circle"></i> 新增類別
   </button>
@@ -32,12 +32,12 @@ ${success ? `
 ` : ''}
 
 <div class="alert alert-info">
-  <i class="bi bi-info-circle"></i> 這裡設定的是專案「成本明細」表單裡的費用類別選項（例如既有/追加）。停用或刪除類別前，系統會先檢查是否有成本記錄仍在使用該類別。
+  <i class="bi bi-info-circle"></i> 這裡設定的是專案「成本明細」表單裡的成本類別選項（例如既有/追加）。停用或刪除類別前，系統會先檢查是否有成本記錄仍在使用該類別。
 </div>
 
 <div class="card">
   <div class="card-header bg-primary text-white">
-    <h5 class="mb-0"><i class="bi bi-list-ul"></i> 費用類別列表</h5>
+    <h5 class="mb-0"><i class="bi bi-list-ul"></i> 成本類別列表</h5>
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
@@ -65,7 +65,7 @@ ${success ? `
                 <button type="button" class="btn btn-sm btn-outline-primary" onclick="editType(${t.id}, '${jsAttr(t.category_name)}', '${t.badge_color}', ${t.display_order}, ${t.is_active})">
                   <i class="bi bi-pencil"></i> 編輯
                 </button>
-                <form action="/cost-categories/delete/${t.id}" method="POST" style="display:inline" onsubmit="return confirm('確定要刪除此費用類別？\\n\\n注意：如果有成本記錄使用此類別，將無法刪除。')">
+                <form action="/cost-categories/delete/${t.id}" method="POST" style="display:inline" onsubmit="return confirm('確定要刪除此成本類別？\\n\\n注意：如果有成本記錄使用此類別，將無法刪除。')">
                   <button type="submit" class="btn btn-sm btn-outline-danger">
                     <i class="bi bi-trash"></i> 刪除
                   </button>
@@ -73,7 +73,7 @@ ${success ? `
               </td>
             </tr>
           `;
-          }).join('') || '<tr><td colspan="5" class="text-center text-muted py-3">尚無費用類別，請點擊「新增類別」新增</td></tr>'}
+          }).join('') || '<tr><td colspan="5" class="text-center text-muted py-3">尚無成本類別，請點擊「新增類別」新增</td></tr>'}
         </tbody>
       </table>
     </div>
@@ -85,7 +85,7 @@ ${success ? `
     <div class="modal-content">
       <form method="POST" action="/cost-categories/create">
         <div class="modal-header">
-          <h5 class="modal-title"><i class="bi bi-plus-circle"></i> 新增費用類別</h5>
+          <h5 class="modal-title"><i class="bi bi-plus-circle"></i> 新增成本類別</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
@@ -123,7 +123,7 @@ ${success ? `
     <div class="modal-content">
       <form method="POST" action="/cost-categories/update/" id="editTypeForm">
         <div class="modal-header">
-          <h5 class="modal-title"><i class="bi bi-pencil"></i> 編輯費用類別</h5>
+          <h5 class="modal-title"><i class="bi bi-pencil"></i> 編輯成本類別</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
