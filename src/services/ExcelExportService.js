@@ -14,6 +14,12 @@ function formatROCDate(dateStr) {
 }
 
 // 格式化金額
+// 成本明細匯出保留到小數 2 位（formatCurrency 會四捨五入成整數；成本有小數金額與換算後的未稅金額，不能掉小數，也才能原樣重新匯入）
+function money2(num) {
+  if (num === null || num === undefined) return '';
+  return Math.round(Number(num) * 100) / 100;
+}
+
 function formatCurrency(num) {
   if (num === null || num === undefined) return '';
   return Math.round(num);
@@ -31,10 +37,10 @@ const PROJECT_HEADERS = [
 const COST_SHEET_NAME = '成本明細';
 // 成本明細欄位（匯出與匯入範本共用，順序需與 ExcelImportService.processCostWorksheet 的 COLS 一致）
 const COST_HEADERS = [
-  '專案編號', '類型', '客戶編號', '專案名稱', '進項編號', '成本名稱', '成本日期',
-  '成本類型', '費用類別', '廠商', '付款辦法', '付款條件', '下單狀態', '預估金額', '實際金額', '備註'
+  '專案編號', '類型', '客戶編號', '專案名稱', '成本名稱', '成本日期',
+  '成本類型', '費用類別', '廠商', '付款辦法', '付款條件', '下單狀態', '預估金額', '實際金額', '備註', '稅別'
 ];
-const COST_COLUMN_WIDTHS = [14, 10, 12, 24, 20, 24, 12, 12, 12, 16, 12, 12, 12, 12, 12, 24];
+const COST_COLUMN_WIDTHS = [14, 10, 12, 24, 24, 12, 12, 12, 16, 12, 12, 12, 12, 12, 24, 8];
 // 客戶/廠商欄位（匯出與匯入範本共用，順序需與 ExcelImportService.importCustomers 的 COLS 一致）
 const CUSTOMER_HEADERS = [
   '客戶編號', '統一編號', '公司名稱', '客戶/廠商類型', '廠商類型',
@@ -79,7 +85,7 @@ function styleHeaderRow(worksheet) {
 
 class ExcelExportService {
   // 匯出專案總表
-  exportProjectSummary(year) {
+  exportProjectSummary(year, { includeBonus = true } = {}) {
     const projects = db.prepare(`
       SELECT 
         p.*,
@@ -219,7 +225,8 @@ class ExcelExportService {
       worksheet.getColumn(index + 1).width = width;
     });
 
-    // 獎金明細：該年度所有專案的全部獎金，一筆一列（任意獎金類型、任意筆數）
+    // 獎金明細：該年度所有專案的全部獎金，一筆一列（任意獎金類型、任意筆數）；沒有檢視獎金權限的角色不含這張工作表
+    if (includeBonus) {
     const bonusRows = db.prepare(`
       SELECT p.project_code, p.project_type, p.project_name,
              c.customer_code, s.name AS salesperson_name,
@@ -253,6 +260,7 @@ class ExcelExportService {
     }
     styleHeaderRow(bonusSheet);
     BONUS_COLUMN_WIDTHS.forEach((w, i) => { bonusSheet.getColumn(i + 1).width = w; });
+    }
 
     // 成本明細：該年度所有專案的全部成本，欄位與「成本明細匯入範本」一致，可直接重新匯入
     this._addCostSheet(workbook, COST_SHEET_NAME, 'WHERE p.contract_year = ?', [year]);
@@ -260,37 +268,41 @@ class ExcelExportService {
     return workbook;
   }
 
-  // 在 workbook 加入「成本明細」工作表：欄位前 16 欄與匯入範本一致（可直接重新匯入），
+  // 在 workbook 加入「成本明細」工作表：欄位前 16 欄（含「稅別」）與匯入範本一致（可直接重新匯入），
   // 之後多的欄位（廠商名稱、專案狀態）僅供閱讀，匯入時會被忽略。where 為含 JOIN 別名 p/co 的 WHERE 子句。
   _addCostSheet(workbook, sheetName, where, params) {
     const rows = db.prepare(`
       SELECT p.project_code, p.project_type, p.project_name, p.status AS project_status, c.customer_code,
-             co.item_code, co.item_name, co.cost_date, co.cost_type, co.cost_category,
+             co.item_name, co.cost_date, co.cost_type, co.cost_category,
              v.customer_code AS vendor_code, v.company_name AS vendor_name,
              co.payment_method, co.payment_term, co.order_status,
-             co.estimated_amount, co.actual_amount, co.notes
+             co.estimated_amount, co.actual_amount, co.notes, co.tax_included,
+             COALESCE(co.estimated_amount_ex_tax, co.estimated_amount) AS estimated_ex_tax,
+             COALESCE(co.actual_amount_ex_tax, co.actual_amount) AS actual_ex_tax
       FROM costs co
       JOIN projects p ON co.project_id = p.id
       LEFT JOIN customers c ON p.customer_id = c.id
       LEFT JOIN customers v ON co.vendor_id = v.id
-      ${where}
+      WHERE co.deleted_at IS NULL${where ? ' AND (' + where.replace(/^\s*WHERE\s+/i, '') + ')' : ''}
       ORDER BY p.contract_year, p.contract_month, p.project_code, co.cost_date, co.id
     `).all(...params);
 
     const sheet = workbook.addWorksheet(sheetName);
-    sheet.addRow([...COST_HEADERS, '廠商名稱', '專案狀態']);
+    sheet.addRow([...COST_HEADERS, '廠商名稱', '專案狀態', '預估金額(未稅)', '實際金額(未稅)']);
     for (const co of rows) {
       sheet.addRow([
         co.project_code, co.project_type, co.customer_code || '', co.project_name || '',
-        co.item_code || '', co.item_name || '', co.cost_date ? formatROCDate(co.cost_date) : '',
+        co.item_name || '', co.cost_date ? formatROCDate(co.cost_date) : '',
         co.cost_type || '', co.cost_category || '', co.vendor_code || '',
         co.payment_method || '', co.payment_term || '', co.order_status || '',
-        formatCurrency(co.estimated_amount), formatCurrency(co.actual_amount), co.notes || '',
-        co.vendor_name || '', co.project_status || ''
+        money2(co.estimated_amount), money2(co.actual_amount), co.notes || '',
+        co.tax_included === 0 ? '免稅' : '含稅',
+        co.vendor_name || '', co.project_status || '',
+        money2(co.estimated_ex_tax), money2(co.actual_ex_tax)
       ]);
     }
     styleHeaderRow(sheet);
-    [...COST_COLUMN_WIDTHS, 20, 10].forEach((w, i) => { sheet.getColumn(i + 1).width = w; });
+    [...COST_COLUMN_WIDTHS, 20, 10, 14, 14].forEach((w, i) => { sheet.getColumn(i + 1).width = w; });
     return sheet;
   }
 
@@ -664,12 +676,12 @@ class ExcelExportService {
     const worksheet = workbook.addWorksheet(COST_SHEET_NAME);
     worksheet.addRow(COST_HEADERS);
     worksheet.addRow([
-      sampleProject.project_code, '', '', '', 'PJ-C-001', '範例成本 A', '113/09/25',
-      pick(costTypes, 0), pick(categories, 0), vendorName, pick(methods, 0), pick(terms, 0), pick(statuses, 0), 8925, 0, '範例備註'
+      sampleProject.project_code, '', '', '', '範例成本 A', '113/09/25',
+      pick(costTypes, 0), pick(categories, 0), vendorName, pick(methods, 0), pick(terms, 0), pick(statuses, 0), 8925, 0, '範例備註', '含稅'
     ]);
     worksheet.addRow([
-      sampleProject.project_code, '', '', '', '', '範例成本 B', '2026-03-01',
-      pick(costTypes, 1), pick(categories, 1), '', '', '', '', 28245, 28000, ''
+      sampleProject.project_code, '', '', '', '範例成本 B', '2026-03-01',
+      pick(costTypes, 1), pick(categories, 1), '', '', '', '', 28245, 28000, '', '免稅'
     ]);
     styleHeaderRow(worksheet);
     COST_COLUMN_WIDTHS.forEach((w, i) => { worksheet.getColumn(i + 1).width = w; });
@@ -678,7 +690,6 @@ class ExcelExportService {
     info.addRow(['欄位名稱', '說明', '必填']);
     info.addRow(['專案編號', '成本所屬專案的專案編號', '是']);
     info.addRow(['類型 / 客戶編號 / 專案名稱', '同一專案編號對應到多個專案時（例如同編號不同類型或不同客戶），用這三欄指定是哪一個；只有一個專案時可留空', '否']);
-    info.addRow(['進項編號', '採購/進項的唯一識別碼；有填時，同專案相同進項編號視為同一筆，重複匯入會略過', '否']);
     info.addRow(['成本名稱', '這筆成本的名稱', '是']);
     info.addRow(['成本日期', '民國年（113/09/25）或西元年（2026-09-25）皆可', '否']);
     info.addRow(['成本類型', `需為系統啟用的成本類型：${listStr(costTypes, '成本類型管理')}`, '否']);
@@ -687,12 +698,13 @@ class ExcelExportService {
     info.addRow(['付款辦法', `需為系統啟用的付款辦法：${listStr(methods, '付款辦法管理')}`, '否']);
     info.addRow(['付款條件', `需為系統啟用的付款條件：${listStr(terms, '付款條件管理')}`, '否']);
     info.addRow(['下單狀態', `需為系統啟用的下單狀態：${listStr(statuses, '下單狀態管理')}`, '否']);
-    info.addRow(['預估金額 / 實際金額', '數字，不需千分位；留空視為 0', '否']);
+    info.addRow(['預估金額 / 實際金額', '數字，不需千分位；留空視為 0。請依「稅別」欄填寫：含稅就填含稅金額（系統依營業稅率換算未稅，毛利以未稅成本計算）', '否']);
+    info.addRow(['稅別', '含稅或免稅，空白視為含稅。「免稅」＝金額不換算（例如免稅、國外廠商）。這欄放在「備註」之後；沒有這欄的舊檔一律視為含稅', '否']);
     info.addRow(['備註', '自由文字', '否']);
     info.addRow(['']);
     info.addRow(['注意事項：']);
     info.addRow(['1. 成本類型、費用類別、付款辦法、付款條件、下單狀態若不在上述清單內，該列會失敗並說明原因；請先到對應的管理頁新增，或修正 Excel 後重新匯入']);
-    info.addRow(['2. 有進項編號時以「專案＋進項編號」判斷重複；沒有進項編號時以「專案＋成本名稱＋日期＋預估金額＋實際金額」判斷。重複的成本會略過，不會覆蓋既有資料']);
+    info.addRow(['2. 以「專案＋成本名稱＋日期＋預估金額＋實際金額」判斷重複（已刪除的成本不算）。重複的成本會略過，不會覆蓋既有資料']);
     info.addRow(['3. 失敗的列不影響其他列，修正後可重新匯入同一份檔案（已匯入的會被視為重複略過）']);
     const infoHeader = info.getRow(1);
     infoHeader.font = { bold: true };
@@ -779,7 +791,9 @@ class ExcelExportService {
 
   // 業務績效匯出：與業務績效儀表板同一份彙總資料（SalesPerformanceService），加上合計列、
   // 銷售機會總覽，以及依專案類型（取自實際資料，不寫死類型名稱）拆分的業績金額。
-  exportSalesPerformance(year = null) {
+  exportSalesPerformance(year = null, { includeBonus = true } = {}) {
+    // 沒有檢視獎金權限時拿掉「總獎金／已發放／待發放」三欄（第 8–10 欄）
+    const cols = (arr) => (includeBonus ? arr : arr.filter((_, i) => i < 7 || i > 9));
     const SalesPerformanceService = require('./SalesPerformanceService');
     const Salesperson = require('../models/Salesperson');
     const performance = SalesPerformanceService.getPerformanceBySalesperson(year);
@@ -791,28 +805,28 @@ class ExcelExportService {
 
     // 1. 業務績效彙總（欄位與儀表板一致）
     const ws = workbook.addWorksheet(`業務績效${suffix}`);
-    ws.addRow(SALES_PERFORMANCE_HEADERS);
+    ws.addRow(cols(SALES_PERFORMANCE_HEADERS));
     const totals = { project_count: 0, total_price: 0, total_invoiced: 0, uninvoiced_amount: 0, total_received: 0, total_unpaid: 0, total_bonus: 0, paid_bonus: 0, pending_bonus: 0, pipeline_count: 0, pipeline_amount: 0 };
     for (const p of performance) {
       Object.keys(totals).forEach(k => { totals[k] += p[k] || 0; });
-      ws.addRow([
+      ws.addRow(cols([
         p.name, p.project_count || 0,
         formatCurrency(p.total_price || 0), formatCurrency(p.total_invoiced || 0), formatCurrency(p.uninvoiced_amount || 0),
         formatCurrency(p.total_received || 0), formatCurrency(p.total_unpaid || 0),
         formatCurrency(p.total_bonus || 0), formatCurrency(p.paid_bonus || 0), formatCurrency(p.pending_bonus || 0),
         p.pipeline_count || 0, formatCurrency(p.pipeline_amount || 0)
-      ]);
+      ]));
     }
-    const totalRow = ws.addRow([
+    const totalRow = ws.addRow(cols([
       '合計', totals.project_count,
       formatCurrency(totals.total_price), formatCurrency(totals.total_invoiced), formatCurrency(totals.uninvoiced_amount),
       formatCurrency(totals.total_received), formatCurrency(totals.total_unpaid),
       formatCurrency(totals.total_bonus), formatCurrency(totals.paid_bonus), formatCurrency(totals.pending_bonus),
       totals.pipeline_count, formatCurrency(totals.pipeline_amount)
-    ]);
+    ]));
     totalRow.font = { bold: true };
     styleHeaderRow(ws);
-    [14, 8, 14, 14, 14, 14, 14, 14, 14, 14, 12, 14].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+    cols([14, 8, 14, 14, 14, 14, 14, 14, 14, 14, 12, 14]).forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
     // 2. 依專案類型拆分的專案金額（含稅）
     const typeAmounts = Salesperson.getTypeAmounts(year);

@@ -31,6 +31,12 @@ async function main() {
   role('own_editor', { all: 0, own: 1, scope: 'own' });
   role('assigned_role', { all: 0, own: 1, scope: 'assigned' });
   role('none_role', { all: 0, own: 0, scope: 'none' });
+  // 獎金檢視權限測試用：no_bonus＝可編輯但看不到獎金；admin_no_bonus＝有使用者管理權限（儀表板獎金卡片原本給這類角色）但看不到獎金；toggle_bonus＝預設看得到，給「在角色管理切換旗標」測試用
+  role('no_bonus');
+  role('admin_no_bonus');
+  role('toggle_bonus');
+  db.prepare("UPDATE roles SET can_view_bonus = 0 WHERE role_key IN ('no_bonus', 'admin_no_bonus')").run();
+  db.prepare("UPDATE roles SET can_manage_users = 1 WHERE role_key = 'admin_no_bonus'").run();
 
   // ---- 業務與客戶 ----
   const sp = db.prepare("INSERT INTO salespeople (name, status) VALUES (?, 'active')");
@@ -60,6 +66,9 @@ async function main() {
   addUser('u_import', 'import_only');
   addUser('u_assigned', 'assigned_role');
   addUser('u_none', 'none_role');
+  addUser('u_nobonus', 'no_bonus');
+  addUser('u_adminnb', 'admin_no_bonus');
+  addUser('u_togglebonus', 'toggle_bonus');
   addUser('u_victim', 'edit_only'); // 給「停用後 session 立即失效」測試用
   addUser('u_lock', 'edit_only');   // 給「帳號連續失敗鎖定」測試用
   addUser('u_mustchange', 'edit_only');

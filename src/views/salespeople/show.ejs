@@ -55,7 +55,7 @@ ${typeof error   !== 'undefined' && error   ? '<div class="alert alert-danger  a
       </div>
     </div>
   </div>
-  <div class="col-md-3">
+  ${locals.canViewBonus ? `<div class="col-md-3">
     <div class="card bg-info text-white">
       <div class="card-body text-center">
         <h6>總獎金</h6>
@@ -63,6 +63,7 @@ ${typeof error   !== 'undefined' && error   ? '<div class="alert alert-danger  a
       </div>
     </div>
   </div>
+  ` : ''}
   <div class="col-md-3">
     <div class="card">
       <div class="card-body text-center">
@@ -114,7 +115,7 @@ ${typeof error   !== 'undefined' && error   ? '<div class="alert alert-danger  a
     </div>
   </div>
   
-  <div class="col-md-6">
+  ${locals.canViewBonus ? `<div class="col-md-6">
     <div class="card h-100">
       <div class="card-header"><i class="bi bi-award"></i> 獎金列表</div>
       <div class="card-body p-0">
@@ -147,6 +148,7 @@ ${typeof error   !== 'undefined' && error   ? '<div class="alert alert-danger  a
       </div>
     </div>
   </div>
+  ` : ''}
 </div>
 
 <div class="card mt-4">

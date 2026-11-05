@@ -56,14 +56,14 @@ ${(performance || []).length > 0 ? `
       </div>
     </div>
   </div>
-  <div class="col-md-6">
+  ${locals.canViewBonus ? `<div class="col-md-6">
     <div class="card h-100">
       <div class="card-header">各業務獎金比較（長條圖）</div>
       <div class="card-body" style="min-height: 280px;">
         <canvas id="chartBonus" height="260"></canvas>
       </div>
     </div>
-  </div>
+  </div>` : ''}
 </div>
 ` : ''}
 
@@ -80,16 +80,16 @@ ${(performance || []).length > 0 ? `
             <th class="text-end">未開發票</th>
             <th class="text-end">已收款</th>
             <th class="text-end">未收款</th>
-            <th class="text-end">總獎金</th>
+            ${locals.canViewBonus ? `<th class="text-end">總獎金</th>
             <th class="text-end">已發放</th>
-            <th class="text-end">待發放</th>
+            <th class="text-end">待發放</th>` : ''}
             <th class="text-center">洽談中銷售機會</th>
             <th class="text-end">預估金額</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          ${(performance || []).length ? (performance || []).map(p => '<tr><td><strong>' + escapeHtml(p.name) + '</strong></td><td class="text-center">' + (p.project_count || 0) + '</td><td class="text-end">$' + (p.total_price || 0).toLocaleString() + '</td><td class="text-end text-success">$' + (p.total_invoiced || 0).toLocaleString() + '</td><td class="text-end">$' + (p.uninvoiced_amount || 0).toLocaleString() + '</td><td class="text-end">$' + (p.total_received || 0).toLocaleString() + '</td><td class="text-end ' + (p.total_unpaid > 0 ? 'text-danger fw-bold' : '') + '">$' + (p.total_unpaid || 0).toLocaleString() + '</td><td class="text-end">$' + (p.total_bonus || 0).toLocaleString() + '</td><td class="text-end text-success">$' + (p.paid_bonus || 0).toLocaleString() + '</td><td class="text-end text-warning">$' + (p.pending_bonus || 0).toLocaleString() + '</td><td class="text-center">' + (p.pipeline_count || 0) + '</td><td class="text-end">$' + (p.pipeline_amount || 0).toLocaleString() + '</td><td><a href="/projects?salesperson=' + encodeURIComponent(p.name) + (selectedYear !== 'all' ? '&year=' + selectedYear : '') + '" class="btn btn-sm btn-outline-primary">專案</a> <a href="/bonuses' + (selectedYear !== 'all' ? '?year=' + selectedYear : '') + '" class="btn btn-sm btn-outline-info">獎金</a></td></tr>').join('') : '<tr><td colspan="13" class="text-center text-muted py-4">尚無資料</td></tr>'}
+          ${(performance || []).length ? (performance || []).map(p => '<tr><td><strong>' + escapeHtml(p.name) + '</strong></td><td class="text-center">' + (p.project_count || 0) + '</td><td class="text-end">$' + (p.total_price || 0).toLocaleString() + '</td><td class="text-end text-success">$' + (p.total_invoiced || 0).toLocaleString() + '</td><td class="text-end">$' + (p.uninvoiced_amount || 0).toLocaleString() + '</td><td class="text-end">$' + (p.total_received || 0).toLocaleString() + '</td><td class="text-end ' + (p.total_unpaid > 0 ? 'text-danger fw-bold' : '') + '">$' + (p.total_unpaid || 0).toLocaleString() + '</td>' + (locals.canViewBonus ? '<td class="text-end">$' + (p.total_bonus || 0).toLocaleString() + '</td><td class="text-end text-success">$' + (p.paid_bonus || 0).toLocaleString() + '</td><td class="text-end text-warning">$' + (p.pending_bonus || 0).toLocaleString() + '</td>' : '') + '<td class="text-center">' + (p.pipeline_count || 0) + '</td><td class="text-end">$' + (p.pipeline_amount || 0).toLocaleString() + '</td><td><a href="/projects?salesperson=' + encodeURIComponent(p.name) + (selectedYear !== 'all' ? '&year=' + selectedYear : '') + '" class="btn btn-sm btn-outline-primary">專案</a>' + (locals.canViewBonus ? ' <a href="/bonuses' + (selectedYear !== 'all' ? '?year=' + selectedYear : '') + '" class="btn btn-sm btn-outline-info">獎金</a>' : '') + '</td></tr>').join('') : '<tr><td colspan="' + (locals.canViewBonus ? 13 : 10) + '" class="text-center text-muted py-4">尚無資料</td></tr>'}
         </tbody>
       </table>
     </div>
@@ -117,7 +117,7 @@ ${(performance || []).length > 0 ? `
       options: { responsive: true, plugins: { legend: { position: 'right' } } }
     });
   }
-  var barCtx = document.getElementById('chartBonus');
+  ${locals.canViewBonus ? `  var barCtx = document.getElementById('chartBonus');
   if (barCtx) {
     new Chart(barCtx, {
       type: 'bar',
@@ -132,6 +132,7 @@ ${(performance || []).length > 0 ? `
       options: { responsive: true, scales: { x: { stacked: false }, y: { beginAtZero: true } }, plugins: { legend: { position: 'top' } } }
     });
   }
+` : ''}
 })();
 </script>
 ` : ''}

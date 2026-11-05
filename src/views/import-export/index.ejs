@@ -157,7 +157,7 @@ ${locals.canImport ? `
 
         <hr>
         
-        <div class="mb-4">
+        ${locals.canViewBonus ? `<div class="mb-4">
           <h6>獎金報表</h6>
           <p class="small text-muted">依業務人員彙整的獎金明細</p>
           <div class="d-flex gap-2 flex-wrap">
@@ -173,6 +173,7 @@ ${locals.canImport ? `
         </div>
 
         <hr>
+` : ''}
 
         <div>
           <h6>應收帳款帳齡分析</h6>

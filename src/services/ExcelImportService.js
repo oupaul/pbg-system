@@ -1472,16 +1472,28 @@ class ExcelImportService {
   }
 
   // 成本明細批次匯入：一列一筆成本，用專案編號（必要時加類型/客戶編號/專案名稱）對應專案。
-  // 欄位：專案編號 | 類型 | 客戶編號 | 專案名稱 | 進項編號 | 成本名稱 | 成本日期 | 成本類型 | 費用類別 | 廠商 | 付款辦法 | 付款條件 | 下單狀態 | 預估金額 | 實際金額 | 備註
+  // 欄位：專案編號 | 類型 | 客戶編號 | 專案名稱 | 成本名稱 | 成本日期 | 成本類型 | 費用類別 | 廠商 | 付款辦法 | 付款條件 | 下單狀態 | 預估金額 | 實際金額 | 備註
+  // （舊版範本／匯出檔在「專案名稱」之後多一欄「進項編號」：依第 1 列標題自動辨識，該欄的內容直接忽略，其餘欄位照常匯入）
+  // 選填的「稅別」欄（含稅／免稅，空白＝含稅）放在「備註」之後，同樣依標題找；沒有這欄的舊檔一律視為含稅。
   // 成本類型/費用類別/付款辦法/付款條件/下單狀態不在管理清單內時整列報錯（由 Cost.create 驗證）；
   // 廠商以廠商編號或公司名稱比對「廠商/兩者皆是」身份的資料，找不到整列報錯。
   // 處理「成本明細」工作表（獨立匯入與專案 Excel 內的「成本明細」工作表共用）。呼叫前需已 resetDedupe。
   processCostWorksheet(worksheet, userInfo) {
+    // 舊版檔案的第 5 欄是「進項編號」（已移除的欄位）：有的話後面的欄位全部往後移一格
+    const legacyItemCodeColumn = safeExtractText(worksheet.getRow(1).getCell(5).value) === '進項編號';
+    const o = legacyItemCodeColumn ? 1 : 0;
     const COLS = {
-      PROJECT_CODE: 0, PROJECT_TYPE: 1, CUSTOMER_CODE: 2, PROJECT_NAME: 3, ITEM_CODE: 4, ITEM_NAME: 5, COST_DATE: 6,
-      COST_TYPE: 7, COST_CATEGORY: 8, VENDOR: 9, PAYMENT_METHOD: 10, PAYMENT_TERM: 11, ORDER_STATUS: 12,
-      ESTIMATED: 13, ACTUAL: 14, NOTES: 15
+      PROJECT_CODE: 0, PROJECT_TYPE: 1, CUSTOMER_CODE: 2, PROJECT_NAME: 3, ITEM_NAME: 4 + o, COST_DATE: 5 + o,
+      COST_TYPE: 6 + o, COST_CATEGORY: 7 + o, VENDOR: 8 + o, PAYMENT_METHOD: 9 + o, PAYMENT_TERM: 10 + o, ORDER_STATUS: 11 + o,
+      ESTIMATED: 12 + o, ACTUAL: 13 + o, NOTES: 14 + o
     };
+    // 「稅別」欄（含稅／免稅）：依第 1 列標題找，找不到就視為全部含稅。
+    // 不能用固定位置——舊版匯出檔的第 16 欄是唯讀的「廠商名稱」，不是稅別
+    let taxColumn = -1;
+    worksheet.getRow(1).eachCell({ includeEmpty: false }, (c, colNumber) => {
+      if (taxColumn === -1 && safeExtractText(c.value) === '稅別') taxColumn = colNumber - 1;
+    });
+    const { parseTaxIncluded } = require('../utils/tax');
     let createdCount = 0;
     let failedCount = 0;
 
@@ -1503,10 +1515,9 @@ class ExcelImportService {
 
       const projectCode = text(COLS.PROJECT_CODE);
       const itemName = text(COLS.ITEM_NAME);
-      const itemCode = text(COLS.ITEM_CODE);
       // 空白列略過
-      if (!projectCode && !itemName && !itemCode) continue;
-      const label = itemName || itemCode || projectCode || '';
+      if (!projectCode && !itemName) continue;
+      const label = itemName || projectCode || '';
 
       try {
         // 1. 對應專案
@@ -1539,6 +1550,14 @@ class ExcelImportService {
         if (estimated === null) { fail(rowNumber, label, `預估金額「${cell(COLS.ESTIMATED)}」不是數字`); continue; }
         if (actual === null) { fail(rowNumber, label, `實際金額「${cell(COLS.ACTUAL)}」不是數字`); continue; }
 
+        // 稅別：空白＝含稅；「免稅」「未稅」＝金額不換算
+        let taxIncluded = 1;
+        if (taxColumn >= 0) {
+          const rawTax = text(taxColumn);
+          taxIncluded = parseTaxIncluded(rawTax);
+          if (taxIncluded === null) { fail(rowNumber, label, `稅別「${rawTax}」不正確，請填「含稅」或「免稅」（空白視為含稅）`); continue; }
+        }
+
         // 3. 廠商（編號或公司名稱）
         let vendorId = null;
         const vendorText = text(COLS.VENDOR);
@@ -1554,13 +1573,9 @@ class ExcelImportService {
           vendorId = vendor.id;
         }
 
-        // 4. 去重：有進項編號用「專案＋進項編號」，否則用「專案＋成本名稱＋日期＋預估＋實際金額」
-        const dedupeKey = itemCode
-          ? `cost|${project.id}|code|${itemCode}`
-          : `cost|${project.id}|${itemName}|${costDate || ''}|${estimated}|${actual}`;
-        const dedupeCount = itemCode
-          ? db.prepare('SELECT COUNT(*) c FROM costs WHERE project_id = ? AND item_code = ?').get(project.id, itemCode).c
-          : db.prepare(`SELECT COUNT(*) c FROM costs WHERE project_id = ? AND TRIM(IFNULL(item_name, '')) = ? AND IFNULL(cost_date, '') = ?
+        // 4. 去重：「專案＋成本名稱＋日期＋預估＋實際金額」相同視為同一筆（已刪除的成本不算）
+        const dedupeKey = `cost|${project.id}|${itemName}|${costDate || ''}|${estimated}|${actual}`;
+        const dedupeCount = db.prepare(`SELECT COUNT(*) c FROM costs WHERE project_id = ? AND deleted_at IS NULL AND TRIM(IFNULL(item_name, '')) = ? AND IFNULL(cost_date, '') = ?
               AND IFNULL(estimated_amount, 0) = ? AND IFNULL(actual_amount, 0) = ?`).get(project.id, itemName, costDate || '', estimated, actual).c;
         if (this.isDuplicateRow(dedupeKey, dedupeCount)) {
           this.log(`第 ${rowNumber} 列（${label}）：成本已存在，略過`);
@@ -1570,7 +1585,6 @@ class ExcelImportService {
         // 5. 建立（成本類型/費用類別/付款辦法/付款條件/下單狀態由 Cost.create 驗證是否存在且啟用）
         Cost.create({
           project_id: project.id,
-          item_code: itemCode,
           item_name: itemName,
           cost_date: costDate,
           cost_type: text(COLS.COST_TYPE),
@@ -1581,6 +1595,7 @@ class ExcelImportService {
           order_status: text(COLS.ORDER_STATUS),
           estimated_amount: estimated,
           actual_amount: actual,
+          tax_included: taxIncluded,
           notes: text(COLS.NOTES),
           userInfo
         });

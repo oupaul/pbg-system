@@ -44,7 +44,7 @@ const TABLES = {
     labels: {
       item_name: '成本名稱', item_code: '進項編號', cost_date: '成本日期', cost_type: '成本類型', cost_category: '費用類別',
       vendor_id: '廠商', estimated_amount: '預估金額', actual_amount: '實際金額', payment_method: '付款辦法',
-      payment_term: '付款條件', order_status: '下單狀態', notes: '備註'
+      payment_term: '付款條件', order_status: '下單狀態', notes: '備註', tax_included: '稅別'
     },
     ident: (r) => r.item_name || r.cost_type || '成本',
     createFields: ['cost_date', 'cost_type', 'vendor_id', 'estimated_amount', 'actual_amount']
@@ -99,6 +99,7 @@ function formatValue(field, value, ctx) {
   if (field === 'customer_id' || field === 'vendor_id') return (lk.customers && lk.customers[value]) || `#${value}`;
   if (field === 'invoice_id' || field === 'replacement_invoice_id' || field === 'original_invoice_id') return (lk.invoices && lk.invoices[value]) || `#${value}`;
   if (field === 'is_new_customer') return value ? '新客戶' : '舊客戶';
+  if (field === 'tax_included') return Number(value) === 0 ? '免稅' : '含稅';
   if (field === 'file_size') return `${Math.round(Number(value) / 1024)} KB`;
   return String(value);
 }

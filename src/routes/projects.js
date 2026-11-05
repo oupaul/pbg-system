@@ -750,9 +750,11 @@ router.get('/:id', (req, res) => {
   // findByProjectWithPayments 優先使用 v_invoice_summary 視圖，每筆發票附帶 total_received / unpaid_amount
   const invoices = Invoice.findByProjectWithPayments(project.id, { includeDeleted: showDeleted });
   const payments = Payment.findByProject(project.id, { includeDeleted: showDeleted });
-  const bonuses = Bonus.findByProject(project.id);
+  // 獎金金額只給「可檢視獎金」且有編輯權限（專案頁的獎金分頁本來就需要編輯權限）的角色；沒有權限時連資料都不查
+  const canSeeBonus = !!(req.user && req.user.canViewBonus && req.user.canEdit);
+  const bonuses = canSeeBonus ? Bonus.findByProject(project.id) : [];
   const Cost = require('../models/Cost');
-  const costs = Cost.findByProject(project.id);
+  const costs = Cost.findByProject(project.id, { includeDeleted: showDeleted });
   // 成本明細「廠商」下拉選單：客戶/廠商表裡 party_type 含「廠商」的資料
   const vendors = Customer.findAll({ party_type: '廠商' }, req.user);
   // 成本明細各分類欄位的下拉選單來源（成本類型/費用類別/付款辦法/付款條件/下單狀態）
@@ -861,8 +863,10 @@ router.get('/:id', (req, res) => {
   // 計算實際收款金額（考慮匯費差異，僅計未刪除收款）
   const totalReceived = sumMoney(paymentsForStatus, p => Payment.calculateActualReceived(p));
   const totalBonus = sumMoney(bonuses, b => b.bonus_amount);
-  const totalCost = Cost.getTotalByProject(project.id);
-  const estimatedCost = Cost.getEstimatedTotalByProject(project.id);
+  // 成本：毛利與「總成本／預估成本」一律用未稅金額；含稅（依各筆輸入的金額加總）另外當參考顯示
+  const costTotals = Cost.getTotalsByProject(project.id);
+  const totalCost = costTotals.actualExTax;
+  const estimatedCost = costTotals.estimatedExTax;
   const grossProfit = round2((project.price_without_tax || 0) - totalCost);
   
   // 建立類型顏色映射
@@ -899,6 +903,7 @@ router.get('/:id', (req, res) => {
     bonusTiers: getActiveBonusTiers(project.project_type),
     typeColorMap,
     salesModeColorMap: getSalesModeColorMap(),
+    costTaxRate: require('../utils/tax').getTaxRate(), // 成本表單的稅率說明
     showDeleted, // 是否顯示已刪除的發票/收款
     success: req.query.success ? decodeURIComponent(req.query.success) : null,
     error: req.query.error ? decodeURIComponent(req.query.error) : null,
@@ -907,9 +912,11 @@ router.get('/:id', (req, res) => {
       uninvoiced: project.price_with_tax - totalInvoiced,
       totalReceived,
       outstanding: totalInvoiced - totalReceived - (project.sales_discount || 0),
-      totalBonus,
+      totalBonus: canSeeBonus ? totalBonus : undefined,
       totalCost,
       estimatedCost,
+      totalCostWithTax: costTotals.actual,
+      estimatedCostWithTax: costTotals.estimated,
       grossProfit
     }
   });

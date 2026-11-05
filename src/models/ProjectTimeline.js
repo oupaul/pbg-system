@@ -11,7 +11,7 @@ const CHILD_TABLES = ['invoices', 'payments', 'costs', 'bonus_calculations', 'pr
 
 // 可看到哪些種類：獎金只有可編輯的角色看得到（與專案頁的「獎金明細」分頁相同）
 function allowedKinds(user) {
-  return KINDS.filter(k => k !== 'bonus' || (user && user.canEdit));
+  return KINDS.filter(k => k !== 'bonus' || (user && user.canEdit && user.canViewBonus));
 }
 
 // 記錄內容裡的 project_id 可能是字串（表單送來的 "3"）也可能是數字，一律轉成整數再比較

@@ -146,3 +146,102 @@ describeIntegration('Excel 匯入：預覽、確認、快照與權限', () => {
     }
   });
 });
+
+// ---- 成本明細匯入：新格式（沒有進項編號）與舊格式 ----
+// 放在這個檔案是因為匯入確認會在共用資料目錄產生快照，上面數快照的測試不能和別的檔案平行。
+const Database = require('better-sqlite3');
+const withDb = (fn, { readonly = true } = {}) => {
+  const db = new Database(path.join(process.env.PBG_TEST_TMP, 'data', 'invoice_bonus.db'), { readonly });
+  db.pragma('busy_timeout = 5000');
+  try { return fn(db); } finally { db.close(); }
+};
+const xlsx = async (rows, sheetName = '成本明細') => {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet(sheetName);
+  rows.forEach(r => ws.addRow(r));
+  return Buffer.from(await wb.xlsx.writeBuffer());
+};
+const NEW_HEADER = ['專案編號', '類型', '客戶編號', '專案名稱', '成本名稱', '成本日期', '成本類型', '費用類別', '廠商', '付款辦法', '付款條件', '下單狀態', '預估金額', '實際金額', '備註'];
+const TAX_HEADER = [...NEW_HEADER, '稅別'];
+// 舊版匯出檔：第 16 欄是唯讀的「廠商名稱」、第 17 欄「專案狀態」，不是稅別
+const OLD_EXPORT_HEADER = [...NEW_HEADER, '廠商名稱', '專案狀態'];
+const OLD_HEADER = ['專案編號', '類型', '客戶編號', '專案名稱', '進項編號', '成本名稱', '成本日期', '成本類型', '費用類別', '廠商', '付款辦法', '付款條件', '下單狀態', '預估金額', '實際金額', '備註'];
+
+describeIntegration('成本匯入：新格式（無進項編號）與舊格式', () => {
+  let admin; let P; let code;
+  const mkProject = (c) => withDb(db => Number(db.prepare(`
+    INSERT INTO projects (project_code, contract_year, contract_month, project_type, project_name, salesperson_id, customer_id, price_with_tax, price_without_tax)
+    VALUES (?, 2026, 10, 'A類', ?, ?, ?, 100000, 95238)
+  `).run(c, `成本匯入 ${c}`, ids.spA, ids.A.customer).lastInsertRowid), { readonly: false });
+  const importFile = async (buf) => {
+    const up = await postFile(admin, '/import-export/import-costs', { filename: 'costs.xlsx', content: buf });
+    expect(up.location).toMatch(/\/preview\/[0-9a-f]{32}$/);
+    const token = up.location.split('/').pop();
+    const confirm = await admin.post(`/import-export/import-costs/confirm/${token}`, { form: {} });
+    return decode(confirm.location);
+  };
+  const rowsOf = (name) => withDb(db => db.prepare('SELECT * FROM costs WHERE item_name = ? ORDER BY id').all(name));
+
+  beforeAll(async () => {
+    admin = await as('admin');
+    code = 'CIMP-1';
+    P = mkProject(code);
+  });
+
+  test('新格式（沒有進項編號欄）：欄位對得上，金額與日期正確', async () => {
+    await importFile(await xlsx([NEW_HEADER, [code, '', '', '', 'CI-NEW', '2026-10-05', '', '', '', '', '', '', 1050, 1000, '備註新']]));
+    const r = rowsOf('CI-NEW');
+    expect(r).toHaveLength(1);
+    expect(r[0]).toMatchObject({ project_id: P, cost_date: '2026-10-05', estimated_amount: 1050, actual_amount: 1000, notes: '備註新' });
+  });
+
+  test('舊格式（第 5 欄是進項編號）仍可匯入：進項編號被忽略，其餘欄位不錯位', async () => {
+    await importFile(await xlsx([OLD_HEADER, [code, '', '', '', 'OLD-CODE-1', 'CI-OLD', '2026-10-06', '', '', '', '', '', '', 2100, 2000, '備註舊']]));
+    const r = rowsOf('CI-OLD');
+    expect(r).toHaveLength(1);
+    expect(r[0]).toMatchObject({ project_id: P, cost_date: '2026-10-06', estimated_amount: 2100, actual_amount: 2000, notes: '備註舊' });
+    expect(r[0].item_code).toBeNull(); // 不再寫入
+  });
+
+  test('稅別欄：含稅／免稅／空白，並算好未稅金額；沒有這欄的檔案一律含稅', async () => {
+    await importFile(await xlsx([TAX_HEADER,
+      [code, '', '', '', 'CI-TAX-1', '2026-10-07', '', '', '', '', '', '', 1050, 1050, '', '含稅'],
+      [code, '', '', '', 'CI-TAX-2', '2026-10-07', '', '', '', '', '', '', 1050, 1050, '', '免稅'],
+      [code, '', '', '', 'CI-TAX-3', '2026-10-07', '', '', '', '', '', '', 1050, 1050, '', '']]));
+    expect(rowsOf('CI-TAX-1')[0]).toMatchObject({ tax_included: 1, estimated_amount_ex_tax: 1000, actual_amount_ex_tax: 1000 });
+    expect(rowsOf('CI-TAX-2')[0]).toMatchObject({ tax_included: 0, estimated_amount_ex_tax: 1050, actual_amount_ex_tax: 1050 });
+    expect(rowsOf('CI-TAX-3')[0]).toMatchObject({ tax_included: 1, estimated_amount_ex_tax: 1000 });
+    // 沒有稅別欄（先前新格式的測試資料 CI-NEW 也是）→ 含稅
+    expect(rowsOf('CI-NEW')[0]).toMatchObject({ tax_included: 1, estimated_amount: 1050, estimated_amount_ex_tax: 1000 });
+  });
+
+  test('稅別填錯：該列失敗並說明，不會默默當成含稅；其他列照常匯入', async () => {
+    const up = await postFile(admin, '/import-export/import-costs', { filename: 'costs.xlsx', content: await xlsx([TAX_HEADER,
+      [code, '', '', '', 'CI-TAX-BAD', '2026-10-08', '', '', '', '', '', '', 100, 100, '', '亂填'],
+      [code, '', '', '', 'CI-TAX-OK', '2026-10-08', '', '', '', '', '', '', 100, 100, '', '免稅']]) });
+    const token = up.location.split('/').pop();
+    const preview = (await admin.get(`/import-export/import-costs/preview/${token}`)).text;
+    expect(preview).toContain('稅別');
+    expect(preview).toContain('亂填');
+    await admin.post(`/import-export/import-costs/confirm/${token}`, { form: {} });
+    expect(rowsOf('CI-TAX-BAD')).toHaveLength(0);
+    expect(rowsOf('CI-TAX-OK')).toHaveLength(1);
+  });
+
+  test('舊版匯出檔（第 16 欄是廠商名稱）重新匯入：不會把廠商名稱當成稅別', async () => {
+    await importFile(await xlsx([OLD_EXPORT_HEADER,
+      [code, '', '', '', 'CI-OLDEXP', '2026-10-09', '', '', '', '', '', '', 525, 525, '', '某某企業有限公司', '進行中']]));
+    expect(rowsOf('CI-OLDEXP')[0]).toMatchObject({ tax_included: 1, estimated_amount_ex_tax: 500 });
+  });
+
+  test('重複匯入同一筆會略過；已刪除的不算重複（刪掉後可以再匯入）', async () => {
+    const file = await xlsx([NEW_HEADER, [code, '', '', '', 'CI-NEW', '2026-10-05', '', '', '', '', '', '', 1050, 1000, '']]);
+    await importFile(file);
+    expect(rowsOf('CI-NEW')).toHaveLength(1);
+    await admin.post(`/costs/${rowsOf('CI-NEW')[0].id}/delete`, { form: {} });
+    await importFile(file);
+    const r = rowsOf('CI-NEW');
+    expect(r).toHaveLength(2);
+    expect(r.filter(x => !x.deleted_at)).toHaveLength(1);
+  });
+});

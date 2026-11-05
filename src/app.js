@@ -91,7 +91,7 @@ console.log('[啟動] ✓ EJS模板引擎設定完成');
 
 // 載入認證中間件
 console.log('[啟動] 載入認證中間件...');
-const { requireAuth, requireImportExport, setUserPermissions, enforcePasswordChange, enforceTwoFactorSetup } = require('./middleware/auth');
+const { requireAuth, requireImportExport, requireViewBonus, setUserPermissions, enforcePasswordChange, enforceTwoFactorSetup } = require('./middleware/auth');
 console.log('[啟動] ✓ 認證中間件載入完成');
 
 // 載入部署配置
@@ -294,7 +294,7 @@ try {
   app.use('/invoices', requireAuth, invoiceRoutes);
   app.use('/payments', requireAuth, paymentRoutes);
   app.use('/costs', requireAuth, costRoutes);
-  app.use('/bonuses', requireAuth, bonusRoutes);
+  app.use('/bonuses', requireAuth, requireViewBonus, bonusRoutes);
   app.use('/referral-rewards', requireAuth, referralRewardRoutes);
   app.use('/salespeople', requireAuth, salespersonRoutes);
   app.use('/customers', requireAuth, customerRoutes);

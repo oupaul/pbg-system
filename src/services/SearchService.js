@@ -193,6 +193,8 @@ function collect(q, user, perTableLimit) {
     const cols = searchableColumns(table, settings);
     if (!cols.length) return;
     if (EDIT_REQUIRED_TABLES.has(table.name) && !canEdit) return;
+    // 獎金金額另外要有「檢視獎金」權限（呼叫端沒帶 canViewBonus 屬性＝維持原行為）
+    if (table.name === 'bonus_calculations' && user && user.canViewBonus === false) return;
 
     const owner = table.owner;
     // 沒有歸屬的資料表只有管理者搜得到，且不顯示內容（防止漏擋敏感表時洩漏內容）

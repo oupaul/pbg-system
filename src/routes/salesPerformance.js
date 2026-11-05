@@ -28,7 +28,9 @@ router.get('/', (req, res) => {
   const years = Project.getYears();
   const selectedYear = req.query.year && req.query.year !== 'all' ? parseInt(req.query.year) : null;
 
-  const performance = SalesPerformanceService.getPerformanceBySalesperson(selectedYear);
+  let performance = SalesPerformanceService.getPerformanceBySalesperson(selectedYear);
+  // 沒有檢視獎金權限：連資料都不送出（圖表資料會嵌在頁面裡）
+  if (!req.user.canViewBonus) performance = performance.map(({ total_bonus, paid_bonus, pending_bonus, ...rest }) => rest);
   const pipelineSummary = SalesPerformanceService.getPipelineSummary();
 
   res.render('sales-performance/index', {
@@ -48,7 +50,7 @@ router.get('/export', async (req, res) => {
   }
   try {
     const selectedYear = req.query.year && req.query.year !== 'all' ? parseInt(req.query.year) : null;
-    const workbook = ExcelExportService.exportSalesPerformance(selectedYear);
+    const workbook = ExcelExportService.exportSalesPerformance(selectedYear, { includeBonus: !!req.user.canViewBonus });
     const buffer = await ExcelExportService.writeToBuffer(workbook);
     const nodeBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
     const filename = `業務績效_${selectedYear || '全部年度'}.xlsx`;

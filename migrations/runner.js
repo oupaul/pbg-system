@@ -107,6 +107,9 @@ const MIGRATIONS = [
   'migrate_referral_rewards_created_by',
   'migrate_two_factor_trusted_devices',
   'migrate_password_policy',
+  'migrate_costs_soft_delete',
+  'migrate_cost_tax',
+  'migrate_role_view_bonus',
 ];
 
 function run() {

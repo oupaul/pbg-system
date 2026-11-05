@@ -387,7 +387,7 @@ ${typeof activityReminders !== 'undefined' && activityReminders && activityRemin
     </div>
   </div>
   
-  ${locals.user && locals.isAdmin ? `
+  ${locals.user && locals.isAdmin && locals.canViewBonus ? `
   <div class="col-md-3">
     <div class="card bg-info text-white h-100">
       <div class="card-body">
@@ -715,7 +715,7 @@ ${locals.canEdit ? `
           <a href="/projects/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 新增專案</a>
           <a href="/import-export" class="btn btn-outline-secondary"><i class="bi bi-upload"></i> 匯入Excel</a>
           ${selectedYear !== 'all' ? '<a href="/import-export/export/projects/' + selectedYear + '" class="btn btn-outline-success"><i class="bi bi-download"></i> 匯出專案總表</a>' : ''}
-          ${selectedYear !== 'all' ? '<a href="/import-export/export/bonuses/' + selectedYear + '" class="btn btn-outline-info"><i class="bi bi-download"></i> 匯出獎金報表</a>' : ''}
+          ${selectedYear !== 'all' && locals.canViewBonus ? '<a href="/import-export/export/bonuses/' + selectedYear + '" class="btn btn-outline-info"><i class="bi bi-download"></i> 匯出獎金報表</a>' : ''}
         </div>
       </div>
     </div>

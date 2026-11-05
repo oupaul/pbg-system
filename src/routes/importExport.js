@@ -10,7 +10,7 @@ const { getUserInfo } = require('../utils/authHelper');
 const { guardedSingleUpload, XLSX_EXTENSIONS } = require('../utils/uploadValidation');
 const { mountImportFlow } = require('../utils/importFlow');
 const { requireFullProjectScope } = require('../utils/projectScope');
-const { requireImport } = require('../middleware/auth');
+const { requireImport, requireViewBonus } = require('../middleware/auth');
 const summaries = require('../utils/importSummaries');
 
 module.exports = function(upload) {
@@ -33,7 +33,7 @@ module.exports = function(upload) {
       `).all().map(r => r.y);
       res.locals.costYears = db.prepare(`
         SELECT DISTINCT substr(cost_date, 1, 4) AS y FROM costs
-        WHERE cost_date IS NOT NULL AND length(cost_date) >= 4 ORDER BY y DESC
+        WHERE cost_date IS NOT NULL AND length(cost_date) >= 4 AND deleted_at IS NULL ORDER BY y DESC
       `).all().map(r => r.y);
     } catch (err) {
       res.locals.invoiceYears = [];
@@ -150,7 +150,8 @@ module.exports = function(upload) {
   router.get('/export/projects/:year', async (req, res) => {
     try {
       const year = parseInt(req.params.year);
-      const workbook = ExcelExportService.exportProjectSummary(year);
+      // 專案總表內的「獎金明細」工作表只給可檢視獎金的角色
+      const workbook = ExcelExportService.exportProjectSummary(year, { includeBonus: !!req.user.canViewBonus });
       const buffer = await ExcelExportService.writeToBuffer(workbook);
 
       // 正確處理中文檔案名稱編碼
@@ -173,7 +174,7 @@ module.exports = function(upload) {
   });
 
   // 匯出獎金報表
-  router.get('/export/bonuses/:year', async (req, res) => {
+  router.get('/export/bonuses/:year', requireViewBonus, async (req, res) => {
     try {
       const year = parseInt(req.params.year);
       const workbook = ExcelExportService.exportBonusReport(year);
@@ -251,7 +252,7 @@ module.exports = function(upload) {
   });
 
   // PDF 匯出：獎金報表
-  router.get('/export/pdf/bonuses/:year', async (req, res) => {
+  router.get('/export/pdf/bonuses/:year', requireViewBonus, async (req, res) => {
     try {
       const year = parseInt(req.params.year);
       const buffer = await PdfExportService.exportBonusReport(year);

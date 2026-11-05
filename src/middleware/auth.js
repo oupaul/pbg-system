@@ -178,6 +178,15 @@ function requireRoleFlag(flag, message) {
   };
 }
 
+// 獎金金額的檢視權限（can_view_bonus）：獎金管理頁、獎金匯出／對帳單等。
+// 與 requireRoleFlag 不同：沒有角色資料時維持可看（與 setUserPermissions 一致）
+const requireViewBonus = (req, res, next) => {
+  if (req.user && req.user.canViewBonus) return next();
+  const message = '您的角色沒有檢視獎金的權限';
+  if (req.accepts('html')) return res.status(403).render('error', { title: '權限不足', message, error: {} });
+  return res.status(403).json({ error: '權限不足', message });
+};
+
 // 使用者管理、修改記錄、登入紀錄、系統健康、廣播通知、客戶匯入匯出等（can_manage_users）
 const requireAdmin = requireRoleFlag('can_manage_users', '此功能僅限管理員使用');
 // 角色管理（can_manage_roles）
@@ -289,6 +298,8 @@ const setUserPermissions = (req, res, next) => {
     req.user.canManageSettings = isBuiltInAdmin || !!(role && role.can_manage_settings);
     req.user.canBackupRestore = isBuiltInAdmin || !!(role && role.can_backup_restore);
     req.user.canImport = isBuiltInAdmin || !!(role && role.can_import);
+    // 可檢視獎金：內建 admin 永遠可；沒有角色資料（舊資料）或欄位尚未建立時維持原本行為（可看）
+    req.user.canViewBonus = isBuiltInAdmin || !role || role.can_view_bonus !== 0;
     req.user.isReadOnly = !req.user.canEdit;
     req.user.isSalesperson = req.user.role === ROLES.SALESPERSON;
     req.user.isBoss = req.user.role === ROLES.BOSS;
@@ -315,6 +326,7 @@ const setUserPermissions = (req, res, next) => {
     res.locals.canManageSettings = req.user.canManageSettings;
     res.locals.canBackupRestore = req.user.canBackupRestore;
     res.locals.canImport = req.user.canImport;
+    res.locals.canViewBonus = req.user.canViewBonus;
     res.locals.mustSetup2fa = !!req.user.must_setup_2fa;
     res.locals.isReadOnly = req.user.isReadOnly;
 
@@ -374,6 +386,7 @@ module.exports = {
   requireManageSettings,
   requireBackupRestore,
   requireImport,
+  requireViewBonus,
   requireRoleFlag,
   setUserPermissions
 };

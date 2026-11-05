@@ -136,14 +136,22 @@ ${typeof error !== 'undefined' && error ? '<div class="alert alert-danger alert-
         ` : ''}
         ${typeof summary.totalCost !== 'undefined' ? `
         <div class="d-flex justify-content-between mb-2">
-          <span>總成本</span>
+          <span>總成本<small class="text-muted">（未稅）</small></span>
           <span class="text-danger">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(summary.totalCost || 0).toLocaleString()}</span>
+        </div>
+        <div class="d-flex justify-content-between mb-2 small text-muted">
+          <span>　含稅金額合計</span>
+          <span>${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(summary.totalCostWithTax || 0).toLocaleString()}</span>
         </div>
         ` : ''}
         ${typeof summary.estimatedCost !== 'undefined' && summary.estimatedCost ? `
         <div class="d-flex justify-content-between mb-2">
-          <span>預估成本</span>
+          <span>預估成本<small class="text-muted">（未稅）</small></span>
           <span class="text-secondary">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(summary.estimatedCost || 0).toLocaleString()}</span>
+        </div>
+        <div class="d-flex justify-content-between mb-2 small text-muted">
+          <span>　含稅金額合計</span>
+          <span>${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(summary.estimatedCostWithTax || 0).toLocaleString()}</span>
         </div>
         ` : ''}
         ${typeof summary.grossProfit !== 'undefined' ? `
@@ -170,7 +178,7 @@ ${typeof error !== 'undefined' && error ? '<div class="alert alert-danger alert-
           <span>應收帳款</span>
           <span class="text-danger">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(summary.outstanding || 0).toLocaleString()}</span>
         </div>
-        ${locals.canEdit ? `
+        ${locals.canViewBonus && locals.canEdit ? `
         <hr>
         <div class="d-flex justify-content-between">
           <span>獎金合計</span>
@@ -369,7 +377,7 @@ function resetExpectedInvoice() {
   <li class="nav-item" role="presentation">
     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-costs" type="button" role="tab"><i class="bi bi-cash-stack"></i> 成本明細</button>
   </li>
-  ${locals.canEdit ? `
+  ${locals.canViewBonus && locals.canEdit ? `
   <li class="nav-item" role="presentation">
     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-bonuses" type="button" role="tab"><i class="bi bi-award"></i> 獎金明細</button>
   </li>
@@ -648,7 +656,9 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
     <span><i class="bi bi-cash-stack"></i> 成本明細</span>
     <div class="d-flex align-items-center gap-2 flex-wrap">
       ${locals.canEdit ? '<form id="costBatchForm" method="POST" class="d-none"><input type="hidden" name="project_id" value="' + project.id + '"></form>' : ''}
-      ${locals.canEdit ? '<button type="submit" form="costBatchForm" formaction="/costs/batch-delete" class="btn btn-sm btn-outline-danger d-none" id="costBatchDelete" data-batch-confirm="確定永久刪除選取的 {n} 筆成本？\n成本沒有「已刪除」可還原，刪除後只會留在修改記錄裡。"><i class="bi bi-trash"></i> 刪除選取 (<span>0</span>)</button>' : ''}
+      ${locals.canEdit ? '<button type="button" class="btn btn-sm btn-outline-primary d-none" id="costBatchEdit" data-bs-toggle="modal" data-bs-target="#costBatchEditModal"><i class="bi bi-pencil-square"></i> 批次編輯 (<span>0</span>)</button>' : ''}
+      ${locals.canEdit ? '<button type="submit" form="costBatchForm" formaction="/costs/batch-restore" class="btn btn-sm btn-outline-success d-none" id="costBatchRestore" data-batch-label="還原"><i class="bi bi-arrow-counterclockwise"></i> 還原選取 (<span>0</span>)</button><button type="submit" form="costBatchForm" formaction="/costs/batch-delete" class="btn btn-sm btn-outline-danger d-none" id="costBatchDelete" data-batch-confirm="確定刪除選取的 {n} 筆成本？（刪除後可於「顯示已刪除」還原）"><i class="bi bi-trash"></i> 刪除選取 (<span>0</span>)</button>' : ''}
+      ${typeof showDeleted !== 'undefined' ? (showDeleted ? '<a href="/projects/' + project.id + '#pane-costs" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye-slash"></i> 隱藏已刪除</a>' : '<a href="/projects/' + project.id + '?show_deleted=1#pane-costs" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye"></i> 顯示已刪除</a>') : ''}
       ${locals.canEdit ? '<button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#costModal"><i class="bi bi-plus-lg"></i> 新增成本</button>' : ''}
     </div>
   </div>
@@ -658,7 +668,6 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
         <thead class="table-light">
           <tr>
             ${locals.canEdit ? '<th style="width:36px"><input type="checkbox" class="form-check-input" data-batch-all="cost" title="全選／取消全選"></th>' : ''}
-            <th data-sortkey="text">進項編號</th>
             <th data-sortkey="text">成本名稱</th>
             <th data-sortkey="date">成本日期</th>
             <th data-sortkey="text">成本類型</th>
@@ -669,16 +678,18 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
             <th data-sortkey="text">下單狀態</th>
             <th class="text-end" data-sortkey="num">預估金額</th>
             <th class="text-end" data-sortkey="num">實際金額</th>
+            <th data-sortkey="text" title="含稅：金額含營業稅，系統換算成未稅；免稅：金額不換算">稅別</th>
+            <th class="text-end" data-sortkey="num">預估(未稅)</th>
+            <th class="text-end" data-sortkey="num">實際(未稅)</th>
             <th data-sortkey="text">備註</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           ${typeof costs !== 'undefined' && costs.length ? costs.map(cost => `
-            <tr>
-              ${locals.canEdit ? '<td><input type="checkbox" class="form-check-input" data-batch-row="cost" form="costBatchForm" name="ids" value="' + cost.id + '" data-deleted="0"></td>' : ''}
-              <td>${h(cost.item_code || '-')}</td>
-              <td>${h(cost.item_name || '-')}</td>
+            <tr class="${cost.deleted_at ? 'table-secondary' : ''}">
+              ${locals.canEdit ? '<td><input type="checkbox" class="form-check-input" data-batch-row="cost" form="costBatchForm" name="ids" value="' + cost.id + '" data-deleted="' + (cost.deleted_at ? 1 : 0) + '"></td>' : ''}
+              <td>${h(cost.item_name || '-')}${cost.deleted_at ? ' <span class="badge bg-secondary">已刪除</span>' : ''}</td>
               <td>${cost.cost_date || '-'}</td>
               <td>${h(cost.cost_type || '-')}</td>
               <td>${h(cost.cost_category || '-')}</td>
@@ -688,13 +699,17 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
               <td>${h(cost.order_status || '-')}</td>
               <td class="text-end text-secondary">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(cost.estimated_amount || 0).toLocaleString()}</td>
               <td class="text-end text-danger">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${(cost.actual_amount || 0).toLocaleString()}</td>
+              <td>${cost.tax_included === 0 ? '<span class="badge bg-light text-dark border">免稅</span>' : '含稅'}</td>
+              <td class="text-end text-secondary">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${((cost.estimated_amount_ex_tax != null ? cost.estimated_amount_ex_tax : cost.estimated_amount) || 0).toLocaleString()}</td>
+              <td class="text-end text-danger">${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${((cost.actual_amount_ex_tax != null ? cost.actual_amount_ex_tax : cost.actual_amount) || 0).toLocaleString()}</td>
               <td><small>${h(cost.notes || '')}</small></td>
               <td class="text-end">
-                ${locals.canEdit ? '<button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editCostModal' + cost.id + '"><i class="bi bi-pencil"></i></button>' : ''}
-                ${locals.canEdit ? '<form action="/costs/' + cost.id + '/delete" method="POST" style="display:inline" onsubmit="return confirm(\'確定刪除？\')"><button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>' : ''}
+                ${locals.canEdit && cost.deleted_at ? '<form action="/costs/' + cost.id + '/restore" method="POST" style="display:inline"><button type="submit" class="btn btn-sm btn-outline-success"><i class="bi bi-arrow-counterclockwise"></i> 還原</button></form>' : ''}
+                ${locals.canEdit && !cost.deleted_at ? '<button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editCostModal' + cost.id + '"><i class="bi bi-pencil"></i></button>' : ''}
+                ${locals.canEdit && !cost.deleted_at ? '<form action="/costs/' + cost.id + '/delete" method="POST" style="display:inline" onsubmit="return confirm(\'確定刪除？（刪除後可於「顯示已刪除」還原）\')"><button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>' : ''}
               </td>
             </tr>
-          `).join('') : '<tr><td colspan="14" class="text-center text-muted py-3">尚無成本記錄</td></tr>'}
+          `).join('') : '<tr><td colspan="' + (locals.canEdit ? 16 : 15) + '" class="text-center text-muted py-3">尚無成本記錄</td></tr>'}
         </tbody>
       </table>
     </div>
@@ -703,7 +718,7 @@ ${invoices.filter(inv => !inv.status || inv.status === '有效').map(inv => `
 </div>
 </div>
 
-${locals.canEdit ? `
+${locals.canViewBonus && locals.canEdit ? `
 <div class="tab-content">
 <div class="tab-pane fade" id="pane-bonuses" role="tabpanel">
 <!-- 獎金明細 -->
@@ -813,23 +828,28 @@ ${locals.canEdit ? `
 })();
 </script>
 <script>
-// 發票／收款的批次勾選：勾選後顯示「刪除選取／還原選取」，數量依勾選內容更新；刪除前要確認
+// 發票／收款／成本的批次勾選：勾選後顯示「刪除選取／還原選取」（成本另有「批次編輯」），數量依勾選內容更新；刪除前要確認
 (function () {
   ['inv', 'pay', 'cost'].forEach(function (key) {
     var rows = Array.prototype.slice.call(document.querySelectorAll('[data-batch-row="' + key + '"]'));
     var all = document.querySelector('[data-batch-all="' + key + '"]');
     var delBtn = document.getElementById(key + 'BatchDelete');
     var resBtn = document.getElementById(key + 'BatchRestore');
-    if (!rows.length || !all || !delBtn) return; // 成本沒有還原按鈕（硬刪除）
+    var editBtn = document.getElementById(key + 'BatchEdit'); // 只有成本有批次編輯
+    if (!rows.length || !all || !delBtn || !resBtn) return;
     function refresh() {
       var checked = rows.filter(function (c) { return c.checked; });
       var nDel = checked.filter(function (c) { return c.getAttribute('data-deleted') !== '1'; }).length;
       var nRes = checked.length - nDel;
       delBtn.querySelector('span').textContent = nDel;
+      resBtn.querySelector('span').textContent = nRes;
       delBtn.classList.toggle('d-none', nDel === 0);
-      if (resBtn) {
-        resBtn.querySelector('span').textContent = nRes;
-        resBtn.classList.toggle('d-none', nRes === 0);
+      resBtn.classList.toggle('d-none', nRes === 0);
+      if (editBtn) {
+        editBtn.querySelector('span').textContent = nDel;
+        editBtn.classList.toggle('d-none', nDel === 0);
+        var cnt = document.getElementById('costBatchEditCount');
+        if (cnt) cnt.textContent = nDel;
       }
       all.checked = checked.length > 0 && checked.length === rows.length;
       all.indeterminate = checked.length > 0 && checked.length < rows.length;
@@ -1016,10 +1036,6 @@ ${locals.canEdit ? `
         </div>
         <div class="modal-body">
           <div class="mb-3">
-            <label class="form-label">進項編號</label>
-            <input type="text" name="item_code" class="form-control" placeholder="例如：PRF2509B01V01-C-001">
-          </div>
-          <div class="mb-3">
             <label class="form-label">成本名稱 <span class="text-danger">*</span></label>
             <input type="text" name="item_name" class="form-control" required placeholder="例如：冰水主機">
           </div>
@@ -1082,6 +1098,14 @@ ${locals.canEdit ? `
             <input type="number" name="actual_amount" class="form-control" step="1" min="0" value="0">
           </div>
           <div class="mb-3">
+            <label class="form-label">稅別</label>
+            <select name="tax_included" class="form-select">
+              <option value="1" selected>含稅（金額含營業稅，系統依 ${costTaxRate}% 換算成未稅）</option>
+              <option value="0">免稅／未稅（金額不換算，例如免稅、國外廠商）</option>
+            </select>
+            <div class="form-text">預估金額與實際金額請依此稅別填寫；毛利以未稅成本計算。</div>
+          </div>
+          <div class="mb-3">
             <label class="form-label">備註</label>
             <textarea name="notes" class="form-control" rows="2"></textarea>
           </div>
@@ -1095,8 +1119,84 @@ ${locals.canEdit ? `
   </div>
 </div>
 
-<!-- 編輯成本 Modals -->
-${typeof costs !== 'undefined' && costs.length ? costs.map(cost => `
+<!-- 批次編輯成本 Modal：欄位以 form 屬性關聯到頁面上的批次表單，和勾選的成本一起送出；留空的欄位不會變更 -->
+${locals.canEdit ? `
+<div class="modal fade" id="costBatchEditModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">批次編輯成本（<span id="costBatchEditCount">0</span> 筆）</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3">只會更新有選擇／填寫的欄位，維持「不變更」的欄位保持原樣。金額與成本名稱不在批次編輯範圍，請個別編輯。已刪除的成本會略過。</p>
+        <div class="mb-3">
+          <label class="form-label">成本日期</label>
+          <input type="date" name="cost_date" form="costBatchForm" class="form-control">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">稅別</label>
+          <select name="tax_included" form="costBatchForm" class="form-select">
+            <option value="">-- 不變更 --</option>
+            <option value="1">含稅（依 ${costTaxRate}% 換算未稅）</option>
+            <option value="0">免稅／未稅（金額不換算）</option>
+          </select>
+          <div class="form-text">改稅別會依目前稅率重算這些成本的未稅金額，金額本身不變。</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">成本類型</label>
+          <select name="cost_type" form="costBatchForm" class="form-select">
+            <option value="">-- 不變更 --</option>
+            ${typeof costTypes !== 'undefined' && costTypes ? costTypes.map(t => '<option value="' + h(t.type_name) + '">' + h(t.type_name) + '</option>').join('') : ''}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">費用類別</label>
+          <select name="cost_category" form="costBatchForm" class="form-select">
+            <option value="">-- 不變更 --</option>
+            ${typeof costCategories !== 'undefined' && costCategories ? costCategories.map(t => '<option value="' + h(t.category_name) + '">' + h(t.category_name) + '</option>').join('') : ''}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">廠商</label>
+          <select name="vendor_id" form="costBatchForm" class="form-select">
+            <option value="">-- 不變更 --</option>
+            ${typeof vendors !== 'undefined' && vendors ? vendors.map(v => '<option value="' + v.id + '">' + escapeHtml(v.company_name) + ' (' + escapeHtml(v.customer_code) + ')</option>').join('') : ''}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">付款辦法</label>
+          <select name="payment_method" form="costBatchForm" class="form-select">
+            <option value="">-- 不變更 --</option>
+            ${typeof paymentMethods !== 'undefined' && paymentMethods ? paymentMethods.map(t => '<option value="' + h(t.method_name) + '">' + h(t.method_name) + '</option>').join('') : ''}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">付款條件</label>
+          <select name="payment_term" form="costBatchForm" class="form-select">
+            <option value="">-- 不變更 --</option>
+            ${typeof paymentTerms !== 'undefined' && paymentTerms ? paymentTerms.map(t => '<option value="' + h(t.term_name) + '">' + h(t.term_name) + '</option>').join('') : ''}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">下單狀態</label>
+          <select name="order_status" form="costBatchForm" class="form-select">
+            <option value="">-- 不變更 --</option>
+            ${typeof orderStatuses !== 'undefined' && orderStatuses ? orderStatuses.map(t => '<option value="' + h(t.status_name) + '">' + h(t.status_name) + '</option>').join('') : ''}
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="submit" form="costBatchForm" formaction="/costs/batch-update" class="btn btn-primary">套用到選取的成本</button>
+      </div>
+    </div>
+  </div>
+</div>
+` : ''}
+
+<!-- 編輯成本 Modals（已刪除的成本要先還原才能編輯） -->
+${typeof costs !== 'undefined' && costs.length ? costs.filter(cost => !cost.deleted_at).map(cost => `
 <div class="modal fade" id="editCostModal${cost.id}" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -1106,10 +1206,6 @@ ${typeof costs !== 'undefined' && costs.length ? costs.map(cost => `
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label">進項編號</label>
-            <input type="text" name="item_code" class="form-control" value="${h(cost.item_code || '')}" placeholder="例如：PRF2509B01V01-C-001">
-          </div>
           <div class="mb-3">
             <label class="form-label">成本名稱 <span class="text-danger">*</span></label>
             <input type="text" name="item_name" class="form-control" value="${h(cost.item_name || '')}" required placeholder="例如：冰水主機">
@@ -1174,6 +1270,14 @@ ${typeof costs !== 'undefined' && costs.length ? costs.map(cost => `
             <input type="number" name="actual_amount" class="form-control" value="${cost.actual_amount || 0}" step="1" min="0">
           </div>
           <div class="mb-3">
+            <label class="form-label">稅別</label>
+            <select name="tax_included" class="form-select">
+              <option value="1" ${cost.tax_included === 0 ? '' : 'selected'}>含稅（金額含營業稅，系統依 ${costTaxRate}% 換算成未稅）</option>
+              <option value="0" ${cost.tax_included === 0 ? 'selected' : ''}>免稅／未稅（金額不換算，例如免稅、國外廠商）</option>
+            </select>
+            <div class="form-text">預估金額與實際金額請依此稅別填寫；毛利以未稅成本計算。</div>
+          </div>
+          <div class="mb-3">
             <label class="form-label">備註</label>
             <textarea name="notes" class="form-control" rows="2">${escapeHtml(cost.notes || '')}</textarea>
           </div>
@@ -1188,7 +1292,7 @@ ${typeof costs !== 'undefined' && costs.length ? costs.map(cost => `
 </div>
 `).join('') : ''}
 
-${locals.canEdit ? `
+${locals.canViewBonus && locals.canEdit ? `
 <!-- 新增獎金 Modal -->
 <div class="modal fade" id="bonusModal" tabindex="-1">
   <div class="modal-dialog">
@@ -1353,7 +1457,7 @@ ${payments.map(pay => `
 </div>
 `).join('')}
 
-${locals.canEdit ? `
+${locals.canViewBonus && locals.canEdit ? `
 <!-- 編輯獎金 Modals -->
 ${bonuses.map(b => `
 <div class="modal fade" id="editBonusModal${b.id}" tabindex="-1">

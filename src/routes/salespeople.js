@@ -271,7 +271,8 @@ router.get('/:id', (req, res) => {
   }, req.user);
 
   // 業務的獎金
-  const bonuses = Bonus.findBySalesperson(salesperson.id, selectedYear);
+  // 沒有檢視獎金權限就不查（也不送到畫面）
+  const bonuses = req.user.canViewBonus ? Bonus.findBySalesperson(salesperson.id, selectedYear) : [];
 
   // 業績統計
   const performance = Salesperson.getPerformance(salesperson.id, selectedYear);
