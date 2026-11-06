@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
 const { requireAuth, requireManageSettings } = require('../middleware/auth');
+const { mountReorder } = require('../utils/reorder');
 
 function findActive() {
   return db.prepare(`SELECT * FROM pipeline_statuses WHERE is_active = 1 ORDER BY display_order ASC`).all();
@@ -135,4 +136,7 @@ router.post('/delete/:id', requireAuth, requireManageSettings, (req, res) => {
 
 router.findActive = findActive;
 router.findColorMap = findColorMap;
+// 拖曳／上移下移調整順序（POST /reorder）
+mountReorder(router, 'pipeline_statuses');
+
 module.exports = router;

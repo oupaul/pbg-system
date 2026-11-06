@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
 const { requireAuth, requireManageSettings } = require('../middleware/auth');
+const { mountReorder } = require('../utils/reorder');
 
 // 新增獎金表單用：啟用中的獎金類型，依顯示順序排序
 function findActive() {
@@ -123,4 +124,7 @@ router.post('/delete/:id', requireAuth, requireManageSettings, (req, res) => {
 });
 
 router.findActive = findActive;
+// 拖曳／上移下移調整順序（POST /reorder）
+mountReorder(router, 'bonus_types');
+
 module.exports = router;

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
 const { requireAuth, requireManageSettings } = require('../middleware/auth');
+const { mountReorder } = require('../utils/reorder');
 
 // 取得所有專案類型（僅管理員）
 router.get('/', requireAuth, requireManageSettings, (req, res) => {
@@ -120,7 +121,7 @@ router.post('/update/:id', requireAuth, requireManageSettings, (req, res) => {
   const trimmedName = type_name.trim();
   
   // 檢查類型是否存在
-  const existing = db.prepare('SELECT id, type_name FROM project_types WHERE id = ?').get(id);
+  const existing = db.prepare('SELECT * FROM project_types WHERE id = ?').get(id);
   if (!existing) {
     return res.redirect('/project-types?error=' + encodeURIComponent('類型不存在'));
   }
@@ -203,6 +204,9 @@ router.post('/delete/:id', requireAuth, requireManageSettings, (req, res) => {
     res.redirect('/project-types?error=' + encodeURIComponent('刪除失敗：' + err.message));
   }
 });
+
+// 拖曳／上移下移調整順序（POST /reorder）
+mountReorder(router, 'project_types');
 
 module.exports = router;
 

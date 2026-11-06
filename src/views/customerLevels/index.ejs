@@ -41,10 +41,10 @@ ${success ? `
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
-      <table class="table table-hover mb-0">
+      <table class="table table-hover mb-0" data-reorder-url="/customer-levels/reorder">
         <thead class="table-light">
           <tr>
-            <th style="width: 80px;">排序</th>
+            <th style="width: 150px;">排序</th>
             <th>等級名稱</th>
             <th>顏色標籤</th>
             <th>狀態</th>
@@ -56,8 +56,8 @@ ${success ? `
             const badgePreview = '<span class="badge bg-' + l.badge_color + '">' + escapeHtml(l.level_name) + '</span>';
             const colorDescription = colorNames[l.badge_color] || l.badge_color;
             return `
-            <tr>
-              <td>${l.display_order}</td>
+            <tr data-id="${l.id}">
+              <td class="reorder-cell"></td>
               <td>${escapeHtml(l.level_name)}</td>
               <td>${badgePreview} <small class="text-muted">(${colorDescription})</small></td>
               <td>${l.is_active === 1 ? '<span class="badge bg-success">啟用</span>' : '<span class="badge bg-secondary">停用</span>'}</td>
@@ -103,11 +103,6 @@ ${success ? `
               <span class="badge bg-secondary ms-2" id="addColorPreview">範例</span>
             </div>
           </div>
-          <div class="mb-3">
-            <label class="form-label">顯示順序</label>
-            <input type="number" name="display_order" class="form-control" min="0">
-            <small class="form-text text-muted">數字越小越靠前，留空則排在最後</small>
-          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
@@ -142,10 +137,6 @@ ${success ? `
             </div>
           </div>
           <div class="mb-3">
-            <label class="form-label">顯示順序</label>
-            <input type="number" name="display_order" id="editLevelOrder" class="form-control" min="0">
-          </div>
-          <div class="mb-3">
             <div class="form-check form-switch">
               <input class="form-check-input" type="checkbox" name="is_active" id="editLevelActive" value="1">
               <label class="form-check-label" for="editLevelActive">啟用</label>
@@ -167,7 +158,6 @@ function editLevel(id, name, color, order, isActive) {
   document.getElementById('editLevelForm').action = '/customer-levels/update/' + id;
   document.getElementById('editLevelName').value = name;
   document.getElementById('editBadgeColor').value = color;
-  document.getElementById('editLevelOrder').value = order;
   document.getElementById('editLevelActive').checked = isActive === 1;
   updateColorPreview('edit');
   new bootstrap.Modal(document.getElementById('editLevelModal')).show();
@@ -185,4 +175,5 @@ document.addEventListener('DOMContentLoaded', function() {
   updateColorPreview('add');
 });
 </script>
+<script src="/js/reorder-table.js"></script>
 ` }) %>

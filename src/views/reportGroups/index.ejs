@@ -33,12 +33,12 @@
     bodyHtml += '    <div class="alert alert-info">目前尚無報表群組，請點擊「新增群組」按鈕新增。</div>';
   } else {
     bodyHtml += '    <div class="table-responsive">';
-    bodyHtml += '      <table class="table table-hover">';
-    bodyHtml += '        <thead class="table-light"><tr><th style="width:80px">排序</th><th>群組名稱</th><th style="width:200px">操作</th></tr></thead>';
+    bodyHtml += '      <table class="table table-hover" data-reorder-url="/report-groups/reorder">';
+    bodyHtml += '        <thead class="table-light"><tr><th style="width:150px">排序</th><th>群組名稱</th><th style="width:200px">操作</th></tr></thead>';
     bodyHtml += '        <tbody>';
     localGroups.forEach(g => {
-      bodyHtml += '          <tr>';
-      bodyHtml += '            <td>' + (g.display_order ?? 0) + '</td>';
+      bodyHtml += '          <tr data-id="' + g.id + '">';
+      bodyHtml += '            <td class="reorder-cell"></td>';
       bodyHtml += '            <td><strong>' + escapeHtml(g.name || '') + '</strong></td>';
       bodyHtml += '            <td>';
       bodyHtml += '              <button type="button" class="btn btn-sm btn-outline-primary" onclick="editGroup(' + g.id + ', \'' + jsAttr(g.name || '') + '\', ' + (g.display_order ?? 0) + ')"><i class="bi bi-pencil"></i> 編輯</button> ';
@@ -60,10 +60,6 @@
   bodyHtml += '        <div class="mb-3"><label class="form-label">群組名稱 <span class="text-danger">*</span></label>';
   bodyHtml += '          <input type="text" name="name" class="form-control" required maxlength="100" placeholder="例：某客戶系列、同案分批">';
   bodyHtml += '        </div>';
-  bodyHtml += '        <div class="mb-3"><label class="form-label">顯示順序</label>';
-  bodyHtml += '          <input type="number" name="display_order" class="form-control" min="0" value="0">';
-  bodyHtml += '          <small class="form-text text-muted">數字越小越靠前</small>';
-  bodyHtml += '        </div>';
   bodyHtml += '      </div>';
   bodyHtml += '      <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button type="submit" class="btn btn-primary">新增</button></div>';
   bodyHtml += '    </form>';
@@ -77,9 +73,6 @@
   bodyHtml += '        <div class="mb-3"><label class="form-label">群組名稱 <span class="text-danger">*</span></label>';
   bodyHtml += '          <input type="text" name="name" id="editName" class="form-control" required maxlength="100">';
   bodyHtml += '        </div>';
-  bodyHtml += '        <div class="mb-3"><label class="form-label">顯示順序</label>';
-  bodyHtml += '          <input type="number" name="display_order" id="editOrder" class="form-control" min="0" value="0">';
-  bodyHtml += '        </div>';
   bodyHtml += '      </div>';
   bodyHtml += '      <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button type="submit" class="btn btn-primary">儲存</button></div>';
   bodyHtml += '    </form>';
@@ -89,9 +82,9 @@
   bodyHtml += 'function editGroup(id, name, order) {';
   bodyHtml += '  document.getElementById("editForm").action = "/report-groups/update/" + id;';
   bodyHtml += '  document.getElementById("editName").value = name;';
-  bodyHtml += '  document.getElementById("editOrder").value = order;';
   bodyHtml += '  new bootstrap.Modal(document.getElementById("editModal")).show();';
   bodyHtml += '}';
   bodyHtml += '</script>';
+  bodyHtml += '<script src="/js/reorder-table.js"></script>';
 %>
 <%- include('../layout', { title: '報表群組管理', body: bodyHtml }) %>

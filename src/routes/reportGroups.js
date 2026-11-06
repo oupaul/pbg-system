@@ -6,6 +6,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
 const { requireAuth, requireManageSettings } = require('../middleware/auth');
+const { mountReorder } = require('../utils/reorder');
 
 router.get('/', requireAuth, requireManageSettings, (req, res) => {
   try {
@@ -66,7 +67,7 @@ router.post('/update/:id', requireAuth, requireManageSettings, (req, res) => {
     return res.redirect('/report-groups?error=' + encodeURIComponent('群組名稱不能為空'));
   }
 
-  const existing = db.prepare('SELECT id, name FROM report_groups WHERE id = ?').get(id);
+  const existing = db.prepare('SELECT * FROM report_groups WHERE id = ?').get(id);
   if (!existing) {
     return res.redirect('/report-groups?error=' + encodeURIComponent('群組不存在'));
   }
@@ -113,5 +114,8 @@ router.post('/delete/:id', requireAuth, requireManageSettings, (req, res) => {
     res.redirect('/report-groups?error=' + encodeURIComponent('刪除失敗：' + err.message));
   }
 });
+
+// 拖曳／上移下移調整順序（POST /reorder）
+mountReorder(router, 'report_groups');
 
 module.exports = router;

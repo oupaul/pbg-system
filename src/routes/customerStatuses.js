@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
 const { requireAuth, requireManageSettings } = require('../middleware/auth');
+const { mountReorder } = require('../utils/reorder');
 
 // 客戶詳情/列表表單用：啟用中的客戶往來狀態，依顯示順序排序
 function findActive() {
@@ -141,4 +142,7 @@ router.post('/delete/:id', requireAuth, requireManageSettings, (req, res) => {
 
 router.findActive = findActive;
 router.findColorMap = findColorMap;
+// 拖曳／上移下移調整順序（POST /reorder）
+mountReorder(router, 'customer_statuses');
+
 module.exports = router;

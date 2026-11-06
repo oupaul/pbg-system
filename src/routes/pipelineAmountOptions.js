@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
 const { requireAuth, requireManageSettings } = require('../middleware/auth');
+const { mountReorder } = require('../utils/reorder');
 
 // 銷售機會表單用：啟用中的金額選項，依顯示順序排序
 function findActive() {
@@ -110,4 +111,7 @@ router.post('/delete/:id', requireAuth, requireManageSettings, (req, res) => {
 });
 
 router.findActive = findActive;
+// 拖曳／上移下移調整順序（POST /reorder）
+mountReorder(router, 'pipeline_amount_options');
+
 module.exports = router;

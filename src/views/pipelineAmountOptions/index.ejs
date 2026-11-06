@@ -35,10 +35,10 @@ ${success ? `
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
-      <table class="table table-hover mb-0">
+      <table class="table table-hover mb-0" data-reorder-url="/pipeline-amount-options/reorder">
         <thead class="table-light">
           <tr>
-            <th style="width: 80px;">排序</th>
+            <th style="width: 150px;">排序</th>
             <th>金額</th>
             <th>狀態</th>
             <th style="width: 200px;">操作</th>
@@ -46,8 +46,8 @@ ${success ? `
         </thead>
         <tbody>
           ${options.map(o => `
-            <tr>
-              <td>${o.display_order}</td>
+            <tr data-id="${o.id}">
+              <td class="reorder-cell"></td>
               <td>${typeof currencySymbol !== 'undefined' ? currencySymbol : '$'}${Number(o.amount).toLocaleString()}</td>
               <td>${o.is_active === 1 ? '<span class="badge bg-success">啟用</span>' : '<span class="badge bg-secondary">停用</span>'}</td>
               <td>
@@ -81,11 +81,6 @@ ${success ? `
             <label class="form-label">金額 <span class="text-danger">*</span></label>
             <input type="number" name="amount" class="form-control" min="1" step="1" required>
           </div>
-          <div class="mb-3">
-            <label class="form-label">顯示順序</label>
-            <input type="number" name="display_order" class="form-control" min="0">
-            <small class="form-text text-muted">數字越小越靠前，留空則排在最後</small>
-          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
@@ -110,10 +105,6 @@ ${success ? `
             <input type="number" name="amount" id="editOptionAmount" class="form-control" min="1" step="1" required>
           </div>
           <div class="mb-3">
-            <label class="form-label">顯示順序</label>
-            <input type="number" name="display_order" id="editOptionOrder" class="form-control" min="0">
-          </div>
-          <div class="mb-3">
             <div class="form-check form-switch">
               <input class="form-check-input" type="checkbox" name="is_active" id="editOptionActive" value="1">
               <label class="form-check-label" for="editOptionActive">啟用</label>
@@ -134,9 +125,9 @@ ${success ? `
 function editOption(id, amount, order, isActive) {
   document.getElementById('editOptionForm').action = '/pipeline-amount-options/update/' + id;
   document.getElementById('editOptionAmount').value = amount;
-  document.getElementById('editOptionOrder').value = order;
   document.getElementById('editOptionActive').checked = isActive === 1;
   new bootstrap.Modal(document.getElementById('editOptionModal')).show();
 }
 </script>
+<script src="/js/reorder-table.js"></script>
 ` }) %>

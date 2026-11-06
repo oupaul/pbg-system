@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
 const { requireAuth, requireManageSettings } = require('../middleware/auth');
+const { mountReorder } = require('../utils/reorder');
 
 function findActive() {
   return db.prepare(`SELECT * FROM activity_types WHERE is_active = 1 ORDER BY display_order ASC, type_name ASC`).all();
@@ -73,7 +74,7 @@ router.post('/update/:id', requireAuth, requireManageSettings, (req, res) => {
   const { id } = req.params;
   const { type_name, badge_color, display_order, is_active } = req.body;
 
-  const existing = db.prepare('SELECT id, type_name FROM activity_types WHERE id = ?').get(id);
+  const existing = db.prepare('SELECT * FROM activity_types WHERE id = ?').get(id);
   if (!existing) {
     return res.redirect('/activity-types?error=' + encodeURIComponent('類型不存在'));
   }
@@ -142,4 +143,7 @@ router.post('/delete/:id', requireAuth, requireManageSettings, (req, res) => {
 
 router.findActive = findActive;
 router.findColorMap = findColorMap;
+// 拖曳／上移下移調整順序（POST /reorder）
+mountReorder(router, 'activity_types');
+
 module.exports = router;

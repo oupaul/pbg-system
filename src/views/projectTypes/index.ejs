@@ -51,10 +51,10 @@
     bodyHtml += '    <div class="alert alert-info">目前尚無專案類型，請點擊「新增類型」按鈕新增。</div>';
   } else {
     bodyHtml += '    <div class="table-responsive">';
-    bodyHtml += '      <table class="table table-hover">';
+    bodyHtml += '      <table class="table table-hover" data-reorder-url="/project-types/reorder">';
     bodyHtml += '        <thead class="table-light">';
     bodyHtml += '          <tr>';
-    bodyHtml += '            <th style="width: 60px;">排序</th>';
+    bodyHtml += '            <th style="width: 150px;">排序</th>';
     bodyHtml += '            <th>類型名稱</th>';
     bodyHtml += '            <th>顏色標籤</th>';
     bodyHtml += '            <th>毛利警示閾值(%)</th>';
@@ -77,8 +77,8 @@
       const badgePreview = '<span class="badge bg-' + type.badge_color + '">' + escapeHtml(type.type_name) + '</span>';
       const colorDescription = colorNames[type.badge_color] || type.badge_color;
       
-      bodyHtml += '          <tr>';
-      bodyHtml += '            <td>' + type.display_order + '</td>';
+      bodyHtml += '          <tr data-id="' + type.id + '">';
+      bodyHtml += '            <td class="reorder-cell"></td>';
       bodyHtml += '            <td><strong>' + escapeHtml(type.type_name) + '</strong></td>';
       bodyHtml += '            <td>' + badgePreview + ' <small class="text-muted">(' + colorDescription + ')</small></td>';
       bodyHtml += '            <td>' + (type.alert_margin_threshold != null && type.alert_margin_threshold !== '' ? type.alert_margin_threshold + '%' : '<span class="text-muted">-</span>') + '</td>';
@@ -132,11 +132,6 @@
   bodyHtml += '              <small class="text-muted">預覽：</small>';
   bodyHtml += '              <span class="badge bg-info ms-2" id="addColorPreview">範例</span>';
   bodyHtml += '            </div>';
-  bodyHtml += '          </div>';
-  bodyHtml += '          <div class="mb-3">';
-  bodyHtml += '            <label class="form-label">顯示順序</label>';
-  bodyHtml += '            <input type="number" name="display_order" class="form-control" min="0" value="0">';
-  bodyHtml += '            <small class="form-text text-muted">數字越小越靠前，相同數字按名稱排序</small>';
   bodyHtml += '          </div>';
   bodyHtml += '          <div class="mb-3">';
   bodyHtml += '            <label class="form-label">毛利警示閾值(%)</label>';
@@ -195,11 +190,6 @@
   bodyHtml += '            </div>';
   bodyHtml += '          </div>';
   bodyHtml += '          <div class="mb-3">';
-  bodyHtml += '            <label class="form-label">顯示順序</label>';
-  bodyHtml += '            <input type="number" name="display_order" id="editDisplayOrder" class="form-control" min="0" value="0">';
-  bodyHtml += '            <small class="form-text text-muted">數字越小越靠前，相同數字按名稱排序</small>';
-  bodyHtml += '          </div>';
-  bodyHtml += '          <div class="mb-3">';
   bodyHtml += '            <label class="form-label">毛利警示閾值(%)</label>';
   bodyHtml += '            <input type="number" name="alert_margin_threshold" id="editAlertMarginThreshold" class="form-control" min="0" max="100" step="0.1" placeholder="留空則不警示">';
   bodyHtml += '            <small class="form-text text-muted">毛利率低於此值時，該類型下的「每個專案」在毛利分析專案明細顯示警示</small>';
@@ -243,7 +233,6 @@
   bodyHtml += '  document.getElementById("editTypeForm").action = "/project-types/update/" + id;';
   bodyHtml += '  document.getElementById("editTypeName").value = name;';
   bodyHtml += '  document.getElementById("editBadgeColor").value = color;';
-  bodyHtml += '  document.getElementById("editDisplayOrder").value = order;';
   bodyHtml += '  document.getElementById("editIsActive").checked = isActive === 1;';
   bodyHtml += '  document.getElementById("editAlertMarginThreshold").value = (alertThreshold != null && alertThreshold !== \'\' && !isNaN(alertThreshold)) ? alertThreshold : \'\';';
   bodyHtml += '  var dashEl = document.getElementById("editShowInDashboard");';
@@ -271,6 +260,7 @@
   bodyHtml += '  }';
   bodyHtml += '});';
   bodyHtml += '</script>';
+  bodyHtml += '<script src="/js/reorder-table.js"></script>';
 %>
 
 <%- include('../layout', { title: '專案類型管理', body: bodyHtml }) %>

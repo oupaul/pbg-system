@@ -41,10 +41,10 @@ ${success ? `
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
-      <table class="table table-hover mb-0">
+      <table class="table table-hover mb-0" data-reorder-url="/customer-statuses/reorder">
         <thead class="table-light">
           <tr>
-            <th style="width: 80px;">排序</th>
+            <th style="width: 150px;">排序</th>
             <th>狀態名稱</th>
             <th>顏色標籤</th>
             <th>狀態</th>
@@ -56,8 +56,8 @@ ${success ? `
             const badgePreview = '<span class="badge bg-' + s.badge_color + '">' + escapeHtml(s.status_name) + '</span>';
             const colorDescription = colorNames[s.badge_color] || s.badge_color;
             return `
-            <tr>
-              <td>${s.display_order}</td>
+            <tr data-id="${s.id}">
+              <td class="reorder-cell"></td>
               <td>${escapeHtml(s.status_name)}</td>
               <td>${badgePreview} <small class="text-muted">(${colorDescription})</small></td>
               <td>${s.is_active === 1 ? '<span class="badge bg-success">啟用</span>' : '<span class="badge bg-secondary">停用</span>'}</td>
@@ -103,11 +103,6 @@ ${success ? `
               <span class="badge bg-secondary ms-2" id="addColorPreview">範例</span>
             </div>
           </div>
-          <div class="mb-3">
-            <label class="form-label">顯示順序</label>
-            <input type="number" name="display_order" class="form-control" min="0">
-            <small class="form-text text-muted">數字越小越靠前，留空則排在最後</small>
-          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
@@ -142,10 +137,6 @@ ${success ? `
             </div>
           </div>
           <div class="mb-3">
-            <label class="form-label">顯示順序</label>
-            <input type="number" name="display_order" id="editStatusOrder" class="form-control" min="0">
-          </div>
-          <div class="mb-3">
             <div class="form-check form-switch">
               <input class="form-check-input" type="checkbox" name="is_active" id="editStatusActive" value="1">
               <label class="form-check-label" for="editStatusActive">啟用</label>
@@ -167,7 +158,6 @@ function editStatus(id, name, color, order, isActive) {
   document.getElementById('editStatusForm').action = '/customer-statuses/update/' + id;
   document.getElementById('editStatusName').value = name;
   document.getElementById('editBadgeColor').value = color;
-  document.getElementById('editStatusOrder').value = order;
   document.getElementById('editStatusActive').checked = isActive === 1;
   updateColorPreview('edit');
   new bootstrap.Modal(document.getElementById('editStatusModal')).show();
@@ -185,4 +175,5 @@ document.addEventListener('DOMContentLoaded', function() {
   updateColorPreview('add');
 });
 </script>
+<script src="/js/reorder-table.js"></script>
 ` }) %>

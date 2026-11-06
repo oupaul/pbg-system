@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../models/db');
 const { requireAuth, requireManageSettings } = require('../middleware/auth');
+const { mountReorder } = require('../utils/reorder');
 
 function findActive() {
   return db.prepare(`SELECT * FROM payment_terms WHERE is_active = 1 ORDER BY display_order ASC, term_name ASC`).all();
@@ -74,7 +75,7 @@ router.post('/update/:id', requireAuth, requireManageSettings, (req, res) => {
   const { id } = req.params;
   const { term_name, badge_color, display_order, is_active } = req.body;
 
-  const existing = db.prepare('SELECT id, term_name FROM payment_terms WHERE id = ?').get(id);
+  const existing = db.prepare('SELECT * FROM payment_terms WHERE id = ?').get(id);
   if (!existing) {
     return res.redirect('/payment-terms?error=' + encodeURIComponent('付款條件不存在'));
   }
@@ -141,4 +142,7 @@ router.post('/delete/:id', requireAuth, requireManageSettings, (req, res) => {
 
 router.findActive = findActive;
 router.findColorMap = findColorMap;
+// 拖曳／上移下移調整順序（POST /reorder）
+mountReorder(router, 'payment_terms');
+
 module.exports = router;
